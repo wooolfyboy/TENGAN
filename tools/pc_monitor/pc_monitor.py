@@ -389,8 +389,24 @@ class NowPlaying:
                 except Exception:
                     return -1
         pos, dur = secs(tl.position), secs(tl.end_time)
+        # приложение обновляет позицию редко; Windows помнит, КОГДА она была записана —
+        # досчитываем, сколько прошло с тех пор (иначе время на палке отстаёт)
+        if playing and pos >= 0:
+            try:
+                import datetime as _dt
+                upd = tl.last_updated_time
+                if upd is not None and upd.year > 2000:
+                    if upd.tzinfo is None:
+                        upd = upd.replace(tzinfo=_dt.timezone.utc)
+                    late = (_dt.datetime.now(_dt.timezone.utc) - upd).total_seconds()
+                    if 0 < late < 3600:
+                        pos += int(late)
+            except Exception:
+                pass
         if dur <= 0:
             pos = dur = -1
+        elif pos > dur:
+            pos = dur
         title = screen_text(props.title, 90)
         artist = screen_text(props.artist or props.album_artist, 70)
         if not title and not artist:
