@@ -16,17 +16,13 @@
 #include "core/theme.h"
 #include "core/ui.h"
 #include "core/menu.h"
+#include "core/psram.h"
 
 enum { G_TESS = 0, G_TORUS, G_LIFE, G_PEND, G_NUM };
 static int   g_gal = 0;
 static float s_speed = 1.0f;                // множитель скорости (колесо)
 static float s_phase = 0;                   // «время» анимации с учётом скорости
 static uint32_t s_lastMs = 0;
-
-static uint16_t shade(uint16_t c, int pct) {
-  uint8_t r = ((c >> 11) & 0x1F) << 3, g = ((c >> 5) & 0x3F) << 2, b = (c & 0x1F) << 3;
-  return tft.color565(r * pct / 100, g * pct / 100, b * pct / 100);
-}
 
 static void advance(uint32_t now) {
   uint32_t dt = s_lastMs ? min<uint32_t>(now - s_lastMs, 100) : 33;
@@ -68,7 +64,7 @@ void drawTesseract(uint32_t now) {
   // след: прошлые кадры всё тусклее
   for (int f = 0; f < s_trailN; f++) {
     int slot = (s_trailHead - 1 - f + TS_TRAIL * 2) % TS_TRAIL;
-    uint16_t col = shade(C_ACC(), 30 - f * 9);
+    uint16_t col = scale565(C_ACC(), 30 - f * 9);
     for (int i = 0; i < 16; i++)
       for (int b = 0; b < 4; b++) {
         int j = i ^ (1 << b);
@@ -83,7 +79,7 @@ void drawTesseract(uint32_t now) {
       float w = (pw[i] + pw[j]) * 0.5f;                   // -1.4 .. 1.4
       uint16_t col = heatV(constrain(0.35f + w * 0.35f, 0.1f, 1.0f));
       spr.drawLine(px[i], py[i], px[j], py[j], col);
-      spr.drawLine(px[i] + 1, py[i], px[j] + 1, py[j], shade(col, 45));   // «толщина»
+      spr.drawLine(px[i] + 1, py[i], px[j] + 1, py[j], scale565(col, 45));   // «толщина»
     }
   for (int i = 0; i < 16; i++) {
     int r = pw[i] > 0.3f ? 3 : 2;
@@ -104,9 +100,12 @@ void drawTesseract(uint32_t now) {
 #define TO_U 56
 #define TO_V 18
 struct TPt { int16_t x, y; float z; float lum; };
-static TPt s_pts[TO_U * TO_V];
+static TPt*     s_pts = nullptr;                          // ~12 КБ — во внешней памяти (PSRAM)
+static int16_t* s_order = nullptr;
 
 void drawTorus(uint32_t now) {
+  if (!s_pts) { s_pts = psAlloc<TPt>(TO_U * TO_V); s_order = psAlloc<int16_t>(TO_U * TO_V); }
+  if (!s_pts || !s_order) return;
   const int W = spr.width();
   g_fastFrame = true;
   advance(now);
@@ -137,7 +136,7 @@ void drawTorus(uint32_t now) {
       p.z = z; p.lum = L;
     }
   }
-  static int16_t order[TO_U * TO_V];
+  int16_t* order = s_order;
   for (int i = 0; i < n; i++) order[i] = i;
   std::sort(order, order + n, [](int16_t a, int16_t b) { return s_pts[a].z > s_pts[b].z; });   // дальние раньше
   for (int k = 0; k < n; k++) {
@@ -162,8 +161,10 @@ void drawTorus(uint32_t now) {
 #define LF_CELL 4
 #define LF_W 76
 #define LF_H 32
-static uint8_t  s_lf[LF_H][LF_W], s_lfN[LF_H][LF_W];   // возраст живой клетки (0 — мертва)
-static uint8_t  s_glow[LF_H][LF_W];                      // след умерших
+// поля — во внешней памяти (PSRAM), выделяются при первом открытии «Жизни»
+static uint8_t  (*s_lf)[LF_W] = nullptr, (*s_lfN)[LF_W] = nullptr;   // возраст живой клетки (0 — мертва)
+static uint8_t  (*s_glow)[LF_W] = nullptr;                            // след умерших
+static const size_t LF_BYTES = LF_H * LF_W;
 static uint32_t s_lfGen = 0, s_lfLast = 0, s_lfStill = 0, s_lfRng = 12345;
 static int      s_lfPop = 0, s_lfPrevPop = -1;
 static uint32_t s_lfHash[8];
@@ -183,7 +184,8 @@ static void lfDrop() {                                   // подбросить
 }
 
 static void lfSeed() {
-  memset(s_lf, 0, sizeof(s_lf)); memset(s_glow, 0, sizeof(s_glow));
+  if (!s_lf) return;
+  memset(s_lf, 0, LF_BYTES); memset(s_glow, 0, LF_BYTES);
   s_lfRng ^= millis() | 1;
   for (int y = 0; y < LF_H; y++) for (int x = 0; x < LF_W; x++) s_lf[y][x] = (lfRand() % 100) < 28;
   s_lfGen = 0; s_lfStill = 0; memset(s_lfHash, 0, sizeof(s_lfHash));
@@ -207,7 +209,7 @@ static void lfStep() {
       if (nv) { pop++; hash = (hash ^ (y * LF_W + x)) * 16777619u; }
     }
   }
-  memcpy(s_lf, s_lfN, sizeof(s_lf));
+  memcpy(s_lf, s_lfN, LF_BYTES);
   s_lfGen++;
   // застой: повтор узора (мигалки с периодом до 8) или население почти не меняется
   bool repeat = false;
@@ -220,6 +222,13 @@ static void lfStep() {
 }
 
 void drawLife(uint32_t now) {
+  if (!s_lf) {
+    s_lf   = (uint8_t(*)[LF_W])psAlloc<uint8_t>(LF_BYTES);
+    s_lfN  = (uint8_t(*)[LF_W])psAlloc<uint8_t>(LF_BYTES);
+    s_glow = (uint8_t(*)[LF_W])psAlloc<uint8_t>(LF_BYTES);
+    s_lfGen = 0; s_lfPop = 0;
+  }
+  if (!s_lf || !s_lfN || !s_glow) return;
   g_fastFrame = true;
   if (s_lfGen == 0 && s_lfPop == 0) lfSeed();
   uint32_t every = s_speed > 0 ? (uint32_t)(110 / s_speed) : 0;
@@ -234,7 +243,7 @@ void drawLife(uint32_t now) {
         uint16_t c = a == 1 ? C_HOT() : heatV(max(0.3f, 0.9f - a * 0.03f));   // рождённая — белая, стареет к бирюзе
         spr.fillRect(px, py, LF_CELL - 1, LF_CELL - 1, c);
       } else if (s_glow[y][x]) {
-        spr.fillRect(px, py, LF_CELL - 1, LF_CELL - 1, shade(C_ACC(), s_glow[y][x] * 30 / 255));
+        spr.fillRect(px, py, LF_CELL - 1, LF_CELL - 1, scale565(C_ACC(), s_glow[y][x] * 30 / 255));
       }
     }
   char buf[40];
@@ -305,7 +314,7 @@ void drawPendulum(uint32_t now) {
   for (int i = 1; i < s_tN; i++) {
     int a = (s_tHead - s_tN + i - 1 + PD_TRAIL) % PD_TRAIL, b = (a + 1) % PD_TRAIL;
     int age = 100 * i / s_tN;                            // 0 — самая старая
-    uint16_t c = shade(heatV(0.35f + 0.65f * s_tv[b] / 255.0f), 12 + age * 88 / 100);
+    uint16_t c = scale565(heatV(0.35f + 0.65f * s_tv[b] / 255.0f), 12 + age * 88 / 100);
     spr.drawLine(s_tx[a], s_ty[a], s_tx[b], s_ty[b], c);
   }
   // маятник

@@ -57,7 +57,8 @@ int  g_gMode = 0, g_band = 1;
 bool g_ccOk = true, g_ccTried = true;
 uint8_t g_ccVersion = 0x14;
 int8_t  g_spCur[SP_N], g_spPeak[SP_N];
-uint8_t g_wf[WF_ROWS][SP_N];
+static uint8_t s_wfMem[WF_ROWS][SP_N];
+uint8_t (*g_wf)[SP_N] = s_wfMem;
 int     g_wfHead = 0, g_wfCount = 0;
 float spFreq(int i) { const Band& b = BANDS[g_band]; return b.lo + (b.hi - b.lo) * i / (SP_N - 1); }
 int8_t   g_mon[MON_N];

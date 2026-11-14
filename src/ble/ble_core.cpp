@@ -7,6 +7,7 @@
 // ============================================================
 #include <NimBLEDevice.h>
 #include <algorithm>
+#include "core/jsonutil.h"
 #include "core/timeutil.h"
 #include "ble/ble.h"
 #include "ble/ble_model.h"
@@ -416,16 +417,6 @@ const Section bleSection = {
 };
 
 // ---------- для веб-страницы: устройства в JSON ----------
-static void jsonStr(String& o, const char* s) {
-  o += '"';
-  for (; *s; s++) {
-    char c = *s;
-    if (c == '"' || c == '\\') { o += '\\'; o += c; }
-    else if ((uint8_t)c < 0x20) o += ' ';
-    else o += c;
-  }
-  o += '"';
-}
 
 void bleJson(String& o) {
   uint32_t now = millis();

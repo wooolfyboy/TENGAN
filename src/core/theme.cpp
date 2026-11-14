@@ -57,6 +57,12 @@ static const GFXfont* fontFor(int size) {
   }
 }
 
+uint16_t scale565(uint16_t c, int pct) {
+  pct = constrain(pct, 0, 100);
+  uint8_t r = ((c >> 11) & 0x1F) << 3, g = ((c >> 5) & 0x3F) << 2, b = (c & 0x1F) << 3;
+  return tft.color565(r * pct / 100, g * pct / 100, b * pct / 100);
+}
+
 void txt(const char* s, int x, int y, int size) {
   const GFXfont* f = fontFor(size);
   if (f) { spr.setFreeFont(f); spr.drawString(s, x, y); spr.setFreeFont(nullptr); }

@@ -17,6 +17,7 @@
 #include "core/theme.h"
 #include "core/leds.h"
 #include "core/menu.h"
+#include "core/psram.h"
 
 
 int  g_gMode = 0;
@@ -27,7 +28,7 @@ int g_band = 1;
 
 // ---------- SPECTRUM ----------
 int8_t  g_spCur[SP_N], g_spPeak[SP_N];
-uint8_t g_wf[WF_ROWS][SP_N];
+uint8_t (*g_wf)[SP_N] = nullptr;
 int     g_wfHead = 0, g_wfCount = 0;
 int     g_spIdx = 0;
 int8_t  g_spRow[SP_N];
@@ -35,6 +36,7 @@ int8_t  g_spRow[SP_N];
 float spFreq(int i) { const Band& b = BANDS[g_band]; return b.lo + (b.hi - b.lo) * i / (SP_N - 1); }
 
 static void spReset() {
+  if (!g_wf) g_wf = (uint8_t(*)[SP_N])psAlloc<uint8_t>(WF_ROWS * SP_N);
   for (int i = 0; i < SP_N; i++) { g_spCur[i] = -110; g_spPeak[i] = -110; g_spRow[i] = -110; }
   g_wfHead = 0; g_wfCount = 0; g_spIdx = 0;
 }
@@ -48,7 +50,7 @@ static void spTick() {
     if (r > g_spPeak[g_spIdx]) g_spPeak[g_spIdx] = r;
     if (++g_spIdx >= SP_N) {
       g_spIdx = 0;
-      for (int i = 0; i < SP_N; i++) {         // строка водопада
+      for (int i = 0; i < SP_N && g_wf; i++) {   // строка водопада
         g_wf[g_wfHead][i] = (uint8_t)constrain(g_spRow[i] + 120, 0, 110);
         if (g_spPeak[i] > -110) g_spPeak[i]--; // пики медленно оседают
       }

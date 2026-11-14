@@ -24,7 +24,7 @@ extern uint8_t g_ccVersion;
 #define SP_N 96
 #define WF_ROWS 56
 extern int8_t  g_spCur[SP_N], g_spPeak[SP_N];
-extern uint8_t g_wf[WF_ROWS][SP_N];          // «водопад»: dBm + 120
+extern uint8_t (*g_wf)[SP_N];                // «водопад»: dBm + 120 (WF_ROWS строк, во внешней памяти)
 extern int     g_wfHead, g_wfCount;
 float spFreq(int i);
 

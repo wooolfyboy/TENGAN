@@ -23,6 +23,7 @@
 #include <Arduino.h>
 
 uint16_t C(uint8_t r, uint8_t g, uint8_t b);   // цвет, приведённый к палитре
+uint16_t scale565(uint16_t c, int pct);         // тот же цвет темнее: pct% яркости (100 — как есть)
 uint16_t C_BG();
 uint16_t C_HOT();
 uint16_t C_ALERT();

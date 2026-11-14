@@ -16,6 +16,7 @@
 #include <qrcode.h>
 #include <Update.h>
 #include <esp_ota_ops.h>
+#include "core/jsonutil.h"
 #include "web/web.h"
 #include "web/web_page.h"
 #include "ble/ble.h"
@@ -83,16 +84,6 @@ static const char* encStr(wifi_auth_mode_t e) {
     default: return "?";
   }
 }
-static void jsonAppend(String& o, const String& s) {
-  o += '"';
-  for (size_t i = 0; i < s.length(); i++) {
-    char c = s[i];
-    if (c == '"' || c == '\\') { o += '\\'; o += c; }
-    else if ((uint8_t)c < 0x20) o += ' ';
-    else o += c;
-  }
-  o += '"';
-}
 
 static void scanCollect() {
   int n = WiFi.scanComplete();
@@ -104,9 +95,9 @@ static void scanCollect() {
     uint8_t* b = WiFi.BSSID(i);
     char mac[18]; snprintf(mac, sizeof(mac), "%02X:%02X:%02X:%02X:%02X:%02X", b[0], b[1], b[2], b[3], b[4], b[5]);
     const char* v = ouiName(b);                   // производитель по первым байтам адреса
-    o += "{\"s\":"; jsonAppend(o, WiFi.SSID(i));
+    o += "{\"s\":"; jsonStr(o, WiFi.SSID(i));
     o += ",\"b\":\""; o += mac; o += '"';
-    o += ",\"v\":"; jsonAppend(o, v ? v : "");
+    o += ",\"v\":"; jsonStr(o, v ? v : "");
     o += ",\"r\":"; o += WiFi.RSSI(i);
     o += ",\"c\":"; o += WiFi.channel(i);
     o += ",\"e\":\""; o += encStr(WiFi.encryptionType(i)); o += "\"}";

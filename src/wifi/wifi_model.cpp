@@ -61,11 +61,6 @@ const char* genName(uint8_t g) {
 }
 
 
-uint16_t dimColor(uint16_t c, int pct) {
-  uint8_t r = ((c >> 11) & 0x1F) << 3, g = ((c >> 5) & 0x3F) << 2, b = (c & 0x1F) << 3;
-  return C(r * pct / 100, g * pct / 100, b * pct / 100);
-}
-
 const char* ssidOr(const Ap& a) { return a.ssid[0] ? a.ssid : "(hidden)"; }
 
 // цель для FIND: выбранная в списке сеть, иначе самая сильная
