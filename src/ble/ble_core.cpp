@@ -7,6 +7,7 @@
 // ============================================================
 #include <NimBLEDevice.h>
 #include <algorithm>
+#include "core/timeutil.h"
 #include "ble/ble.h"
 #include "ble/ble_model.h"
 #include "ble/vendors.h"
@@ -131,7 +132,7 @@ class ScanCB : public NimBLEScanCallbacks {
         for (auto& kv : g_seen) {
           Dev& o = kv.second;
           if (!o.rnd || o.merged || o.sig != sig) continue;
-          uint32_t age = now - o.t;
+          uint32_t age = msSince(now, o.t);
           if (age < STALE_MIN || age > STALE_MAX) continue;
           int diff = abs((int)o.rssi - rssi);
           if (diff < bestDiff) { bestDiff = diff; best = &o; }
@@ -240,7 +241,7 @@ void bleUpdate(uint32_t now) {
   if (xSemaphoreTake(g_lock, pdMS_TO_TICKS(100)) == pdTRUE) {
     int thr = RANGES[g_range].dbm;
     for (auto it = g_seen.begin(); it != g_seen.end(); ) {
-      if (now - it->second.t > REMEMBER_MS) { it = g_seen.erase(it); continue; }
+      if (msSince(now, it->second.t) > REMEMBER_MS) { it = g_seen.erase(it); continue; }
       Dev& d = it->second;
       // фильтр дальности с гистерезисом + отсев одиночных пакетов
       if (!d.inRange && d.rssiS >= thr) d.inRange = true;
@@ -260,7 +261,7 @@ void bleUpdate(uint32_t now) {
     raw = (int)g_seen.size();
     g_sensCount = 0;
     for (auto it = g_sens.begin(); it != g_sens.end(); ) {
-      if (now - it->second.t > SENSOR_REMEMBER_MS) { it = g_sens.erase(it); continue; }
+      if (msSince(now, it->second.t) > SENSOR_REMEMBER_MS) { it = g_sens.erase(it); continue; }
       g_sensCount++;
       if (bleIs(M_WEATHER)) g_sensSnap.push_back(it->second);
       ++it;
@@ -336,7 +337,7 @@ static void drawListOrDetail(uint32_t now) {
   if (g_sparkEnt != g_sel) { g_sparkEnt = g_sel; g_sparkN = 0; g_sparkMs = 0; }
   if (now - g_sparkMs >= 500) {
     g_sparkMs = now;
-    int8_t v = (inMap && now - it->second.t < 3000) ? (int8_t)it->second.rssi : (int8_t)-127;
+    int8_t v = (inMap && msSince(now, it->second.t) < 3000) ? (int8_t)it->second.rssi : (int8_t)-127;
     if (g_sparkN < SPARK_N) g_spark[g_sparkN++] = v;
     else { memmove(g_spark, g_spark + 1, SPARK_N - 1); g_spark[SPARK_N - 1] = v; }
   }
@@ -449,7 +450,7 @@ void bleJson(String& o) {
     o += ",\"r\":"; o += e->rssiS;
     o += ",\"m\":"; o += e->nMacs;
     o += ",\"p\":"; o += e->pkts;
-    o += ",\"age\":"; o += (now - e->first) / 1000;
+    o += ",\"age\":"; o += msSince(now, e->first) / 1000;
     o += '}';
   }
   o += "],\"sens\":[";
@@ -462,7 +463,7 @@ void bleJson(String& o) {
       o += "{\"n\":"; jsonStr(o, z.name[0] ? z.name : z.r.model);
       o += ",\"mo\":"; jsonStr(o, z.r.model);
       o += ",\"r\":"; o += z.rssi;
-      o += ",\"ago\":"; o += (now - z.t) / 1000;
+      o += ",\"ago\":"; o += msSince(now, z.t) / 1000;
       if (z.r.hasT) { o += ",\"t\":"; o += String(z.r.temp, 1); }
       if (z.r.hasH) { o += ",\"h\":"; o += String(z.r.hum, 0); }
       if (z.r.hasB) { o += ",\"b\":"; o += z.r.batt; }
@@ -491,7 +492,7 @@ void bleDevJson(uint32_t id, String& o) {
       if (!f) o += ',';
       f = false;
       o += "{\"mac\":\""; o += mac; o += "\",\"kind\":\""; o += AK[d.akind & 3];
-      o += "\",\"r\":"; o += d.rssi; o += ",\"ago\":"; o += (now - d.t) / 1000; o += '}';
+      o += "\",\"r\":"; o += d.rssi; o += ",\"ago\":"; o += msSince(now, d.t) / 1000; o += '}';
     }
     o += ']';
     if (best) {
@@ -502,7 +503,7 @@ void bleDevJson(uint32_t id, String& o) {
       o += ",\"r\":"; o += d.rssi;
       o += ",\"rmin\":"; o += d.rmin; o += ",\"rmax\":"; o += d.rmax;
       o += ",\"pk\":"; o += d.pkts;
-      o += ",\"age\":"; o += (now - d.first) / 1000;
+      o += ",\"age\":"; o += msSince(now, d.first) / 1000;
       if (d.hasCid) { char b[8]; snprintf(b, sizeof(b), "0x%04X", d.cid); o += ",\"cid\":\""; o += b; o += '"'; }
       if (d.appearance) { o += ",\"app\":"; o += d.appearance; }
       o += ",\"uu\":[";

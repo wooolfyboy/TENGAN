@@ -12,13 +12,14 @@
 #include "core/settings.h"
 #include "gallery/gallery.h"
 #include "web/web.h"
+#include "pc/pc.h"
 #include "ble/ble.h"
 #include "wifi/wifi.h"
 #include "subghz/subghz.h"
 #include "audio/audio.h"
 
 // порядок карточек в главном меню
-static const Section* const SECTIONS[] = { &bleSection, &wifiSection, &subghzSection, &soundSection, &webSection, &gallerySection, &settingsSection };
+static const Section* const SECTIONS[] = { &bleSection, &wifiSection, &subghzSection, &soundSection, &webSection, &pcSection, &gallerySection, &settingsSection };
 static const int N_SECTIONS = sizeof(SECTIONS) / sizeof(SECTIONS[0]);
 
 static int  s_cur = -1;          // открытый раздел; -1 — главное меню

@@ -18,6 +18,8 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 jobs:
   firmware:
@@ -50,12 +52,38 @@ jobs:
           esptool.py --chip esp32s3 merge_bin -o dist/radio_radar_full_0x0.bin \
             0x0 $B/bootloader.bin 0x8000 $B/partitions.bin 0xe000 "$APP0" 0x10000 $B/firmware.bin
           cp $B/firmware.bin dist/radio_radar_firmware_ota.bin
+          (cd tools && zip -r ../dist/pc_monitor_windows.zip pc_monitor -x "*/__pycache__/*")
           ls -la dist
 
       - uses: actions/upload-artifact@v4
         with:
           name: firmware-${{ github.sha }}
-          path: dist/*.bin
+          path: dist/*
+
+      # страница «прошить в одну кнопку» (GitHub Pages): страница + прошивка + описание для кнопки
+      - name: Prepare flasher page
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != ''
+        run: |
+          VER="${{ inputs.release_tag || github.ref_name }}"
+          mkdir -p _site
+          cp site/index.html _site/
+          cp dist/radio_radar_full_0x0.bin _site/
+          cat > _site/manifest.json <<JSON
+          {
+            "name": "Radio Radar",
+            "version": "$VER",
+            "new_install_prompt_erase": true,
+            "builds": [
+              { "chipFamily": "ESP32-S3", "parts": [ { "path": "radio_radar_full_0x0.bin", "offset": 0 } ] }
+            ]
+          }
+          JSON
+          cat _site/manifest.json
+
+      - uses: actions/upload-pages-artifact@v3
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != ''
+        with:
+          path: _site
 
       - name: Release
         if: startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != ''
@@ -64,8 +92,22 @@ jobs:
           tag_name: ${{ inputs.release_tag || github.ref_name }}
           target_commitish: ${{ github.sha }}
           name: Radio Radar ${{ inputs.release_tag || github.ref_name }}
-          files: dist/*.bin
+          files: |
+            dist/*.bin
+            dist/*.zip
           generate_release_notes: true
           body: |
             **radio_radar_full_0x0.bin** — flash over USB at offset 0x0 (esptool-js / esptool), then power-cycle.
             **radio_radar_firmware_ota.bin** — upload over Wi-Fi: Web section → page → Update tab.
+            **pc_monitor_windows.zip** — laptop monitor for the PC section: unzip, double-click start_pc_monitor.bat.
+
+  flasher-page:
+    needs: firmware
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != ''
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

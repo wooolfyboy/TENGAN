@@ -38,3 +38,4 @@ void iconAntenna(int x, int y, uint16_t c, uint16_t bg);
 void iconMic(int x, int y, uint16_t c, uint16_t bg);
 void iconCube(int x, int y, uint16_t c, uint16_t bg);
 void iconPhone(int x, int y, uint16_t c, uint16_t bg);
+void iconLaptop(int x, int y, uint16_t c, uint16_t bg);
