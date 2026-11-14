@@ -101,13 +101,16 @@ const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;',
 const pct=r=>Math.max(0,Math.min(100,(r+95)*2));
 const ago=s=>s<60?s+'s':s<3600?Math.floor(s/60)+'m':Math.floor(s/3600)+'h '+Math.floor(s/60)%60+'m';
 const heat=x=>{x=Math.max(0,Math.min(1,x));const a=[[70,96,107],[63,217,255],[234,252,255]];const i=x<.6?0:1,t=x<.6?x/.6:(x-.6)/.4;const c=a[i].map((v,k)=>Math.round(v+(a[i+1][k]-v)*t));return`rgb(${c})`};
-async function J(u){const r=await fetch(u,{cache:'no-store'});return r.json()}
+async function J(u){const r=await fetch(u+(u.includes('?')?'&':'?')+'tab='+cur,{cache:'no-store'});return r.json()}
 function sizeC(c,h){const W=c.width=c.clientWidth*dp(),H=c.height=h*dp();const g=c.getContext('2d');g.clearRect(0,0,W,H);return[g,W,H]}
 
 $('nav').innerHTML=TABS.map(([k,n])=>`<button id="n-${k}" onclick="go('${k}')">${n}</button>`).join('');
+// опрос: следующий запрос — только после ответа на предыдущий (не копятся в очередь)
+let gen=0;
 function go(t){cur=t;TABS.forEach(([k])=>{$('n-'+k).className=k==t?'on':'';$('p-'+k).classList.toggle('hide',k!=t)});
- $('n-'+t).scrollIntoView({inline:'nearest',block:'nearest'});clearInterval(timer);const f={ov:ov,ble:ble,wifi:wifi,sub:subP,snd:snd,sys:sys}[t];
- const ms={ov:3000,ble:2000,wifi:5000,sub:300,snd:200,sys:3000}[t];f();timer=setInterval(f,ms)}
+ $('n-'+t).scrollIntoView({inline:'nearest',block:'nearest'});const f={ov:ov,ble:ble,wifi:wifi,sub:subP,snd:snd,sys:sys}[t];
+ const ms={ov:3000,ble:2000,wifi:5000,sub:60,snd:60,sys:3000}[t];const my=++gen;
+ (async function loop(){while(my==gen){const t0=Date.now();await f();const w=ms-(Date.now()-t0);await new Promise(r=>setTimeout(r,Math.max(w,10)))}})()}
 
 // ---------- шапка ----------
 async function info(){try{const j=await J('/api/info');const b=j.bat;$('bat').textContent=b.ok?'PWR '+b.soc+'%':'';
@@ -155,10 +158,10 @@ async function wifi(){try{const j=await J('/api/wifi');wd=j.nets;$('wc').textCon
 
 // ---------- sub-ghz ----------
 const BANDS=['315','433','868','915'];let wfImg=null,lastMode=-1,lastBand=-1;
-function subUI(){$('sm').innerHTML=['SPECTRUM','MONITOR'].map((n,i)=>`<button class="${sub.m==i?'on':''}" onclick="sub.m=${i};subUI();subP()">${n}</button>`).join('');
- $('sb').innerHTML=BANDS.map((n,i)=>`<button class="${sub.b==i?'on':''}" onclick="sub.b=${i};subUI();subP()">${n} MHz</button>`).join('');
+function subUI(){$('sm').innerHTML=['SPECTRUM','MONITOR'].map((n,i)=>`<button class="${sub.m==i?'on':''}" onclick="sub.m=${i};subUI()">${n}</button>`).join('');
+ $('sb').innerHTML=BANDS.map((n,i)=>`<button class="${sub.b==i?'on':''}" onclick="sub.b=${i};subUI()">${n} MHz</button>`).join('');
  $('s-sp').classList.toggle('hide',sub.m!=0);$('s-mo').classList.toggle('hide',sub.m!=1)}
-async function subP(){try{const j=await J(`/api/sub?m=${sub.m}&b=${sub.b}`);$('s-none').classList.toggle('hide',j.ok);if(!j.ok)return;
+async function subP(){try{const j=await J(`/api/sub?m=${sub.m}&b=${sub.b}`);if(cur!='sub')return;$('s-none').classList.toggle('hide',j.ok);if(!j.ok)return;
  if(j.mode!=lastMode||j.band!=lastBand){wfImg=null;lastMode=j.mode;lastBand=j.band}
  if(j.mode==0&&j.cur){$('s-rng').textContent=j.lo+' – '+j.hi+' MHz';const[g,W,H]=sizeC($('spc'),140),d=dp(),n=j.cur.length,y=v=>H-((v+120)/90)*(H-8*d);
   g.strokeStyle='#12303a';for(let v=-110;v<=-40;v+=10){g.beginPath();g.moveTo(0,y(v));g.lineTo(W,y(v));g.stroke()}
@@ -176,13 +179,13 @@ async function subP(){try{const j=await J(`/api/sub?m=${sub.m}&b=${sub.b}`);$('s
 }catch(e){}}
 
 // ---------- sound ----------
-async function snd(){try{const j=await J('/api/snd');$('a-on').classList.toggle('hide',!j.ok);$('a-off').classList.toggle('hide',j.ok);
+async function snd(){try{const j=await J('/api/snd');if(cur!='snd')return;$('a-on').classList.toggle('hide',!j.ok);$('a-off').classList.toggle('hide',j.ok);
  if(!j.en){$('a-msg').textContent='microphone is off — turn it on on the device: Settings > Sound > Microphone';return}
  if(!j.ok){$('a-msg').textContent='starting microphone…';return}
  $('a-lv').textContent=Math.round(j.lv)+' dBFS';$('a-w').innerHTML=j.lv>=-25?`<span class="alert">${j.w}</span>`:j.w;$('a-hz').textContent=j.e>.15?'loudest '+(j.hz>=1000?(j.hz/1000).toFixed(1)+' kHz':j.hz+' Hz'):'';
  $('a-pk').textContent=Math.round(j.pk);$('a-mx').textContent=Math.round(j.mx);$('a-avg').textContent=Math.round(j.avg);
  const[g,W,H]=sizeC($('a-bars'),150),d=dp(),n=j.b.length,bw=W/n;j.b.forEach((v,i)=>{const h=v/100*(H-4*d);g.fillStyle=heat(.2+v/120);g.fillRect(i*bw+1*d,H-h,bw-2*d,h)});
- ahist.push(j.lv);if(ahist.length>600)ahist.shift();line($('a-h'),ahist,90,'#3fd9ff',-90,0)}catch(e){}}
+ ahist.push(j.lv);if(ahist.length>1200)ahist.shift();line($('a-h'),ahist,90,'#3fd9ff',-90,0)}catch(e){}}
 
 // ---------- system ----------
 async function sys(){const j=await info();if(!j)return;const b=j.bat;$('y-soc').textContent=b.ok?b.soc+'%':'n/a';

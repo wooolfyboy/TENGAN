@@ -104,8 +104,21 @@ static void scanCollect() {
   WiFi.scanDelete();
 }
 
+// какая вкладка открыта на телефоне: страница присылает её в каждом запросе (?tab=)
+static void noteTab() {
+  static const char* const T[][2] = { { "ov", "overview" }, { "ble", "bluetooth" }, { "wifi", "wi-fi" },
+                                      { "sub", "sub-ghz" }, { "snd", "sound" }, { "sys", "system" } };
+  String t = s_srv->arg("tab");
+  for (auto& p : T) if (t == p[0]) { s_tab = p[1]; return; }
+}
+static bool tabIs(const char* a) { return strcmp(s_tab, a) == 0; }
+
 static void sendJson(const String& s) {
+  noteTab();
   s_reqs++;
+  // без этого заголовок и данные уходят двумя кусками, и телефон ждёт ~0.2-0.5 с
+  // перед вторым (алгоритм Нейгла + отложенное подтверждение TCP)
+  s_srv->client().setNoDelay(true);
   s_srv->sendHeader("Cache-Control", "no-store");
   s_srv->send(200, "application/json", s);
 }
@@ -124,17 +137,15 @@ static void webStart() {
   s_dns.start(53, "*", ip);                        // любые адреса -> на палку (страница откроется сама)
   s_srv = new WebServer(80);
   s_srv->on("/", [] { s_reqs++; s_srv->send_P(200, "text/html", WEB_PAGE); });
-  s_srv->on("/api/ble", [] { s_tab = "bluetooth"; String o; bleJson(o); sendJson(o); });
+  s_srv->on("/api/ble", [] { String o; bleJson(o); sendJson(o); });
   s_srv->on("/api/bledev", [] { String o; bleDevJson((uint32_t)strtoul(s_srv->arg("id").c_str(), nullptr, 10), o); sendJson(o); });
-  s_srv->on("/api/wifi", [] { s_tab = "wi-fi"; sendJson(s_wifiJson); });
+  s_srv->on("/api/wifi", [] { sendJson(s_wifiJson); });
   s_srv->on("/api/sub", [] {
-    s_tab = "sub-ghz";
     s_subMs = millis();
     s_subOn = subWebUse(s_srv->arg("m").toInt(), s_srv->hasArg("b") ? s_srv->arg("b").toInt() : 1);
     String o; subJson(o); sendJson(o);
   });
   s_srv->on("/api/snd", [] {
-    s_tab = "sound";
     s_sndMs = millis();
     s_sndOn = audioWebUse();
     String o; audioJson(o); sendJson(o);
@@ -176,6 +187,7 @@ static void webStop() {
   if (s_subOn) { subWebStop(); s_subOn = false; }
   if (s_sndOn) { audioWebStop(); s_sndOn = false; }
   s_on = false;
+  s_tab = "";
 }
 
 static void webTick(uint32_t now) {
@@ -183,13 +195,20 @@ static void webTick(uint32_t now) {
   s_dns.processNextRequest();
   s_srv->handleClient();
   scanCollect();
+  // работает только то, что нужно открытой вкладке, остальное молчит:
+  //  Bluetooth — на «Обзоре» и «Bluetooth»; скан сетей — на «Обзоре» и «Wi-Fi»;
+  //  CC1101 и микрофон — только на своих вкладках (ниже)
+  static bool bleWanted = true;
+  bool wantBle = s_tab[0] == 0 || tabIs("overview") || tabIs("bluetooth");
+  if (wantBle != bleWanted) { bleWanted = wantBle; if (wantBle) bleRadioOn(); else bleRadioOff(); }
+  bool wantScan = s_tab[0] == 0 || tabIs("overview") || tabIs("wi-fi");
   // CC1101 и микрофон работают, только пока их вкладку смотрят на телефоне
   // время берём заново: запрос мог прийти уже после того, как посчитали now,
   // и тогда now - s_sndMs «перекручивается» в огромное число (микрофон гас сразу)
   uint32_t t = millis();
   if (s_subOn) { if ((int32_t)(t - s_subMs) > 4000) { subWebStop(); s_subOn = false; } else subWebTick(t); }
   if (s_sndOn) { if ((int32_t)(t - s_sndMs) > 4000) { audioWebStop(); s_sndOn = false; } else audioWebTick(t); }
-  if (now - s_scanMs > 20000 && WiFi.scanComplete() != WIFI_SCAN_RUNNING) {
+  if (wantScan && now - s_scanMs > 20000 && WiFi.scanComplete() != WIFI_SCAN_RUNNING) {   // скан «глушит» точку на ~1 с
     s_scanMs = now;
     WiFi.scanNetworks(true, true, false, 90);       // асинхронно, 90 мс на канал
   }
