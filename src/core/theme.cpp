@@ -86,6 +86,45 @@ int txtW(const char* s, int size) {
   return w;
 }
 
+// ---------- «жар» ----------
+struct Stop { float x; uint8_t r, g, b; };
+static const Stop HEAT_PHOSPHOR[] = {
+  { 0.00f,   4,  34,  14 }, { 0.30f,  31, 156,  84 }, { 0.55f, 200, 255,  74 },
+  { 0.80f, 255, 174,  46 }, { 1.00f, 255, 243, 214 },
+};
+static const Stop HEAT_CLASSIC[] = {
+  { 0.00f,  40,  60, 120 }, { 0.30f,  70, 200, 130 }, { 0.55f, 240, 220,  70 },
+  { 0.80f, 240, 140,  50 }, { 1.00f, 235,  70,  60 },
+};
+
+uint16_t heatV(float x) {
+  const Stop* s = g_theme == THEME_CLASSIC ? HEAT_CLASSIC : HEAT_PHOSPHOR;
+  x = constrain(x, 0.0f, 1.0f);
+  int i = 0;
+  while (i < 3 && x > s[i + 1].x) i++;
+  float k = (x - s[i].x) / (s[i + 1].x - s[i].x);
+  return tft.color565(s[i].r + (s[i + 1].r - s[i].r) * k,
+                      s[i].g + (s[i + 1].g - s[i].g) * k,
+                      s[i].b + (s[i + 1].b - s[i].b) * k);
+}
+uint16_t heat(int rssi) { return heatV((rssi + 100) / 60.0f); }
+
+void drawGlyph(int x, int y, char ch, uint16_t col, bool inverted) {
+  int x0 = x - GLYPH_W / 2, y0 = y - GLYPH_H / 2;
+  char s[2] = { ch, 0 };
+  spr.setFreeFont(nullptr);
+  spr.setTextDatum(MC_DATUM);
+  if (inverted) {
+    spr.fillRect(x0, y0, GLYPH_W, GLYPH_H, col);
+    spr.setTextColor(C_BG());
+  } else {
+    spr.fillRect(x0, y0, GLYPH_W, GLYPH_H, C_BG());
+    spr.drawRect(x0, y0, GLYPH_W, GLYPH_H, col);
+    spr.setTextColor(col);
+  }
+  spr.drawString(s, x + 1, y + 1, 1);
+}
+
 // ---------- кадр ----------
 // Полосы строк: каждая вторая строка темнее, как на старом экране.
 static void scanlines() {

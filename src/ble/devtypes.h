@@ -40,6 +40,22 @@ inline const char* typeName(uint8_t t) {
   }
 }
 
+// буква-значок типа (для одноцветной темы)
+inline char typeGlyph(uint8_t t) {
+  switch (t) {
+    case T_PHONE:    return 'P';
+    case T_COMPUTER: return 'C';
+    case T_AUDIO:    return 'A';
+    case T_WATCH:    return 'W';
+    case T_TV:       return 'V';
+    case T_TRACKER:  return 'T';
+    case T_BEACON:   return 'B';
+    case T_INPUT:    return 'K';
+    case T_SENSOR:   return 'S';
+    default:         return '?';
+  }
+}
+
 // цвета типов (r,g,b) — переводятся в 565 в main.cpp
 inline void typeRGB(uint8_t t, uint8_t& r, uint8_t& g, uint8_t& b) {
   switch (t) {

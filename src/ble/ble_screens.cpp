@@ -3,6 +3,7 @@
 //
 //  RADAR · PROXIMITY · SCOPE · TIMELINE · TYPES · DEVICES (+подробности) · WEATHER
 // ============================================================
+#include <algorithm>
 #include "ble/ble_model.h"
 #include "ble/vendors.h"
 #include "core/display.h"
@@ -132,9 +133,10 @@ void drawProximity(bool have, int rssi, const Ent& best, int count) {
   int pct = (rssi + 95) * 100 / 50;
   pct = constrain(pct, 0, 100);
   uint16_t col; const char* word;
-  if (pct > 66)      { col = C(235, 80, 80);  word = "CLOSE"; }
-  else if (pct > 33) { col = C(240, 185, 60); word = "NEAR";  }
-  else               { col = C(70, 200, 130); word = "FAR";   }
+  if (pct > 66)      word = "CLOSE";
+  else if (pct > 33) word = "NEAR";
+  else               word = "FAR";
+  col = heat(rssi);                              // чем ближе, тем «горячее»
 
   int bw = W - 60, bh = 26, bx = 30, by = H / 2 - 14;
   spr.setTextDatum(BC_DATUM);
@@ -184,33 +186,34 @@ void drawScope(const std::vector<Blip>& bl) {
                  C(0, g, g / 2));
   }
 
-  // блипы — только цветные точки, без букв
-  for (size_t i = 0; i < bl.size(); i++) {
+  // цели — буквы-значки типа, цвет — «жар» (сила сигнала); метки — инверсией (тревога).
+  // Сначала слабые, сильные рисуются поверх.
+  std::vector<int> idx(bl.size());
+  for (size_t i = 0; i < bl.size(); i++) idx[i] = (int)i;
+  std::sort(idx.begin(), idx.end(), [&](int a, int b) { return bl[a].rssi < bl[b].rssi; });
+  for (int i : idx) {
     float ang = (bl[i].h % 360) * PI / 180.0f;
     int pct = (bl[i].rssi + 95) * 100 / 50;
     pct = constrain(pct, 0, 100);
     int r = maxR - (maxR - 8) * pct / 100;
     int x = cx + (int)(cos(ang) * r), y = cy + (int)(sin(ang) * r);
-    spr.fillCircle(x, y, 3, vendorColor(bl[i].cat));
+    drawGlyph(x, y, typeGlyph(bl[i].type), heat(bl[i].rssi), bl[i].type == T_TRACKER);
   }
 
-  // легенда слева: 6 самых частых производителей на экране сейчас
-  int bc[N_BRANDS] = {0};
-  for (size_t i = 0; i < bl.size(); i++) if (bl[i].cat < N_BRANDS) bc[bl[i].cat]++;
-  spr.setTextDatum(ML_DATUM);
-  for (int row = 0; row < 6; row++) {
+  // легенда слева: сколько каких типов (по убыванию)
+  int tc[T_NUM] = {0};
+  for (size_t i = 0; i < bl.size(); i++) tc[bl[i].type < T_NUM ? (int)bl[i].type : 0]++;
+  for (int row = 0; row < 8; row++) {
     int bi = -1;
-    for (int b = 0; b < N_BRANDS; b++) if (bc[b] > 0 && (bi < 0 || bc[b] > bc[bi])) bi = b;
+    for (int t = 0; t < T_NUM; t++) if (tc[t] > 0 && (bi < 0 || tc[t] > tc[bi])) bi = t;
     if (bi < 0) break;
-    int y = 14 + row * 24;
-    char lb[8]; snprintf(lb, sizeof(lb), "%s", BRANDS[bi].label);
-    spr.fillCircle(7, y, 3, vendorColor(bi));
-    spr.setTextColor(vendorColor(bi), C_BG());
-    txt(lb, 14, y, 1);
-    char nb[6]; sprintf(nb, "%d", bc[bi]);
-    spr.setTextColor(C(90, 90, 100), C_BG());
-    txt(nb, 14, y + 9, 1);
-    bc[bi] = 0;
+    int y = 22 + row * 18;
+    drawGlyph(9, y, typeGlyph(bi), bi == T_TRACKER ? C_HOT() : C(170, 170, 185), bi == T_TRACKER);
+    char nb[8]; sprintf(nb, "%d", tc[bi]);
+    spr.setTextDatum(ML_DATUM);
+    spr.setTextColor(C(150, 150, 165));
+    txt(nb, 18, y, 2);
+    tc[bi] = 0;
   }
 
   spr.setTextDatum(TC_DATUM);
@@ -284,7 +287,54 @@ void drawTimeline() {
 }
 
 // ---------- TYPES: кольцевая диаграмма по типам устройств ----------
+static void drawTypesBars(const int* cnt, int total) {
+  int W = spr.width(), H = spr.height();
+  spr.fillSprite(C_BG());
+  char buf[24];
+  spr.setTextDatum(TL_DATUM);
+  spr.setTextColor(C(120, 120, 135));
+  txt("TYPES", 4, 2, 2);
+  sprintf(buf, "%d TOTAL", total);
+  spr.setTextDatum(TR_DATUM);
+  txt(buf, W - 4, 2, 2);
+
+  int order[T_NUM], n = 0;
+  for (int t = 0; t < T_NUM; t++) if (cnt[t] > 0) order[n++] = t;
+  for (int i = 1; i < n; i++)
+    for (int j = i; j > 0 && cnt[order[j - 1]] < cnt[order[j]]; j--) {
+      int x = order[j]; order[j] = order[j - 1]; order[j - 1] = x;
+    }
+  if (n == 0) {
+    spr.setTextDatum(MC_DATUM);
+    spr.setTextColor(C(90, 90, 100));
+    txt("no devices", W / 2, H / 2, 4);
+    present();
+    return;
+  }
+  int maxc = cnt[order[0]];
+  const int rows = n < 7 ? n : 7, rh = 20, y0 = 26;
+  const int bx = 98, bwMax = W - bx - 36;
+  for (int i = 0; i < rows; i++) {
+    int t = order[i], cy = y0 + i * rh + rh / 2;
+    bool alert = (t == T_TRACKER);
+    uint16_t c = alert ? C_HOT() : (t == T_UNKNOWN ? C(110, 110, 125) : C(175, 175, 190));
+    drawGlyph(10, cy, typeGlyph(t), c, alert);
+    spr.setTextDatum(ML_DATUM);
+    spr.setTextColor(c);
+    txt(typeName(t), 22, cy, 2);
+    // сегментная полоска, как на старых индикаторах
+    int len = bwMax * cnt[t] / maxc;
+    for (int x = 0; x + 4 <= len; x += 6) spr.fillRect(bx + x, cy - 6, 4, 12, c);
+    if (len < 4) spr.fillRect(bx, cy - 6, 2, 12, c);
+    sprintf(buf, "%d", cnt[t]);
+    spr.setTextDatum(MR_DATUM);
+    txt(buf, W - 4, cy, 2);
+  }
+  present();
+}
+
 void drawTypes(const int* cnt, int total) {
+  if (g_theme == THEME_PHOSPHOR) { drawTypesBars(cnt, total); return; }
   int W = spr.width(), H = spr.height();
   spr.fillSprite(C_BG());
 
@@ -407,12 +457,13 @@ void drawList(const std::map<uint32_t, Ent>& ents) {
     }
     const Ent& e = it->second;
     uint16_t tc = typeColor(e.type);
-    spr.fillRect(3, y + 3, 4, LIST_ROWH - 7, tc);
+    bool alert = (e.type == T_TRACKER);
+    drawGlyph(8, y + LIST_ROWH / 2 - 1, typeGlyph(e.type), alert ? C_HOT() : C(170, 170, 185), alert);
 
-    fitText(e.name[0] ? e.name : typeName(e.type), buf, sizeof(buf), 132, 2);
+    fitText(e.name[0] ? e.name : typeName(e.type), buf, sizeof(buf), 128, 2);
     spr.setTextDatum(TL_DATUM);
     spr.setTextColor(e.name[0] ? C_HOT() : tc, bg);
-    txt(buf, 12, y + 1, 2);
+    txt(buf, 16, y + 1, 2);
 
     spr.setTextColor(vendorColor(e.cat), bg);
     char vb[16];
@@ -421,9 +472,9 @@ void drawList(const std::map<uint32_t, Ent>& ents) {
 
     sprintf(buf, "%d", e.rssi);
     spr.setTextDatum(TR_DATUM);
-    spr.setTextColor(C_GRAY(), bg);
+    spr.setTextColor(heat(e.rssi), bg);
     txt(buf, 268, y + 1, 2);
-    drawBars(274, y + 2, e.rssi, C(90, 220, 140));
+    drawBars(274, y + 2, e.rssi, heat(e.rssi));
   }
 
   // полоса прокрутки
@@ -496,7 +547,7 @@ void drawDetail(const Dev& d, const Ent& e, bool inMap, uint32_t now) {
   spr.setTextDatum(TL_DATUM);
   spr.setTextColor(C_DIM(), C_BG());
   txt("signal, 30s", gx + 3, gy + 3, 1);
-  drawSpark(gx, gy, gw, gh, g_spark, g_sparkN, SPARK_N, C(90, 220, 140));
+  drawSpark(gx, gy, gw, gh, g_spark, g_sparkN, SPARK_N, heat(e.rssi));
 
   // низ: технические подробности мелким шрифтом
   y = 126;

@@ -277,7 +277,7 @@ void bleUpdate(uint32_t now) {
     if (e.rssi > g_bestRssi) { g_bestRssi = e.rssi; g_bestEnt = e; g_have = true; }
     g_typeCnt[e.type < T_NUM ? (int)e.type : (int)T_UNKNOWN]++;
     // угол блипа — от id физического устройства: не прыгает при смене MAC
-    if (wantScope) g_snap.push_back({ e.rssi, kv.first * 2654435761u, e.cat });
+    if (wantScope) g_snap.push_back({ e.rssi, kv.first * 2654435761u, e.cat, e.type });
   }
   g_lastCount = (int)g_ents.size();
   g_lastRaw = raw;

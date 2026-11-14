@@ -10,6 +10,23 @@
 #include "core/theme.h"
 #include "core/leds.h"
 
+// значок защиты сети (вариант C); открытые и WEP — инверсией, как тревога
+static char secGlyph(uint8_t e) {
+  switch (e) {
+    case WIFI_AUTH_OPEN:            return 'O';
+    case WIFI_AUTH_WEP:             return '!';
+    case WIFI_AUTH_WPA_PSK:         return '1';
+    case WIFI_AUTH_WPA2_PSK:
+    case WIFI_AUTH_WPA_WPA2_PSK:    return '2';
+    case WIFI_AUTH_WPA3_PSK:
+    case WIFI_AUTH_WPA2_WPA3_PSK:
+    case WIFI_AUTH_OWE:             return '3';
+    case WIFI_AUTH_WPA2_ENTERPRISE: return 'E';
+    default:                        return '?';
+  }
+}
+static bool secAlert(uint8_t e) { return e == WIFI_AUTH_OPEN || e == WIFI_AUTH_WEP; }
+
 void drawScanDot(int x, int y) {
   if ((g_scanning || g_prom) && (millis() / 300) % 2) spr.fillCircle(x, y, 2, C(70, 210, 130));
 }
@@ -44,11 +61,11 @@ void drawNets(uint32_t now) {
     bool sel = (k == g_wSel);
     uint16_t bg = sel ? C(28, 38, 62) : C_BG();
     if (sel) spr.fillRoundRect(0, y, W - 4, LIST_ROWH - 1, 3, bg);
-    spr.fillRect(3, y + 3, 4, LIST_ROWH - 7, encColor(a.enc));
-    fitText(ssidOr(a), buf, sizeof(buf), 150, 2);
+    drawGlyph(8, y + LIST_ROWH / 2 - 1, secGlyph(a.enc), secAlert(a.enc) ? C_HOT() : C(170, 170, 185), secAlert(a.enc));
+    fitText(ssidOr(a), buf, sizeof(buf), 146, 2);
     spr.setTextDatum(TL_DATUM);
     spr.setTextColor(a.ssid[0] ? C_HOT() : C_DIM(), bg);
-    txt(buf, 12, y + 1, 2);
+    txt(buf, 16, y + 1, 2);
     sprintf(buf, "%d", a.ch);
     spr.setTextColor(apColor(k), bg);
     txt(buf, 168, y + 1, 2);
@@ -58,9 +75,9 @@ void drawNets(uint32_t now) {
     else if (a.gen == 6)          { spr.setTextColor(C(60, 205, 205), bg); txt("W6", 190, y + 1, 2); }
     sprintf(buf, "%d", a.rssi);
     spr.setTextDatum(TR_DATUM);
-    spr.setTextColor(now - a.t > 6000 ? C_DIM() : C_GRAY(), bg);
+    spr.setTextColor(now - a.t > 6000 ? C_DIM() : heat(a.rssi), bg);
     txt(buf, 268, y + 1, 2);
-    drawBars(274, y + 2, a.rssi, C(90, 220, 140));
+    drawBars(274, y + 2, a.rssi, heat(a.rssi));
   }
   int n = (int)g_wOrder.size();
   if (n > LIST_ROWS) {
@@ -135,7 +152,7 @@ void drawNetDetail(uint32_t now) {
   spr.drawRect(gx, gy, gw, gh, C(40, 40, 50));
   spr.setTextColor(C_DIM(), C_BG());
   txt("signal, 2 min", gx + 3, gy + 3, 1);
-  drawSpark(gx, gy, gw, gh, g_wSpark, g_wSparkN, W_SPARK_N, C(90, 220, 140));
+  drawSpark(gx, gy, gw, gh, g_wSpark, g_wSparkN, W_SPARK_N, heat(a.rssi));
 
   // низ: производитель и BSSID
   const uint8_t* b = a.bssid;
@@ -196,7 +213,7 @@ void drawChannels(uint32_t now) {
   std::sort(v.begin(), v.end());
   for (auto& p : v) {
     const Ap& a = g_aps[p.second];
-    uint16_t c = apColor(p.second);
+    uint16_t c = heat(a.rssiS);                 // «жар»: сильная сеть — раскалённый холмик
     uint16_t fill = dimColor(c, 22);
     int top = dbY(a.rssiS);
     float cen = apCenter(a), half = apHalf(a);
@@ -260,9 +277,10 @@ void drawActivity(uint32_t now) {
     int h = (int)((pb - pt) * sqrtf(t) / smx);
     int hd = t > 0 ? (int)(h * g_ppsData[c] / t) : 0;
     spr.fillRect(x + 2, pt, bw - 4, pb - pt, C(22, 22, 28));
-    if (h > 0) {
-      spr.fillRect(x + 2, pb - h, bw - 4, h - hd, C(80, 150, 240));
-      spr.fillRect(x + 2, pb - hd, bw - 4, hd, C(70, 210, 130));
+    if (h > 0) {                                // «жар» по загрузке канала; служебные — тусклее
+      uint16_t hc = heatV(sqrtf(t) / smx);
+      spr.fillRect(x + 2, pb - h, bw - 4, h - hd, dimColor(hc, 45));
+      spr.fillRect(x + 2, pb - hd, bw - 4, hd, hc);
     }
     if (c == g_hopCh) spr.fillRect(x + 2, pb + 1, bw - 4, 2, C_HOT());
     bool main3 = (c == 1 || c == 6 || c == 11);
@@ -284,9 +302,9 @@ void drawActivity(uint32_t now) {
   txt("ch", 4, pb + 4, 1);
   txt("-dBm", 0, pb + 14, 1);
   txt("noise", 0, pb + 23, 1);
-  spr.fillRect(pl + 40, pb + 26, 6, 6, C(70, 210, 130));
+  spr.fillRect(pl + 40, pb + 26, 6, 6, heatV(0.8f));
   txt("data", pl + 49, pb + 25, 1);
-  spr.fillRect(pl + 82, pb + 26, 6, 6, C(80, 150, 240));
+  spr.fillRect(pl + 82, pb + 26, 6, 6, dimColor(heatV(0.8f), 45));
   txt("beacons/service", pl + 91, pb + 25, 1);
 
   // история общего трафика ~2 мин
@@ -359,7 +377,7 @@ void drawClients(uint32_t now) {
       snprintf(vb, sizeof(vb), "? %s", ven ? ven : "unknown net");
       nm = vb;
     }
-    uint16_t c = apColor(b);
+    uint16_t c = heatV(0.35f + 0.65f * cnt / maxc);   // больше устройств — «горячее»
     fitText(nm, buf, sizeof(buf), 120, 2);
     spr.setTextDatum(TL_DATUM);
     spr.setTextColor(it != g_aps.end() ? C_HOT() : C_DIM(), C_BG());
@@ -411,11 +429,11 @@ void drawFind(uint32_t now) {
   int r = cnt ? sum / cnt : a.rssi;
   const char* word; uint16_t col;
   if (lost)          { word = "no signal"; col = C(120, 120, 130); }
-  else if (r > -55)  { word = "excellent"; col = C(70, 210, 130); }
-  else if (r > -67)  { word = "good";      col = C(170, 220, 80); }
-  else if (r > -75)  { word = "fair";      col = C(240, 200, 70); }
-  else if (r > -85)  { word = "weak";      col = C(240, 150, 50); }
-  else               { word = "bad";       col = C(235, 80, 80); }
+  else if (r > -55)  { word = "excellent"; col = heat(r); }
+  else if (r > -67)  { word = "good";      col = heat(r); }
+  else if (r > -75)  { word = "fair";      col = heat(r); }
+  else if (r > -85)  { word = "weak";      col = heat(r); }
+  else               { word = "bad";       col = heat(r); }
 
   // крупное число + оценка
   sprintf(buf, "%d", lost ? 0 : -r);

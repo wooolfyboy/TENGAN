@@ -76,7 +76,7 @@ struct Sensor {
   uint8_t  mac[6];
   char     name[20];
 };
-struct Blip { int rssi; uint32_t h; uint8_t cat; };      // точка на SCOPE
+struct Blip { int rssi; uint32_t h; uint8_t cat; uint8_t type; };   // точка на SCOPE
 
 // --- история для TIMELINE ---
 #define HIST_N 150

@@ -26,4 +26,14 @@ void txt(const char* s, int x, int y, int size);
 void txtNum(long n, int x, int y, int size);
 int  txtW(const char* s, int size);
 
+// «Жар» — цвет по силе сигнала (вариант D): далёкое тлеет тёмно-зелёным,
+// ближе — жёлто-зелёное, рядом — янтарное, вплотную — добела.
+// Это настоящие цвета: они не проходят через зелёный фильтр люминофора.
+uint16_t heatV(float x);           // x = 0..1
+uint16_t heat(int rssi);           // -100 dBm (холодно) .. -40 dBm (горячо)
+
+// Значок-буква (вариант C): буква в рамке; inverted — тёмная буква на светлом (тревога).
+void drawGlyph(int x, int y, char ch, uint16_t col, bool inverted);   // (x, y) — центр
+static const int GLYPH_W = 9, GLYPH_H = 11;
+
 void present();                    // эффекты темы + вывести кадр на экран

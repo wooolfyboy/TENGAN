@@ -68,12 +68,15 @@ static void spTick() {
 }
 
 // цвет водопада: -110 (чёрный) -> синий -> бирюзовый -> жёлтый -> красный (-40)
+// тусклая версия цвета (заливка под трассой)
+static uint16_t dimColor565(uint16_t c) {
+  uint8_t r = ((c >> 11) & 0x1F) << 3, g = ((c >> 5) & 0x3F) << 2, b = (c & 0x1F) << 3;
+  return tft.color565(r / 4, g / 4, b / 4);
+}
+
 static uint16_t wfColor(int v) {        // v = dBm + 120
   float x = constrain((v - 10) / 70.0f, 0.0f, 1.0f);
-  if (g_theme == THEME_PHOSPHOR) {             // люминофор: просто темнее / ярче
-    uint8_t i = (uint8_t)(255 * x);
-    return C(i, i, i);
-  }
+  if (g_theme == THEME_PHOSPHOR) return heatV(x);   // люминофор: «жар» — тлеет зелёным, вспыхивает янтарным
   uint8_t r, g, b;
   if (x < 0.25f)      { float k = x / 0.25f; r = 0; g = 0; b = (uint8_t)(40 + 160 * k); }
   else if (x < 0.5f)  { float k = (x - 0.25f) / 0.25f; r = 0; g = (uint8_t)(200 * k); b = 200; }
@@ -101,9 +104,10 @@ static void drawSpectrum() {
   for (int i = 1; i < SP_N; i++) spr.drawLine(px(i - 1), py(g_spPeak[i - 1]), px(i), py(g_spPeak[i]), C(90, 70, 40));
   for (int i = 0; i < SP_N; i++) {
     int x = px(i), y = py(g_spCur[i]);
-    spr.drawFastVLine(x, y, pb - y, C(25, 60, 50));
+    spr.drawFastVLine(x, y, pb - y, dimColor565(heat(g_spCur[i] + 10)));
   }
-  for (int i = 1; i < SP_N; i++) spr.drawLine(px(i - 1), py(g_spCur[i - 1]), px(i), py(g_spCur[i]), C(90, 230, 160));
+  // трасса «раскаляется» по уровню сигнала
+  for (int i = 1; i < SP_N; i++) spr.drawLine(px(i - 1), py(g_spCur[i - 1]), px(i), py(g_spCur[i]), heat(max(g_spCur[i - 1], g_spCur[i]) + 10));
   // маркер максимума
   int mi = 0;
   for (int i = 1; i < SP_N; i++) if (g_spCur[i] > g_spCur[mi]) mi = i;
@@ -213,7 +217,7 @@ static void drawMonitor(uint32_t now) {
     int x = gx + 1 + (gw - 3) * (i + (MON_N - g_monN)) / (MON_N - 1);
     int y = yy(g_mon[i]);
     bool hi = g_mon[i] > g_floor + BURST_ON_DB;
-    spr.drawFastVLine(x, y, gy + gh - 2 - y, hi ? C(240, 200, 70) : C(50, 120, 100));
+    spr.drawFastVLine(x, y, gy + gh - 2 - y, hi ? heat(g_mon[i] + 10) : C(50, 120, 100));
   }
   sprintf(buf, "noise %d dBm", (int)g_floor);
   spr.setTextDatum(TL_DATUM);
