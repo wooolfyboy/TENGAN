@@ -36,7 +36,10 @@ void drawPc(uint32_t now) {
   const int W = spr.width();
   char buf[40], a[16], b[16];
   spr.fillSprite(C_BG());
-  uiHeader("PC", p.host[0] ? p.host : "laptop", p.cpu >= 90);
+  uint32_t age = (now - p.t) / 1000;
+  char hdr[32];
+  if (age >= 3) snprintf(hdr, sizeof(hdr), "no data %lus", (unsigned long)age);   // короткая пауза — цифры старые
+  uiHeader("PC", age >= 3 ? hdr : (p.host[0] ? p.host : "laptop"), p.cpu >= 90);
 
   // ---- слева: CPU ----
   spr.setTextDatum(TL_DATUM);
@@ -102,7 +105,6 @@ void drawPc(uint32_t now) {
   uiFooter(top, buf);
   pageDots(0);
   present();
-  (void)now;
 }
 
 void drawPcCores(uint32_t now) {

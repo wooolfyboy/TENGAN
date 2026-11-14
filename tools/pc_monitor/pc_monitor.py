@@ -11,6 +11,7 @@ Radio Radar — монитор нагрузки ноутбука.
 import os
 import socket
 import sys
+import threading
 import time
 
 try:
@@ -69,17 +70,23 @@ class Collector:
         self.disk = psutil.disk_io_counters()
         self.net = psutil.net_io_counters()
         self.top = "-"
-        self.top_t = 0
         self.procs = {}
+        # поиск «прожорливого» процесса — в отдельном потоке: на Windows перебор
+        # сотен процессов занимает 1-2 с и иначе задерживал бы отправку
+        threading.Thread(target=self._top_loop, daemon=True).start()
         self.root = "C:\\" if os.name == "nt" else "/"
         self.host = clean(socket.gethostname())
 
-    def top_process(self):
-        """Самый «прожорливый» процесс (раз в 3 секунды — это не бесплатно)."""
-        now = time.time()
-        if now - self.top_t < 3:
-            return self.top
-        self.top_t = now
+    def _top_loop(self):
+        while True:
+            try:
+                self._find_top()
+            except Exception:
+                pass
+            time.sleep(4)
+
+    def _find_top(self):
+        """Самый «прожорливый» процесс."""
         best, best_cpu = "-", -1.0
         seen = {}
         for p in psutil.process_iter(["name"]):
@@ -95,7 +102,6 @@ class Collector:
                 pass
         self.procs = seen
         self.top = clean(best.replace(".exe", ""))
-        return self.top
 
     def line(self):
         now = time.time()
@@ -138,7 +144,7 @@ class Collector:
             "nd=%.0f" % max(0, nd),
             "nu=%.0f" % max(0, nu),
             "up=%d" % up,
-            "top=" + self.top_process(),
+            "top=" + self.top,
             "host=" + self.host,
         ]
         if bat is not None:
@@ -158,6 +164,7 @@ def main():
     col = Collector()
     port = None
     warned = False
+    next_t = time.monotonic()
     while True:
         # 1. найти и открыть палку
         if port is None:
@@ -198,7 +205,13 @@ def main():
             except Exception:
                 pass
             port = None
-        time.sleep(1)
+        # ровно раз в секунду, сколько бы ни заняли замеры
+        next_t += 1.0
+        wait = next_t - time.monotonic()
+        if wait < 0:
+            next_t = time.monotonic()
+            wait = 0
+        time.sleep(wait)
 
 
 if __name__ == "__main__":
