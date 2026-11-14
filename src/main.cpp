@@ -23,6 +23,7 @@
 #include "core/leds.h"
 #include "ble/ble.h"
 #include "core/boot.h"
+#include <driver/gpio.h>
 #include "audio/audio.h"
 
 // Самый ранний момент, где можно что-то сделать (ещё до setup): гасим подсветку,
@@ -30,6 +31,11 @@
 extern "C" void initVariant() {
   pinMode(TFT_BL, OUTPUT);
   digitalWrite(TFT_BL, LOW);
+}
+// Ещё раньше: глобальный конструктор запускается до всей инициализации Arduino.
+__attribute__((constructor(101))) static void earlyBacklightOff() {
+  gpio_set_direction((gpio_num_t)TFT_BL, GPIO_MODE_OUTPUT);
+  gpio_set_level((gpio_num_t)TFT_BL, 0);
 }
 
 void setup() {

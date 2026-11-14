@@ -233,61 +233,98 @@ void drawMicMissing() {
 }
 
 // ============================================================
-//  TERRAIN — 3D «звуковые горы»: каждый кадр спектр становится
-//  новым хребтом спереди, старые уплывают к горизонту.
-//  Низкие частоты — в центре, высокие — по краям (зеркально).
+//  TERRAIN — 3D «звуковые горы». Каждый кадр спектр становится новым
+//  хребтом спереди, старые уплывают к горизонту. Слева — басы, справа —
+//  высокие. Хребет сглажен и нормирован сам на себя (громкий звук не
+//  превращает всё в стену), к нему добавлен «скалистый» шум. Горы залиты:
+//  тёмные склоны, светлые вершины, белые «снежные шапки».
 // ============================================================
-#define TR_ROWS 22
-#define TR_PTS  (AU_BANDS * 2 - 1)
-static float    s_trH[TR_ROWS][AU_BANDS];   // история спектра (0 — самая свежая)
+#define TR_ROWS 24
+#define TR_COLS 52
+static float    s_trH[TR_ROWS][TR_COLS];   // высоты (0 — самый свежий хребет)
 static int      s_trHead = 0;
-static uint32_t s_trLast = 0;
+static uint32_t s_trLast = 0, s_trSeq = 0;
+static float    s_trTop = 0.3f;            // автоусиление именно для гор
+
+static float rock(uint32_t row, int col) {   // «скалистость»: шум, привязанный к хребту
+  uint32_t x = row * 73856093u ^ (uint32_t)col * 19349663u;
+  x ^= x >> 13; x *= 0x5bd1e995; x ^= x >> 15;
+  return (x & 0xFFFF) / 65535.0f;
+}
+
+static void terrainPush() {
+  float raw[TR_COLS], sm[TR_COLS];
+  for (int c = 0; c < TR_COLS; c++) {                  // полосы -> колонки (с интерполяцией)
+    float k = c * (AU_BANDS - 1) / (float)(TR_COLS - 1);
+    int k0 = (int)k; float f = k - k0;
+    float b = g_au.bands[k0] * (1 - f) + g_au.bands[min(k0 + 1, AU_BANDS - 1)] * f;
+    raw[c] = b * b;                                    // контраст: тихие полосы ниже
+  }
+  for (int pass = 0; pass < 2; pass++) {               // сгладить: острые иглы -> склоны
+    for (int c = 0; c < TR_COLS; c++)
+      sm[c] = (raw[max(c - 1, 0)] + 2 * raw[c] + raw[min(c + 1, TR_COLS - 1)]) * 0.25f;
+    memcpy(raw, sm, sizeof(raw));
+  }
+  float mx = 0;
+  for (int c = 0; c < TR_COLS; c++) mx = max(mx, raw[c]);
+  s_trTop = max(mx, s_trTop * 0.985f);                 // быстро вверх, медленно вниз
+  s_trTop = max(s_trTop, 0.12f);                       // тишину не раздуваем
+  float loud = constrain(g_au.energy * 1.6f, 0.0f, 1.0f);
+  s_trHead = (s_trHead + TR_ROWS - 1) % TR_ROWS;
+  const float* prev = s_trH[(s_trHead + 1) % TR_ROWS];
+  float* row = s_trH[s_trHead];
+  s_trSeq++;
+  for (int c = 0; c < TR_COLS; c++) {
+    float v = raw[c] / s_trTop;                        // форма хребта, 0..1
+    v = 1.0f - expf(-2.2f * v);                        // мягкий «потолок»
+    float edge = sinf(PI * (c + 0.5f) / TR_COLS);      // к краям — предгорья
+    float h = v * (0.35f + 0.65f * loud) * (0.45f + 0.55f * edge);
+    h += 0.05f + 0.07f * rock(s_trSeq, c) * (0.3f + h);   // скалы и неровности
+    row[c] = prev[c] * 0.35f + h * 0.65f;               // плавность во времени
+  }
+}
 
 void drawTerrain(uint32_t now) {
-  const int W = spr.width(), H = spr.height();
-  g_fastFrame = true;                                    // 3D — рисуем чаще
-  if (now - s_trLast >= 45) {                            // новый хребет
-    s_trLast = now;
-    s_trHead = (s_trHead + TR_ROWS - 1) % TR_ROWS;
-    for (int k = 0; k < AU_BANDS; k++) s_trH[s_trHead][k] = g_au.bands[k];
-  }
+  const int W = spr.width();
+  g_fastFrame = true;
+  if (now - s_trLast >= 45) { s_trLast = now; terrainPush(); }
   char buf[40], hz[16];
   spr.fillSprite(C_BG());
   hzStr(g_au.domHz, hz, sizeof(hz));
   snprintf(buf, sizeof(buf), "%d dBfs  %s", (int)g_au.level, g_au.energy > 0.15f ? hz : "--");
 
-  // камера: горизонт и «покачивание» в такт громкости
-  const float F = 120, camH = 1.2f, hy = 40 + g_au.energy * 3;
+  const float F = 120, camH = 1.25f, hy = 44;
   const int cx = W / 2;
   auto proj = [&](float x, float y, float z, int& sx, int& sy) {
     sx = cx + (int)(x * F / z);
     sy = (int)(hy + (camH - y) * F / z);
   };
-  // горизонт и «солнце» — светится от общей громкости
-  int sunR = 10 + (int)(g_au.energy * 10);
-  spr.fillCircle(cx, (int)hy + 2, sunR, dim565(C_ACC(), 18 + (int)(g_au.energy * 40)));
-  spr.drawFastHLine(0, (int)hy + 2, W, UI_DIM());
+  // небо: «солнце» на горизонте светится от громкости
+  int sunR = 12 + (int)(g_au.energy * 8);
+  spr.fillCircle(cx + 60, (int)hy - 2, sunR, dim565(C_ACC(), 20 + (int)(g_au.energy * 35)));
+  spr.drawFastHLine(0, (int)hy, W, UI_LINE());
 
-  // от дальнего хребта к ближнему: заливаем фоном под линией (прячет задние), затем линия
+  // от дальнего хребта к ближнему: каждый — залитый силуэт со светлым гребнем
   for (int r = TR_ROWS - 1; r >= 0; r--) {
     const float* h = s_trH[(s_trHead + r) % TR_ROWS];
-    float z = 1.6f + r * 0.17f;
-    int fade = 100 - r * 85 / TR_ROWS;                   // дальше — тусклее
+    float z = 1.55f + r * 0.16f;
+    int fade = 100 - r * 80 / TR_ROWS;                 // дальше — тусклее (дымка)
     int px = 0, py = 0, pbx = 0, pby = 0;
-    for (int i = 0; i < TR_PTS; i++) {
-      int k = abs(i - (AU_BANDS - 1));                   // зеркало: центр — низкие частоты
-      float v = h[k];
-      float x = (i - (TR_PTS - 1) / 2.0f) / ((TR_PTS - 1) / 2.0f) * 2.7f;
+    float ph = 0;
+    for (int c = 0; c < TR_COLS; c++) {
+      float x = (c - (TR_COLS - 1) / 2.0f) / ((TR_COLS - 1) / 2.0f) * 2.6f;
       int sx, sy, bx, by;
-      proj(x, v * 1.0f, z, sx, sy);
+      proj(x, h[c] * 1.15f, z, sx, sy);
       proj(x, 0, z, bx, by);
-      if (i > 0) {
-        spr.fillTriangle(px, py, sx, sy, pbx, pby, C_BG());
-        spr.fillTriangle(sx, sy, bx, by, pbx, pby, C_BG());
-        float vv = max(v, h[abs(i - 1 - (AU_BANDS - 1))]);
-        spr.drawLine(px, py, sx, sy, dim565(heatV(0.25f + 0.75f * vv), fade));
+      if (c > 0) {
+        float hm = (h[c] + ph) * 0.5f;
+        uint16_t body = dim565(heatV(0.12f + 0.5f * hm), fade * 45 / 100);   // склон
+        spr.fillTriangle(px, py, sx, sy, pbx, pby, body);
+        spr.fillTriangle(sx, sy, bx, by, pbx, pby, body);
+        uint16_t ridge = hm > 0.62f ? C_HOT() : heatV(0.3f + 0.7f * hm);   // высоко — «снег»
+        spr.drawLine(px, py, sx, sy, dim565(ridge, fade));
       }
-      px = sx; py = sy; pbx = bx; pby = by;
+      px = sx; py = sy; pbx = bx; pby = by; ph = h[c];
     }
   }
   uiHeader("Terrain", buf, g_au.level >= -25);

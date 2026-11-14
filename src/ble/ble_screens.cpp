@@ -452,7 +452,8 @@ void drawWeather(const std::vector<Sensor>& ss, uint32_t now) {
 //  площадку, колесо крутит её; новые башни «вырастают».
 // ============================================================
 static float s_yaw = 0.6f, s_yawTarget = 0.6f;
-static std::map<uint32_t, float> s_grow;              // текущая высота башни (анимация роста)
+struct CityT { float rssiAvg = 0, target = 0, pct = 0, h = 0; uint8_t type = 0; bool alive = false; };
+static std::map<uint32_t, CityT> s_city;             // башни: сглаженные значения и анимация
 
 void cityTurn(int dir) { s_yawTarget += dir * 0.26f; }
 
@@ -508,32 +509,44 @@ void drawCity(const std::vector<Blip>& bl, uint32_t now) {
     }
   }
 
-  // башни: не больше 48 самых сильных
+  // башни: данные берём раз в 1.5 с (сигнал BLE сильно «шумит»), а между
+  // обновлениями высота и место плавно перетекают к новым значениям
   struct Tower { float x, z, h, depth; uint16_t col; bool alert; int rssi; uint8_t type; };
-  std::vector<int> idx(bl.size());
-  for (size_t i = 0; i < bl.size(); i++) idx[i] = (int)i;
-  std::sort(idx.begin(), idx.end(), [&](int a, int b) { return bl[a].rssi > bl[b].rssi; });
-  if (idx.size() > 48) idx.resize(48);
-  std::vector<Tower> tw;
-  std::map<uint32_t, float> grow;
-  for (int i : idx) {
-    const Blip& b = bl[i];
-    float pct = constrain((b.rssi + 95) / 50.0f, 0.0f, 1.0f);
-    float ang = (b.h % 360) * PI / 180.0f, r = 0.95f - 0.8f * pct;
-    float target = 0.06f + 0.62f * pct * pct;
-    auto it = s_grow.find(b.h);
-    float h = it == s_grow.end() ? 0.0f : it->second;
-    h += (target - h) * 0.18f;
-    grow[b.h] = h;
-    Tower t;
-    t.x = cosf(ang) * r; t.z = sinf(ang) * r; t.h = h;
-    float sx, sy; proj(t.x, 0, t.z, sx, sy, t.depth);
-    t.alert = (b.type == T_TRACKER);
-    t.col = t.alert ? C_ALERT() : heatV(0.2f + 0.8f * pct);
-    t.rssi = b.rssi; t.type = b.type;
-    tw.push_back(t);
+  static uint32_t lastPick = 0;
+  if (now - lastPick >= 1500 || s_city.empty()) {
+    lastPick = now;
+    std::vector<int> idx(bl.size());
+    for (size_t i = 0; i < bl.size(); i++) idx[i] = (int)i;
+    std::sort(idx.begin(), idx.end(), [&](int a, int b) { return bl[a].rssi > bl[b].rssi; });
+    if (idx.size() > 48) idx.resize(48);
+    for (auto& kv : s_city) kv.second.alive = false;
+    for (int i : idx) {
+      const Blip& b = bl[i];
+      CityT& c = s_city[b.h];
+      if (c.rssiAvg == 0) { c.rssiAvg = b.rssi; c.pct = c.h = 0; }
+      c.rssiAvg = c.rssiAvg * 0.5f + b.rssi * 0.5f;      // ещё и усреднение между выборками
+      c.target = constrain((c.rssiAvg + 95) / 50.0f, 0.0f, 1.0f);
+      c.type = b.type; c.alive = true;
+      if (c.pct == 0) c.pct = c.target;                  // новая башня встаёт на место и растёт
+    }
   }
-  s_grow.swap(grow);
+  std::vector<Tower> tw;
+  for (auto it = s_city.begin(); it != s_city.end();) {
+    CityT& c = it->second;
+    if (c.alive) c.pct += (c.target - c.pct) * 0.06f;
+    float hTarget = c.alive ? 0.06f + 0.62f * c.pct * c.pct : 0.0f;
+    c.h += (hTarget - c.h) * 0.08f;
+    if (!c.alive && c.h < 0.01f) { it = s_city.erase(it); continue; }   // ушло — опустилось и исчезло
+    float ang = (it->first % 360) * PI / 180.0f, r = 0.95f - 0.8f * c.pct;
+    Tower t;
+    t.x = cosf(ang) * r; t.z = sinf(ang) * r; t.h = c.h;
+    float sx, sy; proj(t.x, 0, t.z, sx, sy, t.depth);
+    t.alert = (c.type == T_TRACKER);
+    t.col = t.alert ? C_ALERT() : heatV(0.2f + 0.8f * c.pct);
+    t.rssi = (int)lroundf(c.rssiAvg); t.type = c.type;
+    tw.push_back(t);
+    ++it;
+  }
   std::sort(tw.begin(), tw.end(), [](const Tower& a, const Tower& b) { return a.depth > b.depth; });
 
   const float S = 0.045f;                             // полуширина башни

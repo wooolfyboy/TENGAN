@@ -332,6 +332,7 @@ int main(int argc, char** argv) {
 
   for (int f = 0; f < 40; f++) drawTesseract(s_now + f * 33);   snap("50_gallery_tesseract");
   for (int f = 0; f < 10; f++) drawTorus(s_now + 1500 + f * 33); snap("51_gallery_torus");
+  for (int f = 0; f < 60; f++) drawLife(s_now + 2000 + f * 120); snap("52_gallery_life");
   drawSpectrum();            snap("30_subghz_spectrum");
   drawMonitor(s_now);        snap("31_subghz_monitor");
   return 0;

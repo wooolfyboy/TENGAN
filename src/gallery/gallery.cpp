@@ -4,7 +4,8 @@
 //  TESSERACT — четырёхмерный куб: вращается в плоскостях XW, YW, ZW
 //              и XY, проецируется 4D → 3D → экран; внутренний куб
 //              «выворачивается» через внешний. След — три прошлых кадра.
-//  TORUS     — бублик из ~900 точек; яркость — освещение и глубина.
+//  TORUS     — бублик из ~1000 точек; яркость — освещение и глубина.
+//  LIFE      — игра «Жизнь» Конвея с послесвечением.
 //
 //  Колесо — скорость, нажатие — назад в подменю.
 // ============================================================
@@ -15,7 +16,7 @@
 #include "core/ui.h"
 #include "core/menu.h"
 
-enum { G_TESS = 0, G_TORUS, G_NUM };
+enum { G_TESS = 0, G_TORUS, G_LIFE, G_NUM };
 static int   g_gal = 0;
 static float s_speed = 1.0f;                // множитель скорости (колесо)
 static float s_phase = 0;                   // «время» анимации с учётом скорости
@@ -153,23 +154,115 @@ void drawTorus(uint32_t now) {
   present();
 }
 
+// ---------- LIFE — игра «Жизнь» Конвея ----------
+// Поле замкнуто (края склеены). Новорождённые клетки — белые, старые
+// остывают до бирюзы и стали; умершие оставляют гаснущий след. Если поле
+// «застыло» или вымерло — подбрасываем новые фигуры (глайдеры, R-пентомино).
+#define LF_CELL 4
+#define LF_W 76
+#define LF_H 32
+static uint8_t  s_lf[LF_H][LF_W], s_lfN[LF_H][LF_W];   // возраст живой клетки (0 — мертва)
+static uint8_t  s_glow[LF_H][LF_W];                      // след умерших
+static uint32_t s_lfGen = 0, s_lfLast = 0, s_lfStill = 0, s_lfRng = 12345;
+static int      s_lfPop = 0, s_lfPrevPop = -1;
+static uint32_t s_lfHash[8];
+
+static uint32_t lfRand() { s_lfRng ^= s_lfRng << 13; s_lfRng ^= s_lfRng >> 17; s_lfRng ^= s_lfRng << 5; return s_lfRng; }
+static void lfSet(int x, int y) { s_lf[(y + LF_H) % LF_H][(x + LF_W) % LF_W] = 1; }
+
+static void lfDrop() {                                   // подбросить фигуру в случайное место
+  int x = lfRand() % LF_W, y = lfRand() % LF_H;
+  switch (lfRand() % 4) {
+    case 0: lfSet(x + 1, y); lfSet(x + 2, y + 1); lfSet(x, y + 2); lfSet(x + 1, y + 2); lfSet(x + 2, y + 2); break;  // глайдер
+    case 1: lfSet(x + 1, y); lfSet(x + 2, y); lfSet(x, y + 1); lfSet(x + 1, y + 1); lfSet(x + 1, y + 2); break;      // R-пентомино
+    case 2: lfSet(x + 1, y); lfSet(x + 3, y + 1); lfSet(x, y + 2); lfSet(x + 1, y + 2);                              // «желудь»
+            lfSet(x + 4, y + 2); lfSet(x + 5, y + 2); lfSet(x + 6, y + 2); break;
+    default: for (int dy = 0; dy < 6; dy++) for (int dx = 0; dx < 6; dx++) if (lfRand() % 2) lfSet(x + dx, y + dy); break;   // клякса
+  }
+}
+
+static void lfSeed() {
+  memset(s_lf, 0, sizeof(s_lf)); memset(s_glow, 0, sizeof(s_glow));
+  s_lfRng ^= millis() | 1;
+  for (int y = 0; y < LF_H; y++) for (int x = 0; x < LF_W; x++) s_lf[y][x] = (lfRand() % 100) < 28;
+  s_lfGen = 0; s_lfStill = 0; memset(s_lfHash, 0, sizeof(s_lfHash));
+}
+
+static void lfStep() {
+  uint32_t hash = 2166136261u;
+  int pop = 0;
+  for (int y = 0; y < LF_H; y++) {
+    int ym = (y + LF_H - 1) % LF_H, yp = (y + 1) % LF_H;
+    for (int x = 0; x < LF_W; x++) {
+      int xm = (x + LF_W - 1) % LF_W, xp = (x + 1) % LF_W;
+      int n = (s_lf[ym][xm] > 0) + (s_lf[ym][x] > 0) + (s_lf[ym][xp] > 0) + (s_lf[y][xm] > 0) +
+              (s_lf[y][xp] > 0) + (s_lf[yp][xm] > 0) + (s_lf[yp][x] > 0) + (s_lf[yp][xp] > 0);
+      uint8_t a = s_lf[y][x], nv;
+      if (a) nv = (n == 2 || n == 3) ? (uint8_t)min(a + 1, 255) : 0;
+      else   nv = (n == 3) ? 1 : 0;
+      if (a && !nv) s_glow[y][x] = 255;                  // умерла — оставляет след
+      else if (s_glow[y][x]) s_glow[y][x] = s_glow[y][x] > 28 ? s_glow[y][x] - 28 : 0;
+      s_lfN[y][x] = nv;
+      if (nv) { pop++; hash = (hash ^ (y * LF_W + x)) * 16777619u; }
+    }
+  }
+  memcpy(s_lf, s_lfN, sizeof(s_lf));
+  s_lfGen++;
+  // застой: повтор узора (мигалки с периодом до 8) или население почти не меняется
+  bool repeat = false;
+  for (int i = 0; i < 8; i++) if (s_lfHash[i] == hash) repeat = true;
+  s_lfHash[s_lfGen % 8] = hash;
+  if (repeat || abs(pop - s_lfPrevPop) <= 1) s_lfStill++; else s_lfStill = 0;
+  s_lfPrevPop = pop; s_lfPop = pop;
+  if (pop < 12) lfSeed();                                 // вымерли — новый мир
+  else if (s_lfStill > 40) { for (int i = 0; i < 4; i++) lfDrop(); s_lfStill = 0; }
+}
+
+void drawLife(uint32_t now) {
+  g_fastFrame = true;
+  if (s_lfGen == 0 && s_lfPop == 0) lfSeed();
+  uint32_t every = s_speed > 0 ? (uint32_t)(110 / s_speed) : 0;
+  if (every && now - s_lfLast >= every) { s_lfLast = now; lfStep(); }
+  spr.fillSprite(C_BG());
+  const int x0 = (spr.width() - LF_W * LF_CELL) / 2, y0 = UI_TOP + 1;
+  for (int y = 0; y < LF_H; y++)
+    for (int x = 0; x < LF_W; x++) {
+      uint8_t a = s_lf[y][x];
+      int px = x0 + x * LF_CELL, py = y0 + y * LF_CELL;
+      if (a) {
+        uint16_t c = a == 1 ? C_HOT() : heatV(max(0.3f, 0.9f - a * 0.03f));   // рождённая — белая, стареет к бирюзе
+        spr.fillRect(px, py, LF_CELL - 1, LF_CELL - 1, c);
+      } else if (s_glow[y][x]) {
+        spr.fillRect(px, py, LF_CELL - 1, LF_CELL - 1, shade(C_ACC(), s_glow[y][x] * 30 / 255));
+      }
+    }
+  char buf[40];
+  snprintf(buf, sizeof(buf), "gen %lu  cells %d  x%.1f", (unsigned long)s_lfGen, s_lfPop, s_speed);
+  uiHeader("Life", buf);
+  uiFooter("wheel: speed   click: new world", "side: back");
+  present();
+}
+
 // ---------- раздел ----------
 static void galSubtitle(char* out, size_t n) { snprintf(out, n, "%d demos", G_NUM); }
 static void galEnter() { s_lastMs = 0; }
 static void galLeave() {}
 static void galInfo(int i, SubItem& it) {
-  static const char* const names[G_NUM] = { "Tesseract", "Torus" };
-  static const char* const descs[G_NUM] = { "4D hypercube", "donut of points" };
+  static const char* const names[G_NUM] = { "Tesseract", "Torus", "Life" };
+  static const char* const descs[G_NUM] = { "4D hypercube", "donut of points", "game of life" };
   it.name = names[i]; it.desc = descs[i]; it.value[0] = 0;
-  if (i == G_TESS) strcpy(it.value, "4D");
-  else             strcpy(it.value, "3D");
+  if (i == G_TESS)       strcpy(it.value, "4D");
+  else if (i == G_TORUS) strcpy(it.value, "3D");
+  else if (s_lfGen)      snprintf(it.value, sizeof(it.value), "gen %lu", (unsigned long)s_lfGen);
 }
 static int  galNow() { return g_gal; }
 static void galOpen(int m) { g_gal = m; s_lastMs = 0; s_trailN = 0; }
 static void galClose() {}
-static void galClick() { navToSub(); }
+static void galClick() { if (g_gal == G_LIFE) lfSeed(); else navToSub(); }   // в «Жизни» — новый мир
 static void galRotate(int dir) { s_speed = constrain(s_speed + dir * 0.25f, 0.0f, 4.0f); }
-static void galDraw(uint32_t now) { if (g_gal == G_TESS) drawTesseract(now); else drawTorus(now); }
+static void galDraw(uint32_t now) {
+  if (g_gal == G_TESS) drawTesseract(now); else if (g_gal == G_TORUS) drawTorus(now); else drawLife(now);
+}
 
 const Section gallerySection = {
   "Gallery", 150, 120, 255, iconCube, galSubtitle,
