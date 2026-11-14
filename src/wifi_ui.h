@@ -225,8 +225,7 @@ void wifiStop() {
   g_scanning = false;
 }
 void wifiEnter() {
-  wifiStart();
-  if (wNeedsProm(g_wMode)) promOn();
+  wifiStart();          // в подменю только сканируем; приём пакетов — когда откроют экран
 }
 void wifiLeave() {
   promOff();
@@ -415,10 +414,8 @@ void wifiApplyMove() {
   int idx = -1;
   for (int i = 0; i < n; i++) if (g_wOrder[i] == g_wSel) { idx = i; break; }
   int mv = g_wMove; g_wMove = 0;
-  if (n == 0) { if (mv) wifiSetMode(g_wMode + (mv > 0 ? 1 : -1)); return; }
+  if (n == 0) return;
   if (idx < 0) { if (g_wDetail && mv == 0) return; idx = 0; }
-  if (!g_wDetail && mv < 0 && idx == 0)     { wifiSetMode(g_wMode - 1); return; }   // за верхний край
-  if (!g_wDetail && mv > 0 && idx == n - 1) { wifiSetMode(g_wMode + 1); return; }   // за нижний край
   idx = constrain(idx + mv, 0, n - 1);
   g_wSel = g_wOrder[idx];
   if (idx < g_wTop) g_wTop = idx;
@@ -441,7 +438,63 @@ void wifiClick() {
     if (g_scanning) { esp_wifi_scan_stop(); WiFi.scanDelete(); g_scanning = false; }
     return;
   }
-  wifiSetMode(g_wMode + 1);
+  subBack();                                  // на остальных экранах нажатие — назад в подменю
+}
+
+// ---------- подменю ----------
+void wifiOpenScreen(int m) { wifiSetMode(m); }
+void wifiCloseScreen() {
+  g_wDetail = false;
+  promOff();
+  ledsOff();
+  if (g_scanCh != 0 && g_scanning) { esp_wifi_scan_stop(); WiFi.scanDelete(); g_scanning = false; }
+}
+int  wifiScreenNow() { return g_wMode; }
+bool wifiCloseDetail() {
+  if (g_wMode == W_NETS && g_wDetail) { g_wDetail = false; return true; }
+  return false;
+}
+
+float interference(const Ap& a, int k);
+int bestChannel() {
+  if (g_aps.empty()) return 0;
+  const int cand[3] = { 1, 6, 11 };
+  float best = 1e9; int bestCh = 1;
+  for (int k = 0; k < 3; k++) {
+    float score = 0;
+    for (auto& kv : g_aps) score += interference(kv.second, cand[k]) * (kv.second.rssiS + 100);
+    if (score < best) { best = score; bestCh = cand[k]; }
+  }
+  return bestCh;
+}
+
+void wifiSubFrame(uint32_t now) {
+  // в подменю продолжаем обычный скан всех каналов, чтобы цифры были живыми
+  int saved = g_wMode;
+  if (g_wMode == W_FIND) g_wMode = W_NETS;     // FIND сканирует один канал — тут не нужно
+  wifiScanTick(now);
+  g_wMode = saved;
+  SubItem it[W_NUM] = {
+    { "Networks", "list + details",       "" },
+    { "Channels", "who uses which ch",    "" },
+    { "Activity", "packets & noise",      "" },
+    { "Clients",  "devices in networks",  "" },
+    { "Find",     "best signal spot",     "" },
+  };
+  if (g_wEverScanned) sprintf(it[W_NETS].value, "%d", (int)g_aps.size());
+  else strcpy(it[W_NETS].value, "...");
+  int bc = bestChannel();
+  if (bc) sprintf(it[W_CHANNELS].value, "best %d", bc); else strcpy(it[W_CHANNELS].value, "-");
+  float tot = 0;
+  for (int c = 1; c <= CH_MAX; c++) tot += g_ppsMgmt[c] + g_ppsData[c];
+  if (tot > 0) sprintf(it[W_ACTIVITY].value, "%d/s", (int)tot); else strcpy(it[W_ACTIVITY].value, "-");
+  if (!g_stas.empty()) sprintf(it[W_CLIENTS].value, "%d", (int)g_stas.size()); else strcpy(it[W_CLIENTS].value, "-");
+  uint64_t t = g_wSel && g_aps.count(g_wSel) ? g_wSel : 0;
+  if (t) {
+    char nm[24]; fitText(ssidOr(g_aps[t]), nm, sizeof(nm), 90, 2);
+    strncpy(it[W_FIND].value, nm, 23); it[W_FIND].value[23] = 0;
+  } else strcpy(it[W_FIND].value, "-");
+  drawSubmenu("WI-FI", tft.color565(70, 210, 130), it, W_NUM);
 }
 
 // ---------- экраны ----------
@@ -675,14 +728,7 @@ void drawChannels(uint32_t now) {
   }
 
   if (!g_aps.empty()) {
-    const int cand[3] = { 1, 6, 11 };
-    float best = 1e9; int bestCh = 1;
-    for (int k = 0; k < 3; k++) {
-      float score = 0;
-      for (auto& kv : g_aps) score += interference(kv.second, cand[k]) * (kv.second.rssiS + 100);
-      if (score < best) { best = score; bestCh = cand[k]; }
-    }
-    sprintf(buf, "best channel: %d", bestCh);
+    sprintf(buf, "best channel: %d", bestChannel());
     spr.setTextDatum(TR_DATUM);
     spr.setTextColor(tft.color565(70, 210, 130), TFT_BLACK);
     spr.drawString(buf, W - 4, 1, 2);

@@ -57,6 +57,7 @@ static const uint32_t REDRAW_MS   = 66;
 // Разделы главного меню и экраны раздела Bluetooth
 enum { S_MENU = 0, S_BLE, S_WIFI, S_SET };
 enum { M_RADAR = 0, M_PROX, M_SCOPE, M_TIMELINE, M_TYPES, M_LIST, M_WEATHER, NUM_MODES };
+static const int W_SCREENS = 5;   // экранов в разделе Wi-Fi (см. wifi_ui.h)
 static const uint32_t SENSOR_REMEMBER_MS = 300000;  // датчики шлют редко — помним 5 минут
 static const size_t   MAX_SENSORS = 24;
 static const size_t   MAX_DEVS    = 600;     // предохранитель памяти
@@ -152,7 +153,10 @@ SemaphoreHandle_t g_lock;
 volatile int g_mode = 0;         // экран внутри раздела Bluetooth
 int  g_section = S_MENU;         // где мы: меню / Bluetooth / Wi-Fi / настройки
 int  g_menuSel = 0;              // выбранный пункт меню (0 BT, 1 Wi-Fi, 2 настройки)
-bool g_bleActive = true;         // сейчас сканирует Bluetooth (иначе — Wi-Fi)
+bool g_sub = true;               // в разделе показано подменю (список экранов), а не сам экран
+int  g_subSel = 0;               // курсор в подменю
+bool g_bleActive = true;
+int  g_sensCount = 0;            // сколько датчиков погоды сейчас известно         // сейчас сканирует Bluetooth (иначе — Wi-Fi)
 inline bool bleIs(int m) { return g_section == S_BLE && g_mode == m; }
 int g_sweep = 0;
 
@@ -1200,7 +1204,7 @@ void drawSettings() {
   spr.setTextColor(tft.color565(110, 110, 125), TFT_BLACK);
   spr.drawString(hints[g_setItem], 4, H - 12, 1);
   spr.setTextColor(tft.color565(80, 80, 92), TFT_BLACK);
-  spr.drawString("wheel: change   click: next item   side: menu", 4, H - 1, 1);
+  spr.drawString("wheel: change   click: next item   side: back", 4, H - 1, 1);
   spr.pushSprite(0, 0);
 }
 
@@ -1222,6 +1226,12 @@ void wifiFrame(uint32_t now);
 int  wifiNetCount();
 void wifiEnter();
 void wifiLeave();
+void wifiOpenScreen(int m);
+void wifiCloseScreen();
+void wifiSubFrame(uint32_t now);
+int  wifiScreenNow();
+void subBack();
+bool wifiCloseDetail();
 
 void bleStart() {
   if (g_bleActive) return;
@@ -1239,10 +1249,38 @@ void bleStop() {
 }
 
 void enterSection(int sel) {
-  if (sel == 0)      { g_section = S_BLE; bleStart(); }
-  else if (sel == 1) { g_section = S_WIFI; bleStop(); wifiEnter(); }
+  if (sel == 0)      { g_section = S_BLE; bleStart(); g_subSel = g_mode; }
+  else if (sel == 1) { g_section = S_WIFI; bleStop(); wifiEnter(); g_subSel = wifiScreenNow(); }
   else               { g_section = S_SET; g_setItem = 0; }
+  g_sub = true;
   g_detail = false;
+}
+
+// открыть экран, выбранный в подменю
+void subOpen() {
+  if (g_section == S_BLE)  { g_mode = g_subSel; g_detail = false; }
+  if (g_section == S_WIFI) wifiOpenScreen(g_subSel);
+  g_sub = false;
+}
+
+// из экрана — обратно в подменю
+void subBack() {
+  if (g_section == S_BLE)  g_subSel = g_mode;
+  if (g_section == S_WIFI) { g_subSel = wifiScreenNow(); wifiCloseScreen(); }
+  g_detail = false;
+  g_sub = true;
+}
+
+void goMenu();
+// боковая кнопка: на шаг назад (подробности -> экран -> подменю -> главное меню)
+void goBack() {
+  if ((g_section == S_BLE || g_section == S_WIFI) && !g_sub) {
+    if (g_section == S_BLE && g_detail) { g_detail = false; return; }
+    if (g_section == S_WIFI && wifiCloseDetail()) return;
+    subBack();
+    return;
+  }
+  goMenu();
 }
 
 void goMenu() {
@@ -1253,6 +1291,60 @@ void goMenu() {
   if (g_section == S_SET)  g_menuSel = 2;
   g_section = S_MENU;
   g_detail = false;
+}
+
+// --- подменю: список экранов раздела ---
+struct SubItem { const char* name; const char* desc; char value[24]; };
+
+void drawSubmenu(const char* title, uint16_t acc, SubItem* it, int n) {
+  int W = spr.width(), H = spr.height();
+  spr.fillSprite(TFT_BLACK);
+  spr.setTextDatum(TL_DATUM);
+  spr.setTextColor(acc, TFT_BLACK);
+  spr.drawString(title, 4, 1, 2);
+  spr.setTextDatum(TR_DATUM);
+  spr.setTextColor(tft.color565(80, 80, 92), TFT_BLACK);
+  spr.drawString("click: open   side: back", W - 4, 5, 1);
+  int rh = n > 5 ? 21 : 28, y0 = 20;
+  for (int i = 0; i < n; i++) {
+    int y = y0 + i * rh;
+    bool sel = (i == g_subSel);
+    uint16_t bg = sel ? tft.color565(22, 26, 38) : TFT_BLACK;
+    if (sel) {
+      spr.fillRoundRect(0, y, W, rh - 2, 5, bg);
+      spr.fillRoundRect(0, y + 3, 4, rh - 8, 2, acc);
+    }
+    int ty = y + (rh - 2) / 2;
+    spr.setTextDatum(ML_DATUM);
+    spr.setTextColor(sel ? TFT_WHITE : tft.color565(170, 170, 185), bg);
+    spr.drawString(it[i].name, 12, ty, 2);
+    spr.setTextColor(sel ? tft.color565(130, 130, 145) : tft.color565(75, 75, 88), bg);
+    spr.drawString(it[i].desc, 104, ty + 1, 1);
+    spr.setTextDatum(MR_DATUM);
+    spr.setTextColor(sel ? acc : tft.color565(110, 110, 125), bg);
+    spr.drawString(it[i].value, W - 8, ty, 2);
+  }
+  spr.pushSprite(0, 0);
+}
+
+void drawBleSub(int count, int bestRssi, bool have, const int* typeCnt) {
+  SubItem it[NUM_MODES] = {
+    { "Radar",     "how many around",   "" },
+    { "Proximity", "nearest device",    "" },
+    { "Scope",     "radar picture",     "" },
+    { "Timeline",  "count over time",   "" },
+    { "Types",     "what kind of",      "" },
+    { "Devices",   "list + details",    "" },
+    { "Weather",   "BLE thermometers",  "" },
+  };
+  sprintf(it[M_RADAR].value, "%d", count);
+  if (have) sprintf(it[M_PROX].value, "%d dBm", bestRssi); else strcpy(it[M_PROX].value, "-");
+  int top = -1;
+  for (int t = 1; t < T_NUM; t++) if (typeCnt[t] > 0 && (top < 0 || typeCnt[t] > typeCnt[top])) top = t;
+  if (top > 0) snprintf(it[M_TYPES].value, 24, "%s %d", typeName(top), typeCnt[top]);
+  sprintf(it[M_LIST].value, "%d", count);
+  if (g_sensCount) sprintf(it[M_WEATHER].value, "%d", g_sensCount); else strcpy(it[M_WEATHER].value, "-");
+  drawSubmenu("BLUETOOTH", tft.color565(80, 150, 240), it, NUM_MODES);
 }
 
 // --- иконки ---
@@ -1408,9 +1500,10 @@ void pollButtons() {
   if (enc == LOW && lastEnc == HIGH && now - lastEncMs > 250) {
     if (g_section == S_MENU)     enterSection(g_menuSel);
     else if (g_section == S_SET) g_setItem = (g_setItem + 1) % N_SET_ITEMS;
+    else if (g_sub)              subOpen();
     else if (g_section == S_WIFI) wifiClick();
     else if (g_mode == M_LIST)   { g_detail = !g_detail; g_lastTouch = now; }
-    else                         changeMode(+1);
+    else                         subBack();            // на обычном экране нажатие — назад в подменю
     lastEncMs = now;
   }
   lastEnc = enc;
@@ -1429,7 +1522,7 @@ void pollButtons() {
     uint32_t held = now - userDownMs;
     userDown = false;
     g_powerHold = 0;
-    if (held >= 30 && held < PWR_SHOW_MS) goMenu();   // короткое нажатие — назад в меню
+    if (held >= 30 && held < PWR_SHOW_MS) goBack();   // короткое нажатие — на шаг назад
   }
 }
 
@@ -1450,6 +1543,12 @@ void pollEncoder() {
     uint32_t now = millis();
     if (g_section == S_MENU) {
       if (now - lastStepMs > 120) { g_menuSel = (g_menuSel + dir + 3) % 3; lastStepMs = now; }
+    } else if ((g_section == S_BLE || g_section == S_WIFI) && g_sub) {
+      if (now - lastStepMs > 60) {
+        int n = g_section == S_BLE ? NUM_MODES : W_SCREENS;
+        g_subSel = (g_subSel + dir + n) % n;
+        lastStepMs = now;
+      }
     } else if (g_section == S_WIFI) {
       if (now - lastStepMs > 40) { wifiRotate(dir); lastStepMs = now; }
     } else if (bleIs(M_LIST)) {
@@ -1548,6 +1647,8 @@ void loop() {
         ++it;
       }
       raw = (int)g_seen.size();
+      g_sensCount = 0;
+      for (auto& kv : g_sens) if (now - kv.second.t <= SENSOR_REMEMBER_MS) g_sensCount++;
       if (bleIs(M_WEATHER)) {
         for (auto it = g_sens.begin(); it != g_sens.end(); ) {
           if (now - it->second.t > SENSOR_REMEMBER_MS) { it = g_sens.erase(it); continue; }
@@ -1577,7 +1678,8 @@ void loop() {
     }
     else if (g_section == S_MENU) drawMenu(count);
     else if (g_section == S_SET)  drawSettings();
-    else if (g_section == S_WIFI) wifiFrame(now);
+    else if (g_section == S_WIFI) { if (g_sub) wifiSubFrame(now); else wifiFrame(now); }
+    else if (g_sub)               drawBleSub(count, bestRssi, have, typeCnt);
     else if (g_mode == M_LIST) {
       // Порядок списка: ближние сверху, но «липкий», чтобы строки не прыгали:
       //  - пока крутишь колесо или открыты подробности — порядок заморожен;
@@ -1610,12 +1712,6 @@ void loop() {
       int idx = -1;
       for (int i = 0; i < n; i++) if (g_order[i] == g_sel) { idx = i; break; }
       int mv = g_listMove; g_listMove = 0;
-      // прокрутка за край списка — соседний экран раздела
-      if (!g_detail && mv != 0 &&
-          (n == 0 || (mv < 0 && idx <= 0) || (mv > 0 && idx == n - 1))) {
-        changeMode(mv > 0 ? +1 : -1);
-        mv = 0;
-      }
       bool keep = (idx < 0 && g_detail && mv == 0);   // выбранное пропало — держим его подробности
       if (!keep && n > 0) {
         if (idx < 0) idx = 0;
