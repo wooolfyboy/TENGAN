@@ -201,7 +201,7 @@ static void auUpdate(uint32_t now) {
     if (g_auHistN < AU_HIST) g_auHist[g_auHistN++] = b.level;
     else { memmove(g_auHist, g_auHist + 1, sizeof(float) * (AU_HIST - 1)); g_auHist[AU_HIST - 1] = b.level; }
   }
-  if (g_ledEvent == 0) {                                 // лента — индикатор громкости
+  if (g_auLeds && g_ledEvent == 0) {                     // лента — индикатор громкости (настройка)
     float x = constrain((b.level + 70) / 55.0f, 0.0f, 1.0f);
     int lv = (int)(x * WS2812_N + 0.5f);
     strip.clear();

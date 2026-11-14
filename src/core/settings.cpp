@@ -19,6 +19,7 @@ int g_dimIdx = 0;                        // по умолчанию экран �
 int g_sndIdx = 1;                        // тихие звуки интерфейса
 int g_clickEn = 1;
 int g_micEn = 1;
+int g_auLeds = 0;
 int g_bleTicks = 1;
 int g_wifiTicks = 1;
 int g_wRange = 0;
@@ -34,7 +35,7 @@ enum { S_SCREEN, S_DIM, S_LEDBR, S_VOLUME, S_CLICKS, S_BATTERY,
        S_RANGE, S_LEDEV, S_BLETICK,
        S_WRANGE, S_WTICK,
        S_BAND,
-       S_MIC, S_NUM };
+       S_MIC, S_AULED, S_NUM };
 enum { P_GENERAL, P_BLE, P_WIFI, P_SUBGHZ, P_SOUND, P_NUM };
 struct SetDef { const char* name; const char* hint; uint8_t page; };
 static const SetDef DEFS[S_NUM] = {
@@ -51,10 +52,11 @@ static const SetDef DEFS[S_NUM] = {
   { "Find ticks",     "ticks on find screen",        P_WIFI },
   { "Start band",     "band when section opens",     P_SUBGHZ },
   { "Microphone",     "mic for sound section",       P_SOUND },
+  { "LED meter",      "leds show loudness",          P_SOUND },
 };
 static const char* const PAGE_NAMES[P_NUM] = { "General", "Bluetooth", "Wi-Fi", "Sub-GHz", "Sound" };
 static const char* const PAGE_DESCS[P_NUM] = { "screen, leds, sound, battery", "range, leds, ticks",
-                                               "range, ticks", "radio band", "microphone" };
+                                               "range, ticks", "radio band", "mic, leds" };
 static const int SET_ROWS = 7;           // строк на экране (список прокручивается)
 
 // пункты текущей страницы
@@ -80,6 +82,7 @@ void loadSettings() {
   g_sndIdx    = g_prefs.getInt("snd", 1);
   g_micEn     = g_prefs.getInt("mic", 1) ? 1 : 0;
   g_clickEn   = g_prefs.getInt("click", 1) ? 1 : 0;
+  g_auLeds    = g_prefs.getInt("auled", 0) ? 1 : 0;
   g_bleTicks  = g_prefs.getInt("bltick", 1) ? 1 : 0;
   g_wifiTicks = g_prefs.getInt("wftick", 1) ? 1 : 0;
   g_wRange    = g_prefs.getInt("wrange", 0);
@@ -105,6 +108,7 @@ void saveSettings() {
   g_prefs.putInt("snd", g_sndIdx);
   g_prefs.putInt("mic", g_micEn);
   g_prefs.putInt("click", g_clickEn);
+  g_prefs.putInt("auled", g_auLeds);
   g_prefs.putInt("bltick", g_bleTicks);
   g_prefs.putInt("wftick", g_wifiTicks);
   g_prefs.putInt("wrange", g_wRange);
@@ -137,6 +141,7 @@ void settingsAdjust(int dir) {
     case S_WRANGE:  g_wRange = constrain(g_wRange + dir, 0, N_RANGES - 1); break;
     case S_BAND:    g_band = constrain(g_band + dir, 0, N_BANDS - 1); break;
     case S_MIC:     g_micEn = dir > 0; break;
+    case S_AULED:   g_auLeds = dir > 0; if (!g_auLeds) ledsOff(); break;
     default: return;                       // батарея — только показывает
   }
   applyBrightness();
@@ -187,6 +192,7 @@ void drawSettings() {
       case S_WTICK:   strcpy(val, onOff(g_wifiTicks)); break;
       case S_BAND:    strcpy(val, BANDS[g_band].name); break;
       case S_MIC:     strcpy(val, onOff(g_micEn)); break;
+      case S_AULED:   strcpy(val, onOff(g_auLeds)); break;
       default:
         if (g_bat.ok) { sprintf(val, "%d%%  %.2f V", g_bat.soc, g_bat.mv / 1000.0f); alert = g_bat.soc <= 20; }
         else          sprintf(val, "n/a");

@@ -20,6 +20,7 @@ extern int g_thresh;                       // порог событий для �
 extern int g_ledBright;                    // % яркости ленты
 extern int g_scrBright;                    // % яркости экрана
 extern int g_micEn;                        // микрофон разрешён (1) / выключен (0)
+extern int g_auLeds;                       // Sound: светодиоды показывают громкость (по умолчанию выкл)
 extern int g_clickEn;                      // щелчки колеса
 extern int g_bleTicks;                     // щелчки «ближе-дальше» в Bluetooth
 extern int g_wifiTicks;                    // щелчки «ближе-дальше» в Wi-Fi Find
