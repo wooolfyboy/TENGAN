@@ -21,7 +21,9 @@ void powerTouch() {
 }
 bool powerIdle() { return s_dimmed; }
 void powerIdleTick(uint32_t now) {
-  if (!s_dimmed && now - s_lastTouch > IDLE_DIM_MS) {
+  uint32_t limit = DIM_SECS[g_dimIdx] * 1000UL;
+  if (!limit) { if (s_dimmed) powerTouch(); return; }  // выключено в настройках
+  if (!s_dimmed && now - s_lastTouch > limit) {
     s_dimmed = true;
     analogWrite(TFT_BL, g_scrBright * 255 / 100 / 4);   // четверть яркости
   }

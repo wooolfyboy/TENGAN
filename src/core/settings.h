@@ -19,6 +19,9 @@ extern int g_range;                        // индекс в RANGES
 extern int g_thresh;                       // порог событий для светодиодов (0 = выкл)
 extern int g_ledBright;                    // % яркости ленты
 extern int g_scrBright;                    // % яркости экрана
+extern int g_dimIdx;                       // авто-приглушение: индекс в DIM_SECS (0 — выкл)
+static const uint16_t DIM_SECS[] = { 0, 30, 60, 300 };
+static const int N_DIMS = sizeof(DIM_SECS) / sizeof(DIM_SECS[0]);
 
 void settingsBegin();                      // загрузить и применить
 void applyBrightness();
