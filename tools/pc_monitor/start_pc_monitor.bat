@@ -35,6 +35,13 @@ if errorlevel 1 (
   echo Готово!
 )
 
+rem ---- 2б. по желанию: pycaw — чтобы палка видела громкость в процентах ----
+%PY% -c "import pycaw" >nul 2>nul
+if errorlevel 1 (
+  echo Ставлю библиотеку pycaw ^(громкость в процентах на палке^)...
+  %PY% -m pip install --user --disable-pip-version-check pycaw >nul 2>nul
+)
+
 rem ---- 3. запускаем ----
 %PY% pc_monitor.py
 echo.

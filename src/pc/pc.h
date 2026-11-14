@@ -24,11 +24,17 @@ struct PcStat {
   int      bat = -1; bool plug = false;   // батарея ноута (-1 — нет)
   uint32_t up = 0;                    // время работы ноута, с
   char     top[24] = "", host[24] = "";
+  int      vol = -1; bool mute = false;  // громкость ноута (если программа смогла её узнать)
+  uint32_t volT = 0;                  // когда пришла громкость
   float    cpuH[PC_HIST] = {}, ramH[PC_HIST] = {};
   int      histN = 0;
 };
 extern PcStat g_pc;
-extern int    g_pcPage;               // 0 — обзор, 1 — ядра
+extern int    g_pcPage;               // 0 — обзор, 1 — ядра, 2 — музыка (колесо = громкость)
+#define PC_PAGES 3
+// пульт: что и когда палка последний раз отправила ноуту (для анимации экрана)
+extern int      g_pcLastCmd;          // +1 громче, -1 тише, 2 пауза/играть, 3 без звука
+extern uint32_t g_pcLastCmdMs;
 
 void pcPoll(uint32_t now);            // каждый проход loop(): читать USB
 bool pcLive(uint32_t now);            // данные свежие (< 3 с)
@@ -36,5 +42,6 @@ bool pcLive(uint32_t now);            // данные свежие (< 3 с)
 void drawPc(uint32_t now);
 void drawPcCores(uint32_t now);
 void drawPcWaiting(uint32_t now);
+void drawPcMedia(uint32_t now);
 
 extern const Section pcSection;

@@ -7,6 +7,8 @@
 
 PcStat g_pc;
 int    g_pcPage = 0;
+int      g_pcLastCmd = 0;
+uint32_t g_pcLastCmdMs = 0;
 
 static char   s_line[512];
 static size_t s_len = 0;
@@ -21,7 +23,17 @@ static void parseList(const char* v, uint8_t* out, int& n) {
   }
 }
 
+static void parseVol(char* s) {                      // "PV vol=35 mute=0" — громкость ноута
+  char* save = nullptr;
+  for (char* tok = strtok_r(s + 3, " ", &save); tok; tok = strtok_r(nullptr, " ", &save)) {
+    if (!strncmp(tok, "vol=", 4))  g_pc.vol = constrain(atoi(tok + 4), 0, 100);
+    if (!strncmp(tok, "mute=", 5)) g_pc.mute = atoi(tok + 5) != 0;
+  }
+  g_pc.volT = millis();
+}
+
 static void parseLine(char* s) {
+  if (!strncmp(s, "PV ", 3)) { parseVol(s); return; }
   if (strncmp(s, "PC ", 3) != 0) return;            // не наша строка — пропускаем
   PcStat& p = g_pc;
   char* save = nullptr;
@@ -71,6 +83,16 @@ void pcPoll(uint32_t) {
 // «связи нет» — только после 10 с тишины (Windows иногда притормаживает отправку)
 bool pcLive(uint32_t now) { return g_pc.have && msSince(now, g_pc.t) < 10000; }
 
+// ---------- пульт: команды ноутбуку ----------
+// Программа на ноуте читает строки «KEY ...» и нажимает мультимедийные клавиши.
+static void pcSend(const char* cmd, int code) {
+  g_pcLastCmd = code; g_pcLastCmdMs = millis();
+  if (!pcLive(millis())) return;                     // программа не запущена — некому слать
+  if (Serial.availableForWrite() < 16) return;       // не ждать, если ноут не читает
+  Serial.print(cmd);
+  Serial.print('\n');
+}
+
 // ---------- раздел ----------
 static void pcSubtitle(char* out, size_t n) {
   if (pcLive(millis())) snprintf(out, n, "%d%% cpu", (int)g_pc.cpu);
@@ -78,22 +100,31 @@ static void pcSubtitle(char* out, size_t n) {
 }
 static void pcEnter() { g_pcPage = 0; }
 static void pcLeave() {}
-static void pcClick() { g_pcPage = (g_pcPage + 1) % 2; }
+static void pcClick() {
+  if (g_pcPage == 2) pcSend("KEY PLAY", 2);          // на странице музыки — пауза/играть
+  else g_pcPage = (g_pcPage + 1) % PC_PAGES;
+}
 static void pcRotate(int dir) {
+  if (g_pcPage == 2) { pcSend(dir > 0 ? "KEY VOLUP" : "KEY VOLDN", dir > 0 ? 1 : -1); return; }   // колесо = громкость
   static uint32_t last = 0;
   if (millis() - last < 150) return;
   last = millis();
-  g_pcPage = (g_pcPage + dir + 2) % 2;
+  g_pcPage = (g_pcPage + dir + PC_PAGES) % PC_PAGES;
+}
+static bool pcBack() {                               // со страницы музыки боковая — на обзор, а не из раздела
+  if (g_pcPage == 2) { g_pcPage = 0; return true; }
+  return false;
 }
 static void pcDraw(uint32_t now) {
   if (!pcLive(now)) drawPcWaiting(now);
   else if (g_pcPage == 0) drawPc(now);
-  else drawPcCores(now);
+  else if (g_pcPage == 1) drawPcCores(now);
+  else drawPcMedia(now);
 }
 
 const Section pcSection = {
   "PC", 120, 220, 200, iconLaptop, pcSubtitle,
   pcEnter, pcLeave,
   0, nullptr, nullptr, nullptr, nullptr,
-  pcClick, pcRotate, nullptr, nullptr, pcDraw,
+  pcClick, pcRotate, pcBack, nullptr, pcDraw,
 };

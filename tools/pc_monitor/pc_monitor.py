@@ -5,6 +5,10 @@ Radio Radar — монитор нагрузки ноутбука.
 Раз в секунду смотрит загрузку процессора, память, диск, сеть и батарею
 и отправляет это на палку по USB-кабелю. Палка показывает всё в разделе PC.
 
+Обратно палка присылает команды пульта (страница «Media» в разделе PC):
+  KEY VOLUP / KEY VOLDN — громче / тише, KEY PLAY — пауза/играть.
+Программа нажимает за тебя мультимедийные клавиши Windows.
+
 Запускать двойным кликом по start_pc_monitor.bat (он сам всё поставит).
 Остановить — закрыть окно или нажать Ctrl+C.
 """
@@ -24,6 +28,49 @@ except ImportError:
     sys.exit(1)
 
 ESP_VID = 0x303A          # «код производителя» USB у чипов Espressif (наша палка)
+
+# ---------- мультимедийные клавиши (только Windows) ----------
+IS_WIN = os.name == "nt"
+VK = {"VOLUP": 0xAF, "VOLDN": 0xAE, "MUTE": 0xAD, "PLAY": 0xB3, "NEXT": 0xB0, "PREV": 0xB1}
+if IS_WIN:
+    import ctypes
+    _user32 = ctypes.windll.user32
+
+
+def press(name):
+    """Нажать мультимедийную клавишу, как на клавиатуре ноутбука."""
+    code = VK.get(name)
+    if code is None or not IS_WIN:
+        return
+    _user32.keybd_event(code, 0, 0, 0)        # нажали
+    _user32.keybd_event(code, 0, 2, 0)        # отпустили
+
+
+# ---------- текущая громкость (если стоит библиотека pycaw; без неё палка просто не покажет %) ----------
+_vol_iface = None
+
+
+def read_volume():
+    """Вернуть (громкость 0..100, без звука?) или None."""
+    global _vol_iface
+    if not IS_WIN:
+        return None
+    try:
+        if _vol_iface is None:
+            from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
+            spk = AudioUtilities.GetSpeakers()
+            if hasattr(spk, "EndpointVolume"):           # новые версии pycaw
+                _vol_iface = spk.EndpointVolume
+            else:                                        # старые версии pycaw
+                from comtypes import CLSCTX_ALL
+                from ctypes import POINTER, cast
+                raw = spk.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
+                _vol_iface = cast(raw, POINTER(IAudioEndpointVolume))
+        level = _vol_iface.GetMasterVolumeLevelScalar()
+        return int(round(level * 100)), bool(_vol_iface.GetMute())
+    except Exception:
+        _vol_iface = None
+        return None
 
 
 def say(msg=""):
@@ -52,6 +99,7 @@ def open_port(name):
     s.dtr = False             # иначе палка может перезагрузиться при подключении
     s.rts = False
     s.write_timeout = 2
+    s.timeout = 1             # чтение команд от палки: ждать строку не больше секунды
     s.open()
     return s
 
@@ -152,6 +200,25 @@ class Collector:
         return " ".join(parts) + "\n", cpu, vm.percent
 
 
+def reader(port, wake):
+    """Отдельный поток: слушает команды от палки и сразу их выполняет."""
+    while True:
+        try:
+            raw = port.readline()                # ждёт строку (до 1 с), потом снова
+        except Exception:
+            return                               # порт закрыли — поток заканчивается
+        if not raw:
+            continue
+        line = raw.decode("ascii", "ignore").strip()
+        if line.startswith("KEY "):
+            name = line[4:].strip()
+            press(name)
+            label = {"VOLUP": "громче", "VOLDN": "тише", "PLAY": "пауза/играть"}.get(name, name)
+            sys.stdout.write("\r     пульт: %-14s                              " % label)
+            sys.stdout.flush()
+            wake.set()                           # сразу отправить новую громкость
+
+
 def main():
     forced = None
     if len(sys.argv) > 2 and sys.argv[1] == "--port":
@@ -165,6 +232,7 @@ def main():
     port = None
     warned = False
     next_t = time.monotonic()
+    wake = threading.Event()
     while True:
         # 1. найти и открыть палку
         if port is None:
@@ -181,7 +249,9 @@ def main():
                 port = open_port(name)
                 say("")
                 say("[OK] Палка найдена: %s. Отправляю данные. Открой на палке раздел PC." % name)
+                say("     Колесо громкости: в разделе PC прокрути колесом до страницы Media.")
                 warned = False
+                threading.Thread(target=reader, args=(port, wake), daemon=True).start()
             except Exception as e:
                 text = str(e).lower()
                 if "denied" in text or "busy" in text or "permission" in text or "отказано" in text:
@@ -193,8 +263,19 @@ def main():
                 continue
         # 2. отправить показатели
         try:
+            if wake.is_set():                    # только что крутили колесо — громкость сразу
+                wake.clear()
+                time.sleep(0.05)                 # Windows нужно мгновение, чтобы применить
+                v = read_volume()
+                if v:
+                    port.write(("PV vol=%d mute=%d\n" % (v[0], 1 if v[1] else 0)).encode())
+                wake.wait(max(0.0, next_t - time.monotonic()))   # и дальше ждём до своей секунды
+                continue
             line, cpu, ram = col.line()
             port.write(line.encode("ascii", "replace"))
+            v = read_volume()
+            if v:
+                port.write(("PV vol=%d mute=%d\n" % (v[0], 1 if v[1] else 0)).encode())
             sys.stdout.write("\r     CPU %3d%%   RAM %3d%%   -> %s   " % (cpu, ram, port.port))
             sys.stdout.flush()
         except Exception:
@@ -211,7 +292,7 @@ def main():
         if wait < 0:
             next_t = time.monotonic()
             wait = 0
-        time.sleep(wait)
+        wake.wait(wait)                          # проснуться раньше, если крутили колесо
 
 
 if __name__ == "__main__":

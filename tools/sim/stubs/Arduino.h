@@ -76,5 +76,8 @@ struct SimSerial {
   int available() { return (int)(buf.size() - pos); }
   int read() { return pos < buf.size() ? (unsigned char)buf[pos++] : -1; }
   void feed(const char* s) { buf += s; }
+  int availableForWrite() { return 64; }
+  void print(const char*) {}
+  void print(char) {}
 };
 inline SimSerial Serial;

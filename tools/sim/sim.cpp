@@ -353,6 +353,9 @@ int main(int argc, char** argv) {
   g_pc.t = s_now;
   drawPc(s_now);             snap("71_pc_overview");
   drawPcCores(s_now);        snap("72_pc_cores");
+  Serial.feed("PV vol=42 mute=0\n"); pcPoll(0); g_pc.volT = s_now;
+  g_pcLastCmd = 1; g_pcLastCmdMs = s_now - 120;
+  drawPcMedia(s_now);        snap("73_pc_media");
   drawSpectrum();            snap("30_subghz_spectrum");
   drawMonitor(s_now);        snap("31_subghz_monitor");
   return 0;

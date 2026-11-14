@@ -3,6 +3,7 @@
 //
 //  ОБЗОР — CPU крупно + график за минуту; справа RAM, диск, сеть, батарея
 //  ЯДРА  — загрузка каждого ядра столбиками
+//  МУЗЫКА — колесо крутит громкость ноутбука, нажатие — пауза/играть
 //  ЖДЁМ  — если ноутбук ничего не присылает: что сделать по шагам
 // ============================================================
 #include "core/timeutil.h"
@@ -29,7 +30,7 @@ static void bar(int x, int y, int w, int h, float pct, uint16_t col) {
 }
 static void pageDots(int page) {
   int W = spr.width();
-  for (int p = 0; p < 2; p++) spr.fillRect(W / 2 - 8 + p * 10, UI_BOTTOM + 2, 6, 2, p == page ? C_ACC() : UI_LINE());
+  for (int p = 0; p < PC_PAGES; p++) spr.fillRect(W / 2 - PC_PAGES * 5 + p * 10, UI_BOTTOM + 2, 6, 2, p == page ? C_ACC() : UI_LINE());
 }
 
 void drawPc(uint32_t now) {
@@ -158,5 +159,49 @@ void drawPcWaiting(uint32_t now) {
   int k = (now / 300) % 4;
   for (int i = 0; i < 3; i++) spr.fillRect(W - UI_M - 30 + i * 8, UI_TOP + 112, 5, 5, i < k ? C_ACC() : UI_LINE());
   uiFooter("", "side: back");
+  present();
+}
+
+// ---------- МУЗЫКА: пульт громкости ----------
+void drawPcMedia(uint32_t now) {
+  const PcStat& p = g_pc;
+  const int W = spr.width();
+  char buf[32];
+  spr.fillSprite(C_BG());
+  bool known = p.vol >= 0 && msSince(now, p.volT) < 15000;
+  uiHeader("Media", p.host[0] ? p.host : "laptop");
+  const int cx = W / 2, cy = 112, r = 64;
+  uint32_t since = msSince(now, g_pcLastCmdMs);
+  bool fresh = since < 400;
+  uint16_t col = p.mute ? UI_DIM() : (fresh ? C_HOT() : C_ACC());
+  drawArcGauge(cx, cy, r, 10, known ? p.vol : 0, col, UI_LINE(), C_BG());
+  spr.setTextDatum(MC_DATUM);
+  if (known) {
+    snprintf(buf, sizeof(buf), "%d", p.vol);
+    spr.setTextColor(p.mute ? UI_DIM() : C_HOT());
+    txt(buf, cx, cy - 22, 6);
+    spr.setTextColor(UI_LABEL());
+    txt(p.mute ? "MUTED" : "VOLUME", cx, cy + 6, 1);
+  } else {
+    spr.setTextColor(C_HOT());
+    txt("VOL", cx, cy - 22, 4);
+    spr.setTextColor(UI_DIM());
+    txt("LEVEL UNKNOWN", cx, cy + 4, 1);
+  }
+  // отклик на действие: стрелка громче/тише или значок паузы
+  if (fresh) {
+    int k = 255 - (int)(since * 255 / 400);
+    uint16_t fc = tft.color565(k, k, k);
+    if (g_pcLastCmd == 1)  { spr.fillTriangle(cx + 84, cy - 30, cx + 74, cy - 14, cx + 94, cy - 14, fc); }
+    if (g_pcLastCmd == -1) { spr.fillTriangle(cx - 84, cy - 14, cx - 94, cy - 30, cx - 74, cy - 30, fc); }
+    if (g_pcLastCmd == 2)  { spr.fillRect(cx - 11, cy + 18, 7, 16, fc); spr.fillRect(cx + 4, cy + 18, 7, 16, fc); }
+  }
+  spr.setTextDatum(TL_DATUM);
+  spr.setTextColor(UI_DIM());
+  txt("-", UI_M + 8, cy - 4, 4);
+  spr.setTextDatum(TR_DATUM);
+  txt("+", W - UI_M - 8, cy - 4, 4);
+  uiFooter("wheel: volume  click: play/pause", "side: back");
+  pageDots(2);
   present();
 }
