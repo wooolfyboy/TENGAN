@@ -355,7 +355,10 @@ int main(int argc, char** argv) {
   drawPcCores(s_now);        snap("72_pc_cores");
   Serial.feed("PV vol=42 mute=0\n"); pcPoll(0); g_pc.volT = s_now;
   g_pcLastCmd = 1; g_pcLastCmdMs = s_now - 120;
+  Serial.feed("PM\t1\t63\t215\tSpotify\tГруппа крови (Remastered 2024 Edition)\tКино\n"); pcPoll(0); g_pc.trkT = s_now;
   drawPcMedia(s_now);        snap("73_pc_media");
+  Serial.feed("PM\n"); pcPoll(0); g_pc.trkT = s_now;
+  drawPcMedia(s_now);        snap("74_pc_media_idle");
   drawSpectrum();            snap("30_subghz_spectrum");
   drawMonitor(s_now);        snap("31_subghz_monitor");
   return 0;

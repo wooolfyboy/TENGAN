@@ -26,6 +26,12 @@ struct PcStat {
   char     top[24] = "", host[24] = "";
   int      vol = -1; bool mute = false;  // громкость ноута (если программа смогла её узнать)
   uint32_t volT = 0;                  // когда пришла громкость
+  // что играет (Windows: системная панель «Сейчас играет» — Spotify, YouTube в браузере и т.д.)
+  bool     trk = false;               // есть ли трек
+  bool     playing = false;
+  int      pos = -1, dur = -1;        // секунды (-1 — неизвестно)
+  uint32_t trkT = 0;                  // когда пришло (позицию между обновлениями досчитываем сами)
+  char     title[96] = "", artist[72] = "", app[24] = "";   // UTF-8 (русские буквы — по 2 байта)
   float    cpuH[PC_HIST] = {}, ramH[PC_HIST] = {};
   int      histN = 0;
 };

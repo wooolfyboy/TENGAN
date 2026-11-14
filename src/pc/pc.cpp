@@ -32,8 +32,28 @@ static void parseVol(char* s) {                      // "PV vol=35 mute=0" — �
   g_pc.volT = millis();
 }
 
+// "PM\t<играет 0/1>\t<поз>\t<длит>\t<прил.>\t<название>\t<исполнитель>" (поля через TAB:
+// в названиях бывают пробелы). Пустое "PM" — ничего не играет.
+static void copyField(char* dst, size_t cap, const char* src) { strncpy(dst, src ? src : "", cap - 1); dst[cap - 1] = 0; }
+static void parseMedia(char* s) {
+  PcStat& p = g_pc;
+  char* f[7] = {};
+  int n = 0;
+  char* save = nullptr;
+  for (char* tok = strtok_r(s, "\t", &save); tok && n < 7; tok = strtok_r(nullptr, "\t", &save)) f[n++] = tok;
+  p.trkT = millis();
+  if (n < 6) { p.trk = false; p.title[0] = p.artist[0] = p.app[0] = 0; return; }
+  p.trk = true;
+  p.playing = atoi(f[1]) != 0;
+  p.pos = atoi(f[2]); p.dur = atoi(f[3]);
+  copyField(p.app, sizeof(p.app), f[4]);
+  copyField(p.title, sizeof(p.title), f[5]);
+  copyField(p.artist, sizeof(p.artist), n > 6 ? f[6] : "");
+}
+
 static void parseLine(char* s) {
   if (!strncmp(s, "PV ", 3)) { parseVol(s); return; }
+  if (!strncmp(s, "PM", 2) && (s[2] == '\t' || s[2] == 0)) { parseMedia(s); return; }
   if (strncmp(s, "PC ", 3) != 0) return;            // не наша строка — пропускаем
   PcStat& p = g_pc;
   char* save = nullptr;

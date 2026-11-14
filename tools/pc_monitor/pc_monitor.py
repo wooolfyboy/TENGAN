@@ -13,10 +13,12 @@ Radio Radar — монитор нагрузки ноутбука.
 Остановить — закрыть окно или нажать Ctrl+C.
 """
 import os
+import asyncio
 import socket
 import sys
 import threading
 import time
+import unicodedata
 
 try:
     import psutil
@@ -200,6 +202,106 @@ class Collector:
         return " ".join(parts) + "\n", cpu, vm.percent
 
 
+# ---------- что сейчас играет (Windows: панель «Сейчас воспроизводится») ----------
+# Нужна библиотека winrt (её ставит start_pc_monitor.bat); без неё палка просто
+# не покажет название трека — всё остальное работает.
+_media_mgr_cls = None
+try:
+    from winrt.windows.media.control import GlobalSystemMediaTransportControlsSessionManager as _media_mgr_cls
+except Exception:
+    try:
+        from winsdk.windows.media.control import GlobalSystemMediaTransportControlsSessionManager as _media_mgr_cls
+    except Exception:
+        _media_mgr_cls = None
+
+PUNCT = {"\u2014": "-", "\u2013": "-", "\u2012": "-", "\u2212": "-", "\u2018": "'", "\u2019": "'", "\u201c": '"',
+         "\u201d": '"', "\u00ab": '"', "\u00bb": '"', "\u2026": "...", "\u00a0": " ", "\u00d7": "x", "\u2022": "*"}
+
+
+def screen_text(text, limit):
+    """Оставить то, что палка умеет рисовать: латиница, цифры, знаки и русские буквы."""
+    out = []
+    for ch in text or "":
+        ch = PUNCT.get(ch, ch)
+        if len(ch) > 1:
+            out.append(ch)
+            continue
+        o = ord(ch)
+        if 0x20 <= o < 0x7F or 0x400 <= o <= 0x45F:
+            out.append(ch)
+        elif ch in "\t\r\n":
+            out.append(" ")
+        else:                                     # é -> e, остальное (иероглифы, эмодзи) — пропускаем
+            base = unicodedata.normalize("NFKD", ch)[0]
+            if 0x20 <= ord(base) < 0x7F:
+                out.append(base)
+    s = " ".join("".join(out).split())
+    while len(s.encode("utf-8")) > limit:
+        s = s[:-1]
+    return s
+
+
+def app_name(aumid):
+    a = (aumid or "").lower()
+    for key, name in (("spotify", "Spotify"), ("chrome", "Chrome"), ("msedge", "Edge"), ("firefox", "Firefox"),
+                      ("yandex", "Yandex"), ("opera", "Opera"), ("vlc", "VLC"), ("telegram", "Telegram"),
+                      ("zune", "Media Player"), ("music", "Music"), ("aimp", "AIMP"), ("foobar", "foobar"),
+                      ("308046b0af4a39cb", "Firefox")):
+        if key in a:
+            return name
+    tail = a.replace("\\", "!").split("!")[-1].split(".exe")[0]
+    return screen_text(tail[:14] or "player", 14)
+
+
+class NowPlaying:
+    """В отдельном потоке раз в секунду спрашивает Windows, что играет."""
+    def __init__(self):
+        self.line = None                          # готовая строка для палки
+        self.ok = _media_mgr_cls is not None
+        if self.ok:
+            threading.Thread(target=self._run, daemon=True).start()
+
+    def _run(self):
+        loop = asyncio.new_event_loop()
+        mgr = None
+        while True:
+            try:
+                if mgr is None:
+                    mgr = loop.run_until_complete(_media_mgr_cls.request_async())
+                self.line = loop.run_until_complete(self._read(mgr))
+            except Exception:
+                mgr = None
+                self.line = "PM\n"
+            time.sleep(1)
+
+    @staticmethod
+    async def _read(mgr):
+        s = mgr.get_current_session()
+        if s is None:
+            return "PM\n"
+        props = await s.try_get_media_properties_async()
+        info = s.get_playback_info()
+        tl = s.get_timeline_properties()
+        playing = 1 if int(info.playback_status) == 4 else 0      # 4 — играет, 5 — пауза
+
+        def secs(v):
+            try:
+                return int(v.total_seconds())
+            except Exception:
+                try:
+                    return int(v.duration / 10000000)             # старые версии: 100-нс тики
+                except Exception:
+                    return -1
+        pos, dur = secs(tl.position), secs(tl.end_time)
+        if dur <= 0:
+            pos = dur = -1
+        title = screen_text(props.title, 90)
+        artist = screen_text(props.artist or props.album_artist, 70)
+        if not title and not artist:
+            return "PM\n"
+        return "PM\t%d\t%d\t%d\t%s\t%s\t%s\n" % (playing, pos, dur, app_name(s.source_app_user_model_id), title, artist)
+
+
 def reader(port, wake):
     """Отдельный поток: слушает команды от палки и сразу их выполняет."""
     while True:
@@ -229,6 +331,9 @@ def main():
     say("  Остановить — закрыть окно (или Ctrl+C).")
     say("=" * 56)
     col = Collector()
+    media = NowPlaying()
+    if not media.ok and IS_WIN:
+        say("  (Название трека не будет видно: нет библиотеки winrt. Громкость работает.)")
     port = None
     warned = False
     next_t = time.monotonic()
@@ -276,6 +381,8 @@ def main():
             v = read_volume()
             if v:
                 port.write(("PV vol=%d mute=%d\n" % (v[0], 1 if v[1] else 0)).encode())
+            if media.line:
+                port.write(media.line.encode("utf-8"))
             sys.stdout.write("\r     CPU %3d%%   RAM %3d%%   -> %s   " % (cpu, ram, port.port))
             sys.stdout.flush()
         except Exception:
