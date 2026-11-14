@@ -206,13 +206,15 @@ class Collector:
 # Нужна библиотека winrt (её ставит start_pc_monitor.bat); без неё палка просто
 # не покажет название трека — всё остальное работает.
 _media_mgr_cls = None
+_media_import_err = ""
 try:
     from winrt.windows.media.control import GlobalSystemMediaTransportControlsSessionManager as _media_mgr_cls
-except Exception:
+except Exception as e1:
     try:
         from winsdk.windows.media.control import GlobalSystemMediaTransportControlsSessionManager as _media_mgr_cls
     except Exception:
         _media_mgr_cls = None
+        _media_import_err = "%s: %s" % (type(e1).__name__, e1)
 
 PUNCT = {"\u2014": "-", "\u2013": "-", "\u2012": "-", "\u2212": "-", "\u2018": "'", "\u2019": "'", "\u201c": '"',
          "\u201d": '"', "\u00ab": '"', "\u00bb": '"', "\u2026": "...", "\u00a0": " ", "\u00d7": "x", "\u2022": "*"}
@@ -253,26 +255,95 @@ def app_name(aumid):
     return screen_text(tail[:14] or "player", 14)
 
 
+def window_track():
+    """Запасной способ: название из заголовка окна (Spotify, вкладка YouTube)."""
+    if not IS_WIN:
+        return None
+    found = []
+    titles = []
+
+    @ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
+    def cb(hwnd, _):
+        if _user32.IsWindowVisible(hwnd):
+            n = _user32.GetWindowTextLengthW(hwnd)
+            if n > 0:
+                buf = ctypes.create_unicode_buffer(n + 1)
+                _user32.GetWindowTextW(hwnd, buf, n + 1)
+                pid = ctypes.c_ulong()
+                _user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+                titles.append((buf.value, pid.value))
+        return True
+    _user32.EnumWindows(cb, 0)
+    for title, pid in titles:
+        try:
+            pname = psutil.Process(pid).name().lower()
+        except Exception:
+            pname = ""
+        if pname == "spotify.exe" and " - " in title:          # играет: «Исполнитель - Песня»
+            artist, song = title.split(" - ", 1)
+            found.append(("Spotify", song, artist))
+        elif " - YouTube" in title:                             # вкладка YouTube: «Песня - YouTube - Google Chrome»
+            found.append(("YouTube", title.split(" - YouTube")[0], ""))
+    if not found:
+        return None
+    app, song, artist = found[0]
+    return "PM\t1\t-1\t-1\t%s\t%s\t%s\n" % (app, screen_text(song, 90), screen_text(artist, 70))
+
+
 class NowPlaying:
-    """В отдельном потоке раз в секунду спрашивает Windows, что играет."""
+    """В отдельном потоке раз в секунду узнаёт, что играет, и пишет в окно, что нашёл."""
     def __init__(self):
         self.line = None                          # готовая строка для палки
-        self.ok = _media_mgr_cls is not None
+        self.ok = _media_mgr_cls is not None or IS_WIN
+        self.err = None
+        self.shown = None
         if self.ok:
             threading.Thread(target=self._run, daemon=True).start()
 
+    def _note(self, text):
+        say("")
+        say("     " + text)
+
     def _run(self):
         loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         mgr = None
         while True:
-            try:
-                if mgr is None:
-                    mgr = loop.run_until_complete(_media_mgr_cls.request_async())
-                self.line = loop.run_until_complete(self._read(mgr))
-            except Exception:
-                mgr = None
-                self.line = "PM\n"
+            line, how = None, ""
+            if _media_mgr_cls is not None:
+                try:
+                    if mgr is None:
+                        mgr = loop.run_until_complete(self._request())
+                    line = loop.run_until_complete(self._read(mgr))
+                    how = "Windows"
+                    if self.err:
+                        self.err = None
+                except Exception as e:
+                    mgr = None
+                    msg = "%s: %s" % (type(e).__name__, e)
+                    if msg != self.err:                      # одну и ту же ошибку пишем один раз
+                        self.err = msg
+                        self._note("[трек] системная панель не ответила: " + msg[:150])
+            if (line is None or line == "PM\n") and IS_WIN:
+                try:
+                    w = window_track()
+                    if w:
+                        line, how = w, "заголовок окна"
+                except Exception as e:
+                    msg = "window: %s" % e
+                    if msg != self.err:
+                        self.err = msg
+                        self._note("[трек] " + msg[:150])
+            self.line = line or "PM\n"
+            shown = self.line.strip().split("\t")[4:6]
+            if shown != self.shown:                          # трек сменился — написать в окно
+                self.shown = shown
+                self._note("[трек] " + (" | ".join(shown) + "  (" + how + ")" if shown else "ничего не играет"))
             time.sleep(1)
+
+    @staticmethod
+    async def _request():
+        return await _media_mgr_cls.request_async()
 
     @staticmethod
     async def _read(mgr):
@@ -332,8 +403,12 @@ def main():
     say("=" * 56)
     col = Collector()
     media = NowPlaying()
-    if not media.ok and IS_WIN:
-        say("  (Название трека не будет видно: нет библиотеки winrt. Громкость работает.)")
+    if IS_WIN:
+        if _media_mgr_cls is not None:
+            say("  Название трека: через системную панель Windows (winrt).")
+        else:
+            say("  Название трека: winrt не загрузился (%s)." % _media_import_err[:120])
+            say("  Беру название из заголовка окна Spotify / вкладки YouTube.")
     port = None
     warned = False
     next_t = time.monotonic()
