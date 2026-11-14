@@ -19,6 +19,7 @@
 #include <vector>
 #include <algorithm>
 #include <atomic>
+#include "core/timeutil.h"
 #include "core/settings.h"
 #include "wifi/wifi.h"
 #include "core/board.h"
@@ -229,7 +230,7 @@ static void wifiScanTick(uint32_t now) {
   if (g_scanCh == 0) {                       // полный проход
     g_wEverScanned = true;
     for (auto it = g_aps.begin(); it != g_aps.end(); )
-      if (now - it->second.t > AP_REMEMBER_MS) it = g_aps.erase(it); else ++it;
+      if (msSince(now, it->second.t) > AP_REMEMBER_MS) it = g_aps.erase(it); else ++it;
     if (g_wDetail && g_wSel) {               // история для подробностей
       if (g_wSparkFor != g_wSel) { g_wSparkFor = g_wSel; g_wSparkN = 0; }
       auto it = g_aps.find(g_wSel);
@@ -296,7 +297,7 @@ static void wifiHopTick(uint32_t now) {
     if (g_actHistN < ACT_HIST_N) g_actHist[g_actHistN++] = tot;
     else { memmove(g_actHist, g_actHist + 1, sizeof(float) * (ACT_HIST_N - 1)); g_actHist[ACT_HIST_N - 1] = tot; }
     for (auto it = g_stas.begin(); it != g_stas.end(); )
-      if (now - it->second.t > STA_REMEMBER_MS) it = g_stas.erase(it); else ++it;
+      if (msSince(now, it->second.t) > STA_REMEMBER_MS) it = g_stas.erase(it); else ++it;
     for (auto it = g_probes.begin(); it != g_probes.end(); )
       if (now - it->second > STA_REMEMBER_MS) it = g_probes.erase(it); else ++it;
   }

@@ -5,6 +5,7 @@
 //  Все экраны собраны из компонентов core/ui.h по общей сетке.
 // ============================================================
 #include <algorithm>
+#include "core/timeutil.h"
 #include "ble/ble_model.h"
 #include "ble/vendors.h"
 #include "core/display.h"
@@ -324,7 +325,7 @@ void drawDetail(const Dev& d, const Ent& e, bool inMap, uint32_t now) {
   txt(bu, UI_M + 20, UI_TOP + 26, 1);
 
   // показатели: 3 колонки × 2 ряда
-  uint32_t ago = (now - e.t) / 1000;
+  uint32_t ago = msSince(now, e.t) / 1000;
   int x0 = UI_M + 8, y0 = UI_TOP + 40, cw = 64;
   if (!inMap) { uiReadout(x0, y0, "signal", "lost", C_ALERT()); }
   else { snprintf(tmp, sizeof(tmp), "%d", e.rssi); uiReadout(x0, y0, ago >= 3 ? "signal (old)" : "signal", tmp, heat(e.rssi)); }
@@ -407,7 +408,7 @@ void drawWeather(const std::vector<Sensor>& ss, uint32_t now) {
     spr.setTextDatum(TL_DATUM);
     spr.setTextColor(UI_LABEL());
     txt(bu, UI_M + 8, y, 1);
-    uint32_t ago = (now - S.t) / 1000;
+    uint32_t ago = msSince(now, S.t) / 1000;
     int n = 0;
     if (S.r.hasB) n += snprintf(buf + n, sizeof(buf) - n, "BAT %d%%  ", S.r.batt);
     if (ago < 60) snprintf(buf + n, sizeof(buf) - n, "%luS AGO", (unsigned long)ago);

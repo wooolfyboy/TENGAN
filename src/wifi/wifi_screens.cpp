@@ -5,6 +5,7 @@
 //  Все экраны собраны из компонентов core/ui.h по общей сетке.
 // ============================================================
 #include <esp_wifi.h>
+#include "core/timeutil.h"
 #include "core/settings.h"
 #include "wifi/wifi_model.h"
 #include "core/board.h"
@@ -82,7 +83,7 @@ void drawNets(uint32_t now) {
     if (a.enc == WIFI_AUTH_WEP) tag = "WEP";
     spr.setTextColor(alert ? C_ALERT() : UI_LABEL());
     txt(tag, 196, cy, 1);
-    bool stale = now - a.t > 6000;
+    bool stale = msSince(now, a.t) > 6000;
     spr.setTextDatum(MR_DATUM);
     spr.setTextColor(stale ? UI_DIM() : heat(a.rssi));
     txtNum(a.rssi, 266, cy, 2);
@@ -131,13 +132,13 @@ void drawNetDetail(uint32_t now) {
     float d = fabsf(apCenter(kv.second) - apCenter(a));
     if (d < 0.5f) sameCh++; else if (d < apHalf(kv.second) + apHalf(a)) near++;
   }
-  uint32_t ago = (now - a.t) / 1000;
+  uint32_t ago = msSince(now, a.t) / 1000;
   int x0 = UI_M + 8, y0 = UI_TOP + 40, cw = 64;
   snprintf(tmp, sizeof(tmp), "%d", a.rssi);
   uiReadout(x0, y0, ago >= 6 ? "signal (old)" : "signal", tmp, heat(a.rssi));
   snprintf(tmp, sizeof(tmp), "%d/%d", a.rmin, a.rmax);
   uiReadout(x0 + cw, y0, "range", tmp, C_HOT());
-  uint32_t secs = (now - a.first) / 1000;
+  uint32_t secs = msSince(now, a.first) / 1000;
   snprintf(tmp, sizeof(tmp), "%lu:%02lu", (unsigned long)(secs / 60), (unsigned long)(secs % 60));
   uiReadout(x0 + 2 * cw, y0, "seen", tmp, C_HOT());
   snprintf(tmp, sizeof(tmp), "%d+%d", sameCh, near);

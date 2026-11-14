@@ -5,6 +5,7 @@
 //  ЯДРА  — загрузка каждого ядра столбиками
 //  ЖДЁМ  — если ноутбук ничего не присылает: что сделать по шагам
 // ============================================================
+#include "core/timeutil.h"
 #include "pc/pc.h"
 #include "core/display.h"
 #include "core/theme.h"
@@ -36,7 +37,7 @@ void drawPc(uint32_t now) {
   const int W = spr.width();
   char buf[40], a[16], b[16];
   spr.fillSprite(C_BG());
-  uint32_t age = (now - p.t) / 1000;
+  uint32_t age = msSince(now, p.t) / 1000;
   char hdr[32];
   if (age >= 3) snprintf(hdr, sizeof(hdr), "no data %lus", (unsigned long)age);   // короткая пауза — цифры старые
   uiHeader("PC", age >= 3 ? hdr : (p.host[0] ? p.host : "laptop"), p.cpu >= 90);

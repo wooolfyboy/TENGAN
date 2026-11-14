@@ -1,6 +1,7 @@
 // ============================================================
 //  pc.cpp — раздел PC: приём строк с ноутбука по USB и сам раздел
 // ============================================================
+#include "core/timeutil.h"
 #include "pc/pc.h"
 #include "core/display.h"
 
@@ -68,7 +69,7 @@ void pcPoll(uint32_t) {
 }
 
 // «связи нет» — только после 10 с тишины (Windows иногда притормаживает отправку)
-bool pcLive(uint32_t now) { return g_pc.have && now - g_pc.t < 10000; }
+bool pcLive(uint32_t now) { return g_pc.have && msSince(now, g_pc.t) < 10000; }
 
 // ---------- раздел ----------
 static void pcSubtitle(char* out, size_t n) {
