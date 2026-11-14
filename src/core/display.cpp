@@ -9,10 +9,14 @@ TFT_eSPI    tft;
 TFT_eSprite spr = TFT_eSprite(&tft);
 
 void displayBegin() {
+  // подсветка включается только после очистки экрана: иначе на долю секунды
+  // видно «мусор» из памяти дисплея (часто красный)
+  pinMode(TFT_BL, OUTPUT); digitalWrite(TFT_BL, LOW);
   tft.init();
   tft.setRotation(3);
   tft.fillScreen(C_BG());
-  pinMode(TFT_BL, OUTPUT); digitalWrite(TFT_BL, HIGH);
+  delay(20);
+  digitalWrite(TFT_BL, HIGH);
   spr.setColorDepth(16);
   if (!spr.createSprite(tft.width(), tft.height())) {   // не хватило памяти — 8 бит на точку
     spr.setColorDepth(8);

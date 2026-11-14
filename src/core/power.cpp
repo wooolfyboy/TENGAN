@@ -64,6 +64,7 @@ void powerOff() {
 // удержания PWR_ON_MS, иначе (случайное касание) засыпаем обратно.
 void checkWakeHold() {
   gpio_hold_dis((gpio_num_t)TFT_BL);
+  pinMode(TFT_BL, OUTPUT); digitalWrite(TFT_BL, LOW);   // подсветка выкл, пока экран не очищен
   gpio_hold_dis((gpio_num_t)BOARD_PWR_EN);
   gpio_deep_sleep_hold_dis();
   if (esp_sleep_get_wakeup_cause() != ESP_SLEEP_WAKEUP_EXT0) return;   // обычное включение
