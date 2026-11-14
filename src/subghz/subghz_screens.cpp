@@ -63,7 +63,7 @@ void drawSpectrum() {
   spr.setTextDatum(TC_DATUM); txt(buf, W / 2, UI_BOTTOM - 6, 1);
   snprintf(buf, sizeof(buf), "%.2f", BANDS[g_band].hi);
   spr.setTextDatum(TR_DATUM); txt(buf, pr, UI_BOTTOM - 6, 1);
-  uiFooter("click: next band", "side: back");
+  uiFooter("wheel: screens  click: band", "side: back");
   present();
 }
 
@@ -124,7 +124,7 @@ void drawMonitor(uint32_t now) {
     spr.setTextColor(UI_DIM());
     txt("PRESS A CAR KEY OR GATE REMOTE NEARBY", tx, ly + 14, 1);
   }
-  uiFooter("click: next band", "side: back");
+  uiFooter("wheel: screens  click: band", "side: back");
   present();
 }
 
@@ -135,6 +135,6 @@ void drawCcMissing() {
   uiHeader("Sub-GHz", "radio not found", true);
   snprintf(buf, sizeof(buf), "chip answered 0x%02X", g_ccVersion);
   uiEmpty("CC1101 not found", buf);
-  uiFooter("", "side: back");
+  uiFooter("wheel: screens", "side: back");
   present();
 }

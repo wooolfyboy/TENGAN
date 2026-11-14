@@ -91,7 +91,7 @@ void drawTesseract(uint32_t now) {
 
   char buf[24]; speedLabel(buf, sizeof(buf));
   uiHeader("Tesseract", buf);
-  uiFooter("wheel: speed   click: back", "side: back");
+  uiFooter("wheel: speed", "side: back");
   present();
   (void)H;
 }
@@ -150,7 +150,7 @@ void drawTorus(uint32_t now) {
   }
   char buf[24]; speedLabel(buf, sizeof(buf));
   uiHeader("Torus", buf);
-  uiFooter("wheel: speed   click: back", "side: back");
+  uiFooter("wheel: speed", "side: back");
   present();
 }
 
@@ -249,7 +249,7 @@ void drawLife(uint32_t now) {
   char buf[40];
   snprintf(buf, sizeof(buf), "gen %lu  cells %d  x%.1f", (unsigned long)s_lfGen, s_lfPop, s_speed);
   uiHeader("Life", buf);
-  uiFooter("wheel: speed   click: new world", "side: back");
+  uiFooter("wheel: speed  click: new world", "side: back");
   present();
 }
 
@@ -328,7 +328,7 @@ void drawPendulum(uint32_t now) {
   spr.fillCircle(x2, y2, 5, C_HOT());
   char buf[24]; speedLabel(buf, sizeof(buf));
   uiHeader("Pendulum", buf);
-  uiFooter("wheel: speed   click: new swing", "side: back");
+  uiFooter("wheel: speed  click: new swing", "side: back");
   present();
 }
 
@@ -348,7 +348,7 @@ static int  galNow() { return g_gal; }
 static void galOpen(int m) { g_gal = m; s_lastMs = 0; s_trailN = 0; }
 static void galClose() {}
 static void galClick() {                                // в «Жизни» — новый мир, в маятнике — новый запуск
-  if (g_gal == G_LIFE) lfSeed(); else if (g_gal == G_PEND) pdReset(); else navToSub();
+  if (g_gal == G_LIFE) lfSeed(); else if (g_gal == G_PEND) pdReset();   // у фигур нажатия нет
 }
 static void galRotate(int dir) { s_speed = constrain(s_speed + dir * 0.25f, 0.0f, 4.0f); }
 static void galDraw(uint32_t now) {

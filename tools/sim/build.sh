@@ -22,7 +22,7 @@ DEFS="-DUSER_SETUP_LOADED=1 -DST7789_DRIVER=1 -DTFT_WIDTH=170 -DTFT_HEIGHT=320 -
 SRC=(
   "$SIM/sim.cpp" "$WORK/tftlib/TFT_eSPI.cpp"
   "$ROOT/src/core/display.cpp" "$ROOT/src/core/theme.cpp" "$ROOT/src/core/menu.cpp" "$ROOT/src/core/settings.cpp"
-  "$ROOT/src/core/battery.cpp" "$ROOT/src/core/ui.cpp" "$ROOT/src/core/leds.cpp" "$ROOT/src/core/boot.cpp"
+  "$ROOT/src/core/battery.cpp" "$ROOT/src/core/ui.cpp" "$ROOT/src/core/leds.cpp" "$ROOT/src/core/boot.cpp" "$ROOT/src/core/power_screens.cpp"
   "$ROOT/src/ble/ble_screens.cpp" "$ROOT/src/ble/ble_city.cpp" "$ROOT/src/ble/vendors.cpp"
   "$ROOT/src/wifi/wifi_model.cpp" "$ROOT/src/wifi/wifi_screens.cpp"
   "$ROOT/src/subghz/subghz_screens.cpp" "$ROOT/src/audio/audio_screens.cpp" "$ROOT/src/gallery/gallery.cpp" "$ROOT/src/web/web_screen.cpp" "$ROOT/src/pc/pc.cpp" "$ROOT/src/pc/pc_screens.cpp"
@@ -38,7 +38,9 @@ files = sorted(glob.glob(os.path.join(out, "*.ppm")))
 imgs = []
 for f in files:
     im = Image.open(f).convert("RGB").resize((640, 340), Image.NEAREST)
-    im.save(f[:-4] + ".png"); os.remove(f); imgs.append(im)
+    im.save(f[:-4] + ".png"); os.remove(f)
+    if not os.path.basename(f).startswith("anim_"):   # кадры гифок — не в общий лист
+        imgs.append(im)
 cols = 3
 rows = (len(imgs) + cols - 1) // cols
 sheet = Image.new("RGB", (cols * 660, rows * 360), (40, 40, 40))

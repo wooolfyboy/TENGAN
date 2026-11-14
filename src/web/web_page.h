@@ -10,7 +10,7 @@
 static const char WEB_PAGE[] PROGMEM = R"HTML(<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Radio Radar</title>
+<title>TENGAN</title>
 <style>
 :root{--bg:#02090b;--panel:#071419;--line:#12303a;--acc:#3fd9ff;--hot:#eafcff;--steel:#7f97a3;--dim:#46606b;--alert:#ff8a3d}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--hot);font:14px/1.35 ui-monospace,Menlo,Consolas,monospace}
@@ -42,7 +42,7 @@ tr.cl{cursor:pointer}tr.cl:hover td{background:#0a1d24}
 .x{float:right;background:none;border:1px solid var(--line);color:var(--steel);font:inherit;padding:4px 10px;cursor:pointer}
 .empty{color:var(--steel);padding:24px 0;text-align:center}
 </style></head><body>
-<header><div class="top"><h1>// RADIO RADAR</h1><span class="sp"></span><span id="bat" class="mut"></span><span id="up" class="dim"></span></div>
+<header><div class="top"><h1>// TENGAN</h1><span class="sp"></span><span id="bat" class="mut"></span><span id="up" class="dim"></span></div>
 <nav id="nav"></nav></header>
 <main>
 <section id="p-ov"><div class="grid">

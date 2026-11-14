@@ -25,7 +25,9 @@ void uiHeader(const char* title, const char* right, bool rightAlert) {
   spr.setTextColor(C_ACC());
   txt(t, UI_M + 4, 3, 2);
   if (right && right[0]) {
-    char r[40]; upper(right, r, sizeof(r));
+    char r0[48], r[48]; upper(right, r0, sizeof(r0));
+    int room = W - UI_M - 4 - (UI_M + 4 + txtW(t, 2)) - 10;   // сколько места справа от заголовка
+    fitText(r0, r, sizeof(r), max(room, 12), 1);               // не наезжать на заголовок
     spr.setTextDatum(TR_DATUM);
     spr.setTextColor(rightAlert ? C_ALERT() : UI_LABEL());
     txt(r, W - UI_M - 4, 6, 1);

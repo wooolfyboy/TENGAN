@@ -15,6 +15,8 @@
 #include "gallery/gallery.h"
 #include "web/web.h"
 #include "pc/pc.h"
+#include "core/power.h"
+#include "core/ui.h"
 #include "core/boot.h"
 #include "ble/ble.h"
 #include "ble/ble_model.h"
@@ -83,6 +85,7 @@ void audioClick() {}
 void audioBeep(uint16_t, uint16_t) {}
 void audioGeiger(int) {}
 bool   g_auFromPc = false;
+uint32_t g_powerHold = 0;
 int    g_auSrcNow = 0;
 int8_t g_auXY[AU_XY][2];
 bool   g_auXYStereo = false;
@@ -143,6 +146,7 @@ const Section subghzSection = { "Sub-GHz", 240, 120, 90, iconAntenna, subSub, no
 
 // ---------- вывод ----------
 static const char* s_outDir = "out";
+static std::vector<Blip> blipsAnim;
 static void snap(const char* name) {
   char path[256];
   snprintf(path, sizeof(path), "%s/%s.ppm", s_outDir, name);
@@ -262,9 +266,12 @@ int main(int argc, char** argv) {
   g_bat.ok = true; g_bat.soc = 87; g_bat.mv = 3980; g_bat.ma = -132; g_bat.tte = 250; g_bat.chgOk = true;
   fillBle(); fillWifi(); fillSub();
 
-  { const uint32_t ts[] = { 250, 600, 1000, 1300, 1600, 1950, 2200 };
+  { const uint32_t ts[] = { 250, 600, 1000, 1300, 1680, 1950, 2200 };
     for (int i = 0; i < 7; i++) { char nm[32]; snprintf(nm, sizeof nm, "00_boot_%04u", (unsigned)ts[i]); bootFrame(ts[i]); snap(nm); } }
   navBegin(); navDraw(s_now);                    snap("01_menu");
+  g_powerHold = 1500; drawPowerHold();           snap("08_power_hold"); g_powerHold = 0;
+  { const uint32_t ts[] = { 300, 760, 1000, 1250 };
+    for (int i = 0; i < 4; i++) { char nm[32]; snprintf(nm, sizeof nm, "09_power_off_%04u", (unsigned)ts[i]); shutFrame(ts[i]); spr.pushSprite(0, 0); snap(nm); } }
   navClick(); navDraw(s_now);                    snap("02_ble_sub");
   navBack();
   navRotate(+1); navClick(); navDraw(s_now);     snap("03_wifi_sub");
@@ -291,6 +298,7 @@ int main(int argc, char** argv) {
   g_mode = M_OVERVIEW; drawOverview((int)g_ents.size(), g_lastRaw, typeCnt); snap("10_ble_overview");
   g_mode = M_SCOPE;    drawScope(blips);                                snap("12_ble_scope");
   g_mode = M_CITY;     for (int f = 0; f < 30; f++) drawCity(blips, s_now + f * 33); snap("13_ble_city");
+  blipsAnim = blips;
   g_mode = M_NEAREST;  drawNearest(true, -48, best, g_lastCount);       snap("11_ble_nearest");
   Ent tr = g_ents[3];
   drawNearest(true, -58, tr, g_lastCount);                              snap("11b_ble_nearest_tracker");
@@ -310,7 +318,9 @@ int main(int argc, char** argv) {
   sens[1].t = s_now - 95000; sens[1].r.hasT = sens[1].r.hasH = sens[1].r.hasP = true;
   sens[1].r.temp = -3.8f; sens[1].r.hum = 78; sens[1].r.press = 1012; sens[1].r.model = "BTHome";
   uint8_t m2[6] = { 1, 2, 3, 4, 0xC4, 0x38 }; memcpy(sens[1].mac, m2, 6);
+  g_uiPages = 6; g_uiPage = 5;
   drawWeather(sens, s_now);                                              snap("17_ble_weather");
+  g_uiPages = 0;
 
   drawNets(s_now);           snap("20_wifi_networks");
   g_wDetail = true;
@@ -322,7 +332,9 @@ int main(int argc, char** argv) {
   drawClients(s_now);        snap("24_wifi_clients");
   g_prom = false;
   g_wMode = W_FIND;
+  g_uiPages = 5; g_uiPage = 4;
   drawFind(s_now);           snap("25_wifi_find");
+  g_uiPages = 0;
 
   // звук: «голос» с пиком около 1.2 кГц и гармониками
   g_au.level = -38; g_au.peak = -31; g_au.domHz = 1187; g_au.energy = 0.45f;
@@ -334,7 +346,9 @@ int main(int argc, char** argv) {
   for (int i = 0; i < AU_WAVE; i++) g_au.wave[i] = (int16_t)(6000 * sinf(i * 0.37f) + 2500 * sinf(i * 1.11f + 1) + noise(i) * 900 - 450);
   for (int i = 0; i < AU_HIST; i++) g_auHist[i] = -52 + 8 * sinf(i / 7.0f) + noise(i) * 6 + (i > 90 && i < 100 ? 30 : 0);
   g_auHistN = AU_HIST;
+  g_uiPages = 6; g_uiPage = 0;
   drawAuBars(s_now);         snap("40_sound_bars");
+  g_uiPages = 0;
   for (int f = 0; f < 30; f++) {                        // «горы»: прокрутить историю
     for (int k = 0; k < AU_BANDS; k++) g_au.bands[k] = constrain(0.15f + 0.7f * expf(-(k - 4 - (f % 7)) * (k - 4 - (f % 7)) / 12.0f) * (0.5f + 0.5f * sinf(f * 0.5f + k * 0.2f)) + noise(k + f) * 0.1f, 0.0f, 1.0f);
     drawTerrain(s_now + f * 50);
@@ -359,7 +373,7 @@ int main(int argc, char** argv) {
   for (int f = 0; f < 60; f++) drawLife(s_now + 2000 + f * 120); snap("52_gallery_life");
   for (int f = 0; f < 160; f++) drawPendulum(s_now + 9000 + f * 33); snap("53_gallery_pendulum");
   { uint8_t qr[29 * 29]; for (int i = 0; i < 29 * 29; i++) qr[i] = (noise(i) > 0.5f) || ((i % 29 < 7 || i % 29 > 21) && (i / 29 < 7) && !((i % 29 == 1 || i % 29 == 5 || i % 29 == 23 || i % 29 == 27) && i / 29 > 0 && i / 29 < 6));
-    WebView v = { "RadioRadar-3F2A", "48213907", "192.168.4.1", 1, 214, true, "sub-ghz" };
+    WebView v = { "TENGAN-3F2A", "48213907", "192.168.4.1", 1, 214, true, "sub-ghz" };
     drawWebScreen(v, qr, 29); snap("60_web"); }
   drawPcWaiting(s_now);      snap("70_pc_waiting");
   for (int i = 0; i < 60; i++) {                        // минута «настоящих» строк с ноутбука
@@ -375,10 +389,19 @@ int main(int argc, char** argv) {
   Serial.feed("PV vol=42 mute=0\n"); pcPoll(0); g_pc.volT = s_now;
   g_pcLastCmd = 1; g_pcLastCmdMs = s_now - 120;
   Serial.feed("PM\t1\t63\t215\tSpotify\tГруппа крови (Remastered 2024 Edition)\tКино\n"); pcPoll(0); g_pc.trkT = s_now;
-  drawPcMedia(s_now);        snap("73_pc_media");
+  g_pc.trkT = 0; g_pcLastCmdMs = 0; g_pc.volT = 0; drawPcMedia(300); snap("73_pc_media");   // бегущая строка — с начала
   Serial.feed("PM\n"); pcPoll(0); g_pc.trkT = s_now;
   drawPcMedia(s_now);        snap("74_pc_media_idle");
+  g_uiPages = 2; g_uiPage = 0;
   drawSpectrum();            snap("30_subghz_spectrum");
+  g_uiPages = 0;
   drawMonitor(s_now);        snap("31_subghz_monitor");
+  if (getenv("SIM_ANIM")) {                              // кадры для гифок README (tools/make_docs.py)
+    char nm[48];
+    for (int f = 0; f * 40 <= 2700; f++) { bootFrame(f * 40); snprintf(nm, sizeof nm, "anim_boot_%03d", f); snap(nm); }
+    for (int f = 0; f < 60; f++) { drawCity(blipsAnim, s_now + 4000 + f * 50); snprintf(nm, sizeof nm, "anim_city_%03d", f); snap(nm); }
+    for (int f = 0; f < 60; f++) { drawTesseract(s_now + 9000 + f * 40); snprintf(nm, sizeof nm, "anim_tess_%03d", f); snap(nm); }
+    for (int f = 0; f < 36; f++) { shutFrame(f * 40); spr.pushSprite(0, 0); snprintf(nm, sizeof nm, "anim_off_%03d", f); snap(nm); }
+  }
   return 0;
 }

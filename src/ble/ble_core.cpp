@@ -383,7 +383,7 @@ static void bleClose() { g_detail = false; }
 
 static void bleClick() {
   if (g_mode == M_LIST) { g_detail = !g_detail; g_lastTouch = millis(); }
-  else navToSub();                                 // на обычном экране нажатие — назад в подменю
+  // на остальных экранах у нажатия нет действия (назад — боковая кнопка)
 }
 static void bleRotate(int dir) {
   static uint32_t last = 0;

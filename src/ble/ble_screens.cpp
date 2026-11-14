@@ -296,7 +296,7 @@ void drawList(const std::map<uint32_t, Ent>& ents) {
     spr.fillRect(W - UI_M + 2, LIST_Y0, 2, trackH, UI_LINE());
     spr.fillRect(W - UI_M + 2, barY, 2, barH, C_ACC());
   }
-  uiFooter("wheel: pick   click: details", "side: back");
+  uiFooter("wheel: pick  click: details", "side: back");
   present();
 }
 
@@ -306,8 +306,8 @@ void drawDetail(const Dev& d, const Ent& e, bool inMap, uint32_t now) {
   spr.fillSprite(C_BG());
   int pos = -1;
   for (size_t i = 0; i < g_order.size(); i++) if (g_order[i] == g_sel) pos = (int)i;
-  if (pos >= 0) snprintf(buf, sizeof(buf), "%d / %d  click: back", pos + 1, (int)g_order.size());
-  else          snprintf(buf, sizeof(buf), "click: back");
+  if (pos >= 0) snprintf(buf, sizeof(buf), "%d / %d  click: list", pos + 1, (int)g_order.size());
+  else          snprintf(buf, sizeof(buf), "click: list");
   uiHeader("Device", buf);
 
   // имя и «кто это»
@@ -388,7 +388,7 @@ void drawWeather(const std::vector<Sensor>& ss, uint32_t now) {
   uiHeader("Weather", ss.empty() ? "" : buf);
   if (ss.empty()) {
     uiEmpty("no sensors yet", "xiaomi pvvx/atc, bthome, govee, qingping, switchbot, ruuvi");
-    uiFooter("", "side: back");
+    uiFooter("wheel: screens", "side: back");
     present();
     return;
   }
@@ -438,10 +438,10 @@ void drawWeather(const std::vector<Sensor>& ss, uint32_t now) {
     if (S.r.hasP)   { snprintf(buf, sizeof(buf), "%.0f hPa", S.r.press); txt(buf, ex, vy + 5, 2); }
     else if (S.r.hasCO2) { snprintf(buf, sizeof(buf), "%d ppm", S.r.co2); txt(buf, ex, vy + 5, 2); }
   }
-  if (pages > 1) {
-    for (int p = 0; p < pages; p++)
-      spr.fillRect(W / 2 - pages * 5 + p * 10, UI_BOTTOM + 2, 6, 2, p == page ? C_ACC() : UI_LINE());
+  if (pages > 1) {                                   // листы датчиков — номером в шапке
+    snprintf(buf, sizeof(buf), "%d sensors  %d/%d", (int)ss.size(), page + 1, pages);
+    uiHeader("Weather", buf);
   }
-  uiFooter("", "side: back");
+  uiFooter("wheel: screens", "side: back");
   present();
 }

@@ -23,3 +23,4 @@ bool powerIdle();                           // экран сейчас приг�
 void powerIdleTick(uint32_t now);
 void powerOff();
 void drawPowerHold();
+void shutFrame(uint32_t t);         // кадр анимации выключения в момент t мс (0..1400)

@@ -2,6 +2,7 @@
 //  theme.cpp — дизайн-система «Tactical HUD»
 // ============================================================
 #include "core/theme.h"
+#include "core/ui.h"
 #include "core/display.h"
 #include "core/fonts/STM14.h"
 #include "core/fonts/RAJ24.h"
@@ -125,7 +126,14 @@ static void corners() {
   spr.drawFastHLine(W - L, H - 1, L, c); spr.drawFastVLine(W - 1, H - L, L, c);
 }
 
+int g_uiPages = 0, g_uiPage = 0;
+
 void present() {
   corners();
+  if (g_uiPages > 1) {                                // точки-страницы: под линией шапки справа (там всегда свободно)
+    int W = spr.width(), x0 = W - UI_M - 4 - g_uiPages * 8 + 2;
+    for (int p = 0; p < g_uiPages; p++)
+      spr.fillRect(x0 + p * 8, 21, 5, 2, p == g_uiPage ? C_ACC() : UI_LINE());
+  }
   spr.pushSprite(0, 0);
 }

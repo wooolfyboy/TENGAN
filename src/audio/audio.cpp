@@ -357,8 +357,8 @@ static int  sndNow() { return g_aMode; }
 static void sndOpen(int m) { g_aMode = m; if (m == A_LEVEL) { g_auMax = -120; } }
 static void sndClose() {}
 static void sndClick() {
-  if (g_aMode == A_LEVEL) { g_auMax = -120; g_auHistN = 0; return; }   // сброс максимума и графика
-  navToSub();
+  if (g_aMode == A_LEVEL) { g_auMax = -120; g_auHistN = 0; }   // шумомер: сброс максимума и графика
+  // на остальных экранах у нажатия нет действия (назад — боковая кнопка)
 }
 static void sndRotate(int dir) {
   static uint32_t last = 0;

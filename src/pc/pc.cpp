@@ -4,6 +4,7 @@
 #include "core/timeutil.h"
 #include "pc/pc.h"
 #include "core/display.h"
+#include "core/ui.h"
 #include "audio/audio.h"
 
 PcStat g_pc;
@@ -162,6 +163,7 @@ static bool pcBack() {                               // со страницы м
   return false;
 }
 static void pcDraw(uint32_t now) {
+  g_uiPages = pcLive(now) ? PC_PAGES : 0; g_uiPage = g_pcPage;   // точки-страницы (у раздела нет подменю)
   if (!pcLive(now)) drawPcWaiting(now);
   else if (g_pcPage == 0) drawPc(now);
   else if (g_pcPage == 1) drawPcCores(now);
