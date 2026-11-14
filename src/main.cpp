@@ -55,7 +55,7 @@
 static const uint32_t REMEMBER_MS = 30000;
 static const uint32_t REDRAW_MS   = 66;
 // Разделы главного меню и экраны раздела Bluetooth
-enum { S_MENU = 0, S_BLE, S_WIFI, S_SET };
+enum { S_MENU = 0, S_BLE, S_WIFI, S_SUB, S_SET };
 enum { M_RADAR = 0, M_PROX, M_SCOPE, M_TIMELINE, M_TYPES, M_LIST, M_WEATHER, NUM_MODES };
 static const int W_SCREENS = 5;   // экранов в разделе Wi-Fi (см. wifi_ui.h)
 static const uint32_t SENSOR_REMEMBER_MS = 300000;  // датчики шлют редко — помним 5 минут
@@ -69,6 +69,7 @@ static const int      MERGE_DB    = 10;
 
 TFT_eSPI    tft;
 TFT_eSprite spr = TFT_eSprite(&tft);
+#include "battery.h"      // заряд батареи (только чтение)
 
 // категории вендоров
 // 0 = неизвестно (private), 1 = прочий производитель (имя берётся из базы btdb.h),
@@ -152,7 +153,7 @@ SemaphoreHandle_t g_lock;
 
 volatile int g_mode = 0;         // экран внутри раздела Bluetooth
 int  g_section = S_MENU;         // где мы: меню / Bluetooth / Wi-Fi / настройки
-int  g_menuSel = 0;              // выбранный пункт меню (0 BT, 1 Wi-Fi, 2 настройки)
+int  g_menuSel = 0;              // выбранный пункт меню (0 BT, 1 Wi-Fi, 2 Sub-GHz, 3 настройки)
 bool g_sub = true;               // в разделе показано подменю (список экранов), а не сам экран
 int  g_subSel = 0;               // курсор в подменю
 bool g_bleActive = true;
@@ -1147,7 +1148,7 @@ void saveSettings() {
   g_setDirty = false;
 }
 
-static const int N_SET_ITEMS = 4;
+static const int N_SET_ITEMS = 5;   // 5-й пункт — батарея (только показывает)
 
 void settingsAdjust(int dir) {
   switch (g_setItem) {
@@ -1169,18 +1170,21 @@ void drawSettings() {
   spr.setTextColor(tft.color565(120, 120, 135), TFT_BLACK);
   spr.drawString("SETTINGS", 4, 1, 2);
 
-  const char* names[N_SET_ITEMS] = { "Range", "LED events", "LED bright", "Screen" };
+  const char* names[N_SET_ITEMS] = { "Range", "LED events", "LED bright", "Screen", "Battery" };
   const char* hints[N_SET_ITEMS] = {
     "ignore devices weaker than this",
     "flash when count jumps by this",
     "brightness of the LED strip",
     "screen backlight",
+    "",
   };
+  char batLine[64]; batSummary(batLine, sizeof(batLine));
+  hints[4] = batLine;
   for (int i = 0; i < N_SET_ITEMS; i++) {
-    int y = 22 + i * 30;
+    int y = 20 + i * 25;
     bool sel = (i == g_setItem);
     uint16_t bg = sel ? tft.color565(28, 38, 62) : TFT_BLACK;
-    if (sel) spr.fillRoundRect(0, y - 3, W, 28, 4, bg);
+    if (sel) spr.fillRoundRect(0, y - 2, W, 26, 4, bg);
     switch (i) {
       case 0:
         if (g_range == 0) sprintf(val, "all");
@@ -1189,6 +1193,10 @@ void drawSettings() {
       case 1: if (g_thresh == 0) sprintf(val, "off"); else sprintf(val, "+-%d", g_thresh); break;
       case 2: sprintf(val, "%d%%", g_ledBright); break;
       case 3: sprintf(val, "%d%%", g_scrBright); break;
+      case 4:
+        if (g_bat.ok) sprintf(val, "%d%%  %.2fV", g_bat.soc, g_bat.mv / 1000.0f);
+        else          sprintf(val, "n/a");
+        break;
     }
     spr.setTextDatum(TL_DATUM);
     spr.setTextColor(sel ? TFT_WHITE : tft.color565(150, 150, 165), bg);
@@ -1231,6 +1239,15 @@ void wifiCloseScreen();
 void wifiSubFrame(uint32_t now);
 int  wifiScreenNow();
 void subBack();
+void subEnter();
+void subLeave();
+void subOpenScreen(int m);
+void subCloseScreen();
+int  subScreenNow();
+void subRotate(int dir);
+void subClick();
+void subTick(uint32_t now);
+const char* subBandName();
 bool wifiCloseDetail();
 
 void bleStart() {
@@ -1251,6 +1268,7 @@ void bleStop() {
 void enterSection(int sel) {
   if (sel == 0)      { g_section = S_BLE; bleStart(); g_subSel = g_mode; }
   else if (sel == 1) { g_section = S_WIFI; bleStop(); wifiEnter(); g_subSel = wifiScreenNow(); }
+  else if (sel == 2) { g_section = S_SUB; subEnter(); g_subSel = subScreenNow(); }
   else               { g_section = S_SET; g_setItem = 0; }
   g_sub = true;
   g_detail = false;
@@ -1260,6 +1278,7 @@ void enterSection(int sel) {
 void subOpen() {
   if (g_section == S_BLE)  { g_mode = g_subSel; g_detail = false; }
   if (g_section == S_WIFI) wifiOpenScreen(g_subSel);
+  if (g_section == S_SUB)  subOpenScreen(g_subSel);
   g_sub = false;
 }
 
@@ -1267,6 +1286,7 @@ void subOpen() {
 void subBack() {
   if (g_section == S_BLE)  g_subSel = g_mode;
   if (g_section == S_WIFI) { g_subSel = wifiScreenNow(); wifiCloseScreen(); }
+  if (g_section == S_SUB)  { g_subSel = subScreenNow(); subCloseScreen(); }
   g_detail = false;
   g_sub = true;
 }
@@ -1274,7 +1294,7 @@ void subBack() {
 void goMenu();
 // боковая кнопка: на шаг назад (подробности -> экран -> подменю -> главное меню)
 void goBack() {
-  if ((g_section == S_BLE || g_section == S_WIFI) && !g_sub) {
+  if ((g_section == S_BLE || g_section == S_WIFI || g_section == S_SUB) && !g_sub) {
     if (g_section == S_BLE && g_detail) { g_detail = false; return; }
     if (g_section == S_WIFI && wifiCloseDetail()) return;
     subBack();
@@ -1286,9 +1306,11 @@ void goBack() {
 void goMenu() {
   if (g_section == S_SET && g_setDirty) saveSettings();
   if (g_section == S_WIFI) wifiLeave();    // без раздела Wi-Fi пакеты не считаем, ленту гасим
+  if (g_section == S_SUB)  subLeave();     // CC1101 — в сон
   if (g_section == S_BLE)  g_menuSel = 0;
   if (g_section == S_WIFI) g_menuSel = 1;
-  if (g_section == S_SET)  g_menuSel = 2;
+  if (g_section == S_SUB)  g_menuSel = 2;
+  if (g_section == S_SET)  g_menuSel = 3;
   g_section = S_MENU;
   g_detail = false;
 }
@@ -1373,20 +1395,41 @@ void iconGear(int x, int y, uint16_t c, uint16_t bg) {
   spr.fillSmoothCircle(x, y, 7, bg, c);
 }
 
+// антенна с волнами (Sub-GHz)
+void iconAntenna(int x, int y, uint16_t c, uint16_t bg) {
+  spr.drawWideLine(x, y - 8, x, y + 22, 3.5f, c, bg);
+  spr.drawWideLine(x, y + 2, x - 9, y + 22, 3, c, bg);
+  spr.drawWideLine(x, y + 2, x + 9, y + 22, 3, c, bg);
+  spr.fillSmoothCircle(x, y - 10, 4, c, bg);
+  for (int i = 0; i < 2; i++) {
+    int r = 11 + i * 8;
+    spr.drawArc(x, y - 10, r, r - 3, 225, 315, c, bg, true);    // волны слева
+    spr.drawArc(x, y - 10, r, r - 3, 45, 135, c, bg, true);     // волны справа
+  }
+}
+
 void drawMenu(int bleCount) {
   int W = spr.width(), H = spr.height();
   spr.fillSprite(TFT_BLACK);
-  const char* names[3] = { "Bluetooth", "Wi-Fi", "Settings" };
-  uint16_t acc[3] = { tft.color565(80, 150, 240), tft.color565(70, 210, 130), tft.color565(200, 160, 90) };
-  char sub[3][24];
+  const char* names[4] = { "Bluetooth", "Wi-Fi", "Sub-GHz", "Settings" };
+  uint16_t acc[4] = { tft.color565(80, 150, 240), tft.color565(70, 210, 130),
+                      tft.color565(240, 120, 90), tft.color565(200, 160, 90) };
+  char sub[4][24];
   if (g_bleActive) sprintf(sub[0], "%d devices", bleCount);
   else             sprintf(sub[0], "paused");
   int wn = wifiNetCount();
-  if (wn >= 0) sprintf(sub[1], "%d networks", wn); else sprintf(sub[1], "scan networks");
-  sprintf(sub[2], "range: %s", RANGES[g_range].name);
+  if (wn >= 0) sprintf(sub[1], "%d nets", wn); else sprintf(sub[1], "tap to scan");
+  sprintf(sub[2], "%s", subBandName());
+  sprintf(sub[3], "range: %s", RANGES[g_range].name);
 
-  int cw = 98, ch = 132, gap = 8, x0 = (W - (cw * 3 + gap * 2)) / 2, y0 = 8;
-  for (int i = 0; i < 3; i++) {
+  // верхняя строка: название + батарея
+  spr.setTextDatum(TL_DATUM);
+  spr.setTextColor(tft.color565(90, 90, 104), TFT_BLACK);
+  spr.drawString("RADIO RADAR", 4, 3, 1);
+  drawBatteryIcon(W - 4, 1);
+
+  int cw = 74, ch = 124, gap = 6, x0 = (W - (cw * 4 + gap * 3)) / 2, y0 = 16;
+  for (int i = 0; i < 4; i++) {
     int x = x0 + i * (cw + gap);
     bool sel = (i == g_menuSel);
     uint16_t c = sel ? acc[i] : tft.color565(85, 85, 98);
@@ -1397,16 +1440,17 @@ void drawMenu(int bleCount) {
     } else {
       spr.drawRoundRect(x, y0, cw, ch, 10, tft.color565(40, 40, 50));
     }
-    int ix = x + cw / 2, iy = y0 + 44;
+    int ix = x + cw / 2, iy = y0 + 40;
     uint16_t bg = sel ? tft.color565(22, 26, 38) : TFT_BLACK;
     if (i == 0) iconBluetooth(ix, iy, c, bg);
     else if (i == 1) iconWifi(ix, iy, c, bg);
+    else if (i == 2) iconAntenna(ix, iy, c, bg);
     else iconGear(ix, iy, c, bg);
     spr.setTextDatum(TC_DATUM);
     spr.setTextColor(sel ? TFT_WHITE : tft.color565(150, 150, 165), bg);
-    spr.drawString(names[i], ix, y0 + 84, 2);
+    spr.drawString(names[i], ix, y0 + 78, 2);
     spr.setTextColor(sel ? acc[i] : tft.color565(90, 90, 104), bg);
-    spr.drawString(sub[i], ix, y0 + 106, 1);
+    spr.drawString(sub[i], ix, y0 + 100, 1);
   }
   spr.setTextDatum(BC_DATUM);
   spr.setTextColor(tft.color565(80, 80, 92), TFT_BLACK);
@@ -1502,6 +1546,7 @@ void pollButtons() {
     else if (g_section == S_SET) g_setItem = (g_setItem + 1) % N_SET_ITEMS;
     else if (g_sub)              subOpen();
     else if (g_section == S_WIFI) wifiClick();
+    else if (g_section == S_SUB) subClick();
     else if (g_mode == M_LIST)   { g_detail = !g_detail; g_lastTouch = now; }
     else                         subBack();            // на обычном экране нажатие — назад в подменю
     lastEncMs = now;
@@ -1542,15 +1587,17 @@ void pollEncoder() {
     int dir = accum >= 4 ? +1 : -1;
     uint32_t now = millis();
     if (g_section == S_MENU) {
-      if (now - lastStepMs > 120) { g_menuSel = (g_menuSel + dir + 3) % 3; lastStepMs = now; }
-    } else if ((g_section == S_BLE || g_section == S_WIFI) && g_sub) {
+      if (now - lastStepMs > 120) { g_menuSel = (g_menuSel + dir + 4) % 4; lastStepMs = now; }
+    } else if ((g_section == S_BLE || g_section == S_WIFI || g_section == S_SUB) && g_sub) {
       if (now - lastStepMs > 60) {
-        int n = g_section == S_BLE ? NUM_MODES : W_SCREENS;
+        int n = g_section == S_BLE ? NUM_MODES : g_section == S_WIFI ? W_SCREENS : 2;
         g_subSel = (g_subSel + dir + n) % n;
         lastStepMs = now;
       }
     } else if (g_section == S_WIFI) {
       if (now - lastStepMs > 40) { wifiRotate(dir); lastStepMs = now; }
+    } else if (g_section == S_SUB) {
+      if (now - lastStepMs > 120) { subRotate(dir); lastStepMs = now; }
     } else if (bleIs(M_LIST)) {
       if (now - lastStepMs > 40) { g_listMove += dir; lastStepMs = now; g_lastTouch = now; }
     } else if (g_section == S_SET) {
@@ -1580,6 +1627,7 @@ void setup() {
   tft.fillScreen(TFT_BLACK);
   pinMode(TFT_BL, OUTPUT); digitalWrite(TFT_BL, HIGH);
   loadSettings();
+  batBegin();
 
   strip.begin();
   applyBrightness();
@@ -1608,6 +1656,8 @@ void setup() {
 uint32_t g_lastDraw = 0;
 
 #include "wifi_ui.h"   // раздел Wi-Fi
+#include "subghz.h"    // раздел Sub-GHz (CC1101, только приём)
+const char* subBandName() { return (g_ccTried && !g_ccOk) ? "no chip" : BANDS[g_band].name; }
 
 void loop() {
   pollButtons();
@@ -1615,6 +1665,8 @@ void loop() {
   sampleTick();
   updateLeds();
   uint32_t now = millis();
+  batTick(now);
+  if (g_section == S_SUB && !g_sub) subTick(now);   // CC1101 меряем на каждом проходе
   if (now - g_lastDraw >= REDRAW_MS) {
     g_lastDraw = now;
     std::map<uint32_t, Ent> ents;     // физические устройства
@@ -1679,6 +1731,7 @@ void loop() {
     else if (g_section == S_MENU) drawMenu(count);
     else if (g_section == S_SET)  drawSettings();
     else if (g_section == S_WIFI) { if (g_sub) wifiSubFrame(now); else wifiFrame(now); }
+    else if (g_section == S_SUB)  { if (g_sub) subSubFrame(); else subFrame(now); }
     else if (g_sub)               drawBleSub(count, bestRssi, have, typeCnt);
     else if (g_mode == M_LIST) {
       // Порядок списка: ближние сверху, но «липкий», чтобы строки не прыгали:

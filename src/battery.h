@@ -1,0 +1,126 @@
+// ============================================================
+//  battery.h — заряд батареи (подключается внутрь main.cpp)
+//
+//  Только чтение регистров, ничего не настраиваем:
+//   - BQ27220 (0x55) — «счётчик топлива»: %, напряжение, ток, время;
+//   - BQ25896 (0x6B) — зарядка: есть ли USB, идёт ли заряд.
+//  Шина I2C: SDA 8, SCL 18 (по utilities.h из репозитория LilyGO).
+// ============================================================
+#pragma once
+#include <Wire.h>
+
+#define BAT_I2C_SDA 8
+#define BAT_I2C_SCL 18
+#define BQ27220_ADDR 0x55
+#define BQ25896_ADDR 0x6B
+
+struct Bat {
+  bool     ok = false;      // датчик заряда ответил
+  bool     chgOk = false;   // контроллер зарядки ответил
+  int      soc = 0;         // %
+  int      mv = 0;          // мВ
+  int      ma = 0;          // мА: + заряд, − разряд
+  float    tempC = 0;
+  int      tte = -1;        // минут до разряда (-1 = неизвестно)
+  int      ttf = -1;        // минут до полного заряда
+  int      remain = 0, full = 0;   // мА·ч
+  uint8_t  bus = 0;         // источник питания (0 = нет USB)
+  uint8_t  chg = 0;         // 0 не заряжается, 1 предзаряд, 2 заряд, 3 заряжено
+  uint32_t t = 0;
+};
+Bat g_bat;
+
+static bool i2cRead(uint8_t addr, uint8_t reg, uint8_t* buf, uint8_t n) {
+  Wire.beginTransmission(addr);
+  Wire.write(reg);
+  if (Wire.endTransmission(false) != 0) return false;
+  if (Wire.requestFrom(addr, n) != n) return false;
+  for (uint8_t i = 0; i < n; i++) buf[i] = Wire.read();
+  return true;
+}
+static bool bq16(uint8_t reg, uint16_t& v) {
+  uint8_t b[2];
+  if (!i2cRead(BQ27220_ADDR, reg, b, 2)) return false;
+  v = b[0] | (b[1] << 8);
+  return true;
+}
+
+void batRead() {
+  uint16_t v;
+  g_bat.ok = bq16(0x2C, v);                     // StateOfCharge
+  if (g_bat.ok) {
+    g_bat.soc = constrain((int)v, 0, 100);
+    if (bq16(0x08, v)) g_bat.mv = v;            // Voltage
+    if (bq16(0x0C, v)) g_bat.ma = (int16_t)v;   // Current
+    if (bq16(0x06, v)) g_bat.tempC = v / 10.0f - 273.15f;
+    if (bq16(0x16, v)) g_bat.tte = (v == 0xFFFF) ? -1 : v;   // TimeToEmpty
+    if (bq16(0x18, v)) g_bat.ttf = (v == 0xFFFF) ? -1 : v;   // TimeToFull
+    if (bq16(0x10, v)) g_bat.remain = v;
+    if (bq16(0x12, v)) g_bat.full = v;
+  }
+  uint8_t st;
+  g_bat.chgOk = i2cRead(BQ25896_ADDR, 0x0B, &st, 1);       // REG0B: статус
+  if (g_bat.chgOk) {
+    g_bat.bus = (st >> 5) & 0x07;
+    g_bat.chg = (st >> 3) & 0x03;
+  }
+}
+
+void batBegin() {
+  Wire.begin(BAT_I2C_SDA, BAT_I2C_SCL);
+  Wire.setClock(100000);
+  batRead();
+  g_bat.t = millis();
+}
+
+void batTick(uint32_t now) {
+  if (now - g_bat.t < 2000) return;
+  g_bat.t = now;
+  batRead();
+}
+
+bool batUsb()      { return g_bat.chgOk && g_bat.bus != 0; }
+bool batCharging() { return g_bat.chgOk && (g_bat.chg == 1 || g_bat.chg == 2); }
+
+uint16_t batColor() {
+  if (batCharging())  return tft.color565(90, 200, 255);
+  if (g_bat.soc > 50) return tft.color565(70, 210, 130);
+  if (g_bat.soc > 20) return tft.color565(240, 200, 70);
+  return tft.color565(235, 80, 80);
+}
+
+// маленький значок батареи; (x, y) — правый верхний угол
+void drawBatteryIcon(int x, int y) {
+  if (!g_bat.ok) return;
+  uint16_t c = batColor();
+  int w = 22, h = 11, bx = x - w - 2;
+  spr.drawRoundRect(bx, y, w, h, 2, tft.color565(140, 140, 155));
+  spr.fillRect(bx + w, y + 3, 2, h - 6, tft.color565(140, 140, 155));
+  int fw = (w - 4) * g_bat.soc / 100;
+  if (fw > 0) spr.fillRect(bx + 2, y + 2, fw, h - 4, c);
+  if (batCharging()) {                          // молния
+    int cx = bx + w / 2, cy = y + h / 2;
+    spr.fillTriangle(cx + 1, y + 1, cx - 3, cy + 1, cx, cy + 1, TFT_WHITE);
+    spr.fillTriangle(cx - 1, y + h - 1, cx + 3, cy - 1, cx, cy - 1, TFT_WHITE);
+  }
+  char buf[8];
+  sprintf(buf, "%d%%", g_bat.soc);
+  spr.setTextDatum(TR_DATUM);
+  spr.setTextColor(c, TFT_BLACK);
+  spr.drawString(buf, bx - 4, y + 2, 1);
+}
+
+// одна строка о питании (для настроек)
+void batSummary(char* out, size_t n) {
+  if (!g_bat.ok) { snprintf(out, n, "battery gauge not found"); return; }
+  if (batCharging()) {
+    if (g_bat.ttf > 0) snprintf(out, n, "charging %d mA, full in ~%dh %02dm", g_bat.ma, g_bat.ttf / 60, g_bat.ttf % 60);
+    else               snprintf(out, n, "charging %d mA", g_bat.ma);
+  } else if (batUsb()) {
+    snprintf(out, n, g_bat.chg == 3 ? "USB power, fully charged" : "USB power");
+  } else if (g_bat.tte > 0) {
+    snprintf(out, n, "on battery %d mA, ~%dh %02dm left", g_bat.ma, g_bat.tte / 60, g_bat.tte % 60);
+  } else {
+    snprintf(out, n, "on battery %d mA", g_bat.ma);
+  }
+}
