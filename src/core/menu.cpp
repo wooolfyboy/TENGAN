@@ -10,6 +10,7 @@
 #include "core/theme.h"
 #include "core/battery.h"
 #include "core/settings.h"
+#include "core/ui.h"
 #include "gallery/gallery.h"
 #include "web/web.h"
 #include "pc/pc.h"
@@ -198,5 +199,9 @@ void navDraw(uint32_t now) {
   const Section* s = cur();
   if (!s)         drawMainMenu();
   else if (s_sub) drawSectionSub(s);
-  else            s->draw(now);
+  else {
+    if (s->nScreens > 1 && s->screenNow) { g_uiPages = s->nScreens; g_uiPage = s->screenNow(); }
+    s->draw(now);
+    g_uiPages = 0;
+  }
 }

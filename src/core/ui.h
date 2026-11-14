@@ -30,5 +30,8 @@ void uiFrame(int x, int y, int w, int h, uint16_t col);
 void uiReadout(int x, int y, const char* label, const char* value, uint16_t valCol, int valSize = 2);
 // пустой экран: крупная фраза и пояснение
 void uiEmpty(const char* msg, const char* sub = nullptr);
+// точки-страницы над подвалом: сколько экранов в разделе и какой открыт.
+// Ставит меню перед рисованием экрана (или сам раздел); рисует present().
+extern int g_uiPages, g_uiPage;
 // выделение строки списка (скошенная панель + маркер слева)
 void uiRowHighlight(int y, int h);

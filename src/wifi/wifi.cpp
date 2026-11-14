@@ -360,7 +360,7 @@ static void wifiClick() {
     if (g_scanning) { esp_wifi_scan_stop(); WiFi.scanDelete(); g_scanning = false; }
     return;
   }
-  navToSub();                                 // на остальных экранах нажатие — назад в подменю
+  // на остальных экранах у нажатия нет действия (назад — боковая кнопка)
 }
 
 // ---------- подменю ----------

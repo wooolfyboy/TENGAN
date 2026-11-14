@@ -158,6 +158,6 @@ void drawCity(const std::vector<Blip>& bl, uint32_t now) {
 
   snprintf(buf, sizeof(buf), "%d devices", (int)bl.size());
   uiHeader("City", buf);
-  uiFooter("wheel: turn   click: back", "side: back");
+  uiFooter("wheel: turn camera", "side: back");
   present();
 }

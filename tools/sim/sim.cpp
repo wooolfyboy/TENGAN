@@ -15,6 +15,7 @@
 #include "gallery/gallery.h"
 #include "web/web.h"
 #include "pc/pc.h"
+#include "core/ui.h"
 #include "core/boot.h"
 #include "ble/ble.h"
 #include "ble/ble_model.h"
@@ -310,7 +311,9 @@ int main(int argc, char** argv) {
   sens[1].t = s_now - 95000; sens[1].r.hasT = sens[1].r.hasH = sens[1].r.hasP = true;
   sens[1].r.temp = -3.8f; sens[1].r.hum = 78; sens[1].r.press = 1012; sens[1].r.model = "BTHome";
   uint8_t m2[6] = { 1, 2, 3, 4, 0xC4, 0x38 }; memcpy(sens[1].mac, m2, 6);
+  g_uiPages = 6; g_uiPage = 5;
   drawWeather(sens, s_now);                                              snap("17_ble_weather");
+  g_uiPages = 0;
 
   drawNets(s_now);           snap("20_wifi_networks");
   g_wDetail = true;
@@ -322,7 +325,9 @@ int main(int argc, char** argv) {
   drawClients(s_now);        snap("24_wifi_clients");
   g_prom = false;
   g_wMode = W_FIND;
+  g_uiPages = 5; g_uiPage = 4;
   drawFind(s_now);           snap("25_wifi_find");
+  g_uiPages = 0;
 
   // звук: «голос» с пиком около 1.2 кГц и гармониками
   g_au.level = -38; g_au.peak = -31; g_au.domHz = 1187; g_au.energy = 0.45f;
@@ -334,7 +339,9 @@ int main(int argc, char** argv) {
   for (int i = 0; i < AU_WAVE; i++) g_au.wave[i] = (int16_t)(6000 * sinf(i * 0.37f) + 2500 * sinf(i * 1.11f + 1) + noise(i) * 900 - 450);
   for (int i = 0; i < AU_HIST; i++) g_auHist[i] = -52 + 8 * sinf(i / 7.0f) + noise(i) * 6 + (i > 90 && i < 100 ? 30 : 0);
   g_auHistN = AU_HIST;
+  g_uiPages = 6; g_uiPage = 0;
   drawAuBars(s_now);         snap("40_sound_bars");
+  g_uiPages = 0;
   for (int f = 0; f < 30; f++) {                        // «горы»: прокрутить историю
     for (int k = 0; k < AU_BANDS; k++) g_au.bands[k] = constrain(0.15f + 0.7f * expf(-(k - 4 - (f % 7)) * (k - 4 - (f % 7)) / 12.0f) * (0.5f + 0.5f * sinf(f * 0.5f + k * 0.2f)) + noise(k + f) * 0.1f, 0.0f, 1.0f);
     drawTerrain(s_now + f * 50);
@@ -378,7 +385,9 @@ int main(int argc, char** argv) {
   drawPcMedia(s_now);        snap("73_pc_media");
   Serial.feed("PM\n"); pcPoll(0); g_pc.trkT = s_now;
   drawPcMedia(s_now);        snap("74_pc_media_idle");
+  g_uiPages = 2; g_uiPage = 0;
   drawSpectrum();            snap("30_subghz_spectrum");
+  g_uiPages = 0;
   drawMonitor(s_now);        snap("31_subghz_monitor");
   return 0;
 }

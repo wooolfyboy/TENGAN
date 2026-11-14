@@ -12,7 +12,7 @@
 // справа в шапке — откуда звук: MIC / PC (в режиме «авто» — AUTO MIC / AUTO PC)
 static const char* src(const char* right) {
   static char buf[56];
-  const char* tag = g_auSrcNow == 1 ? "MIC" : g_auSrcNow == 2 ? "PC" : (g_auFromPc ? "AUTO PC" : "AUTO MIC");
+  const char* tag = g_auFromPc ? "PC" : "MIC";            // откуда звук сейчас (выбор — в настройках)
   snprintf(buf, sizeof(buf), "%s  %s", tag, right ? right : "");
   return buf;
 }
@@ -162,7 +162,7 @@ void drawLevel(uint32_t now) {
   spr.setTextDatum(TL_DATUM);
   spr.setTextColor(UI_DIM());
   txt("1 MIN", gx + 5, gy + 3, 1);
-  uiFooter("click: reset max", "side: back");
+  uiFooter("wheel: screens  click: reset max", "side: back");
   present();
 }
 

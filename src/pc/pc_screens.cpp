@@ -28,11 +28,6 @@ static void bar(int x, int y, int w, int h, float pct, uint16_t col) {
   int f = (int)((w - 2) * constrain(pct, 0.0f, 100.0f) / 100.0f);
   if (f > 0) spr.fillRect(x + 1, y + 1, f, h - 2, col);
 }
-static void pageDots(int page) {
-  int W = spr.width();
-  for (int p = 0; p < PC_PAGES; p++) spr.fillRect(W / 2 - PC_PAGES * 5 + p * 10, UI_BOTTOM + 2, 6, 2, p == page ? C_ACC() : UI_LINE());
-}
-
 void drawPc(uint32_t now) {
   const PcStat& p = g_pc;
   const int W = spr.width();
@@ -105,7 +100,6 @@ void drawPc(uint32_t now) {
   char top[40]; snprintf(top, sizeof(top), "top: %s", p.top[0] ? p.top : "-");
   upStr(p.up, buf, sizeof(buf));
   uiFooter(top, buf);
-  pageDots(0);
   present();
 }
 
@@ -133,8 +127,7 @@ void drawPcCores(uint32_t now) {
     snprintf(buf, sizeof(buf), "%d", i + 1);
     txt(buf, x + bw / 2, bot + 3, 1);
   }
-  uiFooter("wheel: page", "side: back");
-  pageDots(1);
+  uiFooter("wheel: screens", "side: back");
   present();
   (void)now;
 }
@@ -299,6 +292,5 @@ void drawPcMedia(uint32_t now) {
     txt(p.playing ? "PLAYING" : "PAUSED", ix + 22, iy + 4, 1);
   }
   uiFooter("wheel: volume  click: play/pause", "side: back");
-  pageDots(2);
   present();
 }

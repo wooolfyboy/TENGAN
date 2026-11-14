@@ -97,7 +97,7 @@ void drawNets(uint32_t now) {
     spr.fillRect(W - UI_M + 2, LIST_Y0, 2, trackH, UI_LINE());
     spr.fillRect(W - UI_M + 2, barY, 2, barH, C_ACC());
   }
-  uiFooter("wheel: pick   click: details", "side: back");
+  uiFooter("wheel: pick  click: details", "side: back");
   present();
 }
 
@@ -428,7 +428,7 @@ void drawFind(uint32_t now) {
     int tx = W - UI_M - 64;
     uiReadout(tx, UI_TOP + 4, dlt >= 3 ? "warmer" : dlt <= -3 ? "colder" : "trend", buf, dlt >= 3 ? C_ACC() : C_HOT(), 2);
   }
-  uiFooter("click: next network", "side: back");
+  uiFooter("wheel: screens  click: next network", "side: back");
   present();
   if (!lost && g_wifiTicks) audioGeiger(pct);                     // щелчки чаще — ближе
 
