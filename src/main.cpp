@@ -1220,6 +1220,9 @@ void wifiClick();
 void wifiRotate(int dir);
 void wifiFrame(uint32_t now);
 int  wifiNetCount();
+void promOn();
+void promOff();
+extern int g_wMode;
 
 void bleStart() {
   if (g_bleActive) return;
@@ -1238,13 +1241,14 @@ void bleStop() {
 
 void enterSection(int sel) {
   if (sel == 0)      { g_section = S_BLE; bleStart(); }
-  else if (sel == 1) { g_section = S_WIFI; bleStop(); wifiStart(); }
+  else if (sel == 1) { g_section = S_WIFI; bleStop(); wifiStart(); if (g_wMode == 2) promOn(); }
   else               { g_section = S_SET; g_setItem = 0; }
   g_detail = false;
 }
 
 void goMenu() {
   if (g_section == S_SET && g_setDirty) saveSettings();
+  if (g_section == S_WIFI) promOff();      // без раздела Wi-Fi пакеты не считаем, ленту гасим
   if (g_section == S_BLE)  g_menuSel = 0;
   if (g_section == S_WIFI) g_menuSel = 1;
   if (g_section == S_SET)  g_menuSel = 2;
@@ -1505,20 +1509,7 @@ void setup() {
 
 uint32_t g_lastDraw = 0;
 
-// ---- Wi-Fi: временная заглушка ----
-void wifiStart() {}
-void wifiStop() {}
-void wifiClick() {}
-void wifiRotate(int) {}
-int  wifiNetCount() { return -1; }
-void wifiFrame(uint32_t) {
-  int W = spr.width(), H = spr.height();
-  spr.fillSprite(TFT_BLACK);
-  spr.setTextDatum(MC_DATUM);
-  spr.setTextColor(tft.color565(120, 120, 135), TFT_BLACK);
-  spr.drawString("Wi-Fi: coming soon", W / 2, H / 2, 4);
-  spr.pushSprite(0, 0);
-}
+#include "wifi_ui.h"   // раздел Wi-Fi
 
 void loop() {
   pollButtons();
@@ -1620,6 +1611,12 @@ void loop() {
       int idx = -1;
       for (int i = 0; i < n; i++) if (g_order[i] == g_sel) { idx = i; break; }
       int mv = g_listMove; g_listMove = 0;
+      // прокрутка за край списка — соседний экран раздела
+      if (!g_detail && mv != 0 &&
+          (n == 0 || (mv < 0 && idx <= 0) || (mv > 0 && idx == n - 1))) {
+        changeMode(mv > 0 ? +1 : -1);
+        mv = 0;
+      }
       bool keep = (idx < 0 && g_detail && mv == 0);   // выбранное пропало — держим его подробности
       if (!keep && n > 0) {
         if (idx < 0) idx = 0;
