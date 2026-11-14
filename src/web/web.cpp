@@ -184,8 +184,11 @@ static void webTick(uint32_t now) {
   s_srv->handleClient();
   scanCollect();
   // CC1101 и микрофон работают, только пока их вкладку смотрят на телефоне
-  if (s_subOn) { if (now - s_subMs > 4000) { subWebStop(); s_subOn = false; } else subWebTick(now); }
-  if (s_sndOn) { if (now - s_sndMs > 4000) { audioWebStop(); s_sndOn = false; } else audioWebTick(now); }
+  // время берём заново: запрос мог прийти уже после того, как посчитали now,
+  // и тогда now - s_sndMs «перекручивается» в огромное число (микрофон гас сразу)
+  uint32_t t = millis();
+  if (s_subOn) { if ((int32_t)(t - s_subMs) > 4000) { subWebStop(); s_subOn = false; } else subWebTick(t); }
+  if (s_sndOn) { if ((int32_t)(t - s_sndMs) > 4000) { audioWebStop(); s_sndOn = false; } else audioWebTick(t); }
   if (now - s_scanMs > 20000 && WiFi.scanComplete() != WIFI_SCAN_RUNNING) {
     s_scanMs = now;
     WiFi.scanNetworks(true, true, false, 90);       // асинхронно, 90 мс на канал

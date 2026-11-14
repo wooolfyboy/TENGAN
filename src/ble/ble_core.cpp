@@ -194,7 +194,7 @@ void bleSample(uint32_t now) {
     if (delta >= g_thresh)       { ev = +1; g_base = c; g_cooldownMs = now + 3000; }
     else if (delta <= -g_thresh) { ev = -1; g_base = c; g_cooldownMs = now + 3000; }
   }
-  if (ev != 0) ledsEvent(ev);                       // запустить анимацию ленты
+  if (ev != 0 && navActive(&bleSection)) ledsEvent(ev);   // лента — только в самом разделе Bluetooth
   g_base += 0.15f * (c - g_base);                 // дрейф базовой линии (EMA)
 
   Sample s = { c, g_base, ev };
