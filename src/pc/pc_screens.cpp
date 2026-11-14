@@ -217,12 +217,52 @@ void drawPcMedia(uint32_t now) {
 
   const int tx = UI_M + 6, tw = vx - tx - 12;
   if (!trk) {
+    // ---- нет данных о треке: крутится виниловая пластинка, рядом крупно громкость ----
+    g_fastFrame = true;
+    static float rot = 0;
+    static uint32_t lastMs = 0;
+    float dt = lastMs ? min<uint32_t>(msSince(now, lastMs), 100) * 0.001f : 0.03f;
+    lastMs = now;
+    rot += dt * (turning ? 7.0f : 1.8f);                   // крутишь колесо — пластинка разгоняется
+    const int cx = tx + 66, cy = UI_TOP + 64, R = 58;
+    spr.fillCircle(cx, cy, R, tft.color565(6, 18, 22));
+    spr.drawCircle(cx, cy, R, UI_LINE());
+    for (int r = 24; r < R - 2; r += 4) spr.drawCircle(cx, cy, r, tft.color565(12, 34, 41));   // бороздки
+    // блики: два светлых сектора на бороздках, крутятся вместе с пластинкой
+    for (int side = 0; side < 2; side++) {
+      float base = rot + side * PI;
+      for (int r = 26; r < R - 3; r += 4)
+        for (int k = -6; k <= 6; k++) {
+          float ang = base + k * 0.035f;
+          int br = 110 - abs(k) * 15;
+          spr.drawPixel(cx + (int)(cosf(ang) * r), cy + (int)(sinf(ang) * r), tft.color565(br / 3, br, br + 20 > 255 ? 255 : br + 20));
+        }
+    }
+    // яблоко пластинки с меткой, крутится
+    spr.fillCircle(cx, cy, 19, tft.color565(10, 60, 74));
+    spr.drawCircle(cx, cy, 19, C_ACC());
+    float la = rot * 1.0f;
+    spr.drawLine(cx + (int)(cosf(la) * 8), cy + (int)(sinf(la) * 8), cx + (int)(cosf(la) * 16), cy + (int)(sinf(la) * 16), C_HOT());
+    spr.fillCircle(cx, cy, 3, C_HOT());
+    // тонарм
+    const int px = cx + R + 12, py = cy - R + 6;
+    spr.fillCircle(px, py, 6, UI_LINE());
+    spr.drawCircle(px, py, 6, UI_LABEL());
+    int nx = cx + 30, ny = cy - 22;
+    spr.drawLine(px, py, nx + 6, ny - 10, UI_LABEL());
+    spr.drawLine(px + 1, py, nx + 7, ny - 10, UI_LABEL());
+    spr.fillRect(nx, ny - 12, 9, 6, C_ACC());
+    // справа от пластинки: громкость крупно
+    const int gx = px + 16;
     spr.setTextDatum(TL_DATUM);
     spr.setTextColor(UI_LABEL());
-    txt("NOTHING PLAYING", tx, UI_TOP + 30, 4);
+    txt(p.mute ? "MUTED" : "VOLUME", gx, UI_TOP + 22, 1);
+    spr.setTextColor(p.mute ? UI_DIM() : (turning ? C_HOT() : C_ACC()));
+    if (known) { snprintf(buf, sizeof(buf), "%d", p.vol); txt(buf, gx, UI_TOP + 32, 6); }
+    else txt("--", gx, UI_TOP + 32, 6);
     spr.setTextColor(UI_DIM());
-    txt("START MUSIC OR A VIDEO ON THE LAPTOP", tx, UI_TOP + 62, 1);
-    txt("WHEEL STILL CHANGES THE VOLUME", tx, UI_TOP + 74, 1);
+    txt("NO TRACK INFO", gx, UI_TOP + 84, 1);
+    txt("WHEEL: VOLUME", gx, UI_TOP + 96, 1);
   } else {
     // ---- название и исполнитель ----
     spr.setTextDatum(TL_DATUM);
