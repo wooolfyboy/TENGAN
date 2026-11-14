@@ -92,10 +92,6 @@ static void drawSectionSub(const Section* s) {
   size_t k = 0;
   for (; s->title[k] && k < sizeof(title) - 1; k++) title[k] = (char)toupper((unsigned char)s->title[k]);
   title[k] = 0;
-  if (g_theme == THEME_HUD) {                           // «// BLUETOOTH»
-    char t2[20]; snprintf(t2, sizeof(t2), "// %s", title);
-    strncpy(title, t2, sizeof(title) - 1); title[sizeof(title) - 1] = 0;
-  }
   drawSubmenu(title, C(s->r, s->g, s->b), items, n, s_subSel);
 }
 
@@ -185,44 +181,7 @@ static void drawMainMenuHud() {
   present();
 }
 
-// главное меню — список, как на старых приборах: курсор «>», выбранная строка залита
-static void drawMainMenu() {
-  if (g_theme == THEME_HUD) { drawMainMenuHud(); return; }
-  int W = spr.width(), H = spr.height();
-  spr.fillSprite(C_BG());
-  spr.setTextDatum(TL_DATUM);
-  spr.setTextColor(C(150, 150, 165));
-  txt("RADIO RADAR", 6, 3, 2);
-  drawBatteryIcon(W - 6, 4);
-  spr.drawFastHLine(6, 22, W - 12, C(70, 70, 82));
-
-  const int y0 = 28, rh = 31;
-  for (int i = 0; i < N_SECTIONS; i++) {
-    const Section* s = SECTIONS[i];
-    bool sel = (i == s_menuSel);
-    int y = y0 + i * rh, cy = y + (rh - 3) / 2;
-    uint16_t acc = C(s->r, s->g, s->b);
-    if (sel) spr.fillRect(6, y, W - 12, rh - 3, acc);
-    char name[20] = "> ";
-    size_t k = 2;
-    for (size_t t = 0; s->title[t] && k < sizeof(name) - 1; t++) name[k++] = (char)toupper((unsigned char)s->title[t]);
-    name[k] = 0;
-    if (!sel) name[0] = ' ';
-    char sub[24];
-    s->subtitle(sub, sizeof(sub));
-    uint16_t tc = sel ? C_BG() : C(175, 175, 190);
-    spr.setTextColor(tc);
-    spr.setTextDatum(ML_DATUM);
-    txt(name, 10, cy, 4);
-    spr.setTextColor(sel ? C_BG() : C(120, 120, 135));
-    spr.setTextDatum(MR_DATUM);
-    txt(sub, W - 12, cy, 2);
-  }
-  spr.setTextDatum(BC_DATUM);
-  spr.setTextColor(C(80, 80, 92));
-  txt("wheel: choose   click: open   hold side: power off", W / 2, H - 2, 1);
-  present();
-}
+static void drawMainMenu() { drawMainMenuHud(); }
 
 void navDraw(uint32_t now) {
   const Section* s = cur();

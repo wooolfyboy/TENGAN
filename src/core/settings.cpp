@@ -7,6 +7,7 @@
 #include "core/theme.h"
 #include "core/leds.h"
 #include "core/battery.h"
+#include "core/ui.h"
 
 int g_range = 0;
 int g_thresh = 7;
@@ -17,8 +18,7 @@ static int      g_setItem = 0;           // выбранный пункт
 static bool     g_setDirty = false;
 static uint32_t g_setChangedMs = 0;
 static Preferences g_prefs;
-static const int N_SET_ITEMS = 6;        // последний пункт — батарея (только показывает)
-static const int SET_ROWS = 5;           // строк на экране (список прокручивается)
+static const int N_SET_ITEMS = 5;        // последний пункт — батарея (только показывает)
 
 // ---------- настройки ----------
 void applyBrightness() {
@@ -32,13 +32,11 @@ void loadSettings() {
   g_thresh    = g_prefs.getInt("thresh", 7);
   g_ledBright = g_prefs.getInt("ledbr", 50);
   g_scrBright = g_prefs.getInt("scrbr", 100);
-  g_theme     = g_prefs.getInt("theme2", THEME_HUD);
   g_prefs.end();
   if (g_range < 0 || g_range >= N_RANGES) g_range = 0;
   if (g_thresh < 0 || g_thresh > 30) g_thresh = 7;
   if (g_ledBright < 10 || g_ledBright > 100) g_ledBright = 50;
   if (g_scrBright < 20 || g_scrBright > 100) g_scrBright = 100;
-  if (g_theme < 0 || g_theme >= N_THEMES) g_theme = THEME_HUD;
 }
 
 void saveSettings() {
@@ -47,14 +45,13 @@ void saveSettings() {
   g_prefs.putInt("thresh", g_thresh);
   g_prefs.putInt("ledbr", g_ledBright);
   g_prefs.putInt("scrbr", g_scrBright);
-  g_prefs.putInt("theme2", g_theme);
   g_prefs.end();
   g_setDirty = false;
 }
 
 void settingsSaveNow() { if (g_setDirty) saveSettings(); }
 void settingsAutosave(uint32_t now) { if (g_setDirty && now - g_setChangedMs > 3000) saveSettings(); }
-void settingsBegin() { loadSettings(); themeApply(); applyBrightness(); }
+void settingsBegin() { loadSettings(); applyBrightness(); }
 
 void settingsAdjust(int dir) {
   switch (g_setItem) {
@@ -62,7 +59,6 @@ void settingsAdjust(int dir) {
     case 1: g_thresh = constrain(g_thresh + dir, 0, 30); break;
     case 2: g_ledBright = constrain(g_ledBright + dir * 10, 10, 100); break;
     case 3: g_scrBright = constrain(g_scrBright + dir * 10, 20, 100); break;
-    case 4: g_theme = (g_theme + dir + N_THEMES) % N_THEMES; themeApply(); break;
     default: return;                       // батарея — только показывает
   }
   applyBrightness();
@@ -71,59 +67,59 @@ void settingsAdjust(int dir) {
 }
 
 void drawSettings() {
-  int W = spr.width(), H = spr.height();
+  int W = spr.width();
   spr.fillSprite(C_BG());
-  char val[32];
-  spr.setTextDatum(TL_DATUM);
-  spr.setTextColor(C(120, 120, 135), C_BG());
-  txt("SETTINGS", 4, 1, 2);
+  uiHeader("Settings", "stored on device");
 
-  const char* names[N_SET_ITEMS] = { "Range", "LED events", "LED bright", "Screen", "Theme", "Battery" };
-  const char* hints[N_SET_ITEMS] = {
-    "ignore devices weaker than this",
-    "flash when count jumps by this",
-    "brightness of the LED strip",
+  static const char* const names[N_SET_ITEMS] = { "Range", "LED events", "LED brightness", "Screen", "Battery" };
+  static const char* const hints[N_SET_ITEMS] = {
+    "ignore bluetooth devices weaker than this",
+    "flash leds when device count jumps by this",
+    "brightness of the led strip",
     "screen backlight",
-    "HUD: tactical   phosphor: green CRT   classic: colors",
     "",
   };
   char batLine[64]; batSummary(batLine, sizeof(batLine));
-  hints[5] = batLine;
-  int first = constrain(g_setItem - (SET_ROWS - 1), 0, N_SET_ITEMS - SET_ROWS);
-  for (int i = first; i < first + SET_ROWS; i++) {
-    int y = 20 + (i - first) * 25;
+  const int rh = 22;
+  for (int i = 0; i < N_SET_ITEMS; i++) {
+    int y = UI_TOP + 2 + i * rh, cy = y + rh / 2 - 1;
     bool sel = (i == g_setItem);
-    uint16_t bg = sel ? C(28, 38, 62) : C_BG();
-    if (sel) spr.fillRoundRect(0, y - 2, W, 26, 4, bg);
+    if (sel) uiRowHighlight(y, rh - 2);
+    char val[32];
+    bool alert = false;
     switch (i) {
       case 0:
         if (g_range == 0) sprintf(val, "all");
-        else sprintf(val, "%s  %d dBm", RANGES[g_range].name, RANGES[g_range].dbm);
+        else sprintf(val, "%s %d dBm", RANGES[g_range].name, RANGES[g_range].dbm);
         break;
-      case 1: if (g_thresh == 0) sprintf(val, "off"); else sprintf(val, "+-%d", g_thresh); break;
+      case 1: if (g_thresh == 0) sprintf(val, "off"); else sprintf(val, "+/- %d", g_thresh); break;
       case 2: sprintf(val, "%d%%", g_ledBright); break;
       case 3: sprintf(val, "%d%%", g_scrBright); break;
-      case 4: sprintf(val, "%s", themeName(g_theme)); break;
-      case 5:
-        if (g_bat.ok) sprintf(val, "%d%%  %.2fV", g_bat.soc, g_bat.mv / 1000.0f);
+      default:
+        if (g_bat.ok) { sprintf(val, "%d%%  %.2f V", g_bat.soc, g_bat.mv / 1000.0f); alert = g_bat.soc <= 20; }
         else          sprintf(val, "n/a");
         break;
     }
-    spr.setTextDatum(TL_DATUM);
-    spr.setTextColor(sel ? C_HOT() : C(150, 150, 165), bg);
-    txt(names[i], 10, y, 4);
-    // значение крупно, а если не влезает рядом с названием — помельче
-    int room = W - 20 - txtW(names[i], 4) - 12;
-    bool big = txtW(val, 4) <= room;
-    spr.setTextDatum(TR_DATUM);
-    spr.setTextColor(sel ? C(90, 220, 140) : C(110, 110, 125), bg);
-    txt(val, W - 10, big ? y : y + 5, big ? 4 : 2);
+    spr.setTextDatum(ML_DATUM);
+    spr.setTextColor(sel ? C_HOT() : UI_LABEL());
+    txt(names[i], UI_M + 8, cy, 2);
+    spr.setTextDatum(MR_DATUM);
+    spr.setTextColor(alert ? C_ALERT() : (sel ? C_ACC() : C_HOT()));
+    txt(val, W - UI_M - 8, cy, 2);
+    if (sel && i < 4) {                           // стрелки «крути колесо»
+      int vw = txtW(val, 2);
+      spr.setTextColor(UI_DIM());
+      txt("<", W - UI_M - 16 - vw, cy, 2);
+    }
   }
-  spr.setTextDatum(BL_DATUM);
-  spr.setTextColor(C(110, 110, 125), C_BG());
-  txt(hints[g_setItem], 4, H - 12, 1);
-  spr.setTextColor(C(80, 80, 92), C_BG());
-  txt("wheel: change   click: next item   side: back", 4, H - 1, 1);
+  const char* h = g_setItem == 4 ? batLine : hints[g_setItem];
+  char hu[64]; size_t k = 0;
+  for (; h[k] && k < sizeof(hu) - 1; k++) hu[k] = (char)toupper((unsigned char)h[k]);
+  hu[k] = 0;
+  spr.setTextDatum(TL_DATUM);
+  spr.setTextColor(UI_DIM());
+  txt(hu, UI_M + 8, UI_TOP + 2 + N_SET_ITEMS * rh + 4, 1);
+  uiFooter("wheel: change   click: next", "side: back");
   present();
 }
 

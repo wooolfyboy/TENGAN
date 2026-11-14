@@ -24,7 +24,7 @@ static const int      ORDER_HYST_DB = 8;            // меняем местам
 static const uint32_t ORDER_EVERY   = 2000;         // как часто обновлять порядок
 static const uint32_t ORDER_FREEZE  = 4000;         // после касания колеса порядок замирает
 
-enum { M_RADAR = 0, M_PROX, M_SCOPE, M_TIMELINE, M_TYPES, M_LIST, M_WEATHER, NUM_MODES };
+enum { M_OVERVIEW = 0, M_SCOPE, M_NEAREST, M_LIST, M_WEATHER, NUM_MODES };
 enum { V_PRIV = 0, V_OTHER = 1 };                   // 2.. — бренды из таблицы BRANDS (vendors.h)
 enum { A_PUBLIC = 0, A_STATIC, A_ROTATING, A_NONRES };   // виды адресов
 
@@ -102,12 +102,9 @@ extern int      g_sparkN;
 
 // ---------- экраны (ble_screens.cpp) ----------
 float       estDistance(int rssi);
-uint16_t    typeColor(uint8_t t);
-void drawRadar(int count);
-void drawProximity(bool have, int rssi, const Ent& best, int count);
+void drawOverview(int count, int raw, const int* typeCnt);
 void drawScope(const std::vector<Blip>& bl);
-void drawTimeline();
-void drawTypes(const int* cnt, int total);
+void drawNearest(bool have, int rssi, const Ent& best, int count);
 void drawList(const std::map<uint32_t, Ent>& ents);
 void drawDetail(const Dev& d, const Ent& e, bool inMap, uint32_t now);
 void drawWeather(const std::vector<Sensor>& ss, uint32_t now);

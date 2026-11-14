@@ -356,21 +356,21 @@ static void bleEnter() { wifiRadioOff(); bleRadioOn(); }
 static void bleLeave() {}
 
 static void bleScreenInfo(int i, SubItem& it) {
-  static const char* const names[NUM_MODES] = { "Radar", "Proximity", "Scope", "Timeline", "Types", "Devices", "Weather" };
-  static const char* const descs[NUM_MODES] = { "how many around", "nearest device", "radar picture",
-    "count over time", "what kind of", "list + details", "BLE thermometers" };
+  static const char* const names[NUM_MODES] = { "Overview", "Scope", "Nearest", "Devices", "Weather" };
+  static const char* const descs[NUM_MODES] = { "count, trend, types", "radar picture", "closest device",
+    "list + details", "BLE thermometers" };
   it.name = names[i]; it.desc = descs[i]; it.value[0] = 0;
   switch (i) {
-    case M_RADAR: case M_LIST: sprintf(it.value, "%d", g_lastCount); break;
-    case M_PROX:
-      if (g_have) sprintf(it.value, "%d dBm", g_bestRssi); else strcpy(it.value, "-");
-      break;
-    case M_TYPES: {
+    case M_OVERVIEW: case M_LIST: sprintf(it.value, "%d", g_lastCount); break;
+    case M_SCOPE: {
       int top = -1;
       for (int t = 1; t < T_NUM; t++) if (g_typeCnt[t] > 0 && (top < 0 || g_typeCnt[t] > g_typeCnt[top])) top = t;
       if (top > 0) snprintf(it.value, sizeof(it.value), "%s %d", typeName(top), g_typeCnt[top]);
       break;
     }
+    case M_NEAREST:
+      if (g_have) sprintf(it.value, "%d dBm", g_bestRssi); else strcpy(it.value, "-");
+      break;
     case M_WEATHER:
       if (g_sensCount) sprintf(it.value, "%d", g_sensCount); else strcpy(it.value, "-");
       break;
@@ -398,11 +398,9 @@ static bool bleBack() {
 }
 static void bleDraw(uint32_t now) {
   switch (g_mode) {
-    case M_RADAR:    drawRadar(g_lastCount); break;
-    case M_PROX:     drawProximity(g_have, g_bestRssi, g_bestEnt, g_lastCount); break;
+    case M_OVERVIEW: drawOverview(g_lastCount, g_lastRaw, g_typeCnt); break;
     case M_SCOPE:    drawScope(g_snap); break;
-    case M_TIMELINE: drawTimeline(); break;
-    case M_TYPES:    drawTypes(g_typeCnt, g_lastCount); break;
+    case M_NEAREST:  drawNearest(g_have, g_bestRssi, g_bestEnt, g_lastCount); break;
     case M_LIST:     drawListOrDetail(now); break;
     default:         drawWeather(g_sensSnap, now); break;
   }

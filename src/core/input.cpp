@@ -43,17 +43,21 @@ void inputPoll() {
   static uint32_t lastEncMs = 0;
   static bool userDown = false;
   static uint32_t userDownMs = 0;
+  static bool userWoke = false;          // нажатие только разбудило экран
   int enc  = digitalRead(PIN_ENC_KEY);
   int user = digitalRead(PIN_USER_KEY);
   uint32_t now = millis();
 
   if (enc == LOW && lastEnc == HIGH && now - lastEncMs > 250) {
-    navClick();
+    bool wasDim = powerIdle();
+    powerTouch();
+    if (!wasDim) navClick();                 // первое нажатие в «сне» только будит экран
     lastEncMs = now;
   }
   lastEnc = enc;
 
   int st = s_steps.exchange(0);
+  if (st) { bool wasDim = powerIdle(); powerTouch(); if (wasDim) st = 0; }
   for (; st > 0; st--) navRotate(+1);
   for (; st < 0; st++) navRotate(-1);
 
@@ -61,7 +65,7 @@ void inputPoll() {
     if (user == HIGH) g_ignoreUser = false;
     return;
   }
-  if (user == LOW && !userDown) { userDown = true; userDownMs = now; }
+  if (user == LOW && !userDown) { userDown = true; userDownMs = now; userWoke = powerIdle(); powerTouch(); }
   if (userDown && user == LOW) {
     uint32_t held = now - userDownMs;
     g_powerHold = held >= PWR_SHOW_MS ? held : 0;
@@ -71,6 +75,6 @@ void inputPoll() {
     uint32_t held = now - userDownMs;
     userDown = false;
     g_powerHold = 0;
-    if (held >= 30 && held < PWR_SHOW_MS) navBack();   // короткое нажатие (30 мс — от дребезга)
+    if (held >= 30 && held < PWR_SHOW_MS && !userWoke) navBack();   // короткое нажатие (30 мс — от дребезга)
   }
 }

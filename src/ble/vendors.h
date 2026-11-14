@@ -40,6 +40,5 @@ static const int N_BRANDS = sizeof(BRANDS) / sizeof(BRANDS[0]);
 struct Vend { uint8_t cat, kind, score; uint16_t code; };
 
 Vend        resolveVendor(const AdvInfo& ai);   // лучший кандидат из Company ID и UUID сервисов
-uint16_t    vendorColor(uint8_t cat);
 const char* vendorLabel(uint8_t cat, uint8_t kind, uint16_t code);
 const char* btUuidOwner(uint16_t uuid);         // чей «фирменный» UUID (или nullptr)

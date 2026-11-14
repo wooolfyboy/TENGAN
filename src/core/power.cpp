@@ -12,6 +12,20 @@
 #include "core/settings.h"
 
 uint32_t g_powerHold = 0;
+static uint32_t s_lastTouch = 0;
+static bool     s_dimmed = false;
+
+void powerTouch() {
+  s_lastTouch = millis();
+  if (s_dimmed) { s_dimmed = false; applyBrightness(); }
+}
+bool powerIdle() { return s_dimmed; }
+void powerIdleTick(uint32_t now) {
+  if (!s_dimmed && now - s_lastTouch > IDLE_DIM_MS) {
+    s_dimmed = true;
+    analogWrite(TFT_BL, g_scrBright * 255 / 100 / 4);   // четверть яркости
+  }
+}
 bool     g_ignoreUser = false;
 
 void sleepNow() {

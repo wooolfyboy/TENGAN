@@ -10,12 +10,8 @@ extern TFT_eSprite spr;            // весь кадр рисуется в сп
 
 void displayBegin();
 
-// цвета
-uint16_t C_GRAY();
-uint16_t C_DIM();
-
 // списки (Devices, Networks)
-static const int LIST_ROWS = 8, LIST_ROWH = 18, LIST_Y0 = 18;
+static const int LIST_ROWS = 7, LIST_ROWH = 18, LIST_Y0 = 26;   // сетка core/ui.h
 
 // утилиты
 void fitText(const char* src, char* dst, size_t cap, int px, int font);  // обрезать с ".."

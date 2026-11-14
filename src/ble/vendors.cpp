@@ -54,10 +54,6 @@ Vend resolveVendor(const AdvInfo& ai) {
   return best;
 }
 
-uint16_t vendorColor(uint8_t c) {
-  const Brand& b = BRANDS[c < N_BRANDS ? (int)c : (int)V_OTHER];
-  return C(b.r, b.g, b.b);
-}
 // имя производителя для экрана
 const char* vendorLabel(uint8_t cat, uint8_t kind, uint16_t code) {
   if (cat >= 2 && cat < N_BRANDS) return BRANDS[cat].label;

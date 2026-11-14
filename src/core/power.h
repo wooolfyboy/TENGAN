@@ -15,5 +15,11 @@ extern uint32_t g_powerHold;                // сколько уже держа�
 extern bool     g_ignoreUser;               // игнорировать кнопку, пока её не отпустят
 
 void checkWakeHold();                       // в самом начале setup()
+
+// Экономия: через IDLE_DIM_MS без касаний экран гаснет до 25 % и кадры реже.
+static const uint32_t IDLE_DIM_MS = 60000;
+void powerTouch();                          // было нажатие / поворот колеса
+bool powerIdle();                           // экран сейчас приглушён
+void powerIdleTick(uint32_t now);
 void powerOff();
 void drawPowerHold();

@@ -53,9 +53,7 @@ extern int      g_actHistN;
 // помощники (wifi.cpp)
 uint64_t    macKey(const uint8_t* m);
 const char* encName(uint8_t e);
-uint16_t    encColor(uint8_t e);
 const char* genName(uint8_t g);
-uint16_t    apColor(uint64_t key);              // постоянный цвет сети
 uint16_t    dimColor(uint16_t c, int pct);
 const char* ssidOr(const Ap& a);                 // имя или "(hidden)"
 float       apCenter(const Ap& a);               // центр полосы, в каналах

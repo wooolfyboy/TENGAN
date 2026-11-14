@@ -10,7 +10,7 @@ void bootScreen() {
   char bat[24];
   if (g_bat.ok) snprintf(bat, sizeof(bat), "%d%%", g_bat.soc); else snprintf(bat, sizeof(bat), "n/a");
   char theme[16];
-  snprintf(theme, sizeof(theme), "%s", themeName(g_theme));
+  snprintf(theme, sizeof(theme), "%s", "hud");
   for (char* p = theme; *p; p++) *p = (char)toupper((unsigned char)*p);
   const char* labels[] = { "BLUETOOTH RADIO", "WI-FI RADIO", "SUB-GHZ CC1101", "BATTERY", "DISPLAY" };
   const char* vals[]   = { "OK", "OK", "STANDBY", bat, theme };

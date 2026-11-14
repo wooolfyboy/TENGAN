@@ -56,21 +56,6 @@ inline char typeGlyph(uint8_t t) {
   }
 }
 
-// цвета типов (r,g,b) — переводятся в 565 в main.cpp
-inline void typeRGB(uint8_t t, uint8_t& r, uint8_t& g, uint8_t& b) {
-  switch (t) {
-    case T_PHONE:    r = 80;  g = 150; b = 240; break;
-    case T_COMPUTER: r = 160; g = 120; b = 245; break;
-    case T_AUDIO:    r = 240; g = 90;  b = 160; break;
-    case T_WATCH:    r = 70;  g = 210; b = 130; break;
-    case T_TV:       r = 240; g = 205; b = 70;  break;
-    case T_TRACKER:  r = 235; g = 65;  b = 65;  break;
-    case T_BEACON:   r = 60;  g = 205; b = 205; break;
-    case T_INPUT:    r = 240; g = 150; b = 50;  break;
-    case T_SENSOR:   r = 170; g = 220; b = 80;  break;
-    default:         r = 95;  g = 95;  b = 105; break;
-  }
-}
 
 // ---------- разобранная реклама ----------
 struct AdvInfo {
@@ -130,10 +115,6 @@ inline void parseAdv(const uint8_t* p, size_t n, AdvInfo& a) {
   }
 }
 
-inline bool hasUuid(const AdvInfo& a, uint16_t u) {
-  for (uint8_t i = 0; i < a.nUuid; i++) if (a.uuids[i] == u) return true;
-  return false;
-}
 
 // ---------- по «внешнему виду» (Appearance, категория = значение >> 6) ----------
 inline uint8_t typeFromAppearance(uint16_t app) {

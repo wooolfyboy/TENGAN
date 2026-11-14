@@ -54,7 +54,9 @@ void loop() {
   batTick(now);
   navTick(now);                       // работа открытого раздела (сканы, развёртки)
 
-  if (now - lastDraw >= REDRAW_MS) {
+  powerIdleTick(now);
+  // в приглушённом режиме кадры в 4 раза реже — меньше работы процессору и шине
+  if (now - lastDraw >= (powerIdle() ? REDRAW_MS * 4 : REDRAW_MS)) {
     lastDraw = now;
     bleUpdate(now);                   // нужно всегда: меню показывает число устройств, лента — события
     if (g_powerHold) drawPowerHold();

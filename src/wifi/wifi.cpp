@@ -20,7 +20,6 @@
 #include <algorithm>
 #include <atomic>
 #include "wifi/wifi.h"
-#include "wifi/ouidb.h"          // база производителей — подключается только здесь
 #include "core/board.h"
 #include "core/display.h"
 #include "core/theme.h"
@@ -30,49 +29,29 @@
 
 #include "wifi/wifi_model.h"
 
-const char* ouiName(const uint8_t* mac) { return ouiVendor(mac); }
 
-int  g_wMode = 0;
 bool g_wOn = false;
-bool g_wEverScanned = false;
 inline bool wNeedsProm(int m) { return m == W_ACTIVITY || m == W_CLIENTS; }
 
 // ---------- точки доступа ----------
-std::map<uint64_t, Ap> g_aps;
 static const uint32_t AP_REMEMBER_MS = 60000;
 
-bool     g_scanning = false;
 uint32_t g_scanRetryMs = 0;
 int      g_scanCh = 0;           // 0 — все каналы, иначе один (режим FIND)
 
 // список
-std::vector<uint64_t> g_wOrder;
-uint64_t g_wSel = 0;
-int      g_wTop = 0;
 int      g_wMove = 0;
-bool     g_wDetail = false;
 uint32_t g_wTouch = 0;
-int8_t   g_wSpark[W_SPARK_N];
-int      g_wSparkN = 0;
 uint64_t g_wSparkFor = 0;
 // FIND
-int8_t   g_fSpark[F_SPARK_N];
-int      g_fSparkN = 0;
 uint64_t g_fFor = 0;
-uint32_t g_fLastHit = 0;
 
 // ---------- приём пакетов (promiscuous) ----------
 // счётчики пишет обработчик пакетов (другая задача), читает основной цикл
 std::atomic<uint32_t> g_pMgmt{0}, g_pData{0};
 std::atomic<int32_t>  g_nfSum{0};
 std::atomic<uint32_t> g_nfCnt{0};
-bool     g_prom = false;
-int      g_hopCh = 1;
 uint32_t g_hopMs = 0, g_lastMgmt = 0, g_lastData = 0;
-float    g_ppsMgmt[CH_MAX + 1] = {0}, g_ppsData[CH_MAX + 1] = {0};
-float    g_noise[CH_MAX + 1] = {0};       // шум по каналам, дБм (0 = нет данных)
-float    g_actHist[ACT_HIST_N];
-int      g_actHistN = 0;
 uint32_t g_actHistMs = 0;
 static const uint32_t HOP_MS = 200;
 
@@ -83,8 +62,6 @@ PEv g_pev[PEV_N];
 volatile uint16_t g_pevHead = 0, g_pevTail = 0;
 
 // устройства в сетях и «ищущие Wi-Fi» (только в памяти, только для счёта)
-std::map<uint64_t, Sta> g_stas;
-std::map<uint64_t, uint32_t> g_probes;
 static const uint32_t STA_REMEMBER_MS = 120000;
 static const size_t   STA_MAX = 500;
 
@@ -116,55 +93,7 @@ static void IRAM_ATTR promCb(void* buf, wifi_promiscuous_pkt_type_t type) {
   }
 }
 
-uint64_t macKey(const uint8_t* m) {
-  uint64_t k = 0;
-  for (int i = 0; i < 6; i++) k = (k << 8) | m[i];
-  return k;
-}
 
-// ---------- подписи и цвета ----------
-const char* encName(uint8_t e) {
-  switch (e) {
-    case WIFI_AUTH_OPEN:            return "open";
-    case WIFI_AUTH_WEP:             return "WEP";
-    case WIFI_AUTH_WPA_PSK:         return "WPA";
-    case WIFI_AUTH_WPA2_PSK:        return "WPA2";
-    case WIFI_AUTH_WPA_WPA2_PSK:    return "WPA/WPA2";
-    case WIFI_AUTH_WPA2_ENTERPRISE: return "WPA2-Ent";
-    case WIFI_AUTH_WPA3_PSK:        return "WPA3";
-    case WIFI_AUTH_WPA2_WPA3_PSK:   return "WPA2/WPA3";
-    case WIFI_AUTH_OWE:             return "OWE";
-    case WIFI_AUTH_WAPI_PSK:        return "WAPI";
-    default:                        return "other";
-  }
-}
-uint16_t encColor(uint8_t e) {
-  switch (e) {
-    case WIFI_AUTH_OPEN:            return C(235, 80, 80);
-    case WIFI_AUTH_WEP:
-    case WIFI_AUTH_WPA_PSK:         return C(240, 150, 50);
-    case WIFI_AUTH_WPA3_PSK:
-    case WIFI_AUTH_WPA2_WPA3_PSK:
-    case WIFI_AUTH_OWE:             return C(60, 205, 205);
-    case WIFI_AUTH_WPA2_ENTERPRISE: return C(160, 120, 245);
-    default:                        return C(70, 210, 130);
-  }
-}
-const char* genName(uint8_t g) {
-  switch (g) { case 6: return "Wi-Fi 6"; case 4: return "Wi-Fi 4"; case 3: return "11g"; default: return "11b"; }
-}
-uint16_t apColor(uint64_t key) {
-  static const uint8_t pal[8][3] = {
-    {80,150,240},{70,210,130},{240,200,70},{240,90,160},{60,205,205},{240,150,50},{170,220,80},{160,120,245} };
-  uint32_t h = (uint32_t)(key ^ (key >> 29)) * 2654435761u;
-  const uint8_t* c = pal[(h >> 24) & 7];
-  return C(c[0], c[1], c[2]);
-}
-uint16_t dimColor(uint16_t c, int pct) {
-  uint8_t r = ((c >> 11) & 0x1F) << 3, g = ((c >> 5) & 0x3F) << 2, b = (c & 0x1F) << 3;
-  return C(r * pct / 100, g * pct / 100, b * pct / 100);
-}
-const char* ssidOr(const Ap& a) { return a.ssid[0] ? a.ssid : "(hidden)"; }
 
 // раздача с телефона? (по имени сети и производителю)
 static bool looksLikeHotspot(const char* ssid, const char* vendor) {
@@ -243,14 +172,6 @@ static void wifiSetMode(int m) {
   ledsOff();
 }
 
-// цель для FIND: выбранная в списке сеть, иначе самая сильная
-uint64_t findTarget() {
-  if (g_wSel && g_aps.count(g_wSel)) return g_wSel;
-  uint64_t best = 0; int br = -127;
-  for (auto& kv : g_aps) if (kv.second.rssiS > br) { br = kv.second.rssiS; best = kv.first; }
-  g_wSel = best;
-  return best;
-}
 
 // ---------- скан: забираем результаты и запускаем следующий ----------
 static void wifiOrderUpdate(bool force);
@@ -285,7 +206,7 @@ static void wifiScanTick(uint32_t now) {
       Ap a; memset(&a, 0, sizeof(a));
       memcpy(a.bssid, r->bssid, 6);
       a.first = now; a.rssiS = a.rmin = a.rmax = r->rssi;
-      a.vendor = ouiVendor(r->bssid);
+      a.vendor = ouiName(r->bssid);
       it = g_aps.insert({ k, a }).first;
     }
     Ap& a = it->second;
@@ -379,11 +300,6 @@ static void wifiHopTick(uint32_t now) {
   }
 }
 
-int clientsOf(uint64_t bssid) {
-  int n = 0;
-  for (auto& kv : g_stas) if (kv.second.bssid == bssid) n++;
-  return n;
-}
 
 // ---------- список сетей: «липкий» порядок, как у Bluetooth ----------
 static void wifiOrderUpdate(bool force) {
@@ -456,26 +372,7 @@ static bool wifiCloseDetail() {
   return false;
 }
 
-float apCenter(const Ap& a) { return a.ch + a.sec * 2.0f; }
-float apHalf(const Ap& a)   { return a.sec ? 4.0f : 2.0f; }
-// насколько сеть мешает каналу k (0..1)
-float interference(const Ap& a, int k) {
-  float d = fabsf(apCenter(a) - k);
-  float reach = apHalf(a) + 2.0f + 1.0f;      // наша ширина 20 МГц (±2) + запас
-  return d >= reach ? 0.0f : 1.0f - d / reach;
-}
 
-int bestChannel() {
-  if (g_aps.empty()) return 0;
-  const int cand[3] = { 1, 6, 11 };
-  float best = 1e9; int bestCh = 1;
-  for (int k = 0; k < 3; k++) {
-    float score = 0;
-    for (auto& kv : g_aps) score += interference(kv.second, cand[k]) * (kv.second.rssiS + 100);
-    if (score < best) { best = score; bestCh = cand[k]; }
-  }
-  return bestCh;
-}
 
 static void wifiScreenInfo(int i, SubItem& it) {
   static const char* const names[W_NUM] = { "Networks", "Channels", "Activity", "Clients", "Find" };

@@ -3,6 +3,7 @@
 // ============================================================
 #include "core/display.h"
 #include "core/theme.h"
+#include "core/ui.h"
 
 TFT_eSPI    tft;
 TFT_eSprite spr = TFT_eSprite(&tft);
@@ -19,8 +20,6 @@ void displayBegin() {
   }
 }
 
-uint16_t C_GRAY() { return C(120, 120, 135); }
-uint16_t C_DIM()  { return C(80, 80, 92); }
 
 void macStr(const uint8_t* m, char* out) {   // m — младший байт первым
   sprintf(out, "%02X:%02X:%02X:%02X:%02X:%02X", m[5], m[4], m[3], m[2], m[1], m[0]);
@@ -64,34 +63,26 @@ void drawSpark(int gx, int gy, int gw, int gh, const int8_t* buf, int n, int cap
 void drawSubmenu(const char* title, uint16_t acc, SubItem* it, int n, int sel) {
   int W = spr.width();
   spr.fillSprite(C_BG());
-  spr.setTextDatum(TL_DATUM);
-  spr.setTextColor(acc, C_BG());
-  txt(title, 4, 1, 2);
-  spr.setTextDatum(TR_DATUM);
-  spr.setTextColor(C(80, 80, 92), C_BG());
-  txt("click: open   side: back", W - 4, 5, 1);
-  int rh = n > 5 ? 21 : 28, y0 = 20;
+  uiHeader(title, "click: open");
+  int rh = n > 5 ? 18 : 25, y0 = UI_TOP + 1;
   for (int i = 0; i < n; i++) {
-    int y = y0 + i * rh;
+    int y = y0 + i * rh, cy = y + (rh - 2) / 2;
     bool isSel = (i == sel);
-    uint16_t bg = isSel ? C(22, 26, 38) : C_BG();
-    if (isSel && g_theme == THEME_HUD) {
-      hudPanel(0, y, W, rh - 2, 8, bg, true, C_BG());
-      spr.fillRect(0, y + 2, 3, rh - 12, acc);
-    } else if (isSel) {
-      spr.fillRoundRect(0, y, W, rh - 2, 5, bg);
-      spr.fillRoundRect(0, y + 3, 4, rh - 8, 2, acc);
-    }
-    int ty = y + (rh - 2) / 2;
+    if (isSel) uiRowHighlight(y, rh - 2);
     spr.setTextDatum(ML_DATUM);
-    spr.setTextColor(isSel ? C_HOT() : C(170, 170, 185), bg);
-    txt(it[i].name, 12, ty, 2);
-    spr.setTextColor(isSel ? C(130, 130, 145) : C(75, 75, 88), bg);
-    txt(it[i].desc, 104, ty + 1, 1);
+    spr.setTextColor(isSel ? C_HOT() : UI_LABEL());
+    txt(it[i].name, UI_M + 8, cy + 1, n > 5 ? 2 : 4);
+    char d[32]; size_t k = 0;
+    for (; it[i].desc[k] && k < sizeof(d) - 1; k++) d[k] = (char)toupper((unsigned char)it[i].desc[k]);
+    d[k] = 0;
+    spr.setTextColor(isSel ? UI_LABEL() : UI_DIM());
+    txt(d, 118, cy + 1, 1);
+    char v[24]; fitText(it[i].value, v, sizeof(v), 84, 2);
     spr.setTextDatum(MR_DATUM);
-    spr.setTextColor(isSel ? acc : C(110, 110, 125), bg);
-    txt(it[i].value, W - 8, ty, 2);
+    spr.setTextColor(isSel ? acc : C_HOT());
+    txt(v, W - UI_M - 8, cy + 1, 2);
   }
+  uiFooter("wheel: choose", "side: back");
   present();
 }
 
