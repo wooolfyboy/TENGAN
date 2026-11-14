@@ -5,6 +5,11 @@
 //  Режим 2 (PROXIMITY): ближайшее устройство: шкала, ~метры, dBm, вендор.
 //  Режим 3 (SCOPE):     радар-скоуп. Радиус = реальный (RSSI), угол = по MAC.
 //                       Цвет блипа = вендор (Apple/MS/Samsung/Google/...).
+//  Режим 4 (TIMELINE):  число устройств во времени.
+//  Режим 5 (TYPES):     кольцевая диаграмма: какие устройства вокруг
+//                       (телефоны, наушники, часы, метки, ...).
+//  Счёт идёт по «физическим» устройствам: смена случайного MAC-адреса
+//  склеивается по отпечатку рекламы, чтобы один телефон не считался дважды.
 //  Кнопка (энкодер или боковая) листает режимы.
 //
 //  Весь код: Claude. Распиновка — из репозитория LilyGO.
@@ -19,6 +24,7 @@
 #include <string>
 #include <functional>
 #include <math.h>
+#include "devtypes.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -37,6 +43,13 @@
 
 static const uint32_t REMEMBER_MS = 30000;
 static const uint32_t REDRAW_MS   = 66;
+static const int      NUM_MODES   = 5;
+static const size_t   MAX_DEVS    = 600;     // предохранитель памяти
+// склейка смены адреса: старый адрес должен замолчать хотя бы на STALE_MIN
+// и не дольше STALE_MAX назад, а сила сигнала — быть похожей
+static const uint32_t STALE_MIN   = 1500;
+static const uint32_t STALE_MAX   = 12000;
+static const int      MERGE_DB    = 10;
 
 TFT_eSPI    tft;
 TFT_eSprite spr = TFT_eSprite(&tft);
@@ -44,9 +57,24 @@ TFT_eSprite spr = TFT_eSprite(&tft);
 // категории вендоров
 enum { V_PRIV = 0, V_APPLE, V_MS, V_SAMSUNG, V_GOOGLE, V_OTHER };
 
-struct Dev  { uint32_t t; int rssi; uint8_t cat; };
+// Dev — один MAC-адрес. ent — номер «физического» устройства:
+// у нескольких адресов одного телефона (после смены MAC) он общий.
+struct Dev {
+  uint32_t t;        // когда последний раз слышали
+  uint32_t ent;      // id физического устройства
+  uint32_t sig;      // отпечаток рекламы
+  int8_t   rssi;
+  uint8_t  cat;      // вендор
+  uint8_t  type;     // тип устройства (DevType)
+  bool     rnd;      // адрес случайный и меняющийся
+  bool     merged;   // уже стал «предшественником» нового адреса
+};
+// Ent — физическое устройство (агрегат по его адресам)
+struct Ent  { uint32_t t; int rssi; uint8_t cat; uint8_t type; };
 struct Blip { int rssi; uint32_t h; uint8_t cat; };
-std::map<std::string, Dev> g_seen;
+std::map<uint64_t, Dev> g_seen;
+uint32_t g_nextEnt = 0;
+uint32_t g_merges  = 0;         // сколько смен адреса склеили (для статистики)
 SemaphoreHandle_t g_lock;
 
 volatile int g_mode = 0;
@@ -63,6 +91,8 @@ Sample   g_hist[HIST_N];
 int      g_histLen = 0;
 float    g_base = -1.0f;
 volatile int g_lastCount = 0;
+int      g_lastRaw = 0;          // сколько MAC-адресов (без склейки)
+float    g_pieDisp[T_NUM] = {0}; // плавная анимация диаграммы
 uint32_t g_lastSampleMs = 0;
 uint32_t g_cooldownMs = 0;
 
@@ -127,21 +157,61 @@ const char* labelForCount(int n) {
   if (n <= 12) return "crowded"; return "packed";
 }
 
+uint16_t typeColor(uint8_t t) {
+  uint8_t r, g, b; typeRGB(t, r, g, b);
+  return tft.color565(r, g, b);
+}
+
 // ---------- колбэк сканера (NimBLE 2.x) ----------
 class ScanCB : public NimBLEScanCallbacks {
   void onResult(const NimBLEAdvertisedDevice* d) override {
-    std::string mac = d->getAddress().toString();
+    const NimBLEAddress& addr = d->getAddress();
+    uint64_t key = (uint64_t)addr | ((uint64_t)addr.getType() << 48);
     int rssi = d->getRSSI();
-    uint8_t cat = V_PRIV;
-    std::string md = d->getManufacturerData();
-    if (md.size() >= 2) {
-      uint16_t cid = (uint8_t)md[0] | ((uint8_t)md[1] << 8);
-      cat = catFromCompanyId(cid);
+
+    AdvInfo ai;
+    const std::vector<uint8_t>& pl = d->getPayload();
+    parseAdv(pl.data(), pl.size(), ai);
+    uint8_t  cat  = ai.hasMfr ? catFromCompanyId(ai.cid) : V_PRIV;
+    uint8_t  type = classify(ai);
+    uint32_t sig  = advSignature(ai);
+    // случайный меняющийся адрес: тип RANDOM и НЕ «static» (два старших бита != 11)
+    bool rnd = addr.getType() == BLE_ADDR_RANDOM && (addr.getVal()[5] & 0xC0) != 0xC0;
+
+    if (xSemaphoreTake(g_lock, pdMS_TO_TICKS(20)) != pdTRUE) return;
+    uint32_t now = millis();
+    auto it = g_seen.find(key);
+    if (it != g_seen.end()) {
+      Dev& v = it->second;
+      v.t = now; v.rssi = rssi;
+      if (cat  != V_PRIV)    v.cat  = cat;
+      if (type != T_UNKNOWN) v.type = type;
+      if (!v.sig) v.sig = sig;
+    } else if (g_seen.size() < MAX_DEVS) {
+      Dev nd = { now, 0, sig, (int8_t)rssi, cat, type, rnd, false };
+      // ищем «предшественника»: адрес с тем же отпечатком, который недавно замолчал
+      if (rnd && sig) {
+        Dev* best = nullptr; int bestDiff = MERGE_DB + 1;
+        for (auto& kv : g_seen) {
+          Dev& o = kv.second;
+          if (!o.rnd || o.merged || o.sig != sig) continue;
+          uint32_t age = now - o.t;
+          if (age < STALE_MIN || age > STALE_MAX) continue;
+          int diff = abs((int)o.rssi - rssi);
+          if (diff < bestDiff) { bestDiff = diff; best = &o; }
+        }
+        if (best) {
+          best->merged = true;
+          nd.ent = best->ent;
+          if (nd.type == T_UNKNOWN) nd.type = best->type;
+          if (nd.cat  == V_PRIV)    nd.cat  = best->cat;
+          g_merges++;
+        }
+      }
+      if (!nd.ent) nd.ent = ++g_nextEnt;
+      g_seen[key] = nd;
     }
-    if (xSemaphoreTake(g_lock, pdMS_TO_TICKS(20)) == pdTRUE) {
-      g_seen[mac] = { millis(), rssi, cat };
-      xSemaphoreGive(g_lock);
-    }
+    xSemaphoreGive(g_lock);
   }
 };
 
@@ -169,12 +239,19 @@ void drawRadar(int count) {
   spr.setTextDatum(BC_DATUM);
   spr.setTextColor(theme, TFT_BLACK);
   spr.drawString(labelForCount(count), W / 2, H - 6, 4);
+  // сколько было «сырых» адресов до склейки
+  if (g_lastRaw != count) {
+    char buf[24]; sprintf(buf, "%d MAC", g_lastRaw);
+    spr.setTextDatum(TR_DATUM);
+    spr.setTextColor(tft.color565(90, 90, 100), TFT_BLACK);
+    spr.drawString(buf, W - 4, 4, 2);
+  }
   drawThresh();
   spr.pushSprite(0, 0);
 }
 
 // ---------- PROXIMITY ----------
-void drawProximity(bool have, int rssi, uint8_t cat, int count) {
+void drawProximity(bool have, int rssi, uint8_t cat, uint8_t type, int count) {
   int W = spr.width(), H = spr.height();
   spr.fillSprite(TFT_BLACK);
   spr.setTextDatum(TC_DATUM);
@@ -213,9 +290,17 @@ void drawProximity(bool have, int rssi, uint8_t cat, int count) {
   spr.setTextColor(TFT_WHITE, TFT_BLACK);
   spr.drawString(buf, W / 2, by + bh + 8, 4);
 
-  sprintf(buf, "%s   (%d near)", vendorName(cat), count);
+  // строка «тип  вендор  (N near)» — тип и вендор каждый своим цветом
+  char vbuf[48];
+  sprintf(vbuf, "  %s   (%d near)", vendorName(cat), count);
+  const char* tn = typeName(type);
+  int tw = spr.textWidth(tn, 2), vw = spr.textWidth(vbuf, 2);
+  int x0 = W / 2 - (tw + vw) / 2, ty = by + bh + 34;
+  spr.setTextDatum(TL_DATUM);
+  spr.setTextColor(typeColor(type), TFT_BLACK);
+  spr.drawString(tn, x0, ty, 2);
   spr.setTextColor(vendorColor(cat), TFT_BLACK);
-  spr.drawString(buf, W / 2, by + bh + 34, 2);
+  spr.drawString(vbuf, x0 + tw, ty, 2);
   drawThresh();
   spr.pushSprite(0, 0);
 }
@@ -353,6 +438,93 @@ void drawTimeline() {
   spr.pushSprite(0, 0);
 }
 
+// ---------- TYPES: кольцевая диаграмма по типам устройств ----------
+void drawTypes(const int* cnt, int total) {
+  int W = spr.width(), H = spr.height();
+  spr.fillSprite(TFT_BLACK);
+
+  // плавно подтягиваем отображаемые доли к реальным
+  float dispSum = 0;
+  for (int t = 0; t < T_NUM; t++) {
+    g_pieDisp[t] += 0.2f * ((float)cnt[t] - g_pieDisp[t]);
+    if (g_pieDisp[t] < 0.02f) g_pieDisp[t] = 0;
+    dispSum += g_pieDisp[t];
+  }
+
+  int cx = 82, cy = H / 2 + 6, R = 68, IR = 42;
+  if (dispSum < 0.05f) {
+    spr.drawArc(cx, cy, R, IR, 0, 360, tft.color565(35, 35, 42), TFT_BLACK, false);
+  } else {
+    // порядок секторов фиксированный (по типам), начинаем сверху, по часовой
+    float acc = 0;
+    for (int t = 0; t < T_NUM; t++) {
+      if (g_pieDisp[t] <= 0) continue;
+      int a0 = (int)(acc / dispSum * 360.0f + 0.5f);
+      acc += g_pieDisp[t];
+      int a1 = (int)(acc / dispSum * 360.0f + 0.5f);
+      if (a1 <= a0) continue;
+      if (a1 - a0 >= 360) {
+        spr.drawArc(cx, cy, R, IR, 0, 360, typeColor(t), TFT_BLACK, false);
+      } else {
+        // у drawArc 0° внизу -> сдвиг на 180°, чтобы начинать сверху
+        spr.drawArc(cx, cy, R, IR, (a0 + 180) % 360, (a1 + 180) % 360,
+                    typeColor(t), TFT_BLACK, false);
+        // тонкий разделитель между секторами
+        float ar = (a1 - 90) * PI / 180.0f;
+        spr.drawLine(cx + (int)(cos(ar) * IR), cy + (int)(sin(ar) * IR),
+                     cx + (int)(cos(ar) * R),  cy + (int)(sin(ar) * R), TFT_BLACK);
+      }
+    }
+  }
+
+  // в центре — общее число
+  spr.setTextDatum(MC_DATUM);
+  spr.setTextColor(TFT_WHITE, TFT_BLACK);
+  spr.drawNumber(total, cx, cy - 4, 4);
+  spr.setTextColor(tft.color565(110, 110, 125), TFT_BLACK);
+  spr.drawString("devices", cx, cy + 16, 1);
+
+  spr.setTextDatum(TL_DATUM);
+  spr.setTextColor(tft.color565(120, 120, 135), TFT_BLACK);
+  spr.drawString("TYPES", 4, 2, 2);
+
+  // легенда справа: только непустые, по убыванию
+  int order[T_NUM], n = 0;
+  for (int t = 0; t < T_NUM; t++) if (cnt[t] > 0) order[n++] = t;
+  for (int i = 1; i < n; i++)
+    for (int j = i; j > 0 && cnt[order[j - 1]] < cnt[order[j]]; j--) {
+      int x = order[j]; order[j] = order[j - 1]; order[j - 1] = x;
+    }
+  const int maxRows = 8, rowH = 20;
+  int rows = n < maxRows ? n : maxRows;
+  int ly = (H - rows * rowH) / 2 + 2;
+  int lx = 168;
+  char buf[24];
+  for (int i = 0; i < rows; i++) {
+    int t = order[i], y = ly + i * rowH;
+    uint16_t c = typeColor(t);
+    spr.fillRoundRect(lx, y + 3, 10, 10, 2, c);
+    spr.setTextDatum(TL_DATUM);
+    spr.setTextColor(c, TFT_BLACK);
+    spr.drawString(typeName(t), lx + 16, y, 2);
+    sprintf(buf, "%d", cnt[t]);
+    spr.setTextDatum(TR_DATUM);
+    spr.setTextColor(TFT_WHITE, TFT_BLACK);
+    spr.drawString(buf, W - 40, y, 2);
+    sprintf(buf, "%d%%", total ? (cnt[t] * 100 + total / 2) / total : 0);
+    spr.setTextColor(tft.color565(110, 110, 125), TFT_BLACK);
+    spr.drawString(buf, W - 4, y, 2);
+  }
+  if (n == 0) {
+    spr.setTextDatum(MC_DATUM);
+    spr.setTextColor(tft.color565(90, 90, 100), TFT_BLACK);
+    spr.drawString("no devices", lx + (W - lx) / 2, H / 2, 2);
+  }
+
+  drawThresh();
+  spr.pushSprite(0, 0);
+}
+
 // ---------- анимация светодиодной ленты ----------
 void updateLeds() {
   if (g_ledEvent == 0) return;
@@ -385,7 +557,7 @@ void pollButtons() {
   int b = (digitalRead(PIN_ENC_KEY) == LOW || digitalRead(PIN_USER_KEY) == LOW) ? LOW : HIGH;
   uint32_t now = millis();
   if (b == LOW && g_lastBtn == HIGH && now - g_lastBtnMs > 250) {
-    g_mode = (g_mode + 1) % 4;
+    g_mode = (g_mode + 1) % NUM_MODES;
     g_lastBtnMs = now;
   }
   g_lastBtn = b;
@@ -406,8 +578,8 @@ void pollEncoder() {
   if (accum >= 4 || accum <= -4) {
     uint32_t now = millis();
     if (now - lastStepMs > 120) {               // мягкая защита от дребезга
-      if (accum >= 4) g_mode = (g_mode + 1) % 4;
-      else            g_mode = (g_mode + 3) % 4;
+      if (accum >= 4) g_mode = (g_mode + 1) % NUM_MODES;
+      else            g_mode = (g_mode + NUM_MODES - 1) % NUM_MODES;
       lastStepMs = now;
     }
     accum = 0;
@@ -464,29 +636,40 @@ void loop() {
   uint32_t now = millis();
   if (now - g_lastDraw >= REDRAW_MS) {
     g_lastDraw = now;
-    int count = 0; bool have = false; int bestRssi = -127; uint8_t bestCat = V_PRIV;
-    std::vector<Blip> snap;
+    std::map<uint32_t, Ent> ents;     // физические устройства
+    int raw = 0;
     if (xSemaphoreTake(g_lock, pdMS_TO_TICKS(100)) == pdTRUE) {
       for (auto it = g_seen.begin(); it != g_seen.end(); ) {
-        if (now - it->second.t > REMEMBER_MS) {
-          it = g_seen.erase(it);
-        } else {
-          if (it->second.rssi > bestRssi) { bestRssi = it->second.rssi; bestCat = it->second.cat; have = true; }
-          if (g_mode == 2) {
-            uint32_t h = (uint32_t)std::hash<std::string>{}(it->first);
-            snap.push_back({ it->second.rssi, h, it->second.cat });
-          }
-          ++it;
-        }
+        if (now - it->second.t > REMEMBER_MS) { it = g_seen.erase(it); continue; }
+        const Dev& d = it->second;
+        Ent& e = ents[d.ent];             // новый Ent создаётся обнулённым
+        if (d.t >= e.t) { e.t = d.t; e.rssi = d.rssi; }
+        if (d.type != T_UNKNOWN) e.type = d.type;
+        if (d.cat  != V_PRIV)    e.cat  = d.cat;
+        ++it;
       }
-      count = (int)g_seen.size();
+      raw = (int)g_seen.size();
       xSemaphoreGive(g_lock);
     }
+
+    int count = (int)ents.size();
+    bool have = false; int bestRssi = -127; uint8_t bestCat = V_PRIV, bestType = T_UNKNOWN;
+    int typeCnt[T_NUM] = {0};
+    std::vector<Blip> snap;
+    for (auto& kv : ents) {
+      const Ent& e = kv.second;
+      if (e.rssi > bestRssi) { bestRssi = e.rssi; bestCat = e.cat; bestType = e.type; have = true; }
+      typeCnt[e.type < T_NUM ? e.type : T_UNKNOWN]++;
+      // угол блипа — от id физического устройства: не прыгает при смене MAC
+      if (g_mode == 2) snap.push_back({ e.rssi, kv.first * 2654435761u, e.cat });
+    }
     g_lastCount = count;
+    g_lastRaw = raw;
     if (g_mode == 0)      drawRadar(count);
-    else if (g_mode == 1) drawProximity(have, bestRssi, bestCat, count);
+    else if (g_mode == 1) drawProximity(have, bestRssi, bestCat, bestType, count);
     else if (g_mode == 2) drawScope(snap);
-    else                  drawTimeline();
+    else if (g_mode == 3) drawTimeline();
+    else                  drawTypes(typeCnt, count);
   }
   delay(10);
 }
