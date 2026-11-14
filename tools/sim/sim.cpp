@@ -146,6 +146,7 @@ const Section subghzSection = { "Sub-GHz", 240, 120, 90, iconAntenna, subSub, no
 
 // ---------- вывод ----------
 static const char* s_outDir = "out";
+static std::vector<Blip> blipsAnim;
 static void snap(const char* name) {
   char path[256];
   snprintf(path, sizeof(path), "%s/%s.ppm", s_outDir, name);
@@ -297,6 +298,7 @@ int main(int argc, char** argv) {
   g_mode = M_OVERVIEW; drawOverview((int)g_ents.size(), g_lastRaw, typeCnt); snap("10_ble_overview");
   g_mode = M_SCOPE;    drawScope(blips);                                snap("12_ble_scope");
   g_mode = M_CITY;     for (int f = 0; f < 30; f++) drawCity(blips, s_now + f * 33); snap("13_ble_city");
+  blipsAnim = blips;
   g_mode = M_NEAREST;  drawNearest(true, -48, best, g_lastCount);       snap("11_ble_nearest");
   Ent tr = g_ents[3];
   drawNearest(true, -58, tr, g_lastCount);                              snap("11b_ble_nearest_tracker");
@@ -387,12 +389,19 @@ int main(int argc, char** argv) {
   Serial.feed("PV vol=42 mute=0\n"); pcPoll(0); g_pc.volT = s_now;
   g_pcLastCmd = 1; g_pcLastCmdMs = s_now - 120;
   Serial.feed("PM\t1\t63\t215\tSpotify\tГруппа крови (Remastered 2024 Edition)\tКино\n"); pcPoll(0); g_pc.trkT = s_now;
-  drawPcMedia(s_now);        snap("73_pc_media");
+  g_pc.trkT = 0; g_pcLastCmdMs = 0; g_pc.volT = 0; drawPcMedia(300); snap("73_pc_media");   // бегущая строка — с начала
   Serial.feed("PM\n"); pcPoll(0); g_pc.trkT = s_now;
   drawPcMedia(s_now);        snap("74_pc_media_idle");
   g_uiPages = 2; g_uiPage = 0;
   drawSpectrum();            snap("30_subghz_spectrum");
   g_uiPages = 0;
   drawMonitor(s_now);        snap("31_subghz_monitor");
+  if (getenv("SIM_ANIM")) {                              // кадры для гифок README (tools/make_docs.py)
+    char nm[48];
+    for (int f = 0; f * 40 <= 2700; f++) { bootFrame(f * 40); snprintf(nm, sizeof nm, "anim_boot_%03d", f); snap(nm); }
+    for (int f = 0; f < 60; f++) { drawCity(blipsAnim, s_now + 4000 + f * 50); snprintf(nm, sizeof nm, "anim_city_%03d", f); snap(nm); }
+    for (int f = 0; f < 60; f++) { drawTesseract(s_now + 9000 + f * 40); snprintf(nm, sizeof nm, "anim_tess_%03d", f); snap(nm); }
+    for (int f = 0; f < 36; f++) { shutFrame(f * 40); spr.pushSprite(0, 0); snprintf(nm, sizeof nm, "anim_off_%03d", f); snap(nm); }
+  }
   return 0;
 }

@@ -110,8 +110,8 @@ void drawNetDetail(uint32_t now) {
   spr.fillSprite(C_BG());
   int pos = -1;
   for (size_t i = 0; i < g_wOrder.size(); i++) if (g_wOrder[i] == g_wSel) pos = (int)i;
-  if (pos >= 0) snprintf(buf, sizeof(buf), "%d / %d  click: back", pos + 1, (int)g_wOrder.size());
-  else          snprintf(buf, sizeof(buf), "click: back");
+  if (pos >= 0) snprintf(buf, sizeof(buf), "%d / %d  click: list", pos + 1, (int)g_wOrder.size());
+  else          snprintf(buf, sizeof(buf), "click: list");
   uiHeader("Network", buf);
 
   bool alert = secAlert(a.enc);

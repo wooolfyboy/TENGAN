@@ -38,7 +38,9 @@ files = sorted(glob.glob(os.path.join(out, "*.ppm")))
 imgs = []
 for f in files:
     im = Image.open(f).convert("RGB").resize((640, 340), Image.NEAREST)
-    im.save(f[:-4] + ".png"); os.remove(f); imgs.append(im)
+    im.save(f[:-4] + ".png"); os.remove(f)
+    if not os.path.basename(f).startswith("anim_"):   # кадры гифок — не в общий лист
+        imgs.append(im)
 cols = 3
 rows = (len(imgs) + cols - 1) // cols
 sheet = Image.new("RGB", (cols * 660, rows * 360), (40, 40, 40))

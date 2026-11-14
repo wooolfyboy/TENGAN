@@ -306,8 +306,8 @@ void drawDetail(const Dev& d, const Ent& e, bool inMap, uint32_t now) {
   spr.fillSprite(C_BG());
   int pos = -1;
   for (size_t i = 0; i < g_order.size(); i++) if (g_order[i] == g_sel) pos = (int)i;
-  if (pos >= 0) snprintf(buf, sizeof(buf), "%d / %d  click: back", pos + 1, (int)g_order.size());
-  else          snprintf(buf, sizeof(buf), "click: back");
+  if (pos >= 0) snprintf(buf, sizeof(buf), "%d / %d  click: list", pos + 1, (int)g_order.size());
+  else          snprintf(buf, sizeof(buf), "click: list");
   uiHeader("Device", buf);
 
   // имя и «кто это»
