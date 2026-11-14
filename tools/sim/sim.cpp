@@ -15,6 +15,7 @@
 #include "gallery/gallery.h"
 #include "web/web.h"
 #include "pc/pc.h"
+#include "core/power.h"
 #include "core/ui.h"
 #include "core/boot.h"
 #include "ble/ble.h"
@@ -84,6 +85,7 @@ void audioClick() {}
 void audioBeep(uint16_t, uint16_t) {}
 void audioGeiger(int) {}
 bool   g_auFromPc = false;
+uint32_t g_powerHold = 0;
 int    g_auSrcNow = 0;
 int8_t g_auXY[AU_XY][2];
 bool   g_auXYStereo = false;
@@ -266,6 +268,9 @@ int main(int argc, char** argv) {
   { const uint32_t ts[] = { 250, 600, 1000, 1300, 1600, 1950, 2200 };
     for (int i = 0; i < 7; i++) { char nm[32]; snprintf(nm, sizeof nm, "00_boot_%04u", (unsigned)ts[i]); bootFrame(ts[i]); snap(nm); } }
   navBegin(); navDraw(s_now);                    snap("01_menu");
+  g_powerHold = 1500; drawPowerHold();           snap("08_power_hold"); g_powerHold = 0;
+  { const uint32_t ts[] = { 300, 760, 1000, 1250 };
+    for (int i = 0; i < 4; i++) { char nm[32]; snprintf(nm, sizeof nm, "09_power_off_%04u", (unsigned)ts[i]); shutFrame(ts[i]); spr.pushSprite(0, 0); snap(nm); } }
   navClick(); navDraw(s_now);                    snap("02_ble_sub");
   navBack();
   navRotate(+1); navClick(); navDraw(s_now);     snap("03_wifi_sub");

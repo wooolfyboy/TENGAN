@@ -7,6 +7,7 @@
 //  яркая строка развёртки стирает экран сверху вниз — и меню.
 // ============================================================
 #include "core/boot.h"
+#include "core/board.h"
 #include "core/display.h"
 #include "core/theme.h"
 #include "core/ui.h"
@@ -96,7 +97,7 @@ void bootFrame(uint32_t t) {
     }
   }
   if (t >= 1120) {
-    static const char TITLE[] = "RADIO RADAR";
+    static const char TITLE[] = DEVICE_NAME;
     static const char POOL[] = "ABCDEFGHKLMNPRSTVXZ0123456789";
     const int n = sizeof(TITLE) - 1;
     int wsum = txtW(TITLE, 6), x = cx - wsum / 2;

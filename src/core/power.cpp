@@ -10,6 +10,7 @@
 #include "core/theme.h"
 #include "core/leds.h"
 #include "core/settings.h"
+#include "core/ui.h"
 
 uint32_t g_powerHold = 0;
 static uint32_t s_lastTouch = 0;
@@ -47,14 +48,15 @@ void sleepNow() {
 
 void powerOff() {
   settingsSaveNow();
-  int W = tft.width(), H = tft.height();
-  spr.fillSprite(C_BG());
-  spr.setTextDatum(MC_DATUM);
-  spr.setTextColor(C(120, 120, 135), C_BG());
-  txt("bye", W / 2, H / 2, 4);
-  present();
   strip.clear(); strip.show();
-  delay(400);
+  uint32_t t0 = millis();
+  for (;;) {
+    uint32_t t = millis() - t0;
+    if (t > 1450) break;
+    shutFrame(t);
+    spr.pushSprite(0, 0);                              // без уголков: экран «гаснет» целиком
+  }
+  spr.fillSprite(TFT_BLACK); spr.pushSprite(0, 0);
   tft.writecommand(0x28);   // дисплей: выкл
   tft.writecommand(0x10);   // дисплей: сон
   sleepNow();
@@ -76,19 +78,3 @@ void checkWakeHold() {
   g_ignoreUser = true;                           // кнопку ещё держат — не считать нажатием
 }
 
-void drawPowerHold() {
-  int W = spr.width(), H = spr.height();
-  spr.fillSprite(C_BG());
-  spr.setTextDatum(MC_DATUM);
-  spr.setTextColor(C_HOT(), C_BG());
-  txt("power off?", W / 2, H / 2 - 24, 4);
-  int bw = W - 80, bx = 40, by = H / 2 + 4, bh = 14;
-  uint32_t p = g_powerHold > PWR_OFF_MS ? PWR_OFF_MS : g_powerHold;
-  int fill = (bw - 4) * (int)(p - PWR_SHOW_MS) / (int)(PWR_OFF_MS - PWR_SHOW_MS);
-  if (fill < 0) fill = 0;
-  spr.drawRoundRect(bx, by, bw, bh, 4, C(70, 70, 80));
-  if (fill > 0) spr.fillRoundRect(bx + 2, by + 2, fill, bh - 4, 3, C(235, 80, 80));
-  spr.setTextColor(C(110, 110, 125), C_BG());
-  txt("keep holding the side button", W / 2, by + bh + 16, 2);
-  present();
-}

@@ -22,7 +22,7 @@ DEFS="-DUSER_SETUP_LOADED=1 -DST7789_DRIVER=1 -DTFT_WIDTH=170 -DTFT_HEIGHT=320 -
 SRC=(
   "$SIM/sim.cpp" "$WORK/tftlib/TFT_eSPI.cpp"
   "$ROOT/src/core/display.cpp" "$ROOT/src/core/theme.cpp" "$ROOT/src/core/menu.cpp" "$ROOT/src/core/settings.cpp"
-  "$ROOT/src/core/battery.cpp" "$ROOT/src/core/ui.cpp" "$ROOT/src/core/leds.cpp" "$ROOT/src/core/boot.cpp"
+  "$ROOT/src/core/battery.cpp" "$ROOT/src/core/ui.cpp" "$ROOT/src/core/leds.cpp" "$ROOT/src/core/boot.cpp" "$ROOT/src/core/power_screens.cpp"
   "$ROOT/src/ble/ble_screens.cpp" "$ROOT/src/ble/ble_city.cpp" "$ROOT/src/ble/vendors.cpp"
   "$ROOT/src/wifi/wifi_model.cpp" "$ROOT/src/wifi/wifi_screens.cpp"
   "$ROOT/src/subghz/subghz_screens.cpp" "$ROOT/src/audio/audio_screens.cpp" "$ROOT/src/gallery/gallery.cpp" "$ROOT/src/web/web_screen.cpp" "$ROOT/src/pc/pc.cpp" "$ROOT/src/pc/pc_screens.cpp"

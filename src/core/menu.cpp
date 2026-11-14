@@ -11,6 +11,7 @@
 #include "core/battery.h"
 #include "core/settings.h"
 #include "core/ui.h"
+#include "core/board.h"
 #include "gallery/gallery.h"
 #include "web/web.h"
 #include "pc/pc.h"
@@ -127,7 +128,7 @@ static void drawMainMenuHud() {
   spr.fillSprite(bg);
   spr.setTextDatum(TL_DATUM);
   spr.setTextColor(dim);
-  txt("// RADIO RADAR - SYS ONLINE", 8, 5, 1);
+  txt("// " DEVICE_NAME " - SYS ONLINE", 8, 5, 1);
   // заряд: «PWR 87%» и пять сегментов
   char buf[32];
   if (g_bat.ok) {
