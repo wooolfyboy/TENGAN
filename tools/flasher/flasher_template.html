@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Прошить Radio Radar __VERSION__</title>
+<style>
+:root{--bg:#02090b;--panel:#071419;--line:#12303a;--acc:#3fd9ff;--hot:#eafcff;--steel:#7f97a3;--alert:#ff8a3d;--ok:#7dffb0}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--hot);font:16px/1.5 ui-monospace,Menlo,Consolas,monospace}
+main{max-width:620px;margin:0 auto;padding:32px 16px 60px}
+h1{color:var(--acc);font-size:22px;letter-spacing:.08em;margin:0}.ver{color:var(--steel);margin:2px 0 24px}
+.card{background:var(--panel);border:1px solid var(--line);padding:18px;margin-bottom:16px;clip-path:polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,14px 100%,0 calc(100% - 14px))}
+button{background:var(--acc);color:var(--bg);border:0;font:inherit;font-weight:700;letter-spacing:.06em;padding:16px;cursor:pointer;width:100%}
+button:disabled{background:var(--line);color:var(--steel);cursor:default}
+.bar{height:12px;background:#0b2630;margin-top:16px}.bar i{display:block;height:100%;width:0;background:var(--acc);transition:width .2s}
+#st{margin-top:10px;min-height:1.5em}.ok{color:var(--ok)}.bad{color:var(--alert)}
+ol{padding-left:22px;margin:0}li{margin:5px 0}b{color:var(--acc)}
+details{color:var(--steel);font-size:13px}pre{white-space:pre-wrap;max-height:200px;overflow:auto;margin:6px 0 0}
+</style></head><body><main>
+<h1>// RADIO RADAR</h1>
+<div class="ver">прошивальщик · версия __VERSION__ · сборка __BUILT__</div>
+
+<div class="card">
+ <button id="go">ПРОШИТЬ ПАЛКУ</button>
+ <div class="bar"><i id="bar"></i></div>
+ <div id="st">Подключи палку USB-кабелем и нажми кнопку.</div>
+</div>
+
+<div class="card"><ol>
+ <li>Закрой программу <b>start_pc_monitor.bat</b> и сайт esptool-js, если открыты — они держат USB-порт палки.</li>
+ <li>Нажми <b>«Прошить палку»</b>, в списке выбери палку (<b>USB JTAG/serial debug unit</b>) → <b>Подключиться</b>.</li>
+ <li>Подожди примерно минуту — полоска дойдёт до конца.</li>
+ <li>Когда появится «Готово» — <b>выдерни кабель и вставь обратно</b>.</li>
+</ol>
+<p style="color:var(--steel);font-size:14px;margin:12px 0 0">Адрес и файл выбирать не нужно — прошивка уже внутри этой страницы. Настройки палки сохраняются.</p></div>
+
+<details><summary>подробности (для отладки)</summary><pre id="log"></pre></details>
+</main>
+<!-- библиотека прошивки (esptool-js) — отдельным модулем: у неё свои имена переменных -->
+<script type="module">
+__ESPTOOL__
+</script>
+<script type="module">
+const { ESPLoader, Transport } = window.__esptool;
+const FW = "__FIRMWARE_B64__";
+const $ = id => document.getElementById(id);
+const st = (t, cls) => { $('st').textContent = t; $('st').className = cls || ''; };
+const log = t => { $('log').textContent += t; };
+const term = { clean() { $('log').textContent = ''; }, writeLine(t) { log(t + '\n'); }, write(t) { log(t); } };
+
+$('go').onclick = async () => {
+  if (!('serial' in navigator)) { st('Этот браузер не умеет работать с USB. Открой файл в Chrome или Edge.', 'bad'); return; }
+  let port, transport;
+  try {
+    port = await navigator.serial.requestPort({ filters: [{ usbVendorId: 0x303a }] });
+  } catch (e) { st('Палка не выбрана. Нажми кнопку ещё раз и выбери её в списке.', 'bad'); return; }
+  $('go').disabled = true;
+  try {
+    st('Подключаюсь к палке…');
+    transport = new Transport(port, false);
+    const loader = new ESPLoader({ transport, baudrate: 921600, romBaudrate: 115200, terminal: term });
+    const chip = await loader.main();
+    log('chip: ' + chip + '\n');
+    if (!/ESP32-S3/i.test(chip)) throw new Error('это не та плата (' + chip + ')');
+    st('Записываю прошивку…');
+    // общий образ = загрузчик (0x0) + таблица разделов (0x8000) + [настройки 0x9000..0xE000] + otadata (0xE000) + программа (0x10000).
+    // Область настроек (NVS) пропускаем — иначе прошивка сбросила бы настройки палки.
+    const full = atob(FW);
+    const parts = [{ data: full.slice(0, 0x9000), address: 0x0 }, { data: full.slice(0xE000), address: 0xE000 }];
+    const sizes = parts.map(x => x.data.length), total = sizes[0] + sizes[1];
+    await loader.writeFlash({
+      fileArray: parts,
+      flashSize: 'keep', flashMode: 'keep', flashFreq: 'keep', eraseAll: false, compress: true,
+      reportProgress: (i, w, t) => {
+        const done = (i > 0 ? sizes[0] : 0) + w / t * sizes[i];
+        const p = Math.round(done / total * 100); $('bar').style.width = p + '%'; st('Записываю прошивку… ' + p + '%');
+      }
+    });
+    $('bar').style.width = '100%';
+    try { await loader.after(); } catch (e) {}
+    try { await transport.disconnect(); } catch (e) {}
+    st('Готово! Выдерни кабель и вставь обратно — палка запустится с новой прошивкой.', 'ok');
+  } catch (e) {
+    log('\nERROR: ' + (e && e.message || e) + '\n');
+    const m = String(e && e.message || e);
+    if (/open|busy|access|lock/i.test(m)) st('Порт занят: закрой программу для ноутбука и сайт esptool-js, потом попробуй снова.', 'bad');
+    else st('Не получилось: ' + m + '. Выдерни и вставь кабель и попробуй ещё раз. Если не помогает — открой «подробности» внизу и пришли скриншот.', 'bad');
+    try { await transport && transport.disconnect(); } catch (e2) {}
+    $('go').disabled = false;
+  }
+};
+</script></body></html>
