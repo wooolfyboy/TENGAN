@@ -157,6 +157,7 @@ static void wifiEnter() {
 }
 static void wifiLeave() {
   promOff();
+  wifiRadioOff();       // вышли — Wi-Fi выключен
   ledsOff();
 }
 void wifiRadioOff() { wifiStop(); }

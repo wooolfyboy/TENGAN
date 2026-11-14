@@ -211,8 +211,7 @@ void bleBegin() {
   s->setInterval(100);
   s->setWindow(99);
   s->setMaxResults(0);                        // не копить результаты — всё в колбэке
-  s->start(0, false);
-  g_bleActive = true;
+  g_bleActive = false;                        // сканирование включается только при входе в раздел
 }
 
 void bleRadioOn() {
@@ -350,10 +349,10 @@ static void drawListOrDetail(uint32_t now) {
 // ---------- раздел для меню ----------
 static void bleSubtitle(char* out, size_t n) {
   if (g_bleActive) snprintf(out, n, "%d devices", g_lastCount);
-  else             snprintf(out, n, "paused");
+  else             snprintf(out, n, "off");
 }
 static void bleEnter() { wifiRadioOff(); bleRadioOn(); }
-static void bleLeave() {}
+static void bleLeave() { bleRadioOff(); ledsOff(); }   // вышли — радио и лента выключены
 
 static void bleScreenInfo(int i, SubItem& it) {
   static const char* const names[NUM_MODES] = { "Overview", "Scope", "Nearest", "Devices", "Weather" };
