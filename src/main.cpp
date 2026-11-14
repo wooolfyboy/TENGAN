@@ -10,6 +10,7 @@
 //                       (телефоны, наушники, часы, метки, ...).
 //  Режим 6 (LIST):      список устройств (ближние сверху). Колесо — выбор,
 //                       нажатие колеса — подробности. Боковая кнопка — дальше.
+//  Режим 8 (SETTINGS):  дальность, светодиоды, яркость (запоминаются).
 //  Режим 7 (WEATHER):   температура/влажность от BLE-термометров вокруг.
 //  Счёт идёт по «физическим» устройствам: смена случайного MAC-адреса
 //  склеивается по отпечатку рекламы, чтобы один телефон не считался дважды.
@@ -22,6 +23,10 @@
 #include <TFT_eSPI.h>
 #include <NimBLEDevice.h>
 #include <Adafruit_NeoPixel.h>
+#include <Preferences.h>
+#include <esp_sleep.h>
+#include <driver/gpio.h>
+#include <driver/rtc_io.h>
 #include <map>
 #include <vector>
 #include <algorithm>
@@ -49,7 +54,7 @@
 
 static const uint32_t REMEMBER_MS = 30000;
 static const uint32_t REDRAW_MS   = 66;
-enum { M_RADAR = 0, M_PROX, M_SCOPE, M_TIMELINE, M_TYPES, M_LIST, M_WEATHER, NUM_MODES };
+enum { M_RADAR = 0, M_PROX, M_SCOPE, M_TIMELINE, M_TYPES, M_LIST, M_WEATHER, M_SETTINGS, NUM_MODES };
 static const uint32_t SENSOR_REMEMBER_MS = 300000;  // датчики шлют редко — помним 5 минут
 static const size_t   MAX_SENSORS = 24;
 static const size_t   MAX_DEVS    = 600;     // предохранитель памяти
@@ -89,6 +94,7 @@ struct Dev {
   uint8_t  akind;    // вид адреса (A_*)
   bool     rnd;      // адрес случайный и меняющийся
   bool     merged;   // уже стал «предшественником» нового адреса
+  bool     inRange;  // ближе порога дальности (с гистерезисом)
   bool     hasCid;
   uint16_t cid;      // Company ID
   uint16_t appearance;
@@ -145,7 +151,25 @@ volatile int g_mode = 0;
 int g_sweep = 0;
 
 // --- настраиваемый порог события (крутилка) ---
-int      g_thresh = 7;
+int      g_thresh = 7;           // порог событий для светодиодов (0 = выкл)
+
+// --- настройки (хранятся в памяти платы) ---
+// Дальность: устройство засчитывается, когда его сглаженный сигнал >= порога,
+// и выбывает, только когда упал ниже порога ещё на RANGE_HYST_DB.
+struct RangeOpt { int dbm; const char* name; };
+static const RangeOpt RANGES[] = {
+  { -127, "all" }, { -90, "far" }, { -80, "room" }, { -70, "near" }, { -60, "very near" },
+};
+static const int N_RANGES = sizeof(RANGES) / sizeof(RANGES[0]);
+static const int RANGE_HYST_DB = 5;
+static const uint32_t MIN_PKTS = 2;        // одиночный случайный пакет не считается
+int      g_range = 0;                      // индекс в RANGES
+int      g_ledBright = 50;                 // % яркости ленты
+int      g_scrBright = 100;                // % яркости экрана
+int      g_setItem = 0;                    // выбранный пункт настроек
+bool     g_setDirty = false;
+uint32_t g_setChangedMs = 0;
+Preferences g_prefs;
 uint32_t g_encActiveMs = 0;
 
 // --- история для TIMELINE ---
@@ -440,6 +464,11 @@ void drawRadar(int count) {
     spr.setTextColor(tft.color565(90, 90, 100), TFT_BLACK);
     spr.drawString(buf, W - 4, 4, 2);
   }
+  if (g_range > 0) {                 // включён фильтр дальности
+    spr.setTextDatum(TL_DATUM);
+    spr.setTextColor(tft.color565(90, 90, 100), TFT_BLACK);
+    spr.drawString(RANGES[g_range].name, 4, 4, 2);
+  }
   drawThresh();
   spr.pushSprite(0, 0);
 }
@@ -570,7 +599,7 @@ void sampleTick() {
   if (g_base < 0) g_base = c;                     // инициализация
   int8_t ev = 0;
   float delta = c - g_base;
-  if (now >= g_cooldownMs) {
+  if (g_thresh > 0 && now >= g_cooldownMs) {
     if (delta >= g_thresh)       { ev = +1; g_base = c; g_cooldownMs = now + 3000; }
     else if (delta <= -g_thresh) { ev = -1; g_base = c; g_cooldownMs = now + 3000; }
   }
@@ -1078,31 +1107,210 @@ void updateLeds() {
   strip.show();
 }
 
+// ---------- настройки ----------
+void applyBrightness() {
+  strip.setBrightness(g_ledBright * 255 / 100);
+  analogWrite(TFT_BL, g_scrBright * 255 / 100);
+}
+
+void loadSettings() {
+  g_prefs.begin("radar", true);
+  g_range     = g_prefs.getInt("range", 0);
+  g_thresh    = g_prefs.getInt("thresh", 7);
+  g_ledBright = g_prefs.getInt("ledbr", 50);
+  g_scrBright = g_prefs.getInt("scrbr", 100);
+  g_prefs.end();
+  if (g_range < 0 || g_range >= N_RANGES) g_range = 0;
+  if (g_thresh < 0 || g_thresh > 30) g_thresh = 7;
+  if (g_ledBright < 10 || g_ledBright > 100) g_ledBright = 50;
+  if (g_scrBright < 20 || g_scrBright > 100) g_scrBright = 100;
+}
+
+void saveSettings() {
+  g_prefs.begin("radar", false);
+  g_prefs.putInt("range", g_range);
+  g_prefs.putInt("thresh", g_thresh);
+  g_prefs.putInt("ledbr", g_ledBright);
+  g_prefs.putInt("scrbr", g_scrBright);
+  g_prefs.end();
+  g_setDirty = false;
+}
+
+static const int N_SET_ITEMS = 4;
+
+void settingsAdjust(int dir) {
+  switch (g_setItem) {
+    case 0: g_range = constrain(g_range + dir, 0, N_RANGES - 1); break;
+    case 1: g_thresh = constrain(g_thresh + dir, 0, 30); break;
+    case 2: g_ledBright = constrain(g_ledBright + dir * 10, 10, 100); break;
+    case 3: g_scrBright = constrain(g_scrBright + dir * 10, 20, 100); break;
+  }
+  applyBrightness();
+  if (g_setItem == 2) { g_ledEvent = +1; g_ledStart = millis(); }   // показать яркость ленты
+  g_setDirty = true; g_setChangedMs = millis();
+}
+
+void drawSettings() {
+  int W = spr.width(), H = spr.height();
+  spr.fillSprite(TFT_BLACK);
+  char val[32];
+  spr.setTextDatum(TL_DATUM);
+  spr.setTextColor(tft.color565(120, 120, 135), TFT_BLACK);
+  spr.drawString("SETTINGS", 4, 1, 2);
+
+  const char* names[N_SET_ITEMS] = { "Range", "LED events", "LED bright", "Screen" };
+  const char* hints[N_SET_ITEMS] = {
+    "ignore devices weaker than this",
+    "flash when count jumps by this",
+    "brightness of the LED strip",
+    "screen backlight",
+  };
+  for (int i = 0; i < N_SET_ITEMS; i++) {
+    int y = 22 + i * 30;
+    bool sel = (i == g_setItem);
+    uint16_t bg = sel ? tft.color565(28, 38, 62) : TFT_BLACK;
+    if (sel) spr.fillRoundRect(0, y - 3, W, 28, 4, bg);
+    switch (i) {
+      case 0:
+        if (g_range == 0) sprintf(val, "all");
+        else sprintf(val, "%s  %d dBm", RANGES[g_range].name, RANGES[g_range].dbm);
+        break;
+      case 1: if (g_thresh == 0) sprintf(val, "off"); else sprintf(val, "+-%d", g_thresh); break;
+      case 2: sprintf(val, "%d%%", g_ledBright); break;
+      case 3: sprintf(val, "%d%%", g_scrBright); break;
+    }
+    spr.setTextDatum(TL_DATUM);
+    spr.setTextColor(sel ? TFT_WHITE : tft.color565(150, 150, 165), bg);
+    spr.drawString(names[i], 10, y, 4);
+    // значение крупно, а если не влезает рядом с названием — помельче
+    int room = W - 20 - spr.textWidth(names[i], 4) - 12;
+    bool big = spr.textWidth(val, 4) <= room;
+    spr.setTextDatum(TR_DATUM);
+    spr.setTextColor(sel ? tft.color565(90, 220, 140) : tft.color565(110, 110, 125), bg);
+    spr.drawString(val, W - 10, big ? y : y + 5, big ? 4 : 2);
+  }
+  spr.setTextDatum(BL_DATUM);
+  spr.setTextColor(tft.color565(110, 110, 125), TFT_BLACK);
+  spr.drawString(hints[g_setItem], 4, H - 12, 1);
+  spr.setTextColor(tft.color565(80, 80, 92), TFT_BLACK);
+  spr.drawString("wheel: change   click: next item   side: exit", 4, H - 1, 1);
+  spr.pushSprite(0, 0);
+}
+
 // ---------- кнопки и колесо ----------
 void changeMode(int dir) {
+  if (g_mode == M_SETTINGS && g_setDirty) saveSettings();
   g_mode = (g_mode + dir + NUM_MODES) % NUM_MODES;
   g_detail = false;
 }
 
-// Боковая кнопка: всегда следующий режим.
-// Нажатие колеса: в списке — открыть/закрыть подробности, иначе — следующий режим.
+// ---------- питание: выключение / включение боковой кнопкой ----------
+// «Выключено» = глубокий сон ESP32: экран, светодиоды и периферия обесточены,
+// плата ждёт только нажатия боковой кнопки. Будит ТОЛЬКО боковая кнопка.
+static const uint32_t PWR_SHOW_MS = 600;    // после стольких мс удержания показываем шкалу
+static const uint32_t PWR_OFF_MS  = 2000;   // держать столько, чтобы выключить
+static const uint32_t PWR_ON_MS   = 1000;   // держать столько, чтобы включить
+uint32_t g_powerHold = 0;                   // сколько уже держат (для шкалы на экране)
+bool     g_ignoreUser = false;              // игнорировать кнопку, пока её не отпустят
+
+void sleepNow() {
+  // ждём, пока кнопку отпустят, иначе плата тут же проснётся
+  while (digitalRead(PIN_USER_KEY) == LOW) delay(10);
+  delay(50);
+  pinMode(TFT_BL, OUTPUT);       digitalWrite(TFT_BL, LOW);
+  pinMode(BOARD_PWR_EN, OUTPUT); digitalWrite(BOARD_PWR_EN, LOW);   // обесточить периферию
+  gpio_hold_en((gpio_num_t)TFT_BL);
+  gpio_hold_en((gpio_num_t)BOARD_PWR_EN);
+  gpio_deep_sleep_hold_en();
+  rtc_gpio_pullup_en((gpio_num_t)PIN_USER_KEY);
+  rtc_gpio_pulldown_dis((gpio_num_t)PIN_USER_KEY);
+  esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_USER_KEY, 0);       // проснуться по нажатию
+  esp_deep_sleep_start();
+}
+
+void powerOff() {
+  if (g_setDirty) saveSettings();
+  int W = tft.width(), H = tft.height();
+  spr.fillSprite(TFT_BLACK);
+  spr.setTextDatum(MC_DATUM);
+  spr.setTextColor(tft.color565(120, 120, 135), TFT_BLACK);
+  spr.drawString("bye", W / 2, H / 2, 4);
+  spr.pushSprite(0, 0);
+  strip.clear(); strip.show();
+  NimBLEDevice::getScan()->stop();
+  delay(400);
+  tft.writecommand(0x28);   // дисплей: выкл
+  tft.writecommand(0x10);   // дисплей: сон
+  sleepNow();
+}
+
+// Вызывается в самом начале setup(): если нас разбудила кнопка — требуем
+// удержания PWR_ON_MS, иначе (случайное касание) засыпаем обратно.
+void checkWakeHold() {
+  gpio_hold_dis((gpio_num_t)TFT_BL);
+  gpio_hold_dis((gpio_num_t)BOARD_PWR_EN);
+  gpio_deep_sleep_hold_dis();
+  if (esp_sleep_get_wakeup_cause() != ESP_SLEEP_WAKEUP_EXT0) return;   // обычное включение
+  rtc_gpio_deinit((gpio_num_t)PIN_USER_KEY);
+  pinMode(PIN_USER_KEY, INPUT_PULLUP);
+  uint32_t t0 = millis();
+  while (digitalRead(PIN_USER_KEY) == LOW && millis() - t0 < PWR_ON_MS) delay(10);
+  if (millis() - t0 < PWR_ON_MS) sleepNow();     // отпустили раньше — не включаемся
+  g_ignoreUser = true;                           // кнопку ещё держат — не считать нажатием
+}
+
+void drawPowerHold() {
+  int W = spr.width(), H = spr.height();
+  spr.fillSprite(TFT_BLACK);
+  spr.setTextDatum(MC_DATUM);
+  spr.setTextColor(TFT_WHITE, TFT_BLACK);
+  spr.drawString("power off?", W / 2, H / 2 - 24, 4);
+  int bw = W - 80, bx = 40, by = H / 2 + 4, bh = 14;
+  uint32_t p = g_powerHold > PWR_OFF_MS ? PWR_OFF_MS : g_powerHold;
+  int fill = (bw - 4) * (int)(p - PWR_SHOW_MS) / (int)(PWR_OFF_MS - PWR_SHOW_MS);
+  if (fill < 0) fill = 0;
+  spr.drawRoundRect(bx, by, bw, bh, 4, tft.color565(70, 70, 80));
+  if (fill > 0) spr.fillRoundRect(bx + 2, by + 2, fill, bh - 4, 3, tft.color565(235, 80, 80));
+  spr.setTextColor(tft.color565(110, 110, 125), TFT_BLACK);
+  spr.drawString("keep holding the side button", W / 2, by + bh + 16, 2);
+  spr.pushSprite(0, 0);
+}
+
+// Боковая кнопка: короткое нажатие — следующий режим, удержание 2 с — выключить.
+// Нажатие колеса: в списке — подробности, в настройках — следующий пункт, иначе — следующий режим.
 void pollButtons() {
-  static int lastEnc = HIGH, lastUser = HIGH;
-  static uint32_t lastMs = 0;
+  static int lastEnc = HIGH;
+  static uint32_t lastEncMs = 0;
+  static bool userDown = false;
+  static uint32_t userDownMs = 0;
   int enc  = digitalRead(PIN_ENC_KEY);
   int user = digitalRead(PIN_USER_KEY);
   uint32_t now = millis();
-  if (now - lastMs > 250) {
-    if (enc == LOW && lastEnc == HIGH) {
-      if (g_mode == M_LIST) { g_detail = !g_detail; g_lastTouch = now; }
-      else                  changeMode(+1);
-      lastMs = now;
-    } else if (user == LOW && lastUser == HIGH) {
-      changeMode(+1);
-      lastMs = now;
-    }
+
+  if (enc == LOW && lastEnc == HIGH && now - lastEncMs > 250) {
+    if (g_mode == M_LIST) { g_detail = !g_detail; g_lastTouch = now; }
+    else if (g_mode == M_SETTINGS) g_setItem = (g_setItem + 1) % N_SET_ITEMS;
+    else                  changeMode(+1);
+    lastEncMs = now;
   }
-  lastEnc = enc; lastUser = user;
+  lastEnc = enc;
+
+  if (g_ignoreUser) {                    // после включения ждём, пока отпустят
+    if (user == HIGH) g_ignoreUser = false;
+    return;
+  }
+  if (user == LOW && !userDown) { userDown = true; userDownMs = now; }
+  if (userDown && user == LOW) {
+    uint32_t held = now - userDownMs;
+    g_powerHold = held >= PWR_SHOW_MS ? held : 0;
+    if (held >= PWR_OFF_MS) powerOff();
+  }
+  if (userDown && user == HIGH) {
+    uint32_t held = now - userDownMs;
+    userDown = false;
+    g_powerHold = 0;
+    if (held >= 30 && held < PWR_SHOW_MS) changeMode(+1);   // короткое нажатие (30 мс — от дребезга)
+  }
 }
 
 // Колесо: в списке — выбор устройства, иначе — листает режимы.
@@ -1122,6 +1330,8 @@ void pollEncoder() {
     uint32_t now = millis();
     if (g_mode == M_LIST) {
       if (now - lastStepMs > 40) { g_listMove += dir; lastStepMs = now; g_lastTouch = now; }
+    } else if (g_mode == M_SETTINGS) {
+      if (now - lastStepMs > 60) { settingsAdjust(dir); lastStepMs = now; }
     } else if (now - lastStepMs > 120) {        // мягкая защита от дребезга
       changeMode(dir);
       lastStepMs = now;
@@ -1131,6 +1341,7 @@ void pollEncoder() {
 }
 
 void setup() {
+  checkWakeHold();      // включение после «выключения»: только удержанием боковой кнопки
   pinMode(BOARD_PWR_EN, OUTPUT); digitalWrite(BOARD_PWR_EN, HIGH);
   pinMode(PIN_TFT_CS,  OUTPUT);  digitalWrite(PIN_TFT_CS,  HIGH);
   pinMode(PIN_SD_CS,   OUTPUT);  digitalWrite(PIN_SD_CS,   HIGH);
@@ -1145,9 +1356,10 @@ void setup() {
   tft.setRotation(3);
   tft.fillScreen(TFT_BLACK);
   pinMode(TFT_BL, OUTPUT); digitalWrite(TFT_BL, HIGH);
+  loadSettings();
 
   strip.begin();
-  strip.setBrightness(120);
+  applyBrightness();
   strip.clear();
   strip.show();
 
@@ -1192,7 +1404,12 @@ void loop() {
     if (xSemaphoreTake(g_lock, pdMS_TO_TICKS(100)) == pdTRUE) {
       for (auto it = g_seen.begin(); it != g_seen.end(); ) {
         if (now - it->second.t > REMEMBER_MS) { it = g_seen.erase(it); continue; }
-        const Dev& d = it->second;
+        Dev& d = it->second;
+        // фильтр дальности с гистерезисом + отсев одиночных пакетов
+        int thr = RANGES[g_range].dbm;
+        if (!d.inRange && d.rssiS >= thr) d.inRange = true;
+        else if (d.inRange && d.rssiS < thr - RANGE_HYST_DB) d.inRange = false;
+        if (!d.inRange || d.pkts < MIN_PKTS) { ++it; continue; }
         Ent& e = ents[d.ent];             // новый Ent создаётся обнулённым
         if (d.t >= e.t) { e.t = d.t; e.rssi = d.rssi; e.rssiS = d.rssiS; e.key = it->first; }
         if (!e.first || d.first < e.first) e.first = d.first;
@@ -1229,7 +1446,10 @@ void loop() {
     g_lastCount = count;
     g_lastRaw = raw;
 
-    if (g_mode == M_LIST) {
+    if (g_powerHold) {
+      drawPowerHold();
+    }
+    else if (g_mode == M_LIST) {
       // Порядок списка: ближние сверху, но «липкий», чтобы строки не прыгали:
       //  - пока крутишь колесо или открыты подробности — порядок заморожен;
       //  - соседи меняются местами, только если разница сигнала > ORDER_HYST_DB;
@@ -1298,7 +1518,10 @@ void loop() {
     else if (g_mode == M_SCOPE)    drawScope(snap);
     else if (g_mode == M_TIMELINE) drawTimeline();
     else if (g_mode == M_TYPES)    drawTypes(typeCnt, count);
-    else                           drawWeather(sens, now);
+    else if (g_mode == M_WEATHER)  drawWeather(sens, now);
+    else                           drawSettings();
+    // настройки сохраняем через 3 с после последнего изменения
+    if (g_setDirty && now - g_setChangedMs > 3000) saveSettings();
   }
   delay(10);
 }
