@@ -413,3 +413,51 @@ const Section bleSection = {
   NUM_MODES, bleScreenInfo, bleScreenNow, bleOpen, bleClose,
   bleClick, bleRotate, bleBack, nullptr, bleDraw,
 };
+
+// ---------- для веб-страницы: устройства в JSON ----------
+static void jsonStr(String& o, const char* s) {
+  o += '"';
+  for (; *s; s++) {
+    char c = *s;
+    if (c == '"' || c == '\\') { o += '\\'; o += c; }
+    else if ((uint8_t)c < 0x20) o += ' ';
+    else o += c;
+  }
+  o += '"';
+}
+
+void bleJson(String& o) {
+  uint32_t now = millis();
+  std::vector<const Ent*> v;
+  for (auto& kv : g_ents) v.push_back(&kv.second);
+  std::sort(v.begin(), v.end(), [](const Ent* a, const Ent* b) { return a->rssiS > b->rssiS; });
+  if (v.size() > 150) v.resize(150);
+  o.reserve(64 + v.size() * 110);
+  o += "{\"on\":"; o += g_bleActive ? "true" : "false";
+  o += ",\"count\":"; o += g_lastCount;
+  o += ",\"macs\":"; o += g_lastRaw;
+  o += ",\"dev\":[";
+  bool first = true;
+  for (const Ent* e : v) {
+    if (!first) o += ',';
+    first = false;
+    o += "{\"n\":"; jsonStr(o, e->name);
+    o += ",\"t\":"; jsonStr(o, typeName(e->type));
+    o += ",\"v\":"; jsonStr(o, vendorLabel(e->cat, e->vkind, e->vcode));
+    o += ",\"r\":"; o += e->rssiS;
+    o += ",\"m\":"; o += e->nMacs;
+    o += ",\"p\":"; o += e->pkts;
+    o += ",\"age\":"; o += (now - e->first) / 1000;
+    o += '}';
+  }
+  o += "]}";
+}
+
+// для веб-режима: Bluetooth слушает реже, чтобы Wi-Fi точке хватало эфира
+void bleLowDuty(bool low) {
+  NimBLEScan* s = NimBLEDevice::getScan();
+  bool was = g_bleActive;
+  if (was) s->stop();
+  s->setWindow(low ? 45 : 99);
+  if (was) s->start(0, false);
+}

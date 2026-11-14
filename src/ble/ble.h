@@ -11,4 +11,7 @@ void bleSample(uint32_t now);    // раз в секунду: история TIM
 void bleRadioOn();               // Wi-Fi и Bluetooth делят антенну —
 void bleRadioOff();              // работает что-то одно
 
+void bleJson(String& out);       // устройства для веб-страницы
+void bleLowDuty(bool low);       // веб-режим: слушать реже, делить эфир с Wi-Fi
+
 extern const Section bleSection;

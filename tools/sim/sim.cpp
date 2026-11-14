@@ -13,6 +13,7 @@
 #include "core/battery.h"
 #include "core/settings.h"
 #include "gallery/gallery.h"
+#include "web/web.h"
 #include "core/boot.h"
 #include "ble/ble.h"
 #include "ble/ble_model.h"
@@ -118,6 +119,9 @@ static void sndInfo(int i, SubItem& it) {
   static const char* const vv[] = { "1.2 kHz", "", "", "-38 dBfs", "" };
   it.name = nm[i]; it.desc = ds[i]; snprintf(it.value, sizeof(it.value), "%s", vv[i]);
 }
+static void webSub(char* o, size_t n) { snprintf(o, n, "1 online"); }
+const Section webSection = { "Web", 90, 200, 230, iconPhone, webSub, noop, noop,
+  0, nullptr, nullptr, nullptr, nullptr, noop, noopI, noBack, noopT, noopT };
 const Section soundSection = { "Sound", 120, 200, 255, iconMic, sndSub, noop, noop,
   A_NUM, sndInfo, zero, noopI, noop, noop, noopI, noBack, noopT, noopT };
 const Section subghzSection = { "Sub-GHz", 240, 120, 90, iconAntenna, subSub, noop, noop,
@@ -334,6 +338,9 @@ int main(int argc, char** argv) {
   for (int f = 0; f < 10; f++) drawTorus(s_now + 1500 + f * 33); snap("51_gallery_torus");
   for (int f = 0; f < 60; f++) drawLife(s_now + 2000 + f * 120); snap("52_gallery_life");
   for (int f = 0; f < 160; f++) drawPendulum(s_now + 9000 + f * 33); snap("53_gallery_pendulum");
+  { uint8_t qr[29 * 29]; for (int i = 0; i < 29 * 29; i++) qr[i] = (noise(i) > 0.5f) || ((i % 29 < 7 || i % 29 > 21) && (i / 29 < 7) && !((i % 29 == 1 || i % 29 == 5 || i % 29 == 23 || i % 29 == 27) && i / 29 > 0 && i / 29 < 6));
+    WebView v = { "RadioRadar-3F2A", "48213907", "192.168.4.1", 1, 214, true };
+    drawWebScreen(v, qr, 29); snap("60_web"); }
   drawSpectrum();            snap("30_subghz_spectrum");
   drawMonitor(s_now);        snap("31_subghz_monitor");
   return 0;

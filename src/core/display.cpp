@@ -179,3 +179,11 @@ void iconCube(int x, int y, uint16_t c, uint16_t bg) {
   spr.drawLine(x - o + d / 2 + 1, y + o - d / 2 - 1, x - i, y + i - 1, c);
   (void)bg;
 }
+
+// телефон с волнами (Web)
+void iconPhone(int x, int y, uint16_t c, uint16_t bg) {
+  spr.drawSmoothRoundRect(x - 9, y - 17, 3, 2, 18, 34, c, bg);
+  spr.drawFastHLine(x - 3, y + 12, 6, c);
+  spr.drawArc(x + 10, y - 14, 9, 7, 180, 270, c, bg, true);
+  spr.drawArc(x + 10, y - 14, 15, 13, 180, 270, c, bg, true);
+}
