@@ -122,6 +122,10 @@ uint32_t g_sel = 0;             // выбранное устройство (id)
 int      g_top = 0;             // первая видимая строка
 volatile int g_listMove = 0;    // накопленные щелчки колеса
 bool     g_detail = false;      // открыт экран подробностей
+uint32_t g_lastTouch = 0;       // когда последний раз трогали колесо/кнопку в списке
+static const int      ORDER_HYST_DB = 8;      // меняем местами, только если разница > 8 dB
+static const uint32_t ORDER_EVERY   = 2000;   // как часто обновлять порядок
+static const uint32_t ORDER_FREEZE  = 4000;   // после касания колеса порядок замирает
 // история сигнала выбранного устройства (для графика в подробностях)
 #define SPARK_N 60
 int8_t   g_spark[SPARK_N];
@@ -1004,7 +1008,7 @@ void pollButtons() {
   uint32_t now = millis();
   if (now - lastMs > 250) {
     if (enc == LOW && lastEnc == HIGH) {
-      if (g_mode == M_LIST) g_detail = !g_detail;
+      if (g_mode == M_LIST) { g_detail = !g_detail; g_lastTouch = now; }
       else                  changeMode(+1);
       lastMs = now;
     } else if (user == LOW && lastUser == HIGH) {
@@ -1031,7 +1035,7 @@ void pollEncoder() {
     int dir = accum >= 4 ? +1 : -1;
     uint32_t now = millis();
     if (g_mode == M_LIST) {
-      if (now - lastStepMs > 40) { g_listMove += dir; lastStepMs = now; }
+      if (now - lastStepMs > 40) { g_listMove += dir; lastStepMs = now; g_lastTouch = now; }
     } else if (now - lastStepMs > 120) {        // мягкая защита от дребезга
       changeMode(dir);
       lastStepMs = now;
@@ -1140,13 +1144,31 @@ void loop() {
     g_lastRaw = raw;
 
     if (g_mode == M_LIST) {
-      // порядок списка: ближние сверху, пересортировка раз в секунду (чтобы не прыгало)
-      if (now - g_orderMs >= 1000 || g_order.empty()) {
-        std::vector<std::pair<int, uint32_t>> v;
-        for (auto& kv : ents) v.push_back({ -kv.second.rssiS, kv.first });
-        std::sort(v.begin(), v.end());
-        g_order.clear();
-        for (auto& p : v) g_order.push_back(p.second);
+      // Порядок списка: ближние сверху, но «липкий», чтобы строки не прыгали:
+      //  - пока крутишь колесо или открыты подробности — порядок заморожен;
+      //  - соседи меняются местами, только если разница сигнала > ORDER_HYST_DB;
+      //  - новые устройства вставляются на своё место, ушедшие убираются.
+      bool frozen = g_detail || (now - g_lastTouch < ORDER_FREEZE);
+      if (g_order.empty() || (!frozen && now - g_orderMs >= ORDER_EVERY)) {
+        auto rs = [&](uint32_t id) { return ents[id].rssiS; };
+        std::vector<uint32_t> o;
+        o.reserve(ents.size());
+        for (uint32_t id : g_order) if (ents.count(id)) o.push_back(id);
+        for (size_t pass = 0; pass < o.size(); pass++) {
+          bool sw = false;
+          for (size_t i = 0; i + 1 < o.size(); i++)
+            if (rs(o[i + 1]) > rs(o[i]) + ORDER_HYST_DB) { std::swap(o[i], o[i + 1]); sw = true; }
+          if (!sw) break;
+        }
+        std::vector<uint32_t> fresh;
+        for (auto& kv : ents)
+          if (std::find(o.begin(), o.end(), kv.first) == o.end()) fresh.push_back(kv.first);
+        for (uint32_t id : fresh) {
+          size_t pos = 0;
+          while (pos < o.size() && rs(o[pos]) >= rs(id)) pos++;
+          o.insert(o.begin() + pos, id);
+        }
+        g_order.swap(o);
         g_orderMs = now;
       }
       int n = (int)g_order.size();
