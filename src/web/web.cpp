@@ -19,6 +19,8 @@
 #include "ble/ble.h"
 #include "wifi/wifi.h"
 #include "wifi/wifi_model.h"
+#include "subghz/subghz.h"
+#include "audio/audio.h"
 #include "core/battery.h"
 #include "core/display.h"
 #include "core/leds.h"
@@ -32,6 +34,10 @@ static bool       s_scanned = false;
 static String     s_wifiJson = "{\"scanned\":false,\"nets\":[]}";
 static uint8_t    s_qr[45 * 45];
 static int        s_qrN = 0;
+static int        s_netCount = 0;
+static uint32_t   s_subMs = 0, s_sndMs = 0;     // когда вкладки Sub-GHz / Sound последний раз спрашивали
+static bool       s_subOn = false, s_sndOn = false;
+static const char* s_tab = "";                  // что сейчас смотрят на телефоне (для экрана палки)
 
 static void qrStore(esp_qrcode_handle_t q) {
   int n = esp_qrcode_get_size(q);
@@ -93,6 +99,7 @@ static void scanCollect() {
   }
   o += "]}";
   s_wifiJson = o;
+  s_netCount = n;
   s_scanned = true;
   WiFi.scanDelete();
 }
@@ -117,11 +124,35 @@ static void webStart() {
   s_dns.start(53, "*", ip);                        // любые адреса -> на палку (страница откроется сама)
   s_srv = new WebServer(80);
   s_srv->on("/", [] { s_reqs++; s_srv->send_P(200, "text/html", WEB_PAGE); });
-  s_srv->on("/api/ble", [] { String o; bleJson(o); sendJson(o); });
-  s_srv->on("/api/wifi", [] { sendJson(s_wifiJson); });
+  s_srv->on("/api/ble", [] { s_tab = "bluetooth"; String o; bleJson(o); sendJson(o); });
+  s_srv->on("/api/bledev", [] { String o; bleDevJson((uint32_t)strtoul(s_srv->arg("id").c_str(), nullptr, 10), o); sendJson(o); });
+  s_srv->on("/api/wifi", [] { s_tab = "wi-fi"; sendJson(s_wifiJson); });
+  s_srv->on("/api/sub", [] {
+    s_tab = "sub-ghz";
+    s_subMs = millis();
+    s_subOn = subWebUse(s_srv->arg("m").toInt(), s_srv->hasArg("b") ? s_srv->arg("b").toInt() : 1);
+    String o; subJson(o); sendJson(o);
+  });
+  s_srv->on("/api/snd", [] {
+    s_tab = "sound";
+    s_sndMs = millis();
+    s_sndOn = audioWebUse();
+    String o; audioJson(o); sendJson(o);
+  });
   s_srv->on("/api/info", [] {
-    String o = "{\"bat\":"; o += g_bat.ok ? g_bat.soc : -1;
-    o += ",\"up\":"; o += millis() / 1000; o += '}';
+    String o; o.reserve(400);
+    o = "{\"up\":"; o += millis() / 1000;
+    o += ",\"bat\":{\"ok\":"; o += g_bat.ok ? "true" : "false";
+    o += ",\"soc\":"; o += g_bat.soc; o += ",\"mv\":"; o += g_bat.mv; o += ",\"ma\":"; o += g_bat.ma;
+    o += ",\"t\":"; o += String(g_bat.tempC, 1); o += ",\"tte\":"; o += g_bat.tte; o += ",\"ttf\":"; o += g_bat.ttf;
+    o += ",\"rem\":"; o += g_bat.remain; o += ",\"full\":"; o += g_bat.full;
+    o += ",\"usb\":"; o += g_bat.bus ? "true" : "false"; o += ",\"chg\":"; o += g_bat.chg; o += '}';
+    o += ",\"chip\":"; o += String(temperatureRead(), 1);
+    o += ",\"heap\":"; o += ESP.getFreeHeap() / 1024; o += ",\"psram\":"; o += ESP.getFreePsram() / 1024;
+    o += ",\"cli\":"; o += WiFi.softAPgetStationNum();
+    o += ",\"nets\":"; o += s_netCount;
+    o += ",\"build\":\"" __DATE__ " " __TIME__ "\"";
+    o += ",\"ssid\":\""; o += s_ssid; o += "\"}";
     sendJson(o);
   });
   s_srv->onNotFound([] {                           // проверки «есть ли интернет» у телефонов -> на страницу
@@ -142,6 +173,8 @@ static void webStop() {
   WiFi.mode(WIFI_OFF);
   bleRadioOff();
   bleLowDuty(false);
+  if (s_subOn) { subWebStop(); s_subOn = false; }
+  if (s_sndOn) { audioWebStop(); s_sndOn = false; }
   s_on = false;
 }
 
@@ -150,6 +183,9 @@ static void webTick(uint32_t now) {
   s_dns.processNextRequest();
   s_srv->handleClient();
   scanCollect();
+  // CC1101 и микрофон работают, только пока их вкладку смотрят на телефоне
+  if (s_subOn) { if (now - s_subMs > 4000) { subWebStop(); s_subOn = false; } else subWebTick(now); }
+  if (s_sndOn) { if (now - s_sndMs > 4000) { audioWebStop(); s_sndOn = false; } else audioWebTick(now); }
   if (now - s_scanMs > 20000 && WiFi.scanComplete() != WIFI_SCAN_RUNNING) {
     s_scanMs = now;
     WiFi.scanNetworks(true, true, false, 90);       // асинхронно, 90 мс на канал
@@ -157,7 +193,7 @@ static void webTick(uint32_t now) {
 }
 
 static void webDraw(uint32_t) {
-  WebView v = { s_ssid, s_pass, "192.168.4.1", s_ok ? (int)WiFi.softAPgetStationNum() : 0, s_reqs, s_ok };
+  WebView v = { s_ssid, s_pass, "192.168.4.1", s_ok ? (int)WiFi.softAPgetStationNum() : 0, s_reqs, s_ok, s_tab };
   drawWebScreen(v, s_qr, s_qrN);
 }
 

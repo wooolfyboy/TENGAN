@@ -176,3 +176,50 @@ const Section subghzSection = {
   G_NUM, subScreenInfo, subScreenNow, subOpenScreen, subCloseScreen,
   subClick, subRotate, subBackFn, subTickFn, subFrame,
 };
+
+// ============================================================
+//  для веб-страницы: палка включает CC1101, пока вкладка Sub-GHz
+//  на телефоне спрашивает данные (web.cpp выключит её через пару секунд тишины)
+// ============================================================
+bool subWebUse(int mode, int band) {
+  if (!g_ccTried) { g_ccTried = true; g_ccOk = ccInit(); spReset(); }
+  if (!g_ccOk) return false;
+  mode = constrain(mode, 0, G_NUM - 1); band = constrain(band, 0, N_BANDS - 1);
+  bool changed = !g_ccOn || mode != g_gMode || band != g_band;
+  g_ccOn = true;
+  if (changed) { g_gMode = mode; g_band = band; subStartMode(); }
+  return true;
+}
+void subWebTick(uint32_t now) { subTick(now); }
+void subWebStop() { if (g_ccOn) subLeave(); }
+
+void subJson(String& o) {
+  uint32_t now = millis();
+  const Band& b = BANDS[g_band];
+  o.reserve(1200);
+  o = "{\"ok\":"; o += g_ccOk ? "true" : "false";
+  o += ",\"mode\":"; o += g_gMode;
+  o += ",\"band\":"; o += g_band;
+  o += ",\"lo\":"; o += String(b.lo, 2); o += ",\"hi\":"; o += String(b.hi, 2); o += ",\"mon\":"; o += String(b.mon, 2);
+  if (g_gMode == G_SPECTRUM) {
+    o += ",\"cur\":[";
+    for (int i = 0; i < SP_N; i++) { if (i) o += ','; o += g_spCur[i]; }
+    o += "],\"peak\":[";
+    for (int i = 0; i < SP_N; i++) { if (i) o += ','; o += g_spPeak[i]; }
+    o += ']';
+  } else {
+    o += ",\"floor\":"; o += (int)g_floor;
+    o += ",\"burst\":"; o += g_burst ? "true" : "false";
+    o += ",\"events\":"; o += g_events;
+    o += ",\"rssi\":[";
+    int from = max(0, g_monN - 120);
+    for (int i = from; i < g_monN; i++) { if (i > from) o += ','; o += g_mon[i]; }
+    o += "],\"ev\":[";
+    for (int i = g_evN - 1; i >= 0; i--) {
+      if (i < g_evN - 1) o += ',';
+      o += "{\"ago\":"; o += (now - g_ev[i].t) / 1000; o += ",\"ms\":"; o += g_ev[i].durMs; o += ",\"pk\":"; o += g_ev[i].peak; o += '}';
+    }
+    o += ']';
+  }
+  o += '}';
+}

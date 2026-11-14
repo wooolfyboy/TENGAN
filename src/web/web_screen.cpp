@@ -39,7 +39,9 @@ void drawWebScreen(const WebView& v, const uint8_t* qr, int n) {
   spr.setTextColor(C_HOT());
   txt(v.url, tx, y + 84, 2);
   spr.setTextColor(UI_DIM());
-  snprintf(buf, sizeof(buf), "PHONE OR COMPUTER  REQ %lu", (unsigned long)v.reqs);
+  if (v.tab && v.tab[0]) { char tb[16]; size_t k = 0; for (; v.tab[k] && k < 15; k++) tb[k] = (char)toupper((unsigned char)v.tab[k]); tb[k] = 0;
+                          snprintf(buf, sizeof(buf), "VIEWING: %s", tb); }
+  else snprintf(buf, sizeof(buf), "PHONE OR COMPUTER  REQ %lu", (unsigned long)v.reqs);
   txt(buf, tx, y + 106, 1);
   uiFooter("bluetooth + wi-fi live", "side: back");
   present();

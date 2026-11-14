@@ -333,3 +333,35 @@ const Section soundSection = {
   A_NUM, sndInfo, sndNow, sndOpen, sndClose,
   sndClick, sndRotate, nullptr, sndTick, sndDraw,
 };
+
+// ============================================================
+//  для веб-страницы: микрофон включается, пока вкладка Sound на
+//  телефоне спрашивает данные (web.cpp выключит его через пару секунд тишины)
+// ============================================================
+bool audioWebUse() {
+  if (!g_micEn) return false;
+  if (!s_micRun) { g_micOk = micStart(0); g_auMax = -120; g_auHistN = 0; }
+  return g_micOk;
+}
+void audioWebTick(uint32_t now) { if (s_micRun && g_micOk) auUpdate(now); }
+void audioWebStop() { if (s_micRun) { micStop(); ledsOff(); } }
+
+void audioJson(String& o) {
+  o.reserve(600);
+  o = "{\"en\":"; o += g_micEn ? "true" : "false";
+  bool live = s_micRun && g_micOk && g_micDiag.blocks > 0;
+  o += ",\"ok\":"; o += live ? "true" : "false";
+  if (live) {
+    o += ",\"lv\":"; o += String(g_au.level, 1);
+    o += ",\"pk\":"; o += String(g_au.peak, 1);
+    o += ",\"mx\":"; o += String(g_auMax, 1);
+    o += ",\"avg\":"; o += String(g_auAvg, 1);
+    o += ",\"hz\":"; o += (int)g_au.domHz;
+    o += ",\"e\":"; o += String(g_au.energy, 2);
+    o += ",\"w\":\""; o += levelWord(g_au.level); o += '"';
+    o += ",\"b\":[";
+    for (int k = 0; k < AU_BANDS; k++) { if (k) o += ','; o += (int)(g_au.bands[k] * 100); }
+    o += ']';
+  }
+  o += '}';
+}

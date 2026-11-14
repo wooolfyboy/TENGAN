@@ -428,9 +428,9 @@ static void jsonStr(String& o, const char* s) {
 
 void bleJson(String& o) {
   uint32_t now = millis();
-  std::vector<const Ent*> v;
-  for (auto& kv : g_ents) v.push_back(&kv.second);
-  std::sort(v.begin(), v.end(), [](const Ent* a, const Ent* b) { return a->rssiS > b->rssiS; });
+  std::vector<std::pair<uint32_t, const Ent*>> v;
+  for (auto& kv : g_ents) v.push_back({ kv.first, &kv.second });
+  std::sort(v.begin(), v.end(), [](const std::pair<uint32_t, const Ent*>& a, const std::pair<uint32_t, const Ent*>& b) { return a.second->rssiS > b.second->rssiS; });
   if (v.size() > 150) v.resize(150);
   o.reserve(64 + v.size() * 110);
   o += "{\"on\":"; o += g_bleActive ? "true" : "false";
@@ -438,10 +438,12 @@ void bleJson(String& o) {
   o += ",\"macs\":"; o += g_lastRaw;
   o += ",\"dev\":[";
   bool first = true;
-  for (const Ent* e : v) {
+  for (auto& pe : v) {
+    const Ent* e = pe.second;
     if (!first) o += ',';
     first = false;
-    o += "{\"n\":"; jsonStr(o, e->name);
+    o += "{\"id\":"; o += pe.first;
+    o += ",\"n\":"; jsonStr(o, e->name);
     o += ",\"t\":"; jsonStr(o, typeName(e->type));
     o += ",\"v\":"; jsonStr(o, vendorLabel(e->cat, e->vkind, e->vcode));
     o += ",\"r\":"; o += e->rssiS;
@@ -450,7 +452,74 @@ void bleJson(String& o) {
     o += ",\"age\":"; o += (now - e->first) / 1000;
     o += '}';
   }
+  o += "],\"sens\":[";
+  if (xSemaphoreTake(g_lock, pdMS_TO_TICKS(50)) == pdTRUE) {
+    bool f = true;
+    for (auto& kv : g_sens) {
+      const Sensor& z = kv.second;
+      if (!f) o += ',';
+      f = false;
+      o += "{\"n\":"; jsonStr(o, z.name[0] ? z.name : z.r.model);
+      o += ",\"mo\":"; jsonStr(o, z.r.model);
+      o += ",\"r\":"; o += z.rssi;
+      o += ",\"ago\":"; o += (now - z.t) / 1000;
+      if (z.r.hasT) { o += ",\"t\":"; o += String(z.r.temp, 1); }
+      if (z.r.hasH) { o += ",\"h\":"; o += String(z.r.hum, 0); }
+      if (z.r.hasB) { o += ",\"b\":"; o += z.r.batt; }
+      if (z.r.hasP) { o += ",\"p\":"; o += String(z.r.press, 1); }
+      if (z.r.hasCO2) { o += ",\"co2\":"; o += z.r.co2; }
+      o += '}';
+    }
+    xSemaphoreGive(g_lock);
+  }
   o += "]}";
+}
+
+// подробности одного устройства: все его адреса (MAC меняются), сервисы, данные производителя
+void bleDevJson(uint32_t id, String& o) {
+  static const char* const AK[] = { "public", "static random", "rotating (private)", "non-resolvable" };
+  uint32_t now = millis();
+  o = "{\"addr\":[";
+  if (xSemaphoreTake(g_lock, pdMS_TO_TICKS(50)) == pdTRUE) {
+    bool f = true;
+    const Dev* best = nullptr;
+    for (auto& kv : g_seen) {
+      const Dev& d = kv.second;
+      if (d.ent != id) continue;
+      if (!best || d.t > best->t) best = &d;
+      char mac[18]; macStr(d.mac, mac);
+      if (!f) o += ',';
+      f = false;
+      o += "{\"mac\":\""; o += mac; o += "\",\"kind\":\""; o += AK[d.akind & 3];
+      o += "\",\"r\":"; o += d.rssi; o += ",\"ago\":"; o += (now - d.t) / 1000; o += '}';
+    }
+    o += ']';
+    if (best) {
+      const Dev& d = *best;
+      o += ",\"n\":"; jsonStr(o, d.name);
+      o += ",\"t\":"; jsonStr(o, typeName(d.type));
+      o += ",\"v\":"; jsonStr(o, vendorLabel(d.cat, d.vkind, d.vcode));
+      o += ",\"r\":"; o += d.rssi;
+      o += ",\"rmin\":"; o += d.rmin; o += ",\"rmax\":"; o += d.rmax;
+      o += ",\"pk\":"; o += d.pkts;
+      o += ",\"age\":"; o += (now - d.first) / 1000;
+      if (d.hasCid) { char b[8]; snprintf(b, sizeof(b), "0x%04X", d.cid); o += ",\"cid\":\""; o += b; o += '"'; }
+      if (d.appearance) { o += ",\"app\":"; o += d.appearance; }
+      o += ",\"uu\":[";
+      for (int i = 0; i < d.nU; i++) {
+        char b[8]; snprintf(b, sizeof(b), "%04X", d.uuids[i]);
+        const char* own = btUuidOwner(d.uuids[i]);
+        if (i) o += ',';
+        o += "{\"u\":\""; o += b; o += "\",\"o\":"; jsonStr(o, own ? own : ""); o += '}';
+      }
+      o += "],\"mfr\":\"";
+      for (int i = 0; i < min<int>(d.mfrLen, 6); i++) { char b[4]; snprintf(b, sizeof(b), "%02X", d.mfr[i]); o += b; }
+      if (d.mfrLen > 6) o += "..";
+      o += '"';
+    }
+    xSemaphoreGive(g_lock);
+  } else o += ']';
+  o += '}';
 }
 
 // для веб-режима: Bluetooth слушает реже, чтобы Wi-Fi точке хватало эфира

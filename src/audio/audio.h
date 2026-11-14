@@ -11,3 +11,9 @@ void audioBeep(uint16_t hz, uint16_t ms);
 void audioGeiger(int pct);           // «счётчик Гейгера»: чем ближе (pct 0..100), тем чаще щелчки
 
 extern const Section soundSection;
+
+// веб-страница (раздел Web)
+bool audioWebUse();                  // включить микрофон (если разрешён в настройках)
+void audioWebTick(uint32_t now);
+void audioWebStop();
+void audioJson(String& out);
