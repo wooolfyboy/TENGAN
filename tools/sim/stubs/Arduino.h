@@ -66,3 +66,4 @@ class Print {
   virtual size_t write(uint8_t) = 0;
   size_t print(const char* s) { size_t n = 0; while (*s) n += write(*s++); return n; }
 };
+inline uint32_t esp_random() { static uint32_t s = 2463534242u; s ^= s << 13; s ^= s >> 17; s ^= s << 5; return s; }

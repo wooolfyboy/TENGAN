@@ -6,6 +6,7 @@
 //              «выворачивается» через внешний. След — три прошлых кадра.
 //  TORUS     — бублик из ~1000 точек; яркость — освещение и глубина.
 //  LIFE      — игра «Жизнь» Конвея с послесвечением.
+//  PENDULUM  — двойной маятник: хаос и светящийся след.
 //
 //  Колесо — скорость, нажатие — назад в подменю.
 // ============================================================
@@ -16,7 +17,7 @@
 #include "core/ui.h"
 #include "core/menu.h"
 
-enum { G_TESS = 0, G_TORUS, G_LIFE, G_NUM };
+enum { G_TESS = 0, G_TORUS, G_LIFE, G_PEND, G_NUM };
 static int   g_gal = 0;
 static float s_speed = 1.0f;                // множитель скорости (колесо)
 static float s_phase = 0;                   // «время» анимации с учётом скорости
@@ -243,13 +244,92 @@ void drawLife(uint32_t now) {
   present();
 }
 
+// ---------- PENDULUM — двойной маятник ----------
+// Два сцепленных маятника, уравнения Лагранжа, шаг Рунге-Кутты 4-го порядка.
+// Нижний груз оставляет светящийся след: ярче и белее — где быстрее.
+#define PD_TRAIL 420
+static float   s_th1, s_th2, s_w1, s_w2;                // углы и угловые скорости
+static int16_t s_tx[PD_TRAIL], s_ty[PD_TRAIL];
+static uint8_t s_tv[PD_TRAIL];                           // скорость в точке следа (0..255)
+static int     s_tHead = 0, s_tN = 0;
+static bool    s_pdInit = false;
+
+static void pdDeriv(const float* y, float* d) {          // y = th1, th2, w1, w2 (m1=m2, l1=l2)
+  const float g = 9.81f, l = 1.0f;
+  float t1 = y[0], t2 = y[1], w1 = y[2], w2 = y[3], dt = t1 - t2;
+  float den = 3.0f - cosf(2 * dt);                       // 2m1+m2 - m2 cos(2Δ) при m1=m2=1
+  d[0] = w1; d[1] = w2;
+  d[2] = (-g * 3 * sinf(t1) - g * sinf(t1 - 2 * t2) - 2 * sinf(dt) * (w2 * w2 * l + w1 * w1 * l * cosf(dt))) / (l * den);
+  d[3] = (2 * sinf(dt) * (w1 * w1 * l * 2 + g * 2 * cosf(t1) + w2 * w2 * l * cosf(dt))) / (l * den);
+}
+static void pdStep(float h) {
+  float y[4] = { s_th1, s_th2, s_w1, s_w2 }, k1[4], k2[4], k3[4], k4[4], t[4];
+  pdDeriv(y, k1);
+  for (int i = 0; i < 4; i++) t[i] = y[i] + k1[i] * h / 2; pdDeriv(t, k2);
+  for (int i = 0; i < 4; i++) t[i] = y[i] + k2[i] * h / 2; pdDeriv(t, k3);
+  for (int i = 0; i < 4; i++) t[i] = y[i] + k3[i] * h;     pdDeriv(t, k4);
+  for (int i = 0; i < 4; i++) y[i] += h / 6 * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]);
+  s_th1 = y[0]; s_th2 = y[1]; s_w1 = y[2]; s_w2 = y[3];
+}
+static void pdReset() {
+  uint32_t r = esp_random();
+  s_th1 = 2.0f + (r % 1000) / 1000.0f * 1.0f;            // высоко: хаос
+  s_th2 = 1.5f + ((r >> 10) % 1000) / 1000.0f * 1.6f;
+  s_w1 = s_w2 = 0; s_tN = 0; s_tHead = 0; s_pdInit = true;
+}
+
+void drawPendulum(uint32_t now) {
+  g_fastFrame = true;
+  if (!s_pdInit) pdReset();
+  uint32_t prev = s_lastMs;
+  advance(now);
+  float dtReal = prev ? min<uint32_t>(now - prev, 100) * 0.001f * s_speed : 0.033f;
+  const int W = spr.width();
+  const int cx = W / 2, cy = 84;
+  const float L = 33;
+  int steps = 6;
+  for (int k = 0; k < steps; k++) {
+    pdStep(dtReal / steps);
+    // точка следа на каждом подшаге — линия получается гладкой
+    if (k % 2 == 1) {
+      float x1 = cx + L * sinf(s_th1), y1 = cy + L * cosf(s_th1);
+      int x2 = (int)(x1 + L * sinf(s_th2)), y2 = (int)(y1 + L * cosf(s_th2));
+      float v = fabsf(s_w2) + fabsf(s_w1) * 0.5f;
+      s_tx[s_tHead] = x2; s_ty[s_tHead] = y2; s_tv[s_tHead] = (uint8_t)min(255.0f, v * 22);
+      s_tHead = (s_tHead + 1) % PD_TRAIL; if (s_tN < PD_TRAIL) s_tN++;
+    }
+  }
+  if (!isfinite(s_th1) || !isfinite(s_th2)) pdReset();   // на всякий случай
+  spr.fillSprite(C_BG());
+  // след: старые точки тусклее; цвет — скорость
+  for (int i = 1; i < s_tN; i++) {
+    int a = (s_tHead - s_tN + i - 1 + PD_TRAIL) % PD_TRAIL, b = (a + 1) % PD_TRAIL;
+    int age = 100 * i / s_tN;                            // 0 — самая старая
+    uint16_t c = shade(heatV(0.35f + 0.65f * s_tv[b] / 255.0f), 12 + age * 88 / 100);
+    spr.drawLine(s_tx[a], s_ty[a], s_tx[b], s_ty[b], c);
+  }
+  // маятник
+  float x1 = cx + L * sinf(s_th1), y1 = cy + L * cosf(s_th1);
+  float x2 = x1 + L * sinf(s_th2), y2 = y1 + L * cosf(s_th2);
+  spr.drawCircle(cx, cy, (int)(2 * L), UI_LINE());
+  spr.drawLine(cx, cy, x1, y1, UI_LABEL());
+  spr.drawLine(x1, y1, x2, y2, UI_LABEL());
+  spr.fillCircle(cx, cy, 2, UI_DIM());
+  spr.fillCircle(x1, y1, 4, C_ACC());
+  spr.fillCircle(x2, y2, 5, C_HOT());
+  char buf[24]; speedLabel(buf, sizeof(buf));
+  uiHeader("Pendulum", buf);
+  uiFooter("wheel: speed   click: new swing", "side: back");
+  present();
+}
+
 // ---------- раздел ----------
 static void galSubtitle(char* out, size_t n) { snprintf(out, n, "%d demos", G_NUM); }
 static void galEnter() { s_lastMs = 0; }
 static void galLeave() {}
 static void galInfo(int i, SubItem& it) {
-  static const char* const names[G_NUM] = { "Tesseract", "Torus", "Life" };
-  static const char* const descs[G_NUM] = { "4D hypercube", "donut of points", "game of life" };
+  static const char* const names[G_NUM] = { "Tesseract", "Torus", "Life", "Pendulum" };
+  static const char* const descs[G_NUM] = { "4D hypercube", "donut of points", "game of life", "double pendulum chaos" };
   it.name = names[i]; it.desc = descs[i]; it.value[0] = 0;
   if (i == G_TESS)       strcpy(it.value, "4D");
   else if (i == G_TORUS) strcpy(it.value, "3D");
@@ -258,10 +338,13 @@ static void galInfo(int i, SubItem& it) {
 static int  galNow() { return g_gal; }
 static void galOpen(int m) { g_gal = m; s_lastMs = 0; s_trailN = 0; }
 static void galClose() {}
-static void galClick() { if (g_gal == G_LIFE) lfSeed(); else navToSub(); }   // в «Жизни» — новый мир
+static void galClick() {                                // в «Жизни» — новый мир, в маятнике — новый запуск
+  if (g_gal == G_LIFE) lfSeed(); else if (g_gal == G_PEND) pdReset(); else navToSub();
+}
 static void galRotate(int dir) { s_speed = constrain(s_speed + dir * 0.25f, 0.0f, 4.0f); }
 static void galDraw(uint32_t now) {
-  if (g_gal == G_TESS) drawTesseract(now); else if (g_gal == G_TORUS) drawTorus(now); else drawLife(now);
+  if (g_gal == G_TESS) drawTesseract(now); else if (g_gal == G_TORUS) drawTorus(now);
+  else if (g_gal == G_LIFE) drawLife(now); else drawPendulum(now);
 }
 
 const Section gallerySection = {
