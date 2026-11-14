@@ -43,6 +43,7 @@ extern int      g_pcLastCmd;          // +1 громче, -1 тише, 2 пау�
 extern uint32_t g_pcLastCmdMs;
 
 void pcPoll(uint32_t now);            // каждый проход loop(): читать USB
+void pcSendLine(const char* s);       // отправить строку программе на ноуте (если она запущена)
 bool pcLive(uint32_t now);            // данные свежие (< 3 с)
 
 void drawPc(uint32_t now);

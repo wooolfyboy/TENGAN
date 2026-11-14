@@ -17,3 +17,8 @@ bool audioWebUse();                  // включить микрофон (ес�
 void audioWebTick(uint32_t now);
 void audioWebStop();
 void audioJson(String& out);
+
+// звук с ноутбука (строки «PA ...» по USB, разбирает pc.cpp)
+void audioPcFrame(float levelDb, int domHz, const uint8_t* bands32, const int8_t* wave64,
+                  const int8_t* xy64x2, bool stereo);
+bool audioPcLive(uint32_t now);      // кадры с ноута идут (< 0.6 с назад)

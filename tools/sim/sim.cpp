@@ -81,6 +81,17 @@ void audioBegin() {}
 void audioClick() {}
 void audioBeep(uint16_t, uint16_t) {}
 void audioGeiger(int) {}
+bool   g_auFromPc = false;
+int8_t g_auXY[AU_XY][2];
+bool   g_auXYStereo = false;
+bool audioPcLive(uint32_t) { return g_auFromPc; }
+void audioPcFrame(float level, int hz, const uint8_t* bands, const int8_t* wave, const int8_t* xy, bool stereo) {
+  g_auFromPc = true; g_au.level = level; g_au.domHz = hz; float e = 0;
+  for (int k = 0; k < AU_BANDS; k++) { g_au.bands[k] = bands[k] / 255.0f; g_au.caps[k] = g_au.bands[k] + 0.05f; e += g_au.bands[k]; }
+  g_au.energy = e / AU_BANDS;
+  for (int i = 0; i < AU_WAVE; i++) g_au.wave[i] = wave[i * 64 / AU_WAVE] * 200;
+  memcpy(g_auXY, xy, sizeof(g_auXY)); g_auXYStereo = stereo;
+}
 
 // ---------- разделы для меню (в прошивке — свои файлы) ----------
 static void noop() {}
@@ -115,9 +126,9 @@ const Section wifiSection = { "Wi-Fi", 70, 210, 130, iconWifi, wifiSub, noop, no
   W_NUM, wifiInfo, zero, noopI, noop, noop, noopI, noBack, noopT, noopT };
 static void sndSub(char* o, size_t n) { snprintf(o, n, "%d dBfs", (int)g_au.level); }
 static void sndInfo(int i, SubItem& it) {
-  static const char* const nm[] = { "Bars", "Terrain", "Reactor", "Level", "Scope" };
-  static const char* const ds[] = { "sound spectrum", "3D sound mountains", "pulse animation", "noise meter", "waveform" };
-  static const char* const vv[] = { "1.2 kHz", "", "", "-38 dBfs", "" };
+  static const char* const nm[] = { "Bars", "Terrain", "Reactor", "Level", "Scope", "XY" };
+  static const char* const ds[] = { "sound spectrum", "3D sound mountains", "pulse animation", "noise meter", "waveform", "oscilloscope XY" };
+  static const char* const vv[] = { "1.2 kHz", "", "", "-38 dBfs", "", "" };
   it.name = nm[i]; it.desc = ds[i]; snprintf(it.value, sizeof(it.value), "%s", vv[i]);
 }
 static void webSub(char* o, size_t n) { snprintf(o, n, "1 online"); }
@@ -330,6 +341,12 @@ int main(int argc, char** argv) {
   drawReactor(s_now);        snap("41_sound_reactor");
   drawLevel(s_now);          snap("42_sound_level");
   drawWave(s_now);           snap("43_sound_scope");
+  drawXY(s_now);             snap("44b_sound_xy_mic");
+  { FILE* f = fopen("/tmp/claude-0/-home-user-lilygostuff/c5b88f80-222b-5b59-9742-a02655fa5cbd/scratchpad/pa_line.txt", "r");
+    if (f) { static char ln[1200]; size_t n = fread(ln, 1, sizeof(ln) - 1, f); ln[n] = 0; fclose(f);
+      Serial.feed(ln); pcPoll(0);
+      for (int k = 0; k < 4; k++) drawXY(s_now);
+      snap("45b_sound_xy_pc"); drawAuBars(s_now); snap("45c_sound_bars_pc"); g_auFromPc = false; } }
   g_au.level = -21; g_au.peak = -18;
   drawLevel(s_now);          snap("42b_sound_level_loud");
   drawMicMissing();          snap("44_mic_check");

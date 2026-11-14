@@ -9,6 +9,10 @@ Radio Radar — монитор нагрузки ноутбука.
   KEY VOLUP / KEY VOLDN — громче / тише, KEY PLAY — пауза/играть.
 Программа нажимает за тебя мультимедийные клавиши Windows.
 
+Звук ноутбука: когда на палке открыт раздел Sound, она шлёт «AUD ON» —
+программа слушает то, что играет в колонках/наушниках (без микрофона),
+считает спектр и ~30 раз в секунду отправляет палке строки «PA ...».
+
 Запускать двойным кликом по start_pc_monitor.bat (он сам всё поставит).
 Остановить — закрыть окно или нажать Ctrl+C.
 """
@@ -414,7 +418,163 @@ class NowPlaying:
         return "PM\t%d\t%d\t%d\t%s\t%s\t%s\n" % (playing, pos, dur, app_name(s.source_app_user_model_id), title, artist)
 
 
-def reader(port, wake):
+# ---------- запись в порт из нескольких потоков — по очереди ----------
+_write_lock = threading.Lock()
+
+
+def send(port, data):
+    with _write_lock:
+        port.write(data)
+
+
+# ---------- звук ноутбука (то, что играет в колонках) ----------
+# Нужны numpy и PyAudioWPatch (их ставит start_pc_monitor.bat). Без них всё
+# остальное работает, а палка просто показывает звук со своего микрофона.
+class AudioTap:
+    FPS = 30
+    NFFT = 2048
+
+    def __init__(self):
+        self.port = None
+        self.want_until = 0.0                   # палка просит звук до этого момента
+        self.err_shown = False
+        self.thread = None
+
+    def request(self):
+        """Палка прислала «AUD ON» (повторяет каждые 1.5 с, пока открыт раздел Sound)."""
+        first = time.time() > self.want_until
+        self.want_until = time.time() + 4.0
+        if first:
+            say("")
+            say("     [звук] палка просит звук ноутбука — начинаю слушать колонки")
+        if self.thread is None or not self.thread.is_alive():
+            self.thread = threading.Thread(target=self._run, daemon=True)
+            self.thread.start()
+
+    def stop(self):
+        if time.time() < self.want_until:
+            say("")
+            say("     [звук] палка закрыла раздел Sound — перестаю слушать")
+        self.want_until = 0.0
+
+    def _run(self):
+        try:
+            import numpy as np
+            import pyaudiowpatch as pyaudio
+        except Exception as e:
+            if not self.err_shown:
+                self.err_shown = True
+                say("")
+                say("     [звук] нет библиотек для звука ноутбука (%s). Палка покажет микрофон." % e)
+            return
+        pa = pyaudio.PyAudio()
+        try:
+            while time.time() < self.want_until:
+                try:
+                    self._capture(np, pyaudio, pa)
+                except Exception as e:
+                    say("")
+                    say("     [звук] ошибка: %s — пробую снова" % str(e)[:120])
+                    time.sleep(1)
+        finally:
+            pa.terminate()
+
+    @staticmethod
+    def _loopback_device(pyaudio, pa):
+        wasapi = pa.get_host_api_info_by_type(pyaudio.paWASAPI)
+        spk = pa.get_device_info_by_index(wasapi["defaultOutputDevice"])
+        if spk.get("isLoopbackDevice"):
+            return spk
+        for lb in pa.get_loopback_device_info_generator():
+            if spk["name"] in lb["name"]:
+                return lb
+        raise RuntimeError("не нашёл «петлю» для устройства вывода %s" % spk["name"])
+
+    def _capture(self, np, pyaudio, pa):
+        dev = self._loopback_device(pyaudio, pa)
+        rate = int(dev["defaultSampleRate"])
+        ch = max(1, min(2, int(dev["maxInputChannels"])))
+        block = rate // self.FPS
+        stream = pa.open(format=pyaudio.paInt16, channels=ch, rate=rate, input=True,
+                         input_device_index=dev["index"], frames_per_buffer=block)
+        say("")
+        say("     [звук] слушаю: %s (%d Гц, %s)" % (dev["name"][:60], rate, "стерео" if ch == 2 else "моно"))
+        name = dev["name"]
+        mono = np.zeros(self.NFFT, dtype=np.float32)
+        win = np.hanning(self.NFFT).astype(np.float32)
+        freqs = np.fft.rfftfreq(self.NFFT, 1.0 / rate)
+        edges = np.geomspace(60, min(8000, rate / 2 - 1), 33)     # как у микрофона палки — совпадают подписи частот
+        idx = [(max(1, int(np.searchsorted(freqs, edges[k]))), max(1, int(np.searchsorted(freqs, edges[k + 1])))) for k in range(32)]
+        top = -40.0
+        gain = 120.0 / 8000.0
+        silent_since = None
+        try:
+            while time.time() < self.want_until:
+                # в тишине Windows не присылает звук совсем — не ждём, шлём «пусто»
+                avail = stream.get_read_available()
+                if avail < block:
+                    if silent_since is None:
+                        silent_since = time.time()
+                    if time.time() - silent_since > 0.15:
+                        data = np.zeros((block, ch), dtype=np.float32)
+                    else:
+                        time.sleep(0.005)
+                        continue
+                else:
+                    silent_since = None
+                    raw = stream.read(block, exception_on_overflow=False)
+                    data = np.frombuffer(raw, dtype=np.int16).astype(np.float32).reshape(-1, ch)
+                if self._device_changed(pyaudio, pa, name):
+                    return                                   # переключили колонки/наушники — откроем заново
+                m = data.mean(axis=1)
+                mono = np.concatenate((mono, m))[-self.NFFT:]
+                # громкость
+                rms = float(np.sqrt(np.mean(m * m))) / 32768.0
+                level = 20 * np.log10(rms + 1e-7)
+                # спектр: 32 полосы 40 Гц..16 кГц, автоусиление
+                spec = np.abs(np.fft.rfft(mono * win))
+                db = np.array([20 * np.log10(spec[a:max(b, a + 1)].max() / (self.NFFT * 8192.0) + 1e-9) for a, b in idx])
+                top = max(float(db.max()), top - 0.25, -60.0)
+                bands = np.clip((db - (top - 48)) / 48.0, 0, 1)
+                k = int(np.argmax(spec[2:])) + 2
+                hz = int(freqs[k]) if level > -60 else 0
+                # форма волны и XY: 64 точки, «автоусиление» чтобы фигура была во весь экран
+                pk = float(np.abs(data).max()) if data.size else 0.0
+                target = 120.0 / max(pk * 1.05, 400.0)
+                gain = target if target < gain else gain + (target - gain) * 0.2   # громче — сразу, тише — плавно
+                tail = mono[-512:][::8]
+                wave = np.clip(tail * gain, -127, 127).astype(np.int8)
+                st = data[-256:] if len(data) >= 256 else data
+                stp = st[::max(1, len(st) // 64)][:64]
+                if len(stp) < 64:
+                    stp = np.vstack([stp, np.zeros((64 - len(stp), ch), dtype=np.float32)])
+                lr = stp if ch == 2 else np.repeat(stp, 2, axis=1)
+                xy = np.clip(lr * gain, -127, 127).astype(np.int8)
+                line = "PA %d %d %s %s %s %d\n" % (int(level * 10), hz, (bands * 255).astype(np.uint8).tobytes().hex(),
+                                                    wave.tobytes().hex(), xy.tobytes().hex(), 1 if ch == 2 else 0)
+                port = self.port
+                if port is not None:
+                    try:
+                        send(port, line.encode())
+                    except Exception:
+                        pass
+        finally:
+            stream.stop_stream()
+            stream.close()
+
+    _dev_check_t = 0.0
+
+    def _device_changed(self, pyaudio, pa, name):
+        if time.time() - self._dev_check_t < 3:
+            return False
+        self._dev_check_t = time.time()
+        try:
+            return self._loopback_device(pyaudio, pa)["name"] != name
+        except Exception:
+            return False
+
+
+def reader(port, wake, tap):
     """Отдельный поток: слушает команды от палки и сразу их выполняет."""
     while True:
         try:
@@ -424,6 +584,12 @@ def reader(port, wake):
         if not raw:
             continue
         line = raw.decode("ascii", "ignore").strip()
+        if line == "AUD ON":
+            tap.request()
+            continue
+        if line == "AUD OFF":
+            tap.stop()
+            continue
         if line.startswith("KEY "):
             name = line[4:].strip()
             press(name)
@@ -444,6 +610,7 @@ def main():
     say("=" * 56)
     col = Collector()
     media = NowPlaying()
+    tap = AudioTap()
     if IS_WIN:
         if _media_mgr_cls is not None:
             say("  Название трека: через системную панель Windows (winrt).")
@@ -472,7 +639,8 @@ def main():
                 say("[OK] Палка найдена: %s. Отправляю данные. Открой на палке раздел PC." % name)
                 say("     Колесо громкости: в разделе PC прокрути колесом до страницы Media.")
                 warned = False
-                threading.Thread(target=reader, args=(port, wake), daemon=True).start()
+                tap.port = port
+                threading.Thread(target=reader, args=(port, wake, tap), daemon=True).start()
             except Exception as e:
                 text = str(e).lower()
                 if "denied" in text or "busy" in text or "permission" in text or "отказано" in text:
@@ -489,21 +657,22 @@ def main():
                 time.sleep(0.05)                 # Windows нужно мгновение, чтобы применить
                 v = read_volume()
                 if v:
-                    port.write(("PV vol=%d mute=%d\n" % (v[0], 1 if v[1] else 0)).encode())
+                    send(port, ("PV vol=%d mute=%d\n" % (v[0], 1 if v[1] else 0)).encode())
                 wake.wait(max(0.0, next_t - time.monotonic()))   # и дальше ждём до своей секунды
                 continue
             line, cpu, ram = col.line()
-            port.write(line.encode("ascii", "replace"))
+            send(port, line.encode("ascii", "replace"))
             v = read_volume()
             if v:
-                port.write(("PV vol=%d mute=%d\n" % (v[0], 1 if v[1] else 0)).encode())
+                send(port, ("PV vol=%d mute=%d\n" % (v[0], 1 if v[1] else 0)).encode())
             if media.line:
-                port.write(media.line.encode("utf-8"))
+                send(port, media.line.encode("utf-8"))
             sys.stdout.write("\r     CPU %3d%%   RAM %3d%%   -> %s   " % (cpu, ram, port.port))
             sys.stdout.flush()
         except Exception:
             say("")
             say("[..] Связь с палкой пропала (кабель отключили?). Жду, когда вернётся...")
+            tap.port = None
             try:
                 port.close()
             except Exception:

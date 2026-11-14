@@ -13,6 +13,14 @@ static uint16_t dim565(uint16_t c, int pct) {
   return tft.color565(r * pct / 100, g * pct / 100, b * pct / 100);
 }
 
+// справа в шапке: «PC» — если картинка по звуку ноутбука
+static const char* src(const char* right) {
+  static char buf[48];
+  if (!g_auFromPc) return right;
+  snprintf(buf, sizeof(buf), "PC  %s", right ? right : "");
+  return buf;
+}
+
 static void hzStr(float hz, char* out, size_t n) {
   if (hz >= 1000) snprintf(out, n, "%.1f kHz", hz / 1000.0f);
   else            snprintf(out, n, "%d Hz", (int)hz);
@@ -27,7 +35,7 @@ void drawAuBars(uint32_t now) {
   spr.fillSprite(C_BG());
   hzStr(g_au.domHz, hz, sizeof(hz));
   snprintf(buf, sizeof(buf), "%d dBfs  %s", (int)g_au.level, g_au.energy > 0.15f ? hz : "--");
-  uiHeader("Sound spectrum", buf);
+  uiHeader("Sound spectrum", src(buf));
 
   const int x0 = UI_M + 8, base = 112, hMax = 84, step = (W - 2 * x0) / AU_BANDS;
   for (int k = 0; k < AU_BANDS; k++) {
@@ -62,7 +70,7 @@ void drawAuBars(uint32_t now) {
 void drawReactor(uint32_t now) {
   int W = spr.width();
   spr.fillSprite(C_BG());
-  uiHeader("Reactor", levelWord(g_au.level), g_au.level >= -25);
+  uiHeader("Reactor", src(levelWord(g_au.level)), g_au.level >= -25);
   int cx = W / 2, cy = 90;
   float e = g_au.energy;
   float rot = now * 0.0004f + e * 0.8f;
@@ -116,7 +124,7 @@ void drawLevel(uint32_t now) {
   char buf[32];
   spr.fillSprite(C_BG());
   bool loud = g_au.level >= -25;
-  uiHeader("Noise meter", levelWord(g_au.level), loud);
+  uiHeader("Noise meter", src(levelWord(g_au.level)), loud);
 
   spr.setTextDatum(TL_DATUM);
   spr.setTextColor(loud ? C_ALERT() : C_HOT());
@@ -170,7 +178,7 @@ void drawWave(uint32_t now) {
   char buf[24];
   spr.fillSprite(C_BG());
   hzStr(g_au.domHz, buf, sizeof(buf));
-  uiHeader("Waveform", g_au.energy > 0.15f ? buf : "listening");
+  uiHeader("Waveform", src(g_au.energy > 0.15f ? buf : "listening"));
   int gx = UI_M + 4, gy = UI_TOP, gw = W - 2 * UI_M - 8, gh = UI_BOTTOM - UI_TOP + 2, cy = gy + gh / 2;
   uiFrame(gx, gy, gw, gh, UI_LINE());
   for (int x = gx + 4; x < gx + gw - 4; x += 4) spr.drawPixel(x, cy, UI_LINE());
@@ -327,7 +335,67 @@ void drawTerrain(uint32_t now) {
       px = sx; py = sy; pbx = bx; pby = by; ph = h[c];
     }
   }
-  uiHeader("Terrain", buf, g_au.level >= -25);
+  uiHeader("Terrain", src(buf), g_au.level >= -25);
   uiFooter("wheel: next view", "side: back");
   present();
+}
+
+// ============================================================
+//  XY — осциллограф «X-Y»: левый канал двигает луч по горизонтали,
+//  правый — по вертикали. Моно-звук рисует диагональ, стерео — фигуры.
+//  С микрофоном (моно) — «фазовый портрет»: X = сигнал, Y = он же чуть позже.
+//  Люминофор: прошлые кадры гаснут не сразу.
+// ============================================================
+#define XY_TRAIL 4
+static int16_t s_xyHist[XY_TRAIL][AU_XY][2];
+static int     s_xyHead = 0, s_xyN = 0;
+
+void drawXY(uint32_t now) {
+  const int W = spr.width();
+  g_fastFrame = true;
+  spr.fillSprite(C_BG());
+  const int side = UI_BOTTOM - UI_TOP - 2, x0 = (W - side) / 2, y0 = UI_TOP + 2;
+  const int cx = x0 + side / 2, cy = y0 + side / 2, half = side / 2 - 4;
+  uiFrame(x0, y0, side, side, UI_LINE());
+  for (int k = 1; k < 8; k++) {                         // сетка точками
+    for (int t = 4; t < side - 4; t += 4) {
+      spr.drawPixel(x0 + k * side / 8, y0 + t, UI_LINE());
+      spr.drawPixel(x0 + t, y0 + k * side / 8, UI_LINE());
+    }
+  }
+  // точки этого кадра (в экранных координатах)
+  int16_t (&cur)[AU_XY][2] = s_xyHist[s_xyHead];
+  for (int i = 0; i < AU_XY; i++) {
+    int x, y;
+    if (g_auFromPc) { x = g_auXY[i][0]; y = g_auXY[i][1]; }
+    else {                                              // микрофон: фазовый портрет из формы волны
+      int a = i * (AU_WAVE - 12) / AU_XY;
+      x = g_au.wave[a] >> 8; y = g_au.wave[a + 10] >> 8;
+    }
+    cur[i][0] = cx + x * half / 128;
+    cur[i][1] = cy - y * half / 128;
+  }
+  s_xyHead = (s_xyHead + 1) % XY_TRAIL;
+  if (s_xyN < XY_TRAIL) s_xyN++;
+  // от старых кадров к новому: тусклее -> ярче
+  for (int f = s_xyN - 1; f >= 0; f--) {
+    int slot = (s_xyHead - 1 - f + XY_TRAIL * 2) % XY_TRAIL;
+    int16_t (&pts)[AU_XY][2] = s_xyHist[slot];
+    uint16_t col = f == 0 ? C_HOT() : dim565(C_ACC(), 70 - f * 18);
+    for (int i = 1; i < AU_XY; i++) spr.drawLine(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1], col);
+    if (f == 0) for (int i = 1; i < AU_XY; i++) spr.drawLine(pts[i - 1][0] + 1, pts[i - 1][1], pts[i][0] + 1, pts[i][1], dim565(C_ACC(), 60));
+  }
+  // подписи осей
+  spr.setTextDatum(TL_DATUM);
+  spr.setTextColor(UI_DIM());
+  txt(g_auFromPc ? "L" : "NOW", x0 + side + 6, cy - 4, 1);
+  txt(g_auFromPc ? "R" : "LATER", x0 - 30, y0 + 2, 1);
+  char buf[24];
+  snprintf(buf, sizeof(buf), "%d dBfs", (int)g_au.level);
+  spr.setTextColor(UI_LABEL());
+  txt(buf, UI_M + 6, UI_BOTTOM - 12, 1);
+  uiHeader("XY scope", src(g_auFromPc ? (g_auXYStereo ? "stereo" : "mono") : "mic phase"));
+  uiFooter("wheel: next view", "side: back");
+  present();
+  (void)now;
 }

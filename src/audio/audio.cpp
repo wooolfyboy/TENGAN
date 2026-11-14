@@ -20,6 +20,8 @@
 #include "core/leds.h"
 #include "core/menu.h"
 #include "core/settings.h"
+#include "core/timeutil.h"
+#include "pc/pc.h"
 
 #define MIC_CLK   39
 #define MIC_DATA  42
@@ -37,6 +39,10 @@ float g_auHist[AU_HIST];
 int   g_auHistN = 0;
 float g_auMax = -120, g_auAvg = -90;
 MicDiag g_micDiag = {};
+bool   g_auFromPc = false;
+int8_t g_auXY[AU_XY][2];
+bool   g_auXYStereo = false;
+static uint32_t s_pcAudT = 0;
 
 const char* levelWord(float db) {
   if (db < -55) return "QUIET";
@@ -280,8 +286,45 @@ void audioGeiger(int pct) {
 // ============================================================
 //  раздел Sound
 // ============================================================
+// ============================================================
+//  звук с ноутбука: готовый спектр приходит по USB (ноут считает сам)
+// ============================================================
+bool audioPcLive(uint32_t now) { return s_pcAudT && msSince(now, s_pcAudT) < 600; }
+
+void audioPcFrame(float level, int hz, const uint8_t* bands, const int8_t* wave, const int8_t* xy, bool stereo) {
+  uint32_t now = millis();
+  s_pcAudT = now;
+  g_auFromPc = true;
+  g_au.level = level;
+  g_au.peak = max(level, g_au.peak - 0.4f);
+  g_au.domHz = hz;
+  float e = 0;
+  for (int k = 0; k < AU_BANDS; k++) {
+    float v = bands[k] / 255.0f;
+    g_au.bands[k] = v > g_au.bands[k] ? v : g_au.bands[k] * 0.78f + v * 0.22f;   // быстро вверх, плавно вниз
+    g_au.caps[k] = max(g_au.bands[k], g_au.caps[k] - 0.012f);
+    e += g_au.bands[k];
+  }
+  g_au.energy = e / AU_BANDS;
+  for (int i = 0; i < AU_WAVE; i++) {                  // 64 точки -> 256 (линейно между соседями)
+    float f = i * 63.0f / (AU_WAVE - 1);
+    int a = (int)f; int b = min(a + 1, 63);
+    g_au.wave[i] = (int16_t)((wave[a] + (wave[b] - wave[a]) * (f - a)) * 200);
+  }
+  memcpy(g_auXY, xy, sizeof(g_auXY));
+  g_auXYStereo = stereo;
+  g_auMax = max(g_auMax, level);
+  g_auAvg = g_auAvg * 0.97f + level * 0.03f;
+  if (now - s_histMs >= 500) {
+    s_histMs = now;
+    if (g_auHistN < AU_HIST) g_auHist[g_auHistN++] = level;
+    else { memmove(g_auHist, g_auHist + 1, sizeof(float) * (AU_HIST - 1)); g_auHist[AU_HIST - 1] = level; }
+  }
+}
+
 static void sndSubtitle(char* out, size_t n) {
-  if (s_micRun && g_micOk) snprintf(out, n, "%d dBfs", (int)g_au.level);
+  if (audioPcLive(millis())) snprintf(out, n, "laptop");
+  else if (s_micRun && g_micOk) snprintf(out, n, "%d dBfs", (int)g_au.level);
   else                     snprintf(out, n, g_micEn ? "listen" : "mic off");
 }
 static void sndEnter() {
@@ -290,10 +333,11 @@ static void sndEnter() {
   g_micOk = micStart(0);
   g_auMax = -120; g_auHistN = 0;
 }
-static void sndLeave() { micStop(); ledsOff(); }
+static bool s_micPaused = false;            // микрофон выключен, пока идёт звук с ноута
+static void sndLeave() { micStop(); ledsOff(); pcSendLine("AUD OFF"); s_micPaused = false; g_auFromPc = false; }
 static void sndInfo(int i, SubItem& it) {
-  static const char* const names[A_NUM] = { "Bars", "Terrain", "Reactor", "Level", "Scope" };
-  static const char* const descs[A_NUM] = { "sound spectrum", "3D sound mountains", "pulse animation", "noise meter", "waveform" };
+  static const char* const names[A_NUM] = { "Bars", "Terrain", "Reactor", "Level", "Scope", "XY" };
+  static const char* const descs[A_NUM] = { "sound spectrum", "3D sound mountains", "pulse animation", "noise meter", "waveform", "oscilloscope XY" };
   it.name = names[i]; it.desc = descs[i]; it.value[0] = 0;
   if (!g_micEn) { strcpy(it.value, "mic off"); return; }
   if (!g_micOk) { strcpy(it.value, "no mic"); return; }
@@ -313,14 +357,30 @@ static void sndRotate(int dir) {
   last = millis();
   g_aMode = (g_aMode + dir + A_NUM) % A_NUM;
 }
-static void sndTick(uint32_t now) { if (g_micOk) auUpdate(now); }
+static void sndTick(uint32_t now) {
+  static uint32_t s_audReq = 0;
+  if (!s_audReq || msSince(now, s_audReq) > 1500) { s_audReq = now; pcSendLine("AUD ON"); }   // «ноут, шли звук»
+  if (audioPcLive(now)) {                            // есть звук ноута — микрофон не нужен
+    g_auFromPc = true;
+    if (s_micRun) { micStop(); s_micPaused = true; }
+    return;
+  }
+  g_auFromPc = false;
+  if (s_micPaused) {                                 // ноут замолчал — снова слушаем микрофон
+    s_micPaused = false;
+    if (g_micEn) { g_micOk = micStart(0); g_micDiag.blocks = 0; }
+  }
+  if (g_micOk) auUpdate(now);
+}
 static void sndDraw(uint32_t now) {
   // нет драйвера, выключен или данные не идут больше секунды — экран диагностики
-  if (!g_micOk || (g_micDiag.blocks == 0 && now - s_micStartMs > 1000)) { drawMicMissing(); return; }
+  bool pc = audioPcLive(now);
+  if (!pc && (!g_micOk || (g_micDiag.blocks == 0 && now - s_micStartMs > 1000))) { drawMicMissing(); return; }
   switch (g_aMode) {
     case A_BARS:    drawAuBars(now); break;
     case A_REACTOR: drawReactor(now); break;
     case A_TERRAIN: drawTerrain(now); break;
+    case A_XY:      drawXY(now); break;
     case A_LEVEL:   drawLevel(now); break;
     default:        drawWave(now); break;
   }

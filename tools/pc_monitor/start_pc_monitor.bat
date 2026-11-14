@@ -49,6 +49,13 @@ if errorlevel 1 (
   %PY% -m pip install --user --disable-pip-version-check winrt-runtime winrt-Windows.Media.Control winrt-Windows.Foundation winrt-Windows.Foundation.Collections >nul 2>nul
 )
 
+rem ---- 2г. по желанию: numpy + PyAudioWPatch — звук ноутбука на палке (раздел Sound) ----
+%PY% -c "import numpy, pyaudiowpatch" >nul 2>nul
+if errorlevel 1 (
+  echo Ставлю библиотеки для звука ноутбука ^(numpy, PyAudioWPatch^), около минуты...
+  %PY% -m pip install --user --disable-pip-version-check numpy PyAudioWPatch >nul 2>nul
+)
+
 rem ---- 3. запускаем ----
 %PY% pc_monitor.py
 echo.
