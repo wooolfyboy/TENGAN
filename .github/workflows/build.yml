@@ -47,12 +47,12 @@ jobs:
           B=.pio/build/t-embed-cc1101
           APP0=$(find ~/.platformio/packages -name boot_app0.bin | head -1)
           mkdir -p dist
-          esptool.py --chip esp32s3 merge_bin -o dist/radio_radar_full_0x0.bin \
+          esptool.py --chip esp32s3 merge_bin -o dist/tengan_full_0x0.bin \
             0x0 $B/bootloader.bin 0x8000 $B/partitions.bin 0xe000 "$APP0" 0x10000 $B/firmware.bin
-          cp $B/firmware.bin dist/radio_radar_firmware_ota.bin
+          cp $B/firmware.bin dist/tengan_firmware_ota.bin
           (cd tools && zip -r ../dist/pc_monitor_windows.zip pc_monitor -x "*/__pycache__/*")
           # прошивальщик в одном файле: открыть в Chrome → «Прошить палку»
-          python tools/flasher/make_flasher.py dist/radio_radar_full_0x0.bin dist/flash_radio_radar.html "${{ inputs.release_tag || github.ref_name }}"
+          python tools/flasher/make_flasher.py dist/tengan_full_0x0.bin dist/flash_tengan.html "${{ inputs.release_tag || github.ref_name }}"
           ls -la dist
 
       - uses: actions/upload-artifact@v4
@@ -66,15 +66,15 @@ jobs:
         with:
           tag_name: ${{ inputs.release_tag || github.ref_name }}
           target_commitish: ${{ github.sha }}
-          name: Radio Radar ${{ inputs.release_tag || github.ref_name }}
+          name: TENGAN ${{ inputs.release_tag || github.ref_name }}
           files: |
             dist/*.bin
             dist/*.zip
             dist/*.html
           generate_release_notes: true
           body: |
-            **flash_radio_radar.html** — easiest: open in Chrome/Edge, press the button, pick the device. No addresses, settings are kept.
-            **radio_radar_full_0x0.bin** — flash over USB at offset 0x0 (esptool-js / esptool), then power-cycle.
-            **radio_radar_firmware_ota.bin** — upload over Wi-Fi: Web section → page → Update tab.
+            **flash_tengan.html** — easiest: open in Chrome/Edge, press the button, pick the device. No addresses, settings are kept.
+            **tengan_full_0x0.bin** — flash over USB at offset 0x0 (esptool-js / esptool), then power-cycle.
+            **tengan_firmware_ota.bin** — upload over Wi-Fi: Web section → page → Update tab.
             **pc_monitor_windows.zip** — laptop monitor for the PC section: unzip, double-click start_pc_monitor.bat.
 

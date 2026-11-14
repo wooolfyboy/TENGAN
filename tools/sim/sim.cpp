@@ -265,7 +265,7 @@ int main(int argc, char** argv) {
   g_bat.ok = true; g_bat.soc = 87; g_bat.mv = 3980; g_bat.ma = -132; g_bat.tte = 250; g_bat.chgOk = true;
   fillBle(); fillWifi(); fillSub();
 
-  { const uint32_t ts[] = { 250, 600, 1000, 1300, 1600, 1950, 2200 };
+  { const uint32_t ts[] = { 250, 600, 1000, 1300, 1680, 1950, 2200 };
     for (int i = 0; i < 7; i++) { char nm[32]; snprintf(nm, sizeof nm, "00_boot_%04u", (unsigned)ts[i]); bootFrame(ts[i]); snap(nm); } }
   navBegin(); navDraw(s_now);                    snap("01_menu");
   g_powerHold = 1500; drawPowerHold();           snap("08_power_hold"); g_powerHold = 0;
@@ -371,7 +371,7 @@ int main(int argc, char** argv) {
   for (int f = 0; f < 60; f++) drawLife(s_now + 2000 + f * 120); snap("52_gallery_life");
   for (int f = 0; f < 160; f++) drawPendulum(s_now + 9000 + f * 33); snap("53_gallery_pendulum");
   { uint8_t qr[29 * 29]; for (int i = 0; i < 29 * 29; i++) qr[i] = (noise(i) > 0.5f) || ((i % 29 < 7 || i % 29 > 21) && (i / 29 < 7) && !((i % 29 == 1 || i % 29 == 5 || i % 29 == 23 || i % 29 == 27) && i / 29 > 0 && i / 29 < 6));
-    WebView v = { "RadioRadar-3F2A", "48213907", "192.168.4.1", 1, 214, true, "sub-ghz" };
+    WebView v = { "TENGAN-3F2A", "48213907", "192.168.4.1", 1, 214, true, "sub-ghz" };
     drawWebScreen(v, qr, 29); snap("60_web"); }
   drawPcWaiting(s_now);      snap("70_pc_waiting");
   for (int i = 0; i < 60; i++) {                        // минута «настоящих» строк с ноутбука

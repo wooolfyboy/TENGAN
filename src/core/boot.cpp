@@ -8,6 +8,7 @@
 // ============================================================
 #include "core/boot.h"
 #include "core/board.h"
+#include "core/seal.h"      // печать 天眼
 #include "core/display.h"
 #include "core/theme.h"
 #include "core/ui.h"
@@ -96,11 +97,15 @@ void bootFrame(uint32_t t) {
       spr.drawFastVLine(bx, by + bh - 6, 6, acc);  spr.drawFastVLine(bx + bw - 1, by + bh - 6, 6, acc);
     }
   }
+  // название + печать 天眼 справа от него: общая ширина блока по центру экрана
+  static const char TITLE[] = DEVICE_NAME;
+  const int SEAL_GAP = 14;
+  const int titleW = txtW(TITLE, 6), blockX = cx - (titleW + SEAL_GAP + SEAL_W) / 2;
+  const int titleCx = blockX + titleW / 2;
   if (t >= 1120) {
-    static const char TITLE[] = DEVICE_NAME;
     static const char POOL[] = "ABCDEFGHKLMNPRSTVXZ0123456789";
     const int n = sizeof(TITLE) - 1;
-    int wsum = txtW(TITLE, 6), x = cx - wsum / 2;
+    int x = blockX;
     spr.setTextDatum(TL_DATUM);
     for (int i = 0; i < n; i++) {
       char ch[2] = { TITLE[i], 0 };
@@ -128,7 +133,20 @@ void bootFrame(uint32_t t) {
     if (((t / 120) & 1) && k < (int)sizeof(SUB) - 1) strcat(buf, "_");
     spr.setTextDatum(TC_DATUM);
     spr.setTextColor(UI_LABEL());
-    txt(buf, cx, cy + 20, 1);
+    txt(buf, titleCx, cy + 20, 1);
+  }
+  // печать 天眼 «ставится» с ударом: вспышка и расходящаяся рамка, потом спокойно
+  if (t >= 1640) {
+    const int sx = blockX + titleW + SEAL_GAP, sy = cy - SEAL_H / 2;
+    float k = seg(t, 1640, 1820);                          // 0 — удар, 1 — успокоилась
+    uint16_t ink = k < 0.25f ? hot : acc;
+    for (int y = 0; y < SEAL_H; y++)
+      for (int xx = 0; xx < SEAL_W; xx++)
+        if ((SEAL_BITS[y * (SEAL_W / 8) + xx / 8] >> (7 - xx % 8)) & 1) spr.drawPixel(sx + xx, sy + y, ink);
+    if (k < 1) {
+      int g = 2 + (int)(k * 14);
+      spr.drawRect(sx - g, sy - g, SEAL_W + 2 * g, SEAL_H + 2 * g, scale565(hot, (int)(90 * (1 - k))));
+    }
   }
 
   // 6. яркая строка развёртки стирает всё сверху вниз

@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 cd /d "%~dp0"
-title Radio Radar - PC monitor
+title TENGAN - PC monitor
 
 rem ---- 1. ищем Python ----
 set "PY="

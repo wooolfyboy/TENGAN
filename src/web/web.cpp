@@ -63,7 +63,7 @@ static void qrStore(esp_qrcode_handle_t q) {
 
 static void makeNames() {
   uint8_t m[6]; WiFi.macAddress(m);
-  snprintf(s_ssid, sizeof(s_ssid), "RadioRadar-%02X%02X", m[4], m[5]);
+  snprintf(s_ssid, sizeof(s_ssid), "TENGAN-%02X%02X", m[4], m[5]);
   uint32_t h = 2166136261u;                       // пароль: 8 цифр из MAC (одинаковый каждый раз)
   for (int i = 0; i < 6; i++) h = (h ^ m[i]) * 16777619u;
   snprintf(s_pass, sizeof(s_pass), "%08lu", (unsigned long)(h % 100000000UL));

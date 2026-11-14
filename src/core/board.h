@@ -5,7 +5,7 @@
 #pragma once
 
 // Имя устройства: заставка, главное меню, экран выключения. Поменять — здесь.
-#define DEVICE_NAME "RADIO RADAR"
+#define DEVICE_NAME "TENGAN"            // 天眼 — «небесное око»: видит невидимое
 #include <Arduino.h>
 
 #define BOARD_PWR_EN 15     // питание периферии (CC1101, лента, ...)
