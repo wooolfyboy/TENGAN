@@ -1220,9 +1220,8 @@ void wifiClick();
 void wifiRotate(int dir);
 void wifiFrame(uint32_t now);
 int  wifiNetCount();
-void promOn();
-void promOff();
-extern int g_wMode;
+void wifiEnter();
+void wifiLeave();
 
 void bleStart() {
   if (g_bleActive) return;
@@ -1241,14 +1240,14 @@ void bleStop() {
 
 void enterSection(int sel) {
   if (sel == 0)      { g_section = S_BLE; bleStart(); }
-  else if (sel == 1) { g_section = S_WIFI; bleStop(); wifiStart(); if (g_wMode == 2) promOn(); }
+  else if (sel == 1) { g_section = S_WIFI; bleStop(); wifiEnter(); }
   else               { g_section = S_SET; g_setItem = 0; }
   g_detail = false;
 }
 
 void goMenu() {
   if (g_section == S_SET && g_setDirty) saveSettings();
-  if (g_section == S_WIFI) promOff();      // без раздела Wi-Fi пакеты не считаем, ленту гасим
+  if (g_section == S_WIFI) wifiLeave();    // без раздела Wi-Fi пакеты не считаем, ленту гасим
   if (g_section == S_BLE)  g_menuSel = 0;
   if (g_section == S_WIFI) g_menuSel = 1;
   if (g_section == S_SET)  g_menuSel = 2;

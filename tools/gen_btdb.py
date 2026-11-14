@@ -72,4 +72,5 @@ static inline const char* uuidOwner(uint16_t uuid) {
 }""")
     print("\n".join(out))
 
-main()
+if __name__ == "__main__":
+    main()
