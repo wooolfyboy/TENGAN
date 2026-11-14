@@ -10,7 +10,8 @@
 //
 //  Пины и настройки — из примера test_mic_speaker репозитория LilyGO.
 // ============================================================
-#include <driver/i2s.h>
+#include <driver/i2s_pdm.h>
+#include <driver/i2s_std.h>
 #include "audio/audio.h"
 #include "audio/audio_model.h"
 #include "core/board.h"
@@ -50,6 +51,7 @@ static MicBlock s_blk;
 static portMUX_TYPE s_mux = portMUX_INITIALIZER_UNLOCKED;
 static volatile bool s_micRun = false;
 static TaskHandle_t s_micTask = nullptr;
+static i2s_chan_handle_t s_rx = nullptr, s_tx = nullptr;   // микрофон (I2S0, PDM) и динамик (I2S1)
 static uint8_t s_bandLo[AU_BANDS], s_bandHi[AU_BANDS];   // границы полос в бинах БПФ
 
 // БПФ «на месте», радикс-2
@@ -81,7 +83,7 @@ static void micTask(void*) {
   for (int i = 0; i < N; i++) win[i] = 0.5f - 0.5f * cosf(2 * PI * i / (N - 1));   // окно Ханна
   while (s_micRun) {
     size_t got = 0;
-    i2s_read(I2S_NUM_0, buf, sizeof(buf), &got, pdMS_TO_TICKS(100));
+    i2s_channel_read(s_rx, buf, sizeof(buf), &got, 200);
     if (got < sizeof(buf)) { g_micDiag.timeouts++; continue; }
     float mean = 0;
     int rawPeak = 0;
@@ -126,28 +128,16 @@ static bool micStart(int slot) {
   if (s_micRun) return true;
   g_micDiag.slot = slot; g_micDiag.blocks = 0; g_micDiag.timeouts = 0; g_micDiag.rawPeak = 0;
   s_maxRaw = 0; s_micStartMs = millis();
-  i2s_config_t cfg = {};
-  cfg.mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX | I2S_MODE_PDM);
-  cfg.sample_rate = SR;
-  cfg.bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT;
-  cfg.channel_format = slot ? I2S_CHANNEL_FMT_ONLY_RIGHT : I2S_CHANNEL_FMT_ONLY_LEFT;
-  cfg.communication_format = I2S_COMM_FORMAT_STAND_I2S;     // как в примере записи LilyGO
-  cfg.intr_alloc_flags = ESP_INTR_FLAG_LEVEL1;
-  cfg.dma_buf_count = 4;
-  cfg.dma_buf_len = 256;
-  i2s_pin_config_t pins = {};
-  pins.mck_io_num = I2S_PIN_NO_CHANGE;
-  pins.bck_io_num = I2S_PIN_NO_CHANGE;
-  pins.ws_io_num = MIC_CLK;
-  pins.data_out_num = I2S_PIN_NO_CHANGE;
-  pins.data_in_num = MIC_DATA;
-  if (i2s_driver_install(I2S_NUM_0, &cfg, 0, nullptr) != ESP_OK) { g_micDiag.stage = 1; return false; }
-  if (i2s_set_pin(I2S_NUM_0, &pins) != ESP_OK) { i2s_driver_uninstall(I2S_NUM_0); g_micDiag.stage = 2; return false; }
-  // как в примере записи LilyGO: частоту PDM задаём явно
-  if (i2s_set_clk(I2S_NUM_0, SR, I2S_BITS_PER_SAMPLE_16BIT, I2S_CHANNEL_MONO) != ESP_OK) {
-    i2s_driver_uninstall(I2S_NUM_0); g_micDiag.stage = 3; return false;
-  }
-  i2s_zero_dma_buffer(I2S_NUM_0);
+  i2s_chan_config_t cc = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_0, I2S_ROLE_MASTER);   // PDM — только I2S0
+  if (i2s_new_channel(&cc, nullptr, &s_rx) != ESP_OK) { s_rx = nullptr; g_micDiag.stage = 1; return false; }
+  i2s_pdm_rx_config_t pc = {};
+  pc.clk_cfg  = I2S_PDM_RX_CLK_DEFAULT_CONFIG(SR);
+  pc.slot_cfg = I2S_PDM_RX_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_MONO);
+  pc.slot_cfg.slot_mask = slot ? I2S_PDM_SLOT_RIGHT : I2S_PDM_SLOT_LEFT;
+  pc.gpio_cfg.clk = (gpio_num_t)MIC_CLK;
+  pc.gpio_cfg.din = (gpio_num_t)MIC_DATA;
+  if (i2s_channel_init_pdm_rx_mode(s_rx, &pc) != ESP_OK) { i2s_del_channel(s_rx); s_rx = nullptr; g_micDiag.stage = 2; return false; }
+  if (i2s_channel_enable(s_rx) != ESP_OK) { i2s_del_channel(s_rx); s_rx = nullptr; g_micDiag.stage = 3; return false; }
   g_micDiag.stage = 4;
   // границы полос: 60 Гц .. 8 кГц логарифмически, бин = 31.25 Гц
   for (int k = 0; k < AU_BANDS; k++) {
@@ -164,8 +154,8 @@ static bool micStart(int slot) {
 static void micStop() {
   if (!s_micRun) return;
   s_micRun = false;
-  for (int i = 0; i < 30 && s_micTask; i++) delay(10);   // дождаться выхода задачи
-  i2s_driver_uninstall(I2S_NUM_0);
+  for (int i = 0; i < 40 && s_micTask; i++) delay(10);   // дождаться выхода задачи
+  if (s_rx) { i2s_channel_disable(s_rx); i2s_del_channel(s_rx); s_rx = nullptr; }
 }
 
 // ---------- обработка для экранов (в основном цикле) ----------
@@ -248,32 +238,27 @@ static void spkTask(void*) {
         ph += dph;
       }
       size_t w;
-      i2s_write(I2S_NUM_1, buf, n * 2, &w, pdMS_TO_TICKS(50));
+      i2s_channel_write(s_tx, buf, n * 2, &w, 50);
       done += n;
     }
   }
 }
 
 void audioBegin() {
-  i2s_config_t cfg = {};
-  cfg.mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX);
-  cfg.sample_rate = SR;
-  cfg.bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT;
-  cfg.channel_format = I2S_CHANNEL_FMT_ONLY_LEFT;
-  cfg.communication_format = I2S_COMM_FORMAT_STAND_I2S;
-  cfg.intr_alloc_flags = ESP_INTR_FLAG_LEVEL1;
-  cfg.dma_buf_count = 4;
-  cfg.dma_buf_len = 256;
-  cfg.tx_desc_auto_clear = true;                         // без звука — тишина, а не «залипший» тон
-  i2s_pin_config_t pins = {};
-  pins.mck_io_num = I2S_PIN_NO_CHANGE;
-  pins.bck_io_num = SPK_BCLK;
-  pins.ws_io_num = SPK_LRCLK;
-  pins.data_out_num = SPK_DIN;
-  pins.data_in_num = I2S_PIN_NO_CHANGE;
-  if (i2s_driver_install(I2S_NUM_1, &cfg, 0, nullptr) != ESP_OK) return;
-  if (i2s_set_pin(I2S_NUM_1, &pins) != ESP_OK) { i2s_driver_uninstall(I2S_NUM_1); return; }
-  i2s_zero_dma_buffer(I2S_NUM_1);
+  i2s_chan_config_t cc = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_1, I2S_ROLE_MASTER);
+  cc.auto_clear = true;                                  // без звука — тишина, а не «залипший» тон
+  if (i2s_new_channel(&cc, &s_tx, nullptr) != ESP_OK) { s_tx = nullptr; return; }
+  i2s_std_config_t sc = {};
+  sc.clk_cfg  = I2S_STD_CLK_DEFAULT_CONFIG(SR);
+  sc.slot_cfg = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_MONO);
+  sc.gpio_cfg.mclk = I2S_GPIO_UNUSED;
+  sc.gpio_cfg.bclk = (gpio_num_t)SPK_BCLK;
+  sc.gpio_cfg.ws   = (gpio_num_t)SPK_LRCLK;
+  sc.gpio_cfg.dout = (gpio_num_t)SPK_DIN;
+  sc.gpio_cfg.din  = I2S_GPIO_UNUSED;
+  if (i2s_channel_init_std_mode(s_tx, &sc) != ESP_OK || i2s_channel_enable(s_tx) != ESP_OK) {
+    i2s_del_channel(s_tx); s_tx = nullptr; return;
+  }
   s_toneQ = xQueueCreate(8, sizeof(Tone));
   xTaskCreatePinnedToCore(spkTask, "spk", 3072, nullptr, 1, nullptr, 1);
 }

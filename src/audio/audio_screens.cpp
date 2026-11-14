@@ -212,8 +212,8 @@ void drawMicMissing() {
     present();
     return;
   }
-  static const char* const stages[] = { "not started", "driver did not start", "pins rejected",
-                                         "clock rejected", "running" };
+  static const char* const stages[] = { "not started", "no free channel", "config rejected",
+                                         "start failed", "running" };
   uiHeader("Mic check", g_micDiag.stage == 4 ? "no sound data" : "driver error", true);
   int x = UI_M + 8, y = UI_TOP + 4;
   uiReadout(x, y, "driver", stages[constrain(g_micDiag.stage, 0, 4)], g_micDiag.stage == 4 ? C_HOT() : C_ALERT());
