@@ -30,6 +30,7 @@
 #include <math.h>
 #include "devtypes.h"
 #include "sensors.h"
+#include "btdb.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -62,7 +63,9 @@ TFT_eSPI    tft;
 TFT_eSprite spr = TFT_eSprite(&tft);
 
 // категории вендоров
-enum { V_PRIV = 0, V_APPLE, V_MS, V_SAMSUNG, V_GOOGLE, V_OTHER };
+// 0 = неизвестно (private), 1 = прочий производитель (имя берётся из базы btdb.h),
+// 2.. = крупные бренды со своим цветом (таблица BRANDS ниже)
+enum { V_PRIV = 0, V_OTHER = 1 };
 
 // Dev — один MAC-адрес. ent — номер «физического» устройства:
 // у нескольких адресов одного телефона (после смены MAC) он общий.
@@ -78,7 +81,10 @@ struct Dev {
   int8_t   rssi;     // последний сигнал
   int8_t   rssiS;    // сглаженный сигнал (для сортировки)
   int8_t   rmin, rmax;
-  uint8_t  cat;      // вендор
+  uint8_t  cat;      // бренд (V_* / индекс в BRANDS)
+  uint8_t  vkind;    // откуда узнали производителя: 0 нет, 1 Company ID, 2 UUID сервиса
+  uint8_t  vscore;   // насколько надёжно (3 бренд, 2 прочий, 1 производитель чипа)
+  uint16_t vcode;    // сам Company ID или UUID
   uint8_t  type;     // тип устройства (DevType)
   uint8_t  akind;    // вид адреса (A_*)
   bool     rnd;      // адрес случайный и меняющийся
@@ -98,6 +104,8 @@ struct Ent {
   uint32_t t, first, pkts;
   int      rssi, rssiS;
   uint8_t  cat, type, nMacs;
+  uint8_t  vkind, vscore;
+  uint16_t vcode;
   uint64_t key;      // ключ самого свежего адреса
   char     name[20];
 };
@@ -158,37 +166,99 @@ int      g_ledEvent = 0;        // 0 нет, +1 пришли, -1 ушли
 uint32_t g_ledStart = 0;
 const uint32_t LED_DUR = 1200;
 
-// ---------- вендоры: цвет / буква / имя ----------
-uint16_t vendorColor(uint8_t c) {
-  switch (c) {
-    case V_APPLE:   return tft.color565(240, 240, 240);
-    case V_MS:      return tft.color565(80, 150, 240);
-    case V_SAMSUNG: return tft.color565(60, 205, 205);
-    case V_GOOGLE:  return tft.color565(240, 200, 70);
-    case V_OTHER:   return tft.color565(240, 150, 50);
-    default:        return tft.color565(120, 120, 130); // private
-  }
-}
-const char* vendorLetter(uint8_t c) {
-  switch (c) {
-    case V_APPLE: return "A"; case V_MS: return "M"; case V_SAMSUNG: return "S";
-    case V_GOOGLE: return "G"; case V_OTHER: return "?"; default: return ".";
-  }
-}
-const char* vendorName(uint8_t c) {
-  switch (c) {
-    case V_APPLE: return "Apple"; case V_MS: return "Microsoft"; case V_SAMSUNG: return "Samsung";
-    case V_GOOGLE: return "Google"; case V_OTHER: return "other"; default: return "private";
-  }
-}
-uint8_t catFromCompanyId(uint16_t cid) {
+// ---------- производители ----------
+// Крупные бренды: имя на экране, цвет, ключ (первое слово имени в базе Bluetooth)
+struct Brand { const char* label; const char* key; uint8_t r, g, b; };
+static const Brand BRANDS[] = {
+  { "private",   "",          120, 120, 130 },   // 0  V_PRIV
+  { "other",     "",          175, 145, 105 },   // 1  V_OTHER
+  { "Apple",     "apple",     240, 240, 240 },
+  { "Microsoft", "microsoft",  80, 150, 240 },
+  { "Samsung",   "samsung",    60, 205, 205 },
+  { "Google",    "google",    240, 200,  70 },
+  { "Xiaomi",    "xiaomi",    255, 120,  30 },
+  { "Huawei",    "huawei",    230,  60,  60 },
+  { "Honor",     "honor",     100, 130, 255 },
+  { "OnePlus",   "oneplus",   245,  50,  70 },
+  { "Oppo",      "oppo",       40, 180,  90 },
+  { "Realme",    "realme",    250, 220,   0 },
+  { "vivo",      "vivo",       70, 110, 245 },
+  { "Motorola",  "motorola",  110, 110, 220 },
+  { "Sony",      "sony",      190, 120, 240 },
+  { "LG",        "lg",        220,  60, 140 },
+  { "Amazfit",   "huami",     150, 230,  80 },
+  { "Garmin",    "garmin",     60, 160, 210 },
+  { "Bose",      "bose",      200, 170, 130 },
+  { "JBL",       "harman",    255,  90,  40 },
+  { "Amazon",    "amazon",    255, 165,  60 },
+  { "Meta",      "meta",       70, 110, 250 },
+  { "Tile",      "tile",       60, 200, 240 },
+  { "Nothing",   "nothing",   210, 210, 210 },
+  { "Anker",     "anker",      70, 170, 230 },
+  { "Logitech",  "logitech",    0, 190, 170 },
+};
+static const int N_BRANDS = sizeof(BRANDS) / sizeof(BRANDS[0]);
+
+// производители Bluetooth-чипов: их код говорит о «начинке», а не о бренде устройства
+bool isChipMaker(uint16_t cid) {
   switch (cid) {
-    case 0x004C: return V_APPLE;
-    case 0x0006: return V_MS;
-    case 0x0075: return V_SAMSUNG;
-    case 0x00E0: return V_GOOGLE;
-    default:     return V_OTHER;
+    case 0x0002: case 0x0009: case 0x000A: case 0x000D: case 0x000F: case 0x001D:
+    case 0x0046: case 0x0059: case 0x005D: case 0x0094: case 0x00D7: case 0x0131:
+    case 0x0211: case 0x02B0: case 0x02E5: case 0x02FF: case 0x03E0: case 0x05D6:
+    case 0x0642: case 0x07E3: case 0x0917: case 0x00D2:
+      return true;
   }
+  return false;
+}
+
+// UUID, которыми пользуются устройства любых брендов (о производителе ничего не говорят)
+bool isSharedUuid(uint16_t u) {
+  return u == 0xFD6F /* уведомления о контактах */ || u == 0xFEAA /* Eddystone */ ||
+         u == 0xFE2C /* Fast Pair в чужих наушниках */;
+}
+
+uint8_t brandFromName(const char* name) {
+  if (!name) return V_OTHER;
+  char w[16]; int i = 0;
+  while (name[i] && name[i] != ' ' && name[i] != '.' && i < 15) { w[i] = (char)tolower((unsigned char)name[i]); i++; }
+  w[i] = 0;
+  for (int b = 2; b < N_BRANDS; b++) if (!strcmp(w, BRANDS[b].key)) return (uint8_t)b;
+  return V_OTHER;
+}
+
+struct Vend { uint8_t cat, kind, score; uint16_t code; };
+
+// Выбираем лучшего «кандидата в производители» из Company ID и UUID сервисов
+Vend resolveVendor(const AdvInfo& ai) {
+  Vend best = { V_PRIV, 0, 0, 0 };
+  auto consider = [&](uint8_t kind, uint16_t code, const char* name, bool chip) {
+    uint8_t cat = brandFromName(name);
+    uint8_t score = (cat >= 2) ? 3 : (chip || !name) ? 1 : 2;
+    if (score > best.score) best = { cat, kind, score, code };
+  };
+  if (ai.hasMfr) consider(1, ai.cid, companyName(ai.cid), isChipMaker(ai.cid));
+  for (uint8_t i = 0; i < ai.nUuid; i++) {
+    uint16_t u = ai.uuids[i];
+    if (isSharedUuid(u)) continue;
+    const char* owner = uuidOwner(u);
+    if (owner) consider(2, u, owner, false);
+  }
+  return best;
+}
+
+uint16_t vendorColor(uint8_t c) {
+  const Brand& b = BRANDS[c < N_BRANDS ? c : V_OTHER];
+  return tft.color565(b.r, b.g, b.b);
+}
+// имя производителя для экрана
+const char* vendorLabel(uint8_t cat, uint8_t kind, uint16_t code) {
+  if (cat >= 2 && cat < N_BRANDS) return BRANDS[cat].label;
+  if (kind == 1) { const char* n = companyName(code); if (n) return n; }
+  if (kind == 2) { const char* n = uuidOwner(code);   if (n) return n; }
+  if (kind == 1) {
+    static char hex[8]; sprintf(hex, "0x%04X", code); return hex;
+  }
+  return "-";
 }
 
 // RSSI -> ~метры (грубая оценка по модели затухания)
@@ -248,7 +318,7 @@ class ScanCB : public NimBLEScanCallbacks {
     parseAdv(pl.data(), pl.size(), ai);
     SensorReading sr;
     bool isSensor = parseSensor(pl.data(), pl.size(), sr);
-    uint8_t  cat  = ai.hasMfr ? catFromCompanyId(ai.cid) : V_PRIV;
+    Vend     vend = resolveVendor(ai);
     uint8_t  type = classify(ai);
     if (isSensor) type = T_SENSOR;
     uint32_t sig  = advSignature(ai);
@@ -271,7 +341,7 @@ class ScanCB : public NimBLEScanCallbacks {
       v.rssiS = (int8_t)((v.rssiS * 3 + rssi) / 4);
       if (rssi < v.rmin) v.rmin = rssi;
       if (rssi > v.rmax) v.rmax = rssi;
-      if (cat  != V_PRIV)    v.cat  = cat;
+      if (vend.score > v.vscore) { v.cat = vend.cat; v.vkind = vend.kind; v.vcode = vend.code; v.vscore = vend.score; }
       if (type != T_UNKNOWN) v.type = type;
       if (!v.sig) v.sig = sig;
       fillAdv(v, ai);
@@ -279,7 +349,8 @@ class ScanCB : public NimBLEScanCallbacks {
       Dev nd; memset(&nd, 0, sizeof(nd));
       nd.t = now; nd.first = now; nd.sig = sig; nd.pkts = 1;
       nd.rssi = nd.rssiS = nd.rmin = nd.rmax = (int8_t)rssi;
-      nd.cat = cat; nd.type = type; nd.akind = akind; nd.rnd = rnd;
+      nd.cat = vend.cat; nd.vkind = vend.kind; nd.vcode = vend.code; nd.vscore = vend.score;
+      nd.type = type; nd.akind = akind; nd.rnd = rnd;
       memcpy(nd.mac, mac, 6);
       fillAdv(nd, ai);
       // ищем «предшественника»: адрес с тем же отпечатком, который недавно замолчал
@@ -301,7 +372,9 @@ class ScanCB : public NimBLEScanCallbacks {
           if (best->rmin < nd.rmin) nd.rmin = best->rmin;
           if (best->rmax > nd.rmax) nd.rmax = best->rmax;
           if (nd.type == T_UNKNOWN) nd.type = best->type;
-          if (nd.cat  == V_PRIV)    nd.cat  = best->cat;
+          if (best->vscore > nd.vscore) {
+            nd.cat = best->cat; nd.vkind = best->vkind; nd.vcode = best->vcode; nd.vscore = best->vscore;
+          }
           if (!nd.name[0]) memcpy(nd.name, best->name, sizeof(nd.name));
           g_merges++;
         }
@@ -372,7 +445,8 @@ void drawRadar(int count) {
 }
 
 // ---------- PROXIMITY ----------
-void drawProximity(bool have, int rssi, uint8_t cat, uint8_t type, int count) {
+void drawProximity(bool have, int rssi, const Ent& best, int count) {
+  uint8_t cat = best.cat, type = best.type;
   int W = spr.width(), H = spr.height();
   spr.fillSprite(TFT_BLACK);
   spr.setTextDatum(TC_DATUM);
@@ -413,7 +487,7 @@ void drawProximity(bool have, int rssi, uint8_t cat, uint8_t type, int count) {
 
   // строка «тип  вендор  (N near)» — тип и вендор каждый своим цветом
   char vbuf[48];
-  sprintf(vbuf, "  %s   (%d near)", vendorName(cat), count);
+  sprintf(vbuf, "  %s   (%d near)", vendorLabel(cat, best.vkind, best.vcode), count);
   const char* tn = typeName(type);
   int tw = spr.textWidth(tn, 2), vw = spr.textWidth(vbuf, 2);
   int x0 = W / 2 - (tw + vw) / 2, ty = by + bh + 34;
@@ -454,15 +528,23 @@ void drawScope(const std::vector<Blip>& bl) {
     spr.fillCircle(x, y, 3, vendorColor(bl[i].cat));
   }
 
-  // компактная легенда слева (точка + короткая метка)
-  const uint8_t order[5] = { V_APPLE, V_MS, V_SAMSUNG, V_GOOGLE, V_OTHER };
-  const char*   lbl[5]   = { "Apple", "MS", "Sams", "Googl", "other" };
+  // легенда слева: 6 самых частых производителей на экране сейчас
+  int bc[N_BRANDS] = {0};
+  for (size_t i = 0; i < bl.size(); i++) if (bl[i].cat < N_BRANDS) bc[bl[i].cat]++;
   spr.setTextDatum(ML_DATUM);
-  for (int i = 0; i < 5; i++) {
-    int y = 20 + i * 27;
-    spr.fillCircle(7, y, 3, vendorColor(order[i]));
-    spr.setTextColor(vendorColor(order[i]), TFT_BLACK);
-    spr.drawString(lbl[i], 14, y, 1);
+  for (int row = 0; row < 6; row++) {
+    int bi = -1;
+    for (int b = 0; b < N_BRANDS; b++) if (bc[b] > 0 && (bi < 0 || bc[b] > bc[bi])) bi = b;
+    if (bi < 0) break;
+    int y = 14 + row * 24;
+    char lb[8]; snprintf(lb, sizeof(lb), "%s", BRANDS[bi].label);
+    spr.fillCircle(7, y, 3, vendorColor(bi));
+    spr.setTextColor(vendorColor(bi), TFT_BLACK);
+    spr.drawString(lb, 14, y, 1);
+    char nb[6]; sprintf(nb, "%d", bc[bi]);
+    spr.setTextColor(tft.color565(90, 90, 100), TFT_BLACK);
+    spr.drawString(nb, 14, y + 9, 1);
+    bc[bi] = 0;
   }
 
   spr.setTextDatum(TC_DATUM);
@@ -752,13 +834,15 @@ void drawList(const std::map<uint32_t, Ent>& ents) {
     spr.drawString(buf, 12, y + 1, 2);
 
     spr.setTextColor(vendorColor(e.cat), bg);
-    spr.drawString(e.cat == V_PRIV ? "-" : vendorName(e.cat), 150, y + 1, 2);
+    char vb[16];
+    fitText(vendorLabel(e.cat, e.vkind, e.vcode), vb, sizeof(vb), 84, 2);
+    spr.drawString(vb, 150, y + 1, 2);
 
     sprintf(buf, "%d", e.rssi);
     spr.setTextDatum(TR_DATUM);
     spr.setTextColor(C_GRAY(), bg);
-    spr.drawString(buf, 264, y + 1, 2);
-    drawBars(272, y + 2, e.rssi, tft.color565(90, 220, 140));
+    spr.drawString(buf, 268, y + 1, 2);
+    drawBars(274, y + 2, e.rssi, tft.color565(90, 220, 140));
   }
 
   // полоса прокрутки
@@ -798,8 +882,9 @@ void drawDetail(const Dev& d, const Ent& e, bool inMap, uint32_t now) {
   spr.setTextColor(tc, TFT_BLACK);
   spr.drawString(typeName(e.type), 4, 30, 2);
   int x = 4 + spr.textWidth(typeName(e.type), 2) + 10;
-  if (d.hasCid) sprintf(buf, "%s  0x%04X", e.cat == V_OTHER ? "maker" : vendorName(e.cat), d.cid);
-  else          sprintf(buf, "no maker data");
+  if (e.vkind) sprintf(buf, "%s  %s%04X", vendorLabel(e.cat, e.vkind, e.vcode),
+                      e.vkind == 1 ? "0x" : "svc ", e.vcode);
+  else          sprintf(buf, "maker unknown");
   spr.setTextColor(vendorColor(e.cat), TFT_BLACK);
   spr.drawString(buf, x, 30, 2);
 
@@ -855,6 +940,7 @@ void drawDetail(const Dev& d, const Ent& e, bool inMap, uint32_t now) {
     int n = sprintf(buf, "SVC");
     for (uint8_t i = 0; i < d.nU && n < 52; i++) {
       const char* nm = uuidName(d.uuids[i]);
+      if (!nm[0]) { const char* o = uuidOwner(d.uuids[i]); if (o) nm = o; }
       n += snprintf(buf + n, sizeof(buf) - n, nm[0] ? " %04X %s" : " %04X", d.uuids[i], nm);
     }
     spr.drawString(buf, 4, y, 1); y += 10;
@@ -1113,7 +1199,7 @@ void loop() {
         if (d.pkts > e.pkts) e.pkts = d.pkts;
         e.nMacs++;
         if (d.type != T_UNKNOWN) e.type = d.type;
-        if (d.cat  != V_PRIV)    e.cat  = d.cat;
+        if (d.vscore > e.vscore) { e.cat = d.cat; e.vkind = d.vkind; e.vcode = d.vcode; e.vscore = d.vscore; }
         if (d.name[0] && !e.name[0]) memcpy(e.name, d.name, sizeof(e.name));
         if (wantDetail && d.ent == g_sel && d.t >= detT) { detDev = d; detT = d.t; detValid = true; }
         ++it;
@@ -1130,12 +1216,12 @@ void loop() {
     }
 
     int count = (int)ents.size();
-    bool have = false; int bestRssi = -127; uint8_t bestCat = V_PRIV, bestType = T_UNKNOWN;
+    bool have = false; int bestRssi = -127; Ent bestEnt; memset(&bestEnt, 0, sizeof(bestEnt));
     int typeCnt[T_NUM] = {0};
     std::vector<Blip> snap;
     for (auto& kv : ents) {
       const Ent& e = kv.second;
-      if (e.rssi > bestRssi) { bestRssi = e.rssi; bestCat = e.cat; bestType = e.type; have = true; }
+      if (e.rssi > bestRssi) { bestRssi = e.rssi; bestEnt = e; have = true; }
       typeCnt[e.type < T_NUM ? e.type : T_UNKNOWN]++;
       // угол блипа — от id физического устройства: не прыгает при смене MAC
       if (g_mode == M_SCOPE) snap.push_back({ e.rssi, kv.first * 2654435761u, e.cat });
@@ -1208,7 +1294,7 @@ void loop() {
       }
     }
     else if (g_mode == M_RADAR)    drawRadar(count);
-    else if (g_mode == M_PROX)     drawProximity(have, bestRssi, bestCat, bestType, count);
+    else if (g_mode == M_PROX)     drawProximity(have, bestRssi, bestEnt, count);
     else if (g_mode == M_SCOPE)    drawScope(snap);
     else if (g_mode == M_TIMELINE) drawTimeline();
     else if (g_mode == M_TYPES)    drawTypes(typeCnt, count);
