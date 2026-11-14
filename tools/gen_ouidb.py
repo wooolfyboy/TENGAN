@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Генерирует src/ouidb.h — производители сетевых устройств по первым 3 байтам MAC (OUI).
+"""Генерирует src/wifi/ouidb.h — производители сетевых устройств по первым 3 байтам MAC (OUI).
 
 Источник (скачать заранее):
   nmap-mac-prefixes — https://raw.githubusercontent.com/nmap/nmap/master/nmap-mac-prefixes
   (данные IEEE, собранные проектом Nmap)
 
-Запуск:  python3 tools/gen_ouidb.py nmap-mac-prefixes > src/ouidb.h
+Запуск:  python3 tools/gen_ouidb.py nmap-mac-prefixes > src/wifi/ouidb.h
 """
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

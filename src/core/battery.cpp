@@ -1,33 +1,20 @@
 // ============================================================
-//  battery.h — заряд батареи (подключается внутрь main.cpp)
+//  battery.cpp — заряд батареи
 //
 //  Только чтение регистров, ничего не настраиваем:
 //   - BQ27220 (0x55) — «счётчик топлива»: %, напряжение, ток, время;
 //   - BQ25896 (0x6B) — зарядка: есть ли USB, идёт ли заряд.
 //  Шина I2C: SDA 8, SCL 18 (по utilities.h из репозитория LilyGO).
 // ============================================================
-#pragma once
 #include <Wire.h>
+#include "core/battery.h"
+#include "core/display.h"
 
 #define BAT_I2C_SDA 8
 #define BAT_I2C_SCL 18
 #define BQ27220_ADDR 0x55
 #define BQ25896_ADDR 0x6B
 
-struct Bat {
-  bool     ok = false;      // датчик заряда ответил
-  bool     chgOk = false;   // контроллер зарядки ответил
-  int      soc = 0;         // %
-  int      mv = 0;          // мВ
-  int      ma = 0;          // мА: + заряд, − разряд
-  float    tempC = 0;
-  int      tte = -1;        // минут до разряда (-1 = неизвестно)
-  int      ttf = -1;        // минут до полного заряда
-  int      remain = 0, full = 0;   // мА·ч
-  uint8_t  bus = 0;         // источник питания (0 = нет USB)
-  uint8_t  chg = 0;         // 0 не заряжается, 1 предзаряд, 2 заряд, 3 заряжено
-  uint32_t t = 0;
-};
 Bat g_bat;
 
 static bool i2cRead(uint8_t addr, uint8_t reg, uint8_t* buf, uint8_t n) {
@@ -45,7 +32,7 @@ static bool bq16(uint8_t reg, uint16_t& v) {
   return true;
 }
 
-void batRead() {
+static void batRead() {
   uint16_t v;
   g_bat.ok = bq16(0x2C, v);                     // StateOfCharge
   if (g_bat.ok) {

@@ -1,5 +1,5 @@
 // ============================================================
-//  subghz.h — раздел Sub-GHz на CC1101 (подключается внутрь main.cpp)
+//  subghz.cpp — раздел Sub-GHz на CC1101
 //
 //  ТОЛЬКО ПРИЁМ: модуль никогда не переводится в передачу (STX не
 //  используется). Мерим силу сигнала (RSSI) на частотах 315 / 433 / 868 / 915 МГц.
@@ -7,23 +7,18 @@
 //  Экраны:
 //    SPECTRUM — развёртка по полосе ±2 МГц + «водопад»
 //    MONITOR  — слушаем одну частоту и ловим всплески (брелоки, звонки, датчики)
-//
-//  CC1101 делит линии SPI с экраном. Библиотека экрана настраивает SPI только
-//  «на запись», поэтому перед каждым обменом с CC1101 включаем чтение
-//  (SET_BUS_READ_MODE), а экран при следующей отрисовке вернёт своё.
 // ============================================================
-#pragma once
-#include <SPI.h>
+#include "subghz/subghz.h"
+#include "subghz/cc1101.h"
+#include "core/board.h"
+#include "core/display.h"
+#include "core/leds.h"
+#include "core/menu.h"
 
-#define CC_CS    12
-#define CC_MISO  10
-#define CC_SW1   47     // переключатель антенны: SW1/SW0 = 1/0 315, 1/1 433, 0/1 868/915
-#define CC_SW0   48
 
 enum { G_SPECTRUM = 0, G_MONITOR, G_NUM };
 int  g_gMode = 0;
 bool g_ccOk = false, g_ccTried = false, g_ccOn = false;
-uint8_t g_ccVersion = 0;
 
 struct Band { const char* name; float lo, hi, mon; };
 static const Band BANDS[] = {
@@ -35,97 +30,6 @@ static const Band BANDS[] = {
 static const int N_BANDS = 4;
 int g_band = 1;
 
-SPISettings g_ccSet(4000000, MSBFIRST, SPI_MODE0);
-SPIClass* g_ccSpi = nullptr;
-
-// ---------- низкий уровень ----------
-static bool ccSel() {
-  digitalWrite(CC_CS, LOW);
-  uint32_t t = micros();
-  while (digitalRead(CC_MISO)) if (micros() - t > 3000) return false;   // ждём готовности
-  return true;
-}
-static void ccBegin() { g_ccSpi->beginTransaction(g_ccSet); SET_BUS_READ_MODE; }
-static void ccEnd()   { digitalWrite(CC_CS, HIGH); g_ccSpi->endTransaction(); }
-
-uint8_t ccStrobe(uint8_t s) {
-  ccBegin(); ccSel();
-  uint8_t st = g_ccSpi->transfer(s);
-  ccEnd();
-  return st;
-}
-void ccWrite(uint8_t a, uint8_t v) {
-  ccBegin(); ccSel();
-  g_ccSpi->transfer(a); g_ccSpi->transfer(v);
-  ccEnd();
-}
-uint8_t ccReadStatus(uint8_t a) {            // регистры состояния 0x30..0x3D
-  ccBegin(); ccSel();
-  g_ccSpi->transfer(a | 0xC0);
-  uint8_t v = g_ccSpi->transfer(0);
-  ccEnd();
-  return v;
-}
-
-int ccRssi() {
-  uint8_t r = ccReadStatus(0x34);
-  int v = (r >= 128) ? ((int)r - 256) / 2 : r / 2;
-  return v - 74;
-}
-
-void ccAntenna(float mhz) {
-  if (mhz < 350)      { digitalWrite(CC_SW1, HIGH); digitalWrite(CC_SW0, LOW);  }
-  else if (mhz < 500) { digitalWrite(CC_SW1, HIGH); digitalWrite(CC_SW0, HIGH); }
-  else                { digitalWrite(CC_SW1, LOW);  digitalWrite(CC_SW0, HIGH); }
-}
-
-void ccSetFreq(float mhz) {
-  uint32_t f = (uint32_t)(mhz * 65536.0f / 26.0f + 0.5f);
-  ccWrite(0x0D, (f >> 16) & 0xFF);
-  ccWrite(0x0E, (f >> 8) & 0xFF);
-  ccWrite(0x0F, f & 0xFF);
-  // нижняя часть каждого диапазона требует другой настройки VCO (как в библиотеке ELECHOUSE)
-  bool low = (mhz < 322.88f) || (mhz >= 378 && mhz < 430.5f) || (mhz >= 779 && mhz < 861);
-  ccWrite(0x2E, low ? 0x0B : 0x09);          // TEST0
-}
-
-// ширина полосы приёма: 0x?5 в MDMCFG4; F5 ≈ 58 кГц, A5 ≈ 270 кГц
-void ccSetBw(uint8_t mdmcfg4) { ccWrite(0x10, mdmcfg4); }
-
-bool ccInit() {
-  g_ccSpi = &tft.getSPIinstance();
-  pinMode(CC_CS, OUTPUT); digitalWrite(CC_CS, HIGH);
-  pinMode(CC_SW1, OUTPUT); pinMode(CC_SW0, OUTPUT);
-  ccAntenna(BANDS[g_band].mon);
-  // сброс
-  ccStrobe(0x30);                              // SRES
-  delay(2);
-  uint8_t part = ccReadStatus(0x30), ver = ccReadStatus(0x31);
-  g_ccVersion = ver;
-  if (part != 0x00 || (ver != 0x14 && ver != 0x04 && ver != 0x07)) return false;
-
-  // приём OOK/ASK, без пакетов — нам нужен только уровень сигнала
-  static const uint8_t cfg[][2] = {
-    {0x00, 0x2E}, {0x01, 0x2E}, {0x02, 0x2E},    // GDO — высокий импеданс (MISO свободен)
-    {0x03, 0x47}, {0x08, 0x32}, {0x0B, 0x06}, {0x0C, 0x00},
-    {0x10, 0xF5}, {0x11, 0x93}, {0x12, 0x30}, {0x13, 0x22}, {0x14, 0xF8},
-    {0x15, 0x15}, {0x16, 0x07}, {0x17, 0x30}, {0x18, 0x18},
-    {0x19, 0x16}, {0x1A, 0x6C}, {0x1B, 0x07}, {0x1C, 0x00}, {0x1D, 0x91},
-    {0x21, 0x56}, {0x22, 0x11},
-    {0x23, 0xE9}, {0x24, 0x2A}, {0x25, 0x00}, {0x26, 0x1F},
-    {0x2C, 0x81}, {0x2D, 0x35}, {0x2E, 0x09},
-  };
-  for (auto& r : cfg) ccWrite(r[0], r[1]);
-  ccStrobe(0x36);                              // SIDLE
-  return true;
-}
-
-void ccSleep() {
-  if (!g_ccOk) return;
-  ccStrobe(0x36);                              // SIDLE
-  ccStrobe(0x39);                              // SPWD — сон
-  g_ccOn = false;
-}
 
 // ---------- SPECTRUM ----------
 #define SP_N 96
@@ -136,24 +40,14 @@ int     g_wfHead = 0, g_wfCount = 0;
 int     g_spIdx = 0;
 int8_t  g_spRow[SP_N];
 
-float spFreq(int i) { const Band& b = BANDS[g_band]; return b.lo + (b.hi - b.lo) * i / (SP_N - 1); }
+static float spFreq(int i) { const Band& b = BANDS[g_band]; return b.lo + (b.hi - b.lo) * i / (SP_N - 1); }
 
-void spReset() {
+static void spReset() {
   for (int i = 0; i < SP_N; i++) { g_spCur[i] = -110; g_spPeak[i] = -110; g_spRow[i] = -110; }
   g_wfHead = 0; g_wfCount = 0; g_spIdx = 0;
 }
 
-int ccMeasure(float mhz) {
-  ccStrobe(0x36);                              // SIDLE
-  ccSetFreq(mhz);
-  ccStrobe(0x34);                              // SRX (с автокалибровкой)
-  uint32_t t = micros();
-  while ((ccReadStatus(0x35) & 0x1F) != 0x0D && micros() - t < 2000) {}   // ждём RX
-  delayMicroseconds(250);                      // RSSI устанавливается
-  return ccRssi();
-}
-
-void spTick() {
+static void spTick() {
   for (int k = 0; k < 12; k++) {               // ~12 точек за проход цикла (~15 мс)
     int r = ccMeasure(spFreq(g_spIdx));
     r = constrain(r, -120, -10);
@@ -173,7 +67,7 @@ void spTick() {
 }
 
 // цвет водопада: -110 (чёрный) -> синий -> бирюзовый -> жёлтый -> красный (-40)
-uint16_t wfColor(int v) {        // v = dBm + 120
+static uint16_t wfColor(int v) {        // v = dBm + 120
   float x = constrain((v - 10) / 70.0f, 0.0f, 1.0f);
   uint8_t r, g, b;
   if (x < 0.25f)      { float k = x / 0.25f; r = 0; g = 0; b = (uint8_t)(40 + 160 * k); }
@@ -183,7 +77,7 @@ uint16_t wfColor(int v) {        // v = dBm + 120
   return tft.color565(r, g, b);
 }
 
-void drawSpectrum() {
+static void drawSpectrum() {
   int W = spr.width(), H = spr.height();
   spr.fillSprite(TFT_BLACK);
   char buf[40];
@@ -249,7 +143,7 @@ Burst    g_ev[EV_N];
 int      g_evN = 0;
 static const int BURST_ON_DB = 12, BURST_OFF_DB = 7;
 
-void monStart() {
+static void monStart() {
   ccStrobe(0x36);
   ccSetBw(0xA5);                               // пошире (~270 кГц) — брелоки «гуляют» по частоте
   ccSetFreq(BANDS[g_band].mon);
@@ -257,7 +151,7 @@ void monStart() {
   g_monN = 0; g_burst = false;
 }
 
-void monTick(uint32_t now) {
+static void monTick(uint32_t now) {
   int mx = -127;
   for (int k = 0; k < 8; k++) {                // несколько замеров подряд, берём максимум
     int r = ccRssi();
@@ -288,8 +182,8 @@ void monTick(uint32_t now) {
   }
 }
 
-void drawMonitor(uint32_t now) {
-  int W = spr.width(), H = spr.height();
+static void drawMonitor(uint32_t now) {
+  int W = spr.width();
   spr.fillSprite(TFT_BLACK);
   char buf[48];
   spr.setTextDatum(TL_DATUM);
@@ -354,35 +248,41 @@ void drawMonitor(uint32_t now) {
 }
 
 // ---------- раздел целиком ----------
-void subEnter() {
+static void subEnter() {
   if (!g_ccTried) { g_ccTried = true; g_ccOk = ccInit(); spReset(); }
   if (!g_ccOk) return;
   ccAntenna(BANDS[g_band].mon);
   ccStrobe(0x36);
   g_ccOn = true;
 }
-void subLeave() { ccSleep(); strip.clear(); strip.show(); }
+static void subLeave() { if (g_ccOk) ccSleep(); g_ccOn = false; ledsOff(); }
 
-void subStartMode() {
+static void subStartMode() {
   if (!g_ccOk) return;
   ccAntenna(BANDS[g_band].mon);
   if (g_gMode == G_SPECTRUM) { ccSetBw(0xF5); spReset(); }
   else monStart();
   strip.clear(); strip.show();
 }
-void subOpenScreen(int m) { g_gMode = m; subStartMode(); }
-void subCloseScreen() { if (g_ccOk) ccStrobe(0x36); strip.clear(); strip.show(); }
-int  subScreenNow() { return g_gMode; }
-void subRotate(int dir) { g_gMode = (g_gMode + dir + G_NUM) % G_NUM; subStartMode(); }
-void subClick() { g_band = (g_band + 1) % N_BANDS; subStartMode(); }
+static void subOpenScreen(int m) { g_gMode = m; subStartMode(); }
+static void subCloseScreen() { if (g_ccOk) ccStrobe(0x36); strip.clear(); strip.show(); }
+static int  subScreenNow() { return g_gMode; }
+static void subRotate(int dir) {
+  static uint32_t last = 0;
+  if (millis() - last < 120) return;          // экраны не проскакивают при быстром вращении
+  last = millis();
+  g_gMode = (g_gMode + dir + G_NUM) % G_NUM;
+  subStartMode();
+}
+static void subClick() { g_band = (g_band + 1) % N_BANDS; subStartMode(); }
 
 // вызывается на каждом проходе loop(), пока открыт экран раздела
-void subTick(uint32_t now) {
+static void subTick(uint32_t now) {
   if (!g_ccOk || !g_ccOn) return;
   if (g_gMode == G_SPECTRUM) spTick(); else monTick(now);
 }
 
-void drawCcMissing() {
+static void drawCcMissing() {
   int W = spr.width(), H = spr.height();
   spr.fillSprite(TFT_BLACK);
   spr.setTextDatum(MC_DATUM);
@@ -395,20 +295,31 @@ void drawCcMissing() {
   spr.pushSprite(0, 0);
 }
 
-void subFrame(uint32_t now) {
+static void subFrame(uint32_t now) {
   if (!g_ccOk) { drawCcMissing(); return; }
   if (g_gMode == G_SPECTRUM) drawSpectrum(); else drawMonitor(now);
 }
 
-void subSubFrame() {
-  SubItem it[G_NUM] = {
-    { "Spectrum", "band + waterfall",  "" },
-    { "Monitor",  "catch remotes",     "" },
-  };
-  if (!g_ccOk && g_ccTried) { strcpy(it[0].value, "no chip"); strcpy(it[1].value, "no chip"); }
-  else {
-    strcpy(it[0].value, BANDS[g_band].name);
-    if (g_events) sprintf(it[1].value, "%lu", (unsigned long)g_events); else strcpy(it[1].value, "-");
-  }
-  drawSubmenu("SUB-GHZ", tft.color565(200, 160, 90), it, G_NUM);
+static void subScreenInfo(int i, SubItem& it) {
+  static const char* const names[G_NUM] = { "Spectrum", "Monitor" };
+  static const char* const descs[G_NUM] = { "band + waterfall", "catch remotes" };
+  it.name = names[i]; it.desc = descs[i];
+  if (!g_ccOk && g_ccTried) { strcpy(it.value, "no chip"); return; }
+  if (i == G_SPECTRUM) strcpy(it.value, BANDS[g_band].name);
+  else if (g_events)   sprintf(it.value, "%lu", (unsigned long)g_events);
+  else                 strcpy(it.value, "-");
 }
+
+static void subSubtitle(char* out, size_t n) {
+  snprintf(out, n, "%s", (g_ccTried && !g_ccOk) ? "no chip" : BANDS[g_band].name);
+}
+
+static void subTickFn(uint32_t now) { if (!navInSub()) subTick(now); }
+static bool subBackFn() { return false; }
+
+const Section subghzSection = {
+  "Sub-GHz", 240, 120, 90, iconAntenna, subSubtitle,
+  subEnter, subLeave,
+  G_NUM, subScreenInfo, subScreenNow, subOpenScreen, subCloseScreen,
+  subClick, subRotate, subBackFn, subTickFn, subFrame,
+};
