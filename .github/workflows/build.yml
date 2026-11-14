@@ -1,0 +1,61 @@
+# Сборка прошивки на каждый пуш. На тег вида v1.0 — ещё и GitHub Release
+# с двумя файлами: общий (шить по USB на 0x0) и firmware.bin (по Wi-Fi, вкладка Update).
+name: build
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  firmware:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            .pio/libdeps
+          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini', 'boards/*.json') }}
+
+      - name: Install PlatformIO and esptool
+        run: pip install platformio "esptool==4.8.1"
+
+      - name: Build
+        run: pio run
+
+      - name: Make merged image
+        run: |
+          B=.pio/build/t-embed-cc1101
+          APP0=$(find ~/.platformio/packages -name boot_app0.bin | head -1)
+          mkdir -p dist
+          esptool.py --chip esp32s3 merge_bin -o dist/radio_radar_full_0x0.bin \
+            0x0 $B/bootloader.bin 0x8000 $B/partitions.bin 0xe000 "$APP0" 0x10000 $B/firmware.bin
+          cp $B/firmware.bin dist/radio_radar_firmware_ota.bin
+          ls -la dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ github.sha }}
+          path: dist/*.bin
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.bin
+          generate_release_notes: true
+          body: |
+            **radio_radar_full_0x0.bin** — flash over USB at offset 0x0 (esptool-js / esptool), then power-cycle.
+            **radio_radar_firmware_ota.bin** — upload over Wi-Fi: Web section → page → Update tab.

@@ -1,4 +1,6 @@
 .pio/
 .vscode/
 *.bin
-!release/*.bin
+# готовые прошивки — в GitHub Releases (собирает CI), не в истории
+release/
+dist/

@@ -305,25 +305,31 @@ pio run
 
 Board-профиль лежит в `boards/T_Embed_PN532.json` (взят из официального
 репозитория LilyGO): `memory_type=qio_opi`, `BOARD_HAS_PSRAM`, flash QIO 80 МГц,
-вариант `adafruit_feather_esp32s3` — без этого на этой плате прошивка не стартует.
+вариант `esp32s3` (не `adafruit_feather_esp32s3`: тот до запуска программы включает
+GPIO21 — подсветку экрана).
 
 ## Прошивка
 
 Проще всего — браузером, без установки софта:
 
-1. Собери единый образ (или возьми готовый `release/ble_radar_merged.bin`):
+1. Скачай `radio_radar_full_0x0.bin` со страницы **Releases** репозитория
+   (собирает GitHub Actions; сборка любого пуша — во вкладке **Actions**, раздел Artifacts).
+   Или собери сам: `pio run`, затем
    ```
-   esptool --chip esp32s3 merge-bin -o ble_radar_merged.bin \
+   esptool --chip esp32s3 merge-bin -o radio_radar_full_0x0.bin \
      0x0 bootloader.bin 0x8000 partitions.bin 0xe000 boot_app0.bin 0x10000 firmware.bin
    ```
 2. Открой [esptool-js](https://espressif.github.io/esptool-js/) в Chrome →
    **Connect** → порт `USB JTAG/serial debug unit`.
-3. Flash Address **`0x0`** → выбери `ble_radar_merged.bin` → **Program**.
+3. Flash Address **`0x0`** → выбери `radio_radar_full_0x0.bin` → **Program**.
 4. Вынь USB (полный power-cycle) — прошивка стартует. На ESP32-S3 программный
    сброс по USB-JTAG часто не срабатывает, поэтому именно выдёргивание кабеля
    запускает приложение.
 
-Вернуть заводское/Bruce — просто прошей его поверх тем же способом.
+Дальше можно обновляться без провода: раздел **Web** → вкладка **Update**
+(подходит и `radio_radar_full_0x0.bin`, и `radio_radar_firmware_ota.bin`).
+
+Вернуть заводское/Bruce — просто прошей его поверх по USB.
 
 ## Структура
 
