@@ -67,8 +67,8 @@ void pcPoll(uint32_t) {
   }
 }
 
-// «связи нет» — только после 8 с тишины (Windows иногда притормаживает отправку)
-bool pcLive(uint32_t now) { return g_pc.have && now - g_pc.t < 8000; }
+// «связи нет» — только после 10 с тишины (Windows иногда притормаживает отправку)
+bool pcLive(uint32_t now) { return g_pc.have && now - g_pc.t < 10000; }
 
 // ---------- раздел ----------
 static void pcSubtitle(char* out, size_t n) {
