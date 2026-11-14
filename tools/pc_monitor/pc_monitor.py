@@ -284,6 +284,16 @@ def window_track():
             found.append(("Spotify", song, artist))
         elif " - YouTube" in title:                             # вкладка YouTube: «Песня - YouTube - Google Chrome»
             found.append(("YouTube", title.split(" - YouTube")[0], ""))
+        else:                                                   # вкладка Яндекс Музыки: «Песня — Исполнитель — Яндекс Музыка»
+            low = title.lower()
+            for mark in ("яндекс музык", "yandex music", "яндекс.музык"):
+                k = low.find(mark)
+                if k > 0:
+                    head = title[:k].rstrip(" -—–|·")
+                    parts = [x.strip() for x in head.replace("—", "\u0001").replace(" - ", "\u0001").split("\u0001") if x.strip()]
+                    if parts and parts[0].lower() not in ("главная", "моя волна", "коллекция", "поиск"):
+                        found.append(("Yandex", parts[0], parts[1] if len(parts) > 1 else ""))
+                    break
     if not found:
         return None
     app, song, artist = found[0]
@@ -347,7 +357,22 @@ class NowPlaying:
 
     @staticmethod
     async def _read(mgr):
-        s = mgr.get_current_session()
+        # Источников бывает несколько (браузер, плеер...). «Текущий» по мнению Windows —
+        # тот, что трогали последним, а не тот, что играет. Поэтому берём играющий.
+        s = None
+        try:
+            sessions = list(mgr.get_sessions())
+        except Exception:
+            sessions = []
+        for cand in sessions:
+            try:
+                if int(cand.get_playback_info().playback_status) == 4:
+                    s = cand
+                    break
+            except Exception:
+                pass
+        if s is None:
+            s = mgr.get_current_session()
         if s is None:
             return "PM\n"
         props = await s.try_get_media_properties_async()
