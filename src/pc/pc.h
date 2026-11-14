@@ -1,0 +1,40 @@
+// ============================================================
+//  pc.h — раздел PC: монитор нагрузки ноутбука.
+//  На ноуте работает tools/pc_monitor/pc_monitor.py: раз в секунду
+//  шлёт по USB строку вида
+//    PC cpu=23.4 ram=61.2 ramu=9.8 ramt=16.0 c=12,40,5 ... host=LAPTOP
+//  Палка разбирает её и рисует показатели.
+// ============================================================
+#pragma once
+#include <Arduino.h>
+#include "core/section.h"
+
+#define PC_CORES 16
+#define PC_HIST  60                   // история за минуту (точка в секунду)
+
+struct PcStat {
+  bool     have = false;              // приходили ли данные вообще
+  uint32_t t = 0;                     // когда пришли последние (millis)
+  float    cpu = 0, freq = 0;         // %, ГГц
+  int      nCores = 0;
+  uint8_t  core[PC_CORES] = {};       // % по ядрам
+  float    ram = 0, ramU = 0, ramT = 0;   // %, ГБ занято, ГБ всего
+  float    disk = 0, dR = 0, dW = 0;  // % заполнен C:, МБ/с чтение/запись
+  float    nD = 0, nU = 0;            // КБ/с скачивание / отдача
+  int      bat = -1; bool plug = false;   // батарея ноута (-1 — нет)
+  uint32_t up = 0;                    // время работы ноута, с
+  char     top[24] = "", host[24] = "";
+  float    cpuH[PC_HIST] = {}, ramH[PC_HIST] = {};
+  int      histN = 0;
+};
+extern PcStat g_pc;
+extern int    g_pcPage;               // 0 — обзор, 1 — ядра
+
+void pcPoll(uint32_t now);            // каждый проход loop(): читать USB
+bool pcLive(uint32_t now);            // данные свежие (< 3 с)
+
+void drawPc(uint32_t now);
+void drawPcCores(uint32_t now);
+void drawPcWaiting(uint32_t now);
+
+extern const Section pcSection;

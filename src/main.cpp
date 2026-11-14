@@ -23,6 +23,7 @@
 #include "core/leds.h"
 #include "ble/ble.h"
 #include "core/boot.h"
+#include "pc/pc.h"
 #include <driver/gpio.h>
 #include <esp_ota_ops.h>
 #include "audio/audio.h"
@@ -60,6 +61,8 @@ void setup() {
   pinMode(PIN_LORA_CS, OUTPUT);  digitalWrite(PIN_LORA_CS, HIGH);
   pinMode(PIN_NRF_CS,  OUTPUT);  digitalWrite(PIN_NRF_CS,  HIGH);
 
+  Serial.setRxBufferSize(2048);
+  Serial.begin(115200);  // USB: сюда пишет программа ноутбука (раздел PC)
   inputBegin();
   displayBegin();
   ledsBegin();
@@ -79,6 +82,7 @@ void loop() {
   bleSample(now);
   ledsTick();
   batTick(now);
+  pcPoll(now);                        // строки с ноутбука по USB (раздел PC)
   navTick(now);                       // работа открытого раздела (сканы, развёртки)
 
   powerIdleTick(now);

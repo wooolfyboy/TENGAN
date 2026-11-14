@@ -67,3 +67,14 @@ class Print {
   size_t print(const char* s) { size_t n = 0; while (*s) n += write(*s++); return n; }
 };
 inline uint32_t esp_random() { static uint32_t s = 2463534242u; s ^= s << 13; s ^= s >> 17; s ^= s << 5; return s; }
+
+#include <string>
+struct SimSerial {
+  std::string buf; size_t pos = 0;
+  void begin(unsigned long) {}
+  void setRxBufferSize(size_t) {}
+  int available() { return (int)(buf.size() - pos); }
+  int read() { return pos < buf.size() ? (unsigned char)buf[pos++] : -1; }
+  void feed(const char* s) { buf += s; }
+};
+inline SimSerial Serial;

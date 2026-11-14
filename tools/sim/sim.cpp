@@ -14,6 +14,7 @@
 #include "core/settings.h"
 #include "gallery/gallery.h"
 #include "web/web.h"
+#include "pc/pc.h"
 #include "core/boot.h"
 #include "ble/ble.h"
 #include "ble/ble_model.h"
@@ -341,6 +342,17 @@ int main(int argc, char** argv) {
   { uint8_t qr[29 * 29]; for (int i = 0; i < 29 * 29; i++) qr[i] = (noise(i) > 0.5f) || ((i % 29 < 7 || i % 29 > 21) && (i / 29 < 7) && !((i % 29 == 1 || i % 29 == 5 || i % 29 == 23 || i % 29 == 27) && i / 29 > 0 && i / 29 < 6));
     WebView v = { "RadioRadar-3F2A", "48213907", "192.168.4.1", 1, 214, true, "sub-ghz" };
     drawWebScreen(v, qr, 29); snap("60_web"); }
+  drawPcWaiting(s_now);      snap("70_pc_waiting");
+  for (int i = 0; i < 60; i++) {                        // минута «настоящих» строк с ноутбука
+    char ln[300];
+    float cpu = 18 + 14 * sinf(i * 0.25f) + noise(i) * 10 + (i > 44 ? 40 : 0);
+    snprintf(ln, sizeof ln, "PC cpu=%.1f freq=2.80 c=%d,%d,%d,%d,%d,%d,%d,%d ram=%.1f ramu=%.1f ramt=16.0 dsk=71 dr=1.2 dw=0.4 nd=%d nu=46 up=11520 top=chrome host=WOLF-LAPTOP bat=78 plug=0\n",
+             cpu, (int)cpu + 10, (int)cpu - 5, 90, 12, 33, 8, 61, 4, 58 + i * 0.05f, 9.4f + i * 0.01f, 1240 + i * 10);
+    Serial.feed(ln); pcPoll(0);
+  }
+  g_pc.t = s_now;
+  drawPc(s_now);             snap("71_pc_overview");
+  drawPcCores(s_now);        snap("72_pc_cores");
   drawSpectrum();            snap("30_subghz_spectrum");
   drawMonitor(s_now);        snap("31_subghz_monitor");
   return 0;

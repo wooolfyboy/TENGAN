@@ -184,6 +184,15 @@ void iconCube(int x, int y, uint16_t c, uint16_t bg) {
 void iconPhone(int x, int y, uint16_t c, uint16_t bg) {
   spr.drawSmoothRoundRect(x - 9, y - 17, 3, 2, 18, 34, c, bg);
   spr.drawFastHLine(x - 3, y + 12, 6, c);
-  spr.drawArc(x + 10, y - 14, 9, 7, 180, 270, c, bg, true);
-  spr.drawArc(x + 10, y - 14, 15, 13, 180, 270, c, bg, true);
+  spr.drawArc(x + 8, y - 13, 7, 5, 180, 270, c, bg, true);
+  spr.drawArc(x + 8, y - 13, 12, 10, 180, 270, c, bg, true);
+}
+
+// ноутбук (PC)
+void iconLaptop(int x, int y, uint16_t c, uint16_t bg) {
+  spr.drawRoundRect(x - 17, y - 16, 34, 23, 2, c);
+  spr.fillRect(x - 13, y - 12, 26, 15, c);
+  spr.fillRect(x - 11, y - 10, 22, 11, bg);
+  spr.drawLine(x - 9, y - 1, x - 4, y - 6, c); spr.drawLine(x - 4, y - 6, x + 1, y - 3, c); spr.drawLine(x + 1, y - 3, x + 8, y - 9, c);
+  spr.fillRoundRect(x - 22, y + 9, 44, 5, 2, c);
 }
