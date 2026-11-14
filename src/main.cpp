@@ -22,6 +22,7 @@
 #include "core/settings.h"
 #include "core/leds.h"
 #include "ble/ble.h"
+#include "core/boot.h"
 
 void setup() {
   checkWakeHold();      // включение после «выключения»: только удержанием боковой кнопки
@@ -38,6 +39,7 @@ void setup() {
   ledsBegin();
   settingsBegin();
   batBegin();
+  bootScreen();          // заставка-самопроверка
   bleBegin();
   navBegin();
   navDraw(millis());

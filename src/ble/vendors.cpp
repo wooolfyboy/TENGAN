@@ -5,6 +5,7 @@
 #include "ble/ble_model.h"
 #include "ble/btdb.h"            // база Bluetooth — подключается только здесь
 #include "core/display.h"
+#include "core/theme.h"
 
 const char* btUuidOwner(uint16_t uuid) { return uuidOwner(uuid); }
 
@@ -55,7 +56,7 @@ Vend resolveVendor(const AdvInfo& ai) {
 
 uint16_t vendorColor(uint8_t c) {
   const Brand& b = BRANDS[c < N_BRANDS ? (int)c : (int)V_OTHER];
-  return tft.color565(b.r, b.g, b.b);
+  return C(b.r, b.g, b.b);
 }
 // имя производителя для экрана
 const char* vendorLabel(uint8_t cat, uint8_t kind, uint16_t code) {

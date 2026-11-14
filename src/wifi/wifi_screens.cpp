@@ -7,31 +7,32 @@
 #include "wifi/wifi_model.h"
 #include "core/board.h"
 #include "core/display.h"
+#include "core/theme.h"
 #include "core/leds.h"
 
 void drawScanDot(int x, int y) {
-  if ((g_scanning || g_prom) && (millis() / 300) % 2) spr.fillCircle(x, y, 2, tft.color565(70, 210, 130));
+  if ((g_scanning || g_prom) && (millis() / 300) % 2) spr.fillCircle(x, y, 2, C(70, 210, 130));
 }
 void drawWaiting(int W, int H) {
   spr.setTextDatum(MC_DATUM);
-  spr.setTextColor(C_DIM(), TFT_BLACK);
-  spr.drawString(g_wEverScanned ? "no networks" : "scanning...", W / 2, H / 2, 4);
+  spr.setTextColor(C_DIM(), C_BG());
+  txt(g_wEverScanned ? "no networks" : "scanning...", W / 2, H / 2, 4);
 }
 
 void drawNets(uint32_t now) {
   int W = spr.width(), H = spr.height();
-  spr.fillSprite(TFT_BLACK);
+  spr.fillSprite(C_BG());
   char buf[48];
   spr.setTextDatum(TL_DATUM);
-  spr.setTextColor(C_GRAY(), TFT_BLACK);
+  spr.setTextColor(C_GRAY(), C_BG());
   sprintf(buf, "NETWORKS  %d", (int)g_wOrder.size());
-  spr.drawString(buf, 4, 1, 2);
-  drawScanDot(spr.textWidth(buf, 2) + 10, 9);
+  txt(buf, 4, 1, 2);
+  drawScanDot(txtW(buf, 2) + 10, 9);
   spr.setTextDatum(TR_DATUM);
-  spr.setTextColor(C_DIM(), TFT_BLACK);
-  spr.drawString("wheel: pick  click: info", W - 4, 5, 1);
+  spr.setTextColor(C_DIM(), C_BG());
+  txt("wheel: pick  click: info", W - 4, 5, 1);
 
-  if (g_wOrder.empty()) { drawWaiting(W, H); spr.pushSprite(0, 0); return; }
+  if (g_wOrder.empty()) { drawWaiting(W, H); present(); return; }
   for (int i = 0; i < LIST_ROWS; i++) {
     int idx = g_wTop + i;
     if (idx >= (int)g_wOrder.size()) break;
@@ -41,42 +42,42 @@ void drawNets(uint32_t now) {
     const Ap& a = it->second;
     int y = LIST_Y0 + i * LIST_ROWH;
     bool sel = (k == g_wSel);
-    uint16_t bg = sel ? tft.color565(28, 38, 62) : TFT_BLACK;
+    uint16_t bg = sel ? C(28, 38, 62) : C_BG();
     if (sel) spr.fillRoundRect(0, y, W - 4, LIST_ROWH - 1, 3, bg);
     spr.fillRect(3, y + 3, 4, LIST_ROWH - 7, encColor(a.enc));
     fitText(ssidOr(a), buf, sizeof(buf), 150, 2);
     spr.setTextDatum(TL_DATUM);
-    spr.setTextColor(a.ssid[0] ? TFT_WHITE : C_DIM(), bg);
-    spr.drawString(buf, 12, y + 1, 2);
+    spr.setTextColor(a.ssid[0] ? C_HOT() : C_DIM(), bg);
+    txt(buf, 12, y + 1, 2);
     sprintf(buf, "%d", a.ch);
     spr.setTextColor(apColor(k), bg);
-    spr.drawString(buf, 168, y + 1, 2);
+    txt(buf, 168, y + 1, 2);
     // метка: открытая > раздача с телефона > поколение
-    if (a.enc == WIFI_AUTH_OPEN)  { spr.setTextColor(encColor(a.enc), bg); spr.drawString("open", 190, y + 1, 2); }
-    else if (a.hotspot)           { spr.setTextColor(tft.color565(240, 150, 50), bg); spr.drawString("phone", 190, y + 1, 2); }
-    else if (a.gen == 6)          { spr.setTextColor(tft.color565(60, 205, 205), bg); spr.drawString("W6", 190, y + 1, 2); }
+    if (a.enc == WIFI_AUTH_OPEN)  { spr.setTextColor(encColor(a.enc), bg); txt("open", 190, y + 1, 2); }
+    else if (a.hotspot)           { spr.setTextColor(C(240, 150, 50), bg); txt("phone", 190, y + 1, 2); }
+    else if (a.gen == 6)          { spr.setTextColor(C(60, 205, 205), bg); txt("W6", 190, y + 1, 2); }
     sprintf(buf, "%d", a.rssi);
     spr.setTextDatum(TR_DATUM);
     spr.setTextColor(now - a.t > 6000 ? C_DIM() : C_GRAY(), bg);
-    spr.drawString(buf, 268, y + 1, 2);
-    drawBars(274, y + 2, a.rssi, tft.color565(90, 220, 140));
+    txt(buf, 268, y + 1, 2);
+    drawBars(274, y + 2, a.rssi, C(90, 220, 140));
   }
   int n = (int)g_wOrder.size();
   if (n > LIST_ROWS) {
     int trackH = LIST_ROWS * LIST_ROWH;
     int barH = trackH * LIST_ROWS / n; if (barH < 8) barH = 8;
     int barY = LIST_Y0 + (trackH - barH) * g_wTop / (n - LIST_ROWS);
-    spr.fillRect(W - 2, LIST_Y0, 2, trackH, tft.color565(30, 30, 38));
+    spr.fillRect(W - 2, LIST_Y0, 2, trackH, C(30, 30, 38));
     spr.fillRect(W - 2, barY, 2, barH, C_GRAY());
   }
-  spr.pushSprite(0, 0);
+  present();
 }
 
 // полуширина сети в «каналах» (канал = 5 МГц): 20 МГц -> 2, 40 МГц -> 4
 
 void drawNetDetail(uint32_t now) {
   int W = spr.width(), H = spr.height();
-  spr.fillSprite(TFT_BLACK);
+  spr.fillSprite(C_BG());
   char buf[64], tmp[48];
   auto it = g_aps.find(g_wSel);
   if (it == g_aps.end()) { g_wDetail = false; drawNets(now); return; }
@@ -84,25 +85,25 @@ void drawNetDetail(uint32_t now) {
 
   fitText(ssidOr(a), tmp, sizeof(tmp), W - 70, 4);
   spr.setTextDatum(TL_DATUM);
-  spr.setTextColor(a.ssid[0] ? TFT_WHITE : C_DIM(), TFT_BLACK);
-  spr.drawString(tmp, 4, 2, 4);
+  spr.setTextColor(a.ssid[0] ? C_HOT() : C_DIM(), C_BG());
+  txt(tmp, 4, 2, 4);
   int pos = -1;
   for (size_t i = 0; i < g_wOrder.size(); i++) if (g_wOrder[i] == g_wSel) pos = (int)i;
   if (pos >= 0) {
     sprintf(buf, "%d/%d", pos + 1, (int)g_wOrder.size());
     spr.setTextDatum(TR_DATUM);
-    spr.setTextColor(C_DIM(), TFT_BLACK);
-    spr.drawString(buf, W - 4, 6, 2);
+    spr.setTextColor(C_DIM(), C_BG());
+    txt(buf, W - 4, 6, 2);
   }
 
   // строка 2: защита · канал · ширина · поколение
   spr.setTextDatum(TL_DATUM);
-  spr.setTextColor(encColor(a.enc), TFT_BLACK);
-  spr.drawString(encName(a.enc), 4, 30, 2);
-  int x = 4 + spr.textWidth(encName(a.enc), 2) + 10;
+  spr.setTextColor(encColor(a.enc), C_BG());
+  txt(encName(a.enc), 4, 30, 2);
+  int x = 4 + txtW(encName(a.enc), 2) + 10;
   sprintf(buf, "ch %d  %d MHz  %s", a.ch, a.sec ? 40 : 20, genName(a.gen));
-  spr.setTextColor(apColor(g_wSel), TFT_BLACK);
-  spr.drawString(buf, x, 30, 2);
+  spr.setTextColor(apColor(g_wSel), C_BG());
+  txt(buf, x, 30, 2);
 
   // левая колонка
   int sameCh = 0, near = 0;
@@ -113,28 +114,28 @@ void drawNetDetail(uint32_t now) {
   }
   int y = 50; const int LH = 15;
   uint32_t ago = (now - a.t) / 1000;
-  spr.setTextColor(C_GRAY(), TFT_BLACK);
+  spr.setTextColor(C_GRAY(), C_BG());
   if (ago >= 6) sprintf(buf, "signal %d (%lus ago)", a.rssi, (unsigned long)ago);
   else          sprintf(buf, "signal %d dBm", a.rssi);
-  spr.drawString(buf, 4, y, 2); y += LH;
+  txt(buf, 4, y, 2); y += LH;
   sprintf(buf, "range  %d .. %d", a.rmin, a.rmax);
-  spr.drawString(buf, 4, y, 2); y += LH;
+  txt(buf, 4, y, 2); y += LH;
   uint32_t secs = (now - a.first) / 1000;
   sprintf(buf, "seen   %lu:%02lu", (unsigned long)(secs / 60), (unsigned long)(secs % 60));
-  spr.drawString(buf, 4, y, 2); y += LH;
+  txt(buf, 4, y, 2); y += LH;
   sprintf(buf, "rivals %d same, %d near", sameCh, near);
-  spr.drawString(buf, 4, y, 2); y += LH;
+  txt(buf, 4, y, 2); y += LH;
   int cl = clientsOf(g_wSel);
   if (cl > 0) sprintf(buf, "devices %d", cl);
   else        sprintf(buf, "devices ? (see CLIENTS)");
-  spr.drawString(buf, 4, y, 2);
+  txt(buf, 4, y, 2);
 
   // график сигнала (~2 мин)
   int gx = 176, gy = 50, gw = W - gx - 4, gh = 70;
-  spr.drawRect(gx, gy, gw, gh, tft.color565(40, 40, 50));
-  spr.setTextColor(C_DIM(), TFT_BLACK);
-  spr.drawString("signal, 2 min", gx + 3, gy + 3, 1);
-  drawSpark(gx, gy, gw, gh, g_wSpark, g_wSparkN, W_SPARK_N, tft.color565(90, 220, 140));
+  spr.drawRect(gx, gy, gw, gh, C(40, 40, 50));
+  spr.setTextColor(C_DIM(), C_BG());
+  txt("signal, 2 min", gx + 3, gy + 3, 1);
+  drawSpark(gx, gy, gw, gh, g_wSpark, g_wSparkN, W_SPARK_N, C(90, 220, 140));
 
   // низ: производитель и BSSID
   const uint8_t* b = a.bssid;
@@ -143,29 +144,29 @@ void drawNetDetail(uint32_t now) {
   else if (a.vendor)  sprintf(buf, "MAKER %s", a.vendor);
   else if (local)     sprintf(buf, "MAKER hidden (random MAC: hotspot or extra network)");
   else                sprintf(buf, "MAKER unknown");
-  spr.setTextColor(a.hotspot ? tft.color565(240, 150, 50) : C_GRAY(), TFT_BLACK);
-  spr.drawString(buf, 4, 130, 1);
+  spr.setTextColor(a.hotspot ? C(240, 150, 50) : C_GRAY(), C_BG());
+  txt(buf, 4, 130, 1);
   sprintf(buf, "BSSID %02X:%02X:%02X:%02X:%02X:%02X", b[0], b[1], b[2], b[3], b[4], b[5]);
-  spr.setTextColor(C_GRAY(), TFT_BLACK);
-  spr.drawString(buf, 4, 141, 1);
+  spr.setTextColor(C_GRAY(), C_BG());
+  txt(buf, 4, 141, 1);
   if (a.enc == WIFI_AUTH_OPEN) {
-    spr.setTextColor(tft.color565(235, 80, 80), TFT_BLACK);
-    spr.drawString("open network: traffic is not encrypted", 4, 152, 1);
+    spr.setTextColor(C(235, 80, 80), C_BG());
+    txt("open network: traffic is not encrypted", 4, 152, 1);
   }
   spr.setTextDatum(BR_DATUM);
-  spr.setTextColor(C_DIM(), TFT_BLACK);
-  spr.drawString("click: back", W - 4, H - 1, 1);
-  spr.pushSprite(0, 0);
+  spr.setTextColor(C_DIM(), C_BG());
+  txt("click: back", W - 4, H - 1, 1);
+  present();
 }
 
 
 void drawChannels(uint32_t now) {
   int W = spr.width(), H = spr.height();
-  spr.fillSprite(TFT_BLACK);
+  spr.fillSprite(C_BG());
   char buf[40];
   spr.setTextDatum(TL_DATUM);
-  spr.setTextColor(C_GRAY(), TFT_BLACK);
-  spr.drawString("CHANNELS", 4, 1, 2);
+  spr.setTextColor(C_GRAY(), C_BG());
+  txt("CHANNELS", 4, 1, 2);
   drawScanDot(78, 9);
 
   int pl = 24, pr = W - 8, pt = 22, pb = H - 22;
@@ -174,19 +175,19 @@ void drawChannels(uint32_t now) {
 
   for (int db = -90; db <= -40; db += 10) {
     int y = dbY(db);
-    spr.drawFastHLine(pl, y, pr - pl, tft.color565(28, 28, 34));
+    spr.drawFastHLine(pl, y, pr - pl, C(28, 28, 34));
     sprintf(buf, "%d", db);
     spr.setTextDatum(MR_DATUM);
-    spr.setTextColor(tft.color565(70, 70, 80), TFT_BLACK);
-    spr.drawString(buf, pl - 2, y, 1);
+    spr.setTextColor(C(70, 70, 80), C_BG());
+    txt(buf, pl - 2, y, 1);
   }
-  spr.drawFastHLine(pl, pb, pr - pl, tft.color565(60, 60, 70));
+  spr.drawFastHLine(pl, pb, pr - pl, C(60, 60, 70));
   for (int c = 1; c <= CH_MAX; c++) {
     bool main3 = (c == 1 || c == 6 || c == 11);
     spr.setTextDatum(TC_DATUM);
-    spr.setTextColor(main3 ? C_GRAY() : tft.color565(70, 70, 80), TFT_BLACK);
+    spr.setTextColor(main3 ? C_GRAY() : C(70, 70, 80), C_BG());
     sprintf(buf, "%d", c);
-    spr.drawString(buf, chX(c), pb + 3, main3 ? 2 : 1);
+    txt(buf, chX(c), pb + 3, main3 ? 2 : 1);
   }
 
   // «холмики»: ширина по реальной полосе сети (20 или 40 МГц), слабые снизу
@@ -216,24 +217,24 @@ void drawChannels(uint32_t now) {
     char nm[20];
     fitText(ssidOr(a), nm, sizeof(nm), 70, 1);
     spr.setTextDatum(BC_DATUM);
-    spr.setTextColor(apColor(v[i].second), TFT_BLACK);
-    spr.drawString(nm, constrain(chX(apCenter(a)), pl + 20, pr - 20), dbY(a.rssiS) - 2, 1);
+    spr.setTextColor(apColor(v[i].second), C_BG());
+    txt(nm, constrain(chX(apCenter(a)), pl + 20, pr - 20), dbY(a.rssiS) - 2, 1);
   }
 
   if (!g_aps.empty()) {
     sprintf(buf, "best channel: %d", bestChannel());
     spr.setTextDatum(TR_DATUM);
-    spr.setTextColor(tft.color565(70, 210, 130), TFT_BLACK);
-    spr.drawString(buf, W - 4, 1, 2);
+    spr.setTextColor(C(70, 210, 130), C_BG());
+    txt(buf, W - 4, 1, 2);
   } else {
     drawWaiting(W, H);
   }
-  spr.pushSprite(0, 0);
+  present();
 }
 
 void drawActivity(uint32_t now) {
   int W = spr.width();
-  spr.fillSprite(TFT_BLACK);
+  spr.fillSprite(C_BG());
   char buf[40];
   float tot = 0, mx = 1;
   for (int c = 1; c <= CH_MAX; c++) {
@@ -241,13 +242,13 @@ void drawActivity(uint32_t now) {
     tot += t; if (t > mx) mx = t;
   }
   spr.setTextDatum(TL_DATUM);
-  spr.setTextColor(C_GRAY(), TFT_BLACK);
-  spr.drawString("ACTIVITY", 4, 1, 2);
+  spr.setTextColor(C_GRAY(), C_BG());
+  txt("ACTIVITY", 4, 1, 2);
   drawScanDot(76, 9);
   sprintf(buf, "%d pkt/s", (int)(tot + 0.5f));
   spr.setTextDatum(TR_DATUM);
-  spr.setTextColor(TFT_WHITE, TFT_BLACK);
-  spr.drawString(buf, W - 4, 1, 2);
+  spr.setTextColor(C_HOT(), C_BG());
+  txt(buf, W - 4, 1, 2);
 
   // столбики: данные (зелёные) + маячки/служебные (синие), шкала — корень
   int pl = 28, pr = W - 4, pt = 20, pb = 92;
@@ -258,51 +259,51 @@ void drawActivity(uint32_t now) {
     float t = g_ppsMgmt[c] + g_ppsData[c];
     int h = (int)((pb - pt) * sqrtf(t) / smx);
     int hd = t > 0 ? (int)(h * g_ppsData[c] / t) : 0;
-    spr.fillRect(x + 2, pt, bw - 4, pb - pt, tft.color565(22, 22, 28));
+    spr.fillRect(x + 2, pt, bw - 4, pb - pt, C(22, 22, 28));
     if (h > 0) {
-      spr.fillRect(x + 2, pb - h, bw - 4, h - hd, tft.color565(80, 150, 240));
-      spr.fillRect(x + 2, pb - hd, bw - 4, hd, tft.color565(70, 210, 130));
+      spr.fillRect(x + 2, pb - h, bw - 4, h - hd, C(80, 150, 240));
+      spr.fillRect(x + 2, pb - hd, bw - 4, hd, C(70, 210, 130));
     }
-    if (c == g_hopCh) spr.fillRect(x + 2, pb + 1, bw - 4, 2, TFT_WHITE);
+    if (c == g_hopCh) spr.fillRect(x + 2, pb + 1, bw - 4, 2, C_HOT());
     bool main3 = (c == 1 || c == 6 || c == 11);
     sprintf(buf, "%d", c);
     spr.setTextDatum(TC_DATUM);
-    spr.setTextColor(main3 ? C_GRAY() : tft.color565(70, 70, 80), TFT_BLACK);
-    spr.drawString(buf, x + bw / 2, pb + 4, 1);
+    spr.setTextColor(main3 ? C_GRAY() : C(70, 70, 80), C_BG());
+    txt(buf, x + bw / 2, pb + 4, 1);
     // шум канала: обычно ~ -95..-90; выше -85 — что-то сильно шумит
     if (g_noise[c] != 0) {
       int nf = (int)lroundf(g_noise[c]);
-      uint16_t col = nf > -80 ? tft.color565(235, 80, 80) : nf > -88 ? tft.color565(240, 150, 50) : tft.color565(90, 90, 104);
+      uint16_t col = nf > -80 ? C(235, 80, 80) : nf > -88 ? C(240, 150, 50) : C(90, 90, 104);
       sprintf(buf, "%d", -nf);
-      spr.setTextColor(col, TFT_BLACK);
-      spr.drawString(buf, x + bw / 2, pb + 14, 1);
+      spr.setTextColor(col, C_BG());
+      txt(buf, x + bw / 2, pb + 14, 1);
     }
   }
   spr.setTextDatum(TL_DATUM);
-  spr.setTextColor(C_DIM(), TFT_BLACK);
-  spr.drawString("ch", 4, pb + 4, 1);
-  spr.drawString("-dBm", 0, pb + 14, 1);
-  spr.drawString("noise", 0, pb + 23, 1);
-  spr.fillRect(pl + 40, pb + 26, 6, 6, tft.color565(70, 210, 130));
-  spr.drawString("data", pl + 49, pb + 25, 1);
-  spr.fillRect(pl + 82, pb + 26, 6, 6, tft.color565(80, 150, 240));
-  spr.drawString("beacons/service", pl + 91, pb + 25, 1);
+  spr.setTextColor(C_DIM(), C_BG());
+  txt("ch", 4, pb + 4, 1);
+  txt("-dBm", 0, pb + 14, 1);
+  txt("noise", 0, pb + 23, 1);
+  spr.fillRect(pl + 40, pb + 26, 6, 6, C(70, 210, 130));
+  txt("data", pl + 49, pb + 25, 1);
+  spr.fillRect(pl + 82, pb + 26, 6, 6, C(80, 150, 240));
+  txt("beacons/service", pl + 91, pb + 25, 1);
 
   // история общего трафика ~2 мин
   int gx = 4, gy = 128, gw = W - 8, gh = 38;
-  spr.drawRect(gx, gy, gw, gh, tft.color565(40, 40, 50));
+  spr.drawRect(gx, gy, gw, gh, C(40, 40, 50));
   float hm = 1;
   for (int i = 0; i < g_actHistN; i++) if (g_actHist[i] > hm) hm = g_actHist[i];
   for (int i = 0; i < g_actHistN; i++) {
     int xx = gx + 1 + (gw - 3) * (i + (ACT_HIST_N - g_actHistN)) / (ACT_HIST_N - 1);
     int h = (int)((gh - 3) * g_actHist[i] / hm);
-    spr.drawFastVLine(xx, gy + gh - 1 - h, h, tft.color565(70, 170, 120));
+    spr.drawFastVLine(xx, gy + gh - 1 - h, h, C(70, 170, 120));
   }
   sprintf(buf, "2 min, peak %d", (int)hm);
   spr.setTextDatum(TR_DATUM);
-  spr.setTextColor(C_DIM(), TFT_BLACK);
-  spr.drawString(buf, gx + gw - 3, gy + 3, 1);
-  spr.pushSprite(0, 0);
+  spr.setTextColor(C_DIM(), C_BG());
+  txt(buf, gx + gw - 3, gy + 3, 1);
+  present();
 
   if (g_ledEvent == 0) {                       // лента — уровень трафика
     int lv = tot < 1 ? 0 : (int)(log10f(tot) * 2.7f);
@@ -318,7 +319,7 @@ void drawActivity(uint32_t now) {
 
 void drawClients(uint32_t now) {
   int W = spr.width(), H = spr.height();
-  spr.fillSprite(TFT_BLACK);
+  spr.fillSprite(C_BG());
   char buf[48];
   // считаем устройства по сетям
   std::map<uint64_t, int> per;
@@ -328,21 +329,21 @@ void drawClients(uint32_t now) {
   std::sort(v.begin(), v.end());
 
   spr.setTextDatum(TL_DATUM);
-  spr.setTextColor(C_GRAY(), TFT_BLACK);
-  spr.drawString("CLIENTS", 4, 1, 2);
+  spr.setTextColor(C_GRAY(), C_BG());
+  txt("CLIENTS", 4, 1, 2);
   drawScanDot(66, 9);
   sprintf(buf, "%d devices in %d nets", (int)g_stas.size(), (int)per.size());
   spr.setTextDatum(TR_DATUM);
-  spr.setTextColor(TFT_WHITE, TFT_BLACK);
-  spr.drawString(buf, W - 4, 1, 2);
+  spr.setTextColor(C_HOT(), C_BG());
+  txt(buf, W - 4, 1, 2);
 
   int rows = 6, rh = 19, y0 = 22;
   int maxc = v.empty() ? 1 : -v[0].first;
   if (v.empty()) {
     spr.setTextDatum(MC_DATUM);
-    spr.setTextColor(C_DIM(), TFT_BLACK);
-    spr.drawString("listening...", W / 2, 70, 4);
-    spr.drawString("devices appear as they send data", W / 2, 96, 2);
+    spr.setTextColor(C_DIM(), C_BG());
+    txt("listening...", W / 2, 70, 4);
+    txt("devices appear as they send data", W / 2, 96, 2);
   }
   for (int i = 0; i < rows && i < (int)v.size(); i++) {
     uint64_t b = v[i].second;
@@ -361,46 +362,46 @@ void drawClients(uint32_t now) {
     uint16_t c = apColor(b);
     fitText(nm, buf, sizeof(buf), 120, 2);
     spr.setTextDatum(TL_DATUM);
-    spr.setTextColor(it != g_aps.end() ? TFT_WHITE : C_DIM(), TFT_BLACK);
-    spr.drawString(buf, 4, y, 2);
+    spr.setTextColor(it != g_aps.end() ? C_HOT() : C_DIM(), C_BG());
+    txt(buf, 4, y, 2);
     int bx = 130, bwid = W - bx - 40;
     int len = bwid * cnt / maxc; if (len < 2) len = 2;
     spr.fillRoundRect(bx, y + 4, len, 9, 3, c);
     sprintf(buf, "%d", cnt);
     spr.setTextDatum(TR_DATUM);
-    spr.setTextColor(TFT_WHITE, TFT_BLACK);
-    spr.drawString(buf, W - 4, y, 2);
+    spr.setTextColor(C_HOT(), C_BG());
+    txt(buf, W - 4, y, 2);
   }
 
-  spr.drawFastHLine(4, H - 34, W - 8, tft.color565(35, 35, 45));
+  spr.drawFastHLine(4, H - 34, W - 8, C(35, 35, 45));
   spr.setTextDatum(TL_DATUM);
-  spr.setTextColor(tft.color565(240, 200, 70), TFT_BLACK);
+  spr.setTextColor(C(240, 200, 70), C_BG());
   sprintf(buf, "searching for Wi-Fi: %d", (int)g_probes.size());
-  spr.drawString(buf, 4, H - 30, 2);
-  spr.setTextColor(C_DIM(), TFT_BLACK);
-  spr.drawString("last 2 min; phones change addresses, so it's approximate", 4, H - 11, 1);
-  spr.pushSprite(0, 0);
+  txt(buf, 4, H - 30, 2);
+  spr.setTextColor(C_DIM(), C_BG());
+  txt("last 2 min; phones change addresses, so it's approximate", 4, H - 11, 1);
+  present();
 }
 
 void drawFind(uint32_t now) {
   int W = spr.width(), H = spr.height();
-  spr.fillSprite(TFT_BLACK);
+  spr.fillSprite(C_BG());
   char buf[48];
   uint64_t t = findTarget();
   spr.setTextDatum(TL_DATUM);
-  spr.setTextColor(C_GRAY(), TFT_BLACK);
-  spr.drawString("FIND", 4, 1, 2);
+  spr.setTextColor(C_GRAY(), C_BG());
+  txt("FIND", 4, 1, 2);
   drawScanDot(40, 9);
   spr.setTextDatum(TR_DATUM);
-  spr.setTextColor(C_DIM(), TFT_BLACK);
-  spr.drawString("click: next network", W - 4, 5, 1);
-  if (!t) { drawWaiting(W, H); spr.pushSprite(0, 0); ledsOff(); return; }
+  spr.setTextColor(C_DIM(), C_BG());
+  txt("click: next network", W - 4, 5, 1);
+  if (!t) { drawWaiting(W, H); present(); ledsOff(); return; }
   const Ap& a = g_aps[t];
 
   fitText(ssidOr(a), buf, sizeof(buf), W - 16, 4);
   spr.setTextDatum(TC_DATUM);
-  spr.setTextColor(TFT_WHITE, TFT_BLACK);
-  spr.drawString(buf, W / 2, 18, 4);
+  spr.setTextColor(C_HOT(), C_BG());
+  txt(buf, W / 2, 18, 4);
 
   // средний сигнал за последние ~5 замеров (так меньше прыгает)
   int sum = 0, cnt = 0;
@@ -409,38 +410,38 @@ void drawFind(uint32_t now) {
   bool lost = (cnt == 0) || (now - g_fLastHit > 4000);
   int r = cnt ? sum / cnt : a.rssi;
   const char* word; uint16_t col;
-  if (lost)          { word = "no signal"; col = tft.color565(120, 120, 130); }
-  else if (r > -55)  { word = "excellent"; col = tft.color565(70, 210, 130); }
-  else if (r > -67)  { word = "good";      col = tft.color565(170, 220, 80); }
-  else if (r > -75)  { word = "fair";      col = tft.color565(240, 200, 70); }
-  else if (r > -85)  { word = "weak";      col = tft.color565(240, 150, 50); }
-  else               { word = "bad";       col = tft.color565(235, 80, 80); }
+  if (lost)          { word = "no signal"; col = C(120, 120, 130); }
+  else if (r > -55)  { word = "excellent"; col = C(70, 210, 130); }
+  else if (r > -67)  { word = "good";      col = C(170, 220, 80); }
+  else if (r > -75)  { word = "fair";      col = C(240, 200, 70); }
+  else if (r > -85)  { word = "weak";      col = C(240, 150, 50); }
+  else               { word = "bad";       col = C(235, 80, 80); }
 
   // крупное число + оценка
   sprintf(buf, "%d", lost ? 0 : -r);
   spr.setTextDatum(ML_DATUM);
-  spr.setTextColor(col, TFT_BLACK);
+  spr.setTextColor(col, C_BG());
   if (!lost) {
     spr.fillRect(14, 68, 14, 5, col);              // знак «минус»
-    spr.drawString(buf, 32, 70, 7);
+    txt(buf, 32, 70, 7);
   }
   spr.setTextDatum(ML_DATUM);
-  spr.drawString(word, 150, 60, 4);
-  spr.setTextColor(C_DIM(), TFT_BLACK);
+  txt(word, 150, 60, 4);
+  spr.setTextColor(C_DIM(), C_BG());
   sprintf(buf, "dBm   ch %d", a.ch);
-  spr.drawString(buf, 150, 84, 2);
+  txt(buf, 150, 84, 2);
 
   // шкала
   int pct = lost ? 0 : constrain((r + 95) * 100 / 60, 0, 100);
   int bx = 8, by = 102, bw = W - 16, bh = 12;
-  spr.drawRoundRect(bx, by, bw, bh, 4, tft.color565(60, 60, 70));
+  spr.drawRoundRect(bx, by, bw, bh, 4, C(60, 60, 70));
   if (pct > 0) spr.fillRoundRect(bx + 2, by + 2, (bw - 4) * pct / 100, bh - 4, 3, col);
 
   // график
   int gx = 8, gy = 120, gw = W - 16, gh = 46;
-  spr.drawRect(gx, gy, gw, gh, tft.color565(40, 40, 50));
+  spr.drawRect(gx, gy, gw, gh, C(40, 40, 50));
   drawSpark(gx, gy, gw, gh, g_fSpark, g_fSparkN, F_SPARK_N, col);
-  spr.pushSprite(0, 0);
+  present();
 
   if (g_ledEvent == 0) {                       // лента — уровень сигнала
     int lv = pct * WS2812_N / 100;

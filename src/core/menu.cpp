@@ -7,6 +7,7 @@
 // ============================================================
 #include <ctype.h>
 #include "core/menu.h"
+#include "core/theme.h"
 #include "core/battery.h"
 #include "core/settings.h"
 #include "ble/ble.h"
@@ -91,47 +92,45 @@ static void drawSectionSub(const Section* s) {
   size_t k = 0;
   for (; s->title[k] && k < sizeof(title) - 1; k++) title[k] = (char)toupper((unsigned char)s->title[k]);
   title[k] = 0;
-  drawSubmenu(title, tft.color565(s->r, s->g, s->b), items, n, s_subSel);
+  drawSubmenu(title, C(s->r, s->g, s->b), items, n, s_subSel);
 }
 
+// главное меню — список, как на старых приборах: курсор «>», выбранная строка залита
 static void drawMainMenu() {
   int W = spr.width(), H = spr.height();
-  spr.fillSprite(TFT_BLACK);
-  // верхняя строка: название + батарея
+  spr.fillSprite(C_BG());
   spr.setTextDatum(TL_DATUM);
-  spr.setTextColor(tft.color565(90, 90, 104), TFT_BLACK);
-  spr.drawString("RADIO RADAR", 4, 3, 1);
-  drawBatteryIcon(W - 4, 1);
+  spr.setTextColor(C(150, 150, 165));
+  txt("RADIO RADAR", 6, 3, 2);
+  drawBatteryIcon(W - 6, 4);
+  spr.drawFastHLine(6, 22, W - 12, C(70, 70, 82));
 
-  int cw = 74, ch = 124, gap = 6, x0 = (W - (cw * N_SECTIONS + gap * (N_SECTIONS - 1))) / 2, y0 = 16;
+  const int y0 = 28, rh = 31;
   for (int i = 0; i < N_SECTIONS; i++) {
     const Section* s = SECTIONS[i];
-    uint16_t acc = tft.color565(s->r, s->g, s->b);
-    int x = x0 + i * (cw + gap);
     bool sel = (i == s_menuSel);
-    uint16_t c = sel ? acc : tft.color565(85, 85, 98);
-    uint16_t bg = sel ? tft.color565(22, 26, 38) : TFT_BLACK;
-    if (sel) {
-      spr.fillRoundRect(x, y0, cw, ch, 10, bg);
-      spr.drawRoundRect(x, y0, cw, ch, 10, acc);
-      spr.drawRoundRect(x + 1, y0 + 1, cw - 2, ch - 2, 9, acc);
-    } else {
-      spr.drawRoundRect(x, y0, cw, ch, 10, tft.color565(40, 40, 50));
-    }
-    int ix = x + cw / 2;
-    s->icon(ix, y0 + 40, c, bg);
+    int y = y0 + i * rh, cy = y + (rh - 3) / 2;
+    uint16_t acc = C(s->r, s->g, s->b);
+    if (sel) spr.fillRect(6, y, W - 12, rh - 3, acc);
+    char name[20] = "> ";
+    size_t k = 2;
+    for (size_t t = 0; s->title[t] && k < sizeof(name) - 1; t++) name[k++] = (char)toupper((unsigned char)s->title[t]);
+    name[k] = 0;
+    if (!sel) name[0] = ' ';
     char sub[24];
     s->subtitle(sub, sizeof(sub));
-    spr.setTextDatum(TC_DATUM);
-    spr.setTextColor(sel ? TFT_WHITE : tft.color565(150, 150, 165), bg);
-    spr.drawString(s->title, ix, y0 + 78, 2);
-    spr.setTextColor(sel ? acc : tft.color565(90, 90, 104), bg);
-    spr.drawString(sub, ix, y0 + 100, 1);
+    uint16_t tc = sel ? C_BG() : C(175, 175, 190);
+    spr.setTextColor(tc);
+    spr.setTextDatum(ML_DATUM);
+    txt(name, 10, cy, 4);
+    spr.setTextColor(sel ? C_BG() : C(120, 120, 135));
+    spr.setTextDatum(MR_DATUM);
+    txt(sub, W - 12, cy, 2);
   }
   spr.setTextDatum(BC_DATUM);
-  spr.setTextColor(tft.color565(80, 80, 92), TFT_BLACK);
-  spr.drawString("wheel: choose   click: open   hold side: power off", W / 2, H - 2, 1);
-  spr.pushSprite(0, 0);
+  spr.setTextColor(C(80, 80, 92));
+  txt("wheel: choose   click: open   hold side: power off", W / 2, H - 2, 1);
+  present();
 }
 
 void navDraw(uint32_t now) {

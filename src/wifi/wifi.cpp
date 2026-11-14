@@ -23,6 +23,7 @@
 #include "wifi/ouidb.h"          // база производителей — подключается только здесь
 #include "core/board.h"
 #include "core/display.h"
+#include "core/theme.h"
 #include "core/leds.h"
 #include "core/menu.h"
 #include "ble/ble.h"
@@ -139,14 +140,14 @@ const char* encName(uint8_t e) {
 }
 uint16_t encColor(uint8_t e) {
   switch (e) {
-    case WIFI_AUTH_OPEN:            return tft.color565(235, 80, 80);
+    case WIFI_AUTH_OPEN:            return C(235, 80, 80);
     case WIFI_AUTH_WEP:
-    case WIFI_AUTH_WPA_PSK:         return tft.color565(240, 150, 50);
+    case WIFI_AUTH_WPA_PSK:         return C(240, 150, 50);
     case WIFI_AUTH_WPA3_PSK:
     case WIFI_AUTH_WPA2_WPA3_PSK:
-    case WIFI_AUTH_OWE:             return tft.color565(60, 205, 205);
-    case WIFI_AUTH_WPA2_ENTERPRISE: return tft.color565(160, 120, 245);
-    default:                        return tft.color565(70, 210, 130);
+    case WIFI_AUTH_OWE:             return C(60, 205, 205);
+    case WIFI_AUTH_WPA2_ENTERPRISE: return C(160, 120, 245);
+    default:                        return C(70, 210, 130);
   }
 }
 const char* genName(uint8_t g) {
@@ -157,11 +158,11 @@ uint16_t apColor(uint64_t key) {
     {80,150,240},{70,210,130},{240,200,70},{240,90,160},{60,205,205},{240,150,50},{170,220,80},{160,120,245} };
   uint32_t h = (uint32_t)(key ^ (key >> 29)) * 2654435761u;
   const uint8_t* c = pal[(h >> 24) & 7];
-  return tft.color565(c[0], c[1], c[2]);
+  return C(c[0], c[1], c[2]);
 }
 uint16_t dimColor(uint16_t c, int pct) {
   uint8_t r = ((c >> 11) & 0x1F) << 3, g = ((c >> 5) & 0x3F) << 2, b = (c & 0x1F) << 3;
-  return tft.color565(r * pct / 100, g * pct / 100, b * pct / 100);
+  return C(r * pct / 100, g * pct / 100, b * pct / 100);
 }
 const char* ssidOr(const Ap& a) { return a.ssid[0] ? a.ssid : "(hidden)"; }
 

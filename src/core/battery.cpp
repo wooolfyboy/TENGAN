@@ -9,6 +9,7 @@
 #include <Wire.h>
 #include "core/battery.h"
 #include "core/display.h"
+#include "core/theme.h"
 
 #define BAT_I2C_SDA 8
 #define BAT_I2C_SCL 18
@@ -70,10 +71,10 @@ bool batUsb()      { return g_bat.chgOk && g_bat.bus != 0; }
 bool batCharging() { return g_bat.chgOk && (g_bat.chg == 1 || g_bat.chg == 2); }
 
 uint16_t batColor() {
-  if (batCharging())  return tft.color565(90, 200, 255);
-  if (g_bat.soc > 50) return tft.color565(70, 210, 130);
-  if (g_bat.soc > 20) return tft.color565(240, 200, 70);
-  return tft.color565(235, 80, 80);
+  if (batCharging())  return C(90, 200, 255);
+  if (g_bat.soc > 50) return C(70, 210, 130);
+  if (g_bat.soc > 20) return C(240, 200, 70);
+  return C(235, 80, 80);
 }
 
 // маленький значок батареи; (x, y) — правый верхний угол
@@ -81,20 +82,20 @@ void drawBatteryIcon(int x, int y) {
   if (!g_bat.ok) return;
   uint16_t c = batColor();
   int w = 22, h = 11, bx = x - w - 2;
-  spr.drawRoundRect(bx, y, w, h, 2, tft.color565(140, 140, 155));
-  spr.fillRect(bx + w, y + 3, 2, h - 6, tft.color565(140, 140, 155));
+  spr.drawRoundRect(bx, y, w, h, 2, C(140, 140, 155));
+  spr.fillRect(bx + w, y + 3, 2, h - 6, C(140, 140, 155));
   int fw = (w - 4) * g_bat.soc / 100;
   if (fw > 0) spr.fillRect(bx + 2, y + 2, fw, h - 4, c);
   if (batCharging()) {                          // молния
     int cx = bx + w / 2, cy = y + h / 2;
-    spr.fillTriangle(cx + 1, y + 1, cx - 3, cy + 1, cx, cy + 1, TFT_WHITE);
-    spr.fillTriangle(cx - 1, y + h - 1, cx + 3, cy - 1, cx, cy - 1, TFT_WHITE);
+    spr.fillTriangle(cx + 1, y + 1, cx - 3, cy + 1, cx, cy + 1, C_HOT());
+    spr.fillTriangle(cx - 1, y + h - 1, cx + 3, cy - 1, cx, cy - 1, C_HOT());
   }
   char buf[8];
   sprintf(buf, "%d%%", g_bat.soc);
   spr.setTextDatum(TR_DATUM);
-  spr.setTextColor(c, TFT_BLACK);
-  spr.drawString(buf, bx - 4, y + 2, 1);
+  spr.setTextColor(c, C_BG());
+  txt(buf, bx - 4, y + 2, 1);
 }
 
 // одна строка о питании (для настроек)
