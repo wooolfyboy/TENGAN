@@ -10,13 +10,14 @@
 #include "core/theme.h"
 #include "core/battery.h"
 #include "core/settings.h"
+#include "gallery/gallery.h"
 #include "ble/ble.h"
 #include "wifi/wifi.h"
 #include "subghz/subghz.h"
 #include "audio/audio.h"
 
 // порядок карточек в главном меню
-static const Section* const SECTIONS[] = { &bleSection, &wifiSection, &subghzSection, &soundSection, &settingsSection };
+static const Section* const SECTIONS[] = { &bleSection, &wifiSection, &subghzSection, &soundSection, &gallerySection, &settingsSection };
 static const int N_SECTIONS = sizeof(SECTIONS) / sizeof(SECTIONS[0]);
 
 static int  s_cur = -1;          // открытый раздел; -1 — главное меню
@@ -143,12 +144,19 @@ static void drawMainMenuHud() {
     spr.drawPixel(x, 18, tft.color565(r * k, g * k, b * k));
   }
 
-  const int gap = 5, cw = (W - 12 - gap * (N_SECTIONS - 1)) / N_SECTIONS, ch = 128, y0 = 24;
-  int x0 = (W - (cw * N_SECTIONS + gap * (N_SECTIONS - 1))) / 2;
-  for (int i = 0; i < N_SECTIONS; i++) {
+  // видно 5 карточек; если разделов больше — лента сдвигается за выбранной
+  const int VIS = min(N_SECTIONS, 5);
+  const int gap = 5, cw = (W - 12 - gap * (VIS - 1)) / VIS, ch = 128, y0 = 24;
+  int x0 = (W - (cw * VIS + gap * (VIS - 1))) / 2;
+  static int first = 0;
+  if (s_menuSel < first) first = s_menuSel;
+  if (s_menuSel > first + VIS - 1) first = s_menuSel - VIS + 1;
+  if (first > 0) spr.fillTriangle(1, y0 + ch / 2, 5, y0 + ch / 2 - 5, 5, y0 + ch / 2 + 5, acc);           // есть ещё слева
+  if (first + VIS < N_SECTIONS) spr.fillTriangle(W - 2, y0 + ch / 2, W - 6, y0 + ch / 2 - 5, W - 6, y0 + ch / 2 + 5, acc);
+  for (int i = first; i < first + VIS; i++) {
     const Section* s = SECTIONS[i];
     bool sel = (i == s_menuSel);
-    int x = x0 + i * (cw + gap), cx = x + cw / 2;
+    int x = x0 + (i - first) * (cw + gap), cx = x + cw / 2;
     uint16_t pbg = sel ? tft.color565(14, 42, 52) : bg;
     if (sel) hudPanel(x, y0, cw, ch, 12, pbg, true, bg);
     hudPanel(x, y0, cw, ch, 12, sel ? acc : C(45, 60, 72), false, bg);

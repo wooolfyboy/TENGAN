@@ -166,3 +166,16 @@ void iconMic(int x, int y, uint16_t c, uint16_t bg) {
   spr.drawWideLine(x, y + 12, x, y + 20, 3, c, bg);
   spr.drawWideLine(x - 8, y + 21, x + 8, y + 21, 3, c, bg);
 }
+
+// куб в кубе (Gallery)
+void iconCube(int x, int y, uint16_t c, uint16_t bg) {
+  const int o = 14, i = 7, d = 5;
+  spr.drawRect(x - o - d / 2, y - o + d / 2, 2 * o, 2 * o, c);
+  spr.drawRect(x - o + d / 2 + 1, y - o - d / 2, 2 * o, 2 * o, c);
+  spr.drawRect(x - i, y - i, 2 * i, 2 * i, c);
+  spr.drawLine(x - o - d / 2, y - o + d / 2, x - i, y - i, c);
+  spr.drawLine(x + o - d / 2 - 1, y + o + d / 2 - 1, x + i - 1, y + i - 1, c);
+  spr.drawLine(x + o + d / 2, y - o - d / 2, x + i - 1, y - i, c);
+  spr.drawLine(x - o + d / 2 + 1, y + o - d / 2 - 1, x - i, y + i - 1, c);
+  (void)bg;
+}

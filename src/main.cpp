@@ -25,6 +25,13 @@
 #include "core/boot.h"
 #include "audio/audio.h"
 
+// Самый ранний момент, где можно что-то сделать (ещё до setup): гасим подсветку,
+// чтобы не было видно «мусора» на экране, пока он не инициализирован.
+extern "C" void initVariant() {
+  pinMode(TFT_BL, OUTPUT);
+  digitalWrite(TFT_BL, LOW);
+}
+
 void setup() {
   checkWakeHold();      // включение после «выключения»: только удержанием боковой кнопки
 

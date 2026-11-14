@@ -36,3 +36,4 @@ void iconWifi(int x, int y, uint16_t c, uint16_t bg);
 void iconGear(int x, int y, uint16_t c, uint16_t bg);
 void iconAntenna(int x, int y, uint16_t c, uint16_t bg);
 void iconMic(int x, int y, uint16_t c, uint16_t bg);
+void iconCube(int x, int y, uint16_t c, uint16_t bg);

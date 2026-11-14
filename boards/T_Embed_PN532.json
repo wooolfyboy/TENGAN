@@ -21,7 +21,7 @@
         [ "0x239A", "0x811C" ]
       ],
       "mcu": "esp32s3",
-      "variant": "adafruit_feather_esp32s3"
+      "variant": "esp32s3"
     },
     "connectivity": [
       "wifi"

@@ -12,6 +12,7 @@
 #include "core/menu.h"
 #include "core/battery.h"
 #include "core/settings.h"
+#include "gallery/gallery.h"
 #include "core/boot.h"
 #include "ble/ble.h"
 #include "ble/ble_model.h"
@@ -329,6 +330,8 @@ int main(int argc, char** argv) {
   drawMicMissing();          snap("44_mic_check");
   g_micDiag.disabled = true; drawMicMissing(); snap("45_mic_off");
 
+  for (int f = 0; f < 40; f++) drawTesseract(s_now + f * 33);   snap("50_gallery_tesseract");
+  for (int f = 0; f < 10; f++) drawTorus(s_now + 1500 + f * 33); snap("51_gallery_torus");
   drawSpectrum();            snap("30_subghz_spectrum");
   drawMonitor(s_now);        snap("31_subghz_monitor");
   return 0;
