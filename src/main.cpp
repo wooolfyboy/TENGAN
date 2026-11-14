@@ -40,7 +40,7 @@ void setup() {
   ledsBegin();
   settingsBegin();
   batBegin();
-  bootScreen();          // заставка-самопроверка
+  bootScreen();          // анимация включения
   bleBegin();
   audioBegin();          // динамик: звуки интерфейса
   navBegin();

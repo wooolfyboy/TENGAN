@@ -243,7 +243,8 @@ int main(int argc, char** argv) {
   g_bat.ok = true; g_bat.soc = 87; g_bat.mv = 3980; g_bat.ma = -132; g_bat.tte = 250; g_bat.chgOk = true;
   fillBle(); fillWifi(); fillSub();
 
-  bootScreen();                                  snap("00_boot");
+  { const uint32_t ts[] = { 250, 600, 1000, 1300, 1600, 1950, 2200 };
+    for (int i = 0; i < 7; i++) { char nm[32]; snprintf(nm, sizeof nm, "00_boot_%04u", (unsigned)ts[i]); bootFrame(ts[i]); snap(nm); } }
   navBegin(); navDraw(s_now);                    snap("01_menu");
   navClick(); navDraw(s_now);                    snap("02_ble_sub");
   navBack();
