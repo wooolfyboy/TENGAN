@@ -13,11 +13,11 @@ static uint16_t dim565(uint16_t c, int pct) {
   return tft.color565(r * pct / 100, g * pct / 100, b * pct / 100);
 }
 
-// справа в шапке: «PC» — если картинка по звуку ноутбука
+// справа в шапке — откуда звук: MIC / PC (в режиме «авто» — AUTO MIC / AUTO PC)
 static const char* src(const char* right) {
-  static char buf[48];
-  if (!g_auFromPc) return right;
-  snprintf(buf, sizeof(buf), "PC  %s", right ? right : "");
+  static char buf[56];
+  const char* tag = g_auSrcNow == 1 ? "MIC" : g_auSrcNow == 2 ? "PC" : (g_auFromPc ? "AUTO PC" : "AUTO MIC");
+  snprintf(buf, sizeof(buf), "%s  %s", tag, right ? right : "");
   return buf;
 }
 
@@ -336,7 +336,7 @@ void drawTerrain(uint32_t now) {
     }
   }
   uiHeader("Terrain", src(buf), g_au.level >= -25);
-  uiFooter("wheel: next view", "side: back");
+  uiFooter("wheel: screens", "side: back");
   present();
 }
 
@@ -395,7 +395,17 @@ void drawXY(uint32_t now) {
   spr.setTextColor(UI_LABEL());
   txt(buf, UI_M + 6, UI_BOTTOM - 12, 1);
   uiHeader("XY scope", src(g_auFromPc ? (g_auXYStereo ? "stereo" : "mono") : "mic phase"));
-  uiFooter("wheel: next view", "side: back");
+  uiFooter("wheel: screens", "side: back");
+  present();
+  (void)now;
+}
+
+// выбран источник «ноутбук», а звук от него не приходит
+void drawPcAudioWait(uint32_t now) {
+  spr.fillSprite(C_BG());
+  uiHeader("Sound", src("waiting"));
+  uiEmpty("waiting for laptop audio", "run start_pc_monitor.bat on the laptop");
+  uiFooter("wheel: screens", "side: back");
   present();
   (void)now;
 }

@@ -40,6 +40,7 @@ int   g_auHistN = 0;
 float g_auMax = -120, g_auAvg = -90;
 MicDiag g_micDiag = {};
 bool   g_auFromPc = false;
+int    g_auSrcNow = 0;
 int8_t g_auXY[AU_XY][2];
 bool   g_auXYStereo = false;
 static uint32_t s_pcAudT = 0;
@@ -292,6 +293,7 @@ void audioGeiger(int pct) {
 bool audioPcLive(uint32_t now) { return s_pcAudT && msSince(now, s_pcAudT) < 600; }
 
 void audioPcFrame(float level, int hz, const uint8_t* bands, const int8_t* wave, const int8_t* xy, bool stereo) {
+  if (g_auSrcNow == 1) return;                       // выбран микрофон — звук ноута не берём
   uint32_t now = millis();
   s_pcAudT = now;
   g_auFromPc = true;
@@ -323,18 +325,25 @@ void audioPcFrame(float level, int hz, const uint8_t* bands, const int8_t* wave,
 }
 
 static void sndSubtitle(char* out, size_t n) {
-  if (audioPcLive(millis())) snprintf(out, n, "laptop");
+  if (g_auFromPc) snprintf(out, n, "laptop");
   else if (s_micRun && g_micOk) snprintf(out, n, "%d dBfs", (int)g_au.level);
   else                     snprintf(out, n, g_micEn ? "listen" : "mic off");
 }
+static bool s_micTried = false;             // микрофон уже пробовали запустить (не долбить драйвер, если не встал)
+static bool s_pcAsked = false;              // просили ноут слать звук
 static void sndEnter() {
+  g_auSrcNow = g_auSrc;                     // источник — из настроек (Settings > Sound > Source)
   g_micDiag.disabled = !g_micEn;
-  if (!g_micEn) { g_micOk = false; g_micDiag.stage = 0; return; }
-  g_micOk = micStart(0);
   g_auMax = -120; g_auHistN = 0;
+  s_micTried = false;
+  if (!g_micEn) { g_micOk = false; g_micDiag.stage = 0; return; }
+  if (g_auSrcNow != 2) { g_micOk = micStart(0); s_micTried = true; }   // «только ноутбук» — микрофон не трогаем
 }
-static bool s_micPaused = false;            // микрофон выключен, пока идёт звук с ноута
-static void sndLeave() { micStop(); ledsOff(); pcSendLine("AUD OFF"); s_micPaused = false; g_auFromPc = false; }
+static void sndLeave() {
+  micStop(); ledsOff();
+  if (s_pcAsked) { pcSendLine("AUD OFF"); s_pcAsked = false; }
+  g_auFromPc = false;
+}
 static void sndInfo(int i, SubItem& it) {
   static const char* const names[A_NUM] = { "Bars", "Terrain", "Reactor", "Level", "Scope", "XY" };
   static const char* const descs[A_NUM] = { "sound spectrum", "3D sound mountains", "pulse animation", "noise meter", "waveform", "oscilloscope XY" };
@@ -358,24 +367,28 @@ static void sndRotate(int dir) {
   g_aMode = (g_aMode + dir + A_NUM) % A_NUM;
 }
 static void sndTick(uint32_t now) {
+  // источник: 0 авто (ноут, если звук идёт, иначе микрофон), 1 только микрофон, 2 только ноут
   static uint32_t s_audReq = 0;
-  if (!s_audReq || msSince(now, s_audReq) > 1500) { s_audReq = now; pcSendLine("AUD ON"); }   // «ноут, шли звук»
-  if (audioPcLive(now)) {                            // есть звук ноута — микрофон не нужен
-    g_auFromPc = true;
-    if (s_micRun) { micStop(); s_micPaused = true; }
+  bool wantPc = g_auSrcNow != 1;
+  if (wantPc) {
+    if (!s_audReq || msSince(now, s_audReq) > 1500) { s_audReq = now; pcSendLine("AUD ON"); s_pcAsked = true; }   // «ноут, шли звук»
+  } else if (s_pcAsked) { pcSendLine("AUD OFF"); s_pcAsked = false; s_audReq = 0; }
+  bool pc = wantPc && audioPcLive(now);
+  g_auFromPc = pc;
+  bool useMic = g_auSrcNow == 1 || (g_auSrcNow == 0 && !pc);
+  if (!useMic) {                                     // звук ноута — микрофон не нужен
+    if (s_micRun) micStop();
+    s_micTried = false;                              // понадобится — запустим снова
     return;
   }
-  g_auFromPc = false;
-  if (s_micPaused) {                                 // ноут замолчал — снова слушаем микрофон
-    s_micPaused = false;
-    if (g_micEn) { g_micOk = micStart(0); g_micDiag.blocks = 0; }
-  }
-  if (g_micOk) auUpdate(now);
+  if (!s_micRun && g_micEn && !s_micTried) { s_micTried = true; g_micOk = micStart(0); g_micDiag.blocks = 0; }
+  if (g_micOk && s_micRun) auUpdate(now);
 }
 static void sndDraw(uint32_t now) {
   // нет драйвера, выключен или данные не идут больше секунды — экран диагностики
-  bool pc = audioPcLive(now);
-  if (!pc && (!g_micOk || (g_micDiag.blocks == 0 && now - s_micStartMs > 1000))) { drawMicMissing(); return; }
+  bool pc = g_auSrcNow != 1 && audioPcLive(now);
+  if (g_auSrcNow == 2 && !pc) { drawPcAudioWait(now); return; }        // выбран ноут, а звука нет
+  if (!pc && (!g_micOk || (g_micDiag.blocks == 0 && msSince(now, s_micStartMs) > 1000))) { drawMicMissing(); return; }
   switch (g_aMode) {
     case A_BARS:    drawAuBars(now); break;
     case A_REACTOR: drawReactor(now); break;

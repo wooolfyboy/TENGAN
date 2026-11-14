@@ -82,6 +82,7 @@ void audioClick() {}
 void audioBeep(uint16_t, uint16_t) {}
 void audioGeiger(int) {}
 bool   g_auFromPc = false;
+int    g_auSrcNow = 0;
 int8_t g_auXY[AU_XY][2];
 bool   g_auXYStereo = false;
 bool audioPcLive(uint32_t) { return g_auFromPc; }

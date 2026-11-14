@@ -42,6 +42,8 @@ extern MicDiag g_micDiag;
 
 // звук с ноутбука (раздел PC: программа на ноуте слушает то, что играет в колонках)
 extern bool   g_auFromPc;            // сейчас картинки рисуются по звуку ноутбука, а не микрофона
+extern int    g_auSrcNow;            // источник сейчас: 0 авто, 1 микрофон, 2 ноутбук (из настроек)
+void drawPcAudioWait(uint32_t now);  // выбран «ноутбук», а звука от него нет
 #define AU_XY 64
 extern int8_t g_auXY[AU_XY][2];      // точки для XY-осциллографа: левый / правый канал
 extern bool   g_auXYStereo;
