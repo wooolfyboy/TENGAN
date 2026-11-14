@@ -24,6 +24,7 @@
 #include "ble/ble.h"
 #include "core/boot.h"
 #include <driver/gpio.h>
+#include <esp_ota_ops.h>
 #include "audio/audio.h"
 
 // Самый ранний момент, где можно что-то сделать (ещё до setup): гасим подсветку,
@@ -36,6 +37,17 @@ extern "C" void initVariant() {
 __attribute__((constructor(101))) static void earlyBacklightOff() {
   gpio_set_direction((gpio_num_t)TFT_BL, GPIO_MODE_OUTPUT);
   gpio_set_level((gpio_num_t)TFT_BL, 0);
+}
+
+// Откат прошивки: после обновления по Wi-Fi новая прошивка считается «пробной».
+// Подтверждаем её сами, когда она проработала 15 с; если раньше зависла или
+// перезагрузилась — загрузчик вернёт старую.
+extern "C" bool verifyRollbackLater() { return true; }
+static void confirmFirmware(uint32_t now) {
+  static bool done = false;
+  if (done || now < 15000) return;
+  done = true;
+  esp_ota_mark_app_valid_cancel_rollback();      // после прошивки по USB просто ничего не делает
 }
 
 void setup() {
@@ -70,6 +82,7 @@ void loop() {
   navTick(now);                       // работа открытого раздела (сканы, развёртки)
 
   powerIdleTick(now);
+  confirmFirmware(now);
   // в приглушённом режиме кадры в 4 раза реже — меньше работы процессору и шине
   uint32_t frame = powerIdle() ? REDRAW_MS * 4 : (g_fastFrame ? 33 : REDRAW_MS);
   if (now - lastDraw >= frame) {

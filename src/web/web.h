@@ -10,3 +10,4 @@ extern const Section webSection;
 // экран (web_screen.cpp) — отдельно, чтобы его видел симулятор
 struct WebView { const char* ssid; const char* pass; const char* url; int clients; uint32_t reqs; bool ok; const char* tab; };
 void drawWebScreen(const WebView& v, const uint8_t* qr, int qrSize);
+void drawWebOta(const WebView& v, int pct, const char* err);   // загрузка прошивки: -2 ошибка, 0..100

@@ -47,3 +47,34 @@ void drawWebScreen(const WebView& v, const uint8_t* qr, int n) {
   present();
   (void)W;
 }
+
+// загрузка прошивки по Wi-Fi: рисуем и сразу выводим (сервер в это время занят)
+void drawWebOta(const WebView& v, int pct, const char* err) {
+  const int W = spr.width();
+  char buf[40];
+  spr.fillSprite(C_BG());
+  bool bad = pct == -2;
+  uiHeader("Firmware update", bad ? "failed" : pct >= 100 ? "done" : "receiving", bad);
+  int bx = UI_M + 12, bw = W - 2 * bx, by = 76;
+  spr.setTextDatum(TC_DATUM);
+  if (bad) {
+    spr.setTextColor(C_ALERT());
+    txt("UPDATE FAILED", W / 2, 50, 4);
+    spr.setTextColor(UI_LABEL());
+    txt(err && err[0] ? err : "unknown error", W / 2, 84, 2);
+    spr.setTextColor(UI_DIM());
+    txt("OLD FIRMWARE KEPT - NOTHING CHANGED", W / 2, 110, 1);
+  } else {
+    snprintf(buf, sizeof(buf), "%d%%", max(0, pct));
+    spr.setTextColor(C_HOT());
+    txt(pct >= 100 ? "RESTARTING" : buf, W / 2, 38, 4);
+    spr.drawRect(bx, by, bw, 14, UI_LINE());
+    spr.fillRect(bx + 2, by + 2, (bw - 4) * constrain(pct, 0, 100) / 100, 10, C_ACC());
+    spr.setTextColor(UI_DIM());
+    txt("DO NOT TURN OFF", W / 2, by + 26, 1);
+    txt("IF THE NEW FIRMWARE FAILS, THE OLD ONE COMES BACK", W / 2, by + 40, 1);
+  }
+  uiFooter("", "");
+  present();
+  (void)v;
+}

@@ -14,6 +14,8 @@
 #include <WebServer.h>
 #include <DNSServer.h>
 #include <qrcode.h>
+#include <Update.h>
+#include <esp_ota_ops.h>
 #include "web/web.h"
 #include "web/web_page.h"
 #include "ble/ble.h"
@@ -38,6 +40,18 @@ static int        s_netCount = 0;
 static uint32_t   s_subMs = 0, s_sndMs = 0;     // когда вкладки Sub-GHz / Sound последний раз спрашивали
 static bool       s_subOn = false, s_sndOn = false;
 static const char* s_tab = "";                  // что сейчас смотрят на телефоне (для экрана палки)
+
+// ---------- обновление прошивки по Wi-Fi (OTA) ----------
+// Принимаем и обычный firmware.bin, и «общий» файл для прошивки на 0x0
+// (в нём программа лежит со смещения 0x10000 — начало пропускаем).
+// Новая прошивка пишется во второй слот; пока она не проработает 15 с
+// (main.cpp), загрузчик готов откатить палку на старую.
+static int      s_otaPct = -1;                  // -1 — загрузки нет
+static String   s_otaErr;
+static uint8_t* s_otaHead = nullptr;            // первые 0x8002 байт: решаем, «общий» ли файл
+static size_t   s_otaHeadN = 0, s_otaPos = 0, s_otaSkip = 0;
+static bool     s_otaStarted = false;
+static const size_t OTA_PROBE = 0x8002, OTA_APP_OFS = 0x10000;
 
 static void qrStore(esp_qrcode_handle_t q) {
   int n = esp_qrcode_get_size(q);
@@ -107,7 +121,8 @@ static void scanCollect() {
 // какая вкладка открыта на телефоне: страница присылает её в каждом запросе (?tab=)
 static void noteTab() {
   static const char* const T[][2] = { { "ov", "overview" }, { "ble", "bluetooth" }, { "wifi", "wi-fi" },
-                                      { "sub", "sub-ghz" }, { "snd", "sound" }, { "sys", "system" } };
+                                      { "sub", "sub-ghz" }, { "snd", "sound" }, { "sys", "system" },
+                                      { "upd", "update" } };
   String t = s_srv->arg("tab");
   for (auto& p : T) if (t == p[0]) { s_tab = p[1]; return; }
 }
@@ -121,6 +136,84 @@ static void sendJson(const String& s) {
   s_srv->client().setNoDelay(true);
   s_srv->sendHeader("Cache-Control", "no-store");
   s_srv->send(200, "application/json", s);
+}
+
+static void otaDrawProgress() {
+  WebView v = { s_ssid, s_pass, "192.168.4.1", 1, s_reqs, true, "update" };
+  drawWebOta(v, s_otaPct, s_otaErr.c_str());
+}
+
+static bool otaWrite(uint8_t* d, size_t n) {
+  // пропустить загрузчик и таблицу разделов «общего» файла
+  if (s_otaSkip) {
+    size_t k = min(n, s_otaSkip);
+    d += k; n -= k; s_otaSkip -= k;
+    if (!n) return true;
+  }
+  if (!s_otaStarted) {
+    if (d[0] != 0xE9) { s_otaErr = "not an ESP32 firmware file"; return false; }
+    if (!Update.begin(UPDATE_SIZE_UNKNOWN)) { s_otaErr = Update.errorString(); return false; }
+    s_otaStarted = true;
+  }
+  if (Update.write(d, n) != n) { s_otaErr = Update.errorString(); return false; }
+  return true;
+}
+
+static void otaUpload() {
+  HTTPUpload& up = s_srv->upload();
+  if (up.status == UPLOAD_FILE_START) {
+    s_otaErr = ""; s_otaPct = 0; s_otaPos = 0; s_otaHeadN = 0; s_otaSkip = 0; s_otaStarted = false;
+    bleRadioOff();                                 // весь эфир — загрузке
+    if (!s_otaHead) s_otaHead = (uint8_t*)malloc(OTA_PROBE);
+    if (!s_otaHead) s_otaErr = "no memory";
+    otaDrawProgress();
+  } else if (up.status == UPLOAD_FILE_WRITE) {
+    if (s_otaErr.length()) return;
+    uint8_t* d = up.buf; size_t n = up.currentSize;
+    s_otaPos += n;
+    if (s_otaHeadN < OTA_PROBE && s_otaHead) {     // копим начало файла
+      size_t k = min(n, OTA_PROBE - s_otaHeadN);
+      memcpy(s_otaHead + s_otaHeadN, d, k);
+      s_otaHeadN += k; d += k; n -= k;
+      if (s_otaHeadN < OTA_PROBE) return;
+      bool merged = s_otaHead[0x8000] == 0xAA && s_otaHead[0x8001] == 0x50;   // таблица разделов на 0x8000
+      if (merged) s_otaSkip = OTA_APP_OFS - OTA_PROBE;                        // остаток до 0x10000 пропустить
+      else if (!otaWrite(s_otaHead, OTA_PROBE)) return;
+    }
+    if (n && !otaWrite(d, n)) return;
+    static uint32_t lastDraw = 0;
+    if (millis() - lastDraw > 400) {               // экран палки: прогресс (размер неизвестен — по ~2 МБ)
+      lastDraw = millis();
+      s_otaPct = min(99, (int)(s_otaPos * 100 / 2100000));
+      otaDrawProgress();
+    }
+  } else if (up.status == UPLOAD_FILE_END) {
+    if (!s_otaErr.length() && s_otaHeadN < OTA_PROBE && s_otaHead)   // файл меньше 32 КБ
+      s_otaErr = "file is too small";
+    if (!s_otaErr.length() && !Update.end(true)) s_otaErr = Update.errorString();
+    if (s_otaErr.length() && s_otaStarted) Update.abort();
+    s_otaPct = s_otaErr.length() ? -2 : 100;
+    otaDrawProgress();
+  } else if (up.status == UPLOAD_FILE_ABORTED) {
+    if (s_otaStarted) Update.abort();
+    s_otaErr = "upload interrupted"; s_otaPct = -2;
+    otaDrawProgress();
+  }
+}
+
+static void otaDone() {
+  s_reqs++;
+  bool ok = s_otaPct == 100 && !s_otaErr.length();
+  String o = "{\"ok\":"; o += ok ? "true" : "false";
+  o += ",\"err\":\""; o += s_otaErr; o += "\"}";
+  s_srv->client().setNoDelay(true);
+  s_srv->send(200, "application/json", o);
+  if (ok) {                                        // ответить телефону и перезагрузиться в новую прошивку
+    delay(600);
+    ESP.restart();
+  }
+  s_otaPct = -1;
+  bleRadioOn();
 }
 
 static void webStart() {
@@ -164,6 +257,13 @@ static void webStart() {
     o += ",\"nets\":"; o += s_netCount;
     o += ",\"build\":\"" __DATE__ " " __TIME__ "\"";
     o += ",\"ssid\":\""; o += s_ssid; o += "\"}";
+    sendJson(o);
+  });
+  s_srv->on("/update", HTTP_POST, otaDone, otaUpload);
+  s_srv->on("/api/ver", [] {
+    const esp_partition_t* run = esp_ota_get_running_partition();
+    String o = "{\"build\":\"" __DATE__ " " __TIME__ "\",\"slot\":\""; o += run ? run->label : "?";
+    o += "\",\"max\":"; o += (uint32_t)ESP.getFreeSketchSpace(); o += '}';
     sendJson(o);
   });
   s_srv->onNotFound([] {                           // проверки «есть ли интернет» у телефонов -> на страницу

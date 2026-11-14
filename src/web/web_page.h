@@ -91,11 +91,22 @@ tr.cl{cursor:pointer}tr.cl:hover td{background:#0a1d24}
  <div class="card"><div class="lab">battery</div><div class="big" id="y-soc">-</div><div class="kv" id="y-bat"></div></div>
  <div class="card"><div class="lab">device</div><div class="kv" id="y-dev"></div></div>
 </div></section>
+
+<section id="p-upd"><div class="card">
+ <div class="lab">firmware update over wi-fi</div>
+ <div class="kv" id="u-ver" style="margin:8px 0 14px"></div>
+ <div class="mut" style="margin-bottom:10px">Choose the firmware file (the same .bin you flash over USB, or firmware.bin). The device restarts by itself.
+ If the new firmware does not start, the old one comes back automatically.</div>
+ <input type="file" id="u-f" accept=".bin" style="margin-bottom:10px;color:var(--steel)"><br>
+ <button id="u-go" class="x" style="float:none" onclick="upload()">UPLOAD</button>
+ <div class="bar" style="width:100%;height:10px;margin-top:14px"><i id="u-bar" style="width:0%"></i></div>
+ <div id="u-st" class="mut" style="margin-top:8px"></div>
+</div></section>
 </main>
 <div id="modal" class="hide" onclick="if(event.target==this)closeM()"><div class="card" id="mc"></div></div>
 <script>
 const $=id=>document.getElementById(id),dp=()=>window.devicePixelRatio||1;
-const TABS=[['ov','OVERVIEW'],['ble','BLUETOOTH'],['wifi','WI-FI'],['sub','SUB-GHZ'],['snd','SOUND'],['sys','SYSTEM']];
+const TABS=[['ov','OVERVIEW'],['ble','BLUETOOTH'],['wifi','WI-FI'],['sub','SUB-GHZ'],['snd','SOUND'],['sys','SYSTEM'],['upd','UPDATE']];
 let cur='ov',timer=null,bd=[],wd=[],sens=[],bhist=[],rhist={},bs={k:'r',d:-1},ws={k:'r',d:-1},sub={m:0,b:1},ahist=[],detId=null;
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const pct=r=>Math.max(0,Math.min(100,(r+95)*2));
@@ -108,8 +119,8 @@ $('nav').innerHTML=TABS.map(([k,n])=>`<button id="n-${k}" onclick="go('${k}')">$
 // опрос: следующий запрос — только после ответа на предыдущий (не копятся в очередь)
 let gen=0;
 function go(t){cur=t;TABS.forEach(([k])=>{$('n-'+k).className=k==t?'on':'';$('p-'+k).classList.toggle('hide',k!=t)});
- $('n-'+t).scrollIntoView({inline:'nearest',block:'nearest'});const f={ov:ov,ble:ble,wifi:wifi,sub:subP,snd:snd,sys:sys}[t];
- const ms={ov:3000,ble:2000,wifi:5000,sub:60,snd:60,sys:3000}[t];const my=++gen;
+ $('n-'+t).scrollIntoView({inline:'nearest',block:'nearest'});const f={ov:ov,ble:ble,wifi:wifi,sub:subP,snd:snd,sys:sys,upd:ver}[t];
+ const ms={ov:3000,ble:2000,wifi:5000,sub:60,snd:60,sys:3000,upd:600000}[t];const my=++gen;
  (async function loop(){while(my==gen){const t0=Date.now();await f();const w=ms-(Date.now()-t0);await new Promise(r=>setTimeout(r,Math.max(w,10)))}})()}
 
 // ---------- шапка ----------
@@ -194,5 +205,16 @@ async function sys(){const j=await info();if(!j)return;const b=j.bat;$('y-soc').
  $('y-bat').innerHTML=kv.map(([k,v])=>`<span>${k}</span><span>${v}</span>`).join('');
  $('y-dev').innerHTML=[['uptime',ago(j.up)],['chip temp',j.chip+' °C'],['free memory',j.heap+' KB'],['free PSRAM',j.psram+' KB'],['connected',j.cli],['network',j.ssid],['firmware',j.build]].map(([k,v])=>`<span>${k}</span><span>${esc(v)}</span>`).join('')}
 
+// ---------- update ----------
+async function ver(){try{const j=await J('/api/ver');$('u-ver').innerHTML=[['running',j.build],['slot',j.slot],['max size',(j.max/1048576).toFixed(1)+' MB']].map(([k,v])=>`<span>${k}</span><span>${esc(v)}</span>`).join('')}catch(e){}}
+function upload(){const f=$('u-f').files[0];if(!f){$('u-st').textContent='choose a .bin file first';return}
+ if(!confirm('Upload '+f.name+' ('+(f.size/1048576).toFixed(2)+' MB) and restart the device?'))return;
+ gen++;$('u-go').disabled=true;const fd=new FormData();fd.append('fw',f,f.name);const x=new XMLHttpRequest();x.open('POST','/update');
+ x.upload.onprogress=e=>{if(e.lengthComputable){const p=Math.round(e.loaded/e.total*100);$('u-bar').style.width=p+'%';$('u-st').textContent='uploading '+p+'%'}};
+ x.onload=()=>{let j={};try{j=JSON.parse(x.responseText)}catch(e){}
+  if(j.ok){$('u-bar').style.width='100%';$('u-st').innerHTML='done — device is restarting. Reconnect to its Wi-Fi in ~20 s and reload this page.'}
+  else{$('u-st').innerHTML='<span class="alert">failed: '+esc(j.err||x.status)+'</span> — old firmware kept';$('u-go').disabled=false;go('upd')}};
+ x.onerror=()=>{$('u-st').innerHTML='<span class="alert">connection lost</span> — if the device restarted, reconnect and check the version';$('u-go').disabled=false};
+ $('u-st').textContent='uploading…';x.send(fd)}
 heads('p-ble',bs,drawB);heads('p-wifi',ws,drawW);subUI();go('ov');
 </script></body></html>)HTML";
