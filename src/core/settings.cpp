@@ -8,18 +8,20 @@
 #include "core/leds.h"
 #include "core/battery.h"
 #include "core/ui.h"
+#include "audio/audio.h"
 
 int g_range = 0;
 int g_thresh = 7;
 int g_ledBright = 50;
 int g_scrBright = 100;
-int g_dimIdx = 0;                          // по умолчанию экран не гаснет
+int g_dimIdx = 0;
+int g_sndIdx = 1;                          // тихие звуки интерфейса                          // по умолчанию экран не гаснет
 
 static int      g_setItem = 0;           // выбранный пункт
 static bool     g_setDirty = false;
 static uint32_t g_setChangedMs = 0;
 static Preferences g_prefs;
-static const int N_SET_ITEMS = 6;        // последний пункт — батарея (только показывает)
+static const int N_SET_ITEMS = 7;        // последний пункт — батарея (только показывает)
 
 // ---------- настройки ----------
 void applyBrightness() {
@@ -34,12 +36,14 @@ void loadSettings() {
   g_ledBright = g_prefs.getInt("ledbr", 50);
   g_scrBright = g_prefs.getInt("scrbr", 100);
   g_dimIdx    = g_prefs.getInt("dim", 0);
+  g_sndIdx    = g_prefs.getInt("snd", 1);
   g_prefs.end();
   if (g_range < 0 || g_range >= N_RANGES) g_range = 0;
   if (g_thresh < 0 || g_thresh > 30) g_thresh = 7;
   if (g_ledBright < 10 || g_ledBright > 100) g_ledBright = 50;
   if (g_scrBright < 20 || g_scrBright > 100) g_scrBright = 100;
   if (g_dimIdx < 0 || g_dimIdx >= N_DIMS) g_dimIdx = 0;
+  if (g_sndIdx < 0 || g_sndIdx > 2) g_sndIdx = 1;
 }
 
 void saveSettings() {
@@ -49,6 +53,7 @@ void saveSettings() {
   g_prefs.putInt("ledbr", g_ledBright);
   g_prefs.putInt("scrbr", g_scrBright);
   g_prefs.putInt("dim", g_dimIdx);
+  g_prefs.putInt("snd", g_sndIdx);
   g_prefs.end();
   g_setDirty = false;
 }
@@ -64,6 +69,7 @@ void settingsAdjust(int dir) {
     case 2: g_ledBright = constrain(g_ledBright + dir * 10, 10, 100); break;
     case 3: g_scrBright = constrain(g_scrBright + dir * 10, 20, 100); break;
     case 4: g_dimIdx = constrain(g_dimIdx + dir, 0, N_DIMS - 1); break;
+    case 5: g_sndIdx = constrain(g_sndIdx + dir, 0, 2); audioBeep(1400, 60); break;
     default: return;                       // батарея — только показывает
   }
   applyBrightness();
@@ -74,19 +80,20 @@ void settingsAdjust(int dir) {
 void drawSettings() {
   int W = spr.width();
   spr.fillSprite(C_BG());
-  uiHeader("Settings", "stored on device");
 
-  static const char* const names[N_SET_ITEMS] = { "Range", "LED events", "LED brightness", "Screen", "Auto dim", "Battery" };
+  static const char* const names[N_SET_ITEMS] = { "Range", "LED events", "LED brightness", "Screen", "Auto dim", "Sounds", "Battery" };
   static const char* const hints[N_SET_ITEMS] = {
-    "ignore bluetooth devices weaker than this",
-    "flash leds when device count jumps by this",
-    "brightness of the led strip",
+    "bluetooth: ignore weaker",
+    "leds flash on count jump",
+    "led strip brightness",
     "screen backlight",
-    "dim the screen after no buttons for this long",
+    "dim when idle",
+    "clicks + find ticks",
     "",
   };
   char batLine[64]; batSummary(batLine, sizeof(batLine));
-  const int rh = 20;
+  uiHeader("Settings", g_setItem == 6 ? batLine : hints[g_setItem]);   // подсказка к выбранному пункту
+  const int rh = 18;
   for (int i = 0; i < N_SET_ITEMS; i++) {
     int y = UI_TOP + 2 + i * rh, cy = y + rh / 2 - 1;
     bool sel = (i == g_setItem);
@@ -106,6 +113,7 @@ void drawSettings() {
         else if (DIM_SECS[g_dimIdx] < 60) sprintf(val, "%d s", DIM_SECS[g_dimIdx]);
         else sprintf(val, "%d min", DIM_SECS[g_dimIdx] / 60);
         break;
+      case 5: sprintf(val, "%s", g_sndIdx == 0 ? "off" : g_sndIdx == 1 ? "quiet" : "loud"); break;
       default:
         if (g_bat.ok) { sprintf(val, "%d%%  %.2f V", g_bat.soc, g_bat.mv / 1000.0f); alert = g_bat.soc <= 20; }
         else          sprintf(val, "n/a");
@@ -117,19 +125,12 @@ void drawSettings() {
     spr.setTextDatum(MR_DATUM);
     spr.setTextColor(alert ? C_ALERT() : (sel ? C_ACC() : C_HOT()));
     txt(val, W - UI_M - 8, cy, 2);
-    if (sel && i < 5) {                           // стрелка «крути колесо»
+    if (sel && i < 6) {                           // стрелка «крути колесо»
       int vw = txtW(val, 2);
       spr.setTextColor(UI_DIM());
       txt("<", W - UI_M - 16 - vw, cy, 2);
     }
   }
-  const char* h = g_setItem == 5 ? batLine : hints[g_setItem];
-  char hu[64]; size_t k = 0;
-  for (; h[k] && k < sizeof(hu) - 1; k++) hu[k] = (char)toupper((unsigned char)h[k]);
-  hu[k] = 0;
-  spr.setTextDatum(TL_DATUM);
-  spr.setTextColor(UI_DIM());
-  txt(hu, UI_M + 8, UI_TOP + 2 + N_SET_ITEMS * rh + 4, 1);
   uiFooter("wheel: change   click: next", "side: back");
   present();
 }

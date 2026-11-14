@@ -23,6 +23,7 @@
 #include "core/leds.h"
 #include "ble/ble.h"
 #include "core/boot.h"
+#include "audio/audio.h"
 
 void setup() {
   checkWakeHold();      // включение после «выключения»: только удержанием боковой кнопки
@@ -41,6 +42,7 @@ void setup() {
   batBegin();
   bootScreen();          // заставка-самопроверка
   bleBegin();
+  audioBegin();          // динамик: звуки интерфейса
   navBegin();
   navDraw(millis());
 }

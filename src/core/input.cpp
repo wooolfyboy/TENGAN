@@ -7,6 +7,7 @@
 #include "core/board.h"
 #include "core/menu.h"
 #include "core/power.h"
+#include "audio/audio.h"
 
 // --- колесо: квадратурный декодер в прерывании ---
 // таблица переходов (предыдущее состояние AB << 2 | новое) -> -1 / 0 / +1;
@@ -51,13 +52,14 @@ void inputPoll() {
   if (enc == LOW && lastEnc == HIGH && now - lastEncMs > 250) {
     bool wasDim = powerIdle();
     powerTouch();
-    if (!wasDim) navClick();                 // первое нажатие в «сне» только будит экран
+    if (!wasDim) { navClick(); audioClick(); }   // первое нажатие в «сне» только будит экран
     lastEncMs = now;
   }
   lastEnc = enc;
 
   int st = s_steps.exchange(0);
   if (st) { bool wasDim = powerIdle(); powerTouch(); if (wasDim) st = 0; }
+  if (st) audioClick();
   for (; st > 0; st--) navRotate(+1);
   for (; st < 0; st++) navRotate(-1);
 

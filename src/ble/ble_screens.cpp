@@ -11,6 +11,7 @@
 #include "core/theme.h"
 #include "core/ui.h"
 #include "core/settings.h"
+#include "audio/audio.h"
 
 static int g_sweep = 0;                  // угол луча на SCOPE
 
@@ -242,6 +243,7 @@ void drawNearest(bool have, int rssi, const Ent& best, int count) {
     txt("! TRACKER", UI_M + 8, UI_TOP + 4, 2);
   }
   present();
+  audioGeiger(pct);                                // щелчки чаще — ближе
 }
 
 // ============================================================

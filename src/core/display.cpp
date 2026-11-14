@@ -152,3 +152,11 @@ void iconAntenna(int x, int y, uint16_t c, uint16_t bg) {
     spr.drawArc(x, y - 10, r, r - 3, 45, 135, c, bg, true);     // волны справа
   }
 }
+
+// микрофон (Sound)
+void iconMic(int x, int y, uint16_t c, uint16_t bg) {
+  spr.fillSmoothRoundRect(x - 7, y - 20, 14, 26, 7, c, bg);
+  spr.drawArc(x, y - 2, 13, 10, 270, 90, c, bg, true);   // «подкова» под капсюлем
+  spr.drawWideLine(x, y + 12, x, y + 20, 3, c, bg);
+  spr.drawWideLine(x - 8, y + 21, x + 8, y + 21, 3, c, bg);
+}

@@ -11,6 +11,7 @@
 #include "core/theme.h"
 #include "core/ui.h"
 #include "core/leds.h"
+#include "audio/audio.h"
 
 // значок защиты сети; открытые и WEP — инверсией, как тревога
 static char secGlyph(uint8_t e) {
@@ -427,6 +428,7 @@ void drawFind(uint32_t now) {
   }
   uiFooter("click: next network", "side: back");
   present();
+  if (!lost) audioGeiger(pct);                     // щелчки чаще — ближе
 
   if (g_ledEvent == 0) {                           // лента — уровень сигнала
     int lv = pct * WS2812_N / 100;

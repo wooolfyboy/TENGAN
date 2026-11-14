@@ -19,6 +19,8 @@
 #include "wifi/wifi_model.h"
 #include "subghz/subghz.h"
 #include "subghz/subghz_model.h"
+#include "audio/audio.h"
+#include "audio/audio_model.h"
 #include <esp_wifi.h>
 #include <Wire.h>
 #include <SPI.h>
@@ -63,6 +65,19 @@ uint32_t g_events = 3;
 Burst    g_ev[EV_N];
 int      g_evN = 0;
 
+// ---------- звук (в прошивке — audio.cpp) ----------
+AudioView g_au;
+bool  g_micOk = true;
+int   g_aMode = 0;
+float g_auHist[AU_HIST];
+int   g_auHistN = 0;
+float g_auMax = -18, g_auAvg = -47;
+const char* levelWord(float db) { return db < -55 ? "QUIET" : db < -40 ? "NORMAL" : db < -25 ? "LOUD" : "VERY LOUD"; }
+void audioBegin() {}
+void audioClick() {}
+void audioBeep(uint16_t, uint16_t) {}
+void audioGeiger(int) {}
+
 // ---------- разделы для меню (в прошивке — свои файлы) ----------
 static void noop() {}
 static void noopI(int) {}
@@ -94,6 +109,15 @@ const Section bleSection = { "Bluetooth", 80, 150, 240, iconBluetooth, bleSub, n
   NUM_MODES, bleInfo, zero, noopI, noop, noop, noopI, noBack, noopT, noopT };
 const Section wifiSection = { "Wi-Fi", 70, 210, 130, iconWifi, wifiSub, noop, noop,
   W_NUM, wifiInfo, zero, noopI, noop, noop, noopI, noBack, noopT, noopT };
+static void sndSub(char* o, size_t n) { snprintf(o, n, "%d dBfs", (int)g_au.level); }
+static void sndInfo(int i, SubItem& it) {
+  static const char* const nm[] = { "Bars", "Reactor", "Level", "Scope" };
+  static const char* const ds[] = { "sound spectrum", "pulse animation", "noise meter", "waveform" };
+  static const char* const vv[] = { "1.2 kHz", "", "-38 dBfs", "" };
+  it.name = nm[i]; it.desc = ds[i]; snprintf(it.value, sizeof(it.value), "%s", vv[i]);
+}
+const Section soundSection = { "Sound", 120, 200, 255, iconMic, sndSub, noop, noop,
+  A_NUM, sndInfo, zero, noopI, noop, noop, noopI, noBack, noopT, noopT };
 const Section subghzSection = { "Sub-GHz", 240, 120, 90, iconAntenna, subSub, noop, noop,
   G_NUM, subInfo, zero, noopI, noop, noop, noopI, noBack, noopT, noopT };
 
@@ -226,7 +250,9 @@ int main(int argc, char** argv) {
   navBack();
   navRotate(+1); navClick(); navDraw(s_now);     snap("04_subghz_sub");
   navBack();
-  navRotate(+1); navClick(); navDraw(s_now);     snap("05_settings");
+  navRotate(+1); navClick(); navDraw(s_now);     snap("05_sound_sub");
+  navBack();
+  navRotate(+1); navClick(); navDraw(s_now);     snap("06_settings");
   navBack();
 
   std::vector<Blip> blips;
@@ -270,6 +296,23 @@ int main(int argc, char** argv) {
   g_prom = false;
   g_wMode = W_FIND;
   drawFind(s_now);           snap("25_wifi_find");
+
+  // звук: «голос» с пиком около 1.2 кГц и гармониками
+  g_au.level = -38; g_au.peak = -31; g_au.domHz = 1187; g_au.energy = 0.45f;
+  for (int k = 0; k < AU_BANDS; k++) {
+    float x = k / (float)AU_BANDS;
+    float v = 0.25f + 0.55f * expf(-(k - 17) * (k - 17) / 18.0f) + 0.35f * expf(-(k - 9) * (k - 9) / 10.0f) - 0.2f * x + noise(k) * 0.15f;
+    g_au.bands[k] = constrain(v, 0.02f, 1.0f); g_au.caps[k] = min(1.0f, g_au.bands[k] + 0.06f + noise(k + 5) * 0.08f);
+  }
+  for (int i = 0; i < AU_WAVE; i++) g_au.wave[i] = (int16_t)(6000 * sinf(i * 0.37f) + 2500 * sinf(i * 1.11f + 1) + noise(i) * 900 - 450);
+  for (int i = 0; i < AU_HIST; i++) g_auHist[i] = -52 + 8 * sinf(i / 7.0f) + noise(i) * 6 + (i > 90 && i < 100 ? 30 : 0);
+  g_auHistN = AU_HIST;
+  drawAuBars(s_now);         snap("40_sound_bars");
+  drawReactor(s_now);        snap("41_sound_reactor");
+  drawLevel(s_now);          snap("42_sound_level");
+  drawWave(s_now);           snap("43_sound_scope");
+  g_au.level = -21; g_au.peak = -18;
+  drawLevel(s_now);          snap("42b_sound_level_loud");
 
   drawSpectrum();            snap("30_subghz_spectrum");
   drawMonitor(s_now);        snap("31_subghz_monitor");

@@ -13,9 +13,10 @@
 #include "ble/ble.h"
 #include "wifi/wifi.h"
 #include "subghz/subghz.h"
+#include "audio/audio.h"
 
 // порядок карточек в главном меню
-static const Section* const SECTIONS[] = { &bleSection, &wifiSection, &subghzSection, &settingsSection };
+static const Section* const SECTIONS[] = { &bleSection, &wifiSection, &subghzSection, &soundSection, &settingsSection };
 static const int N_SECTIONS = sizeof(SECTIONS) / sizeof(SECTIONS[0]);
 
 static int  s_cur = -1;          // открытый раздел; -1 — главное меню
@@ -142,7 +143,7 @@ static void drawMainMenuHud() {
     spr.drawPixel(x, 18, tft.color565(r * k, g * k, b * k));
   }
 
-  const int cw = 74, ch = 128, gap = 6, y0 = 24;
+  const int gap = 5, cw = (W - 12 - gap * (N_SECTIONS - 1)) / N_SECTIONS, ch = 128, y0 = 24;
   int x0 = (W - (cw * N_SECTIONS + gap * (N_SECTIONS - 1))) / 2;
   for (int i = 0; i < N_SECTIONS; i++) {
     const Section* s = SECTIONS[i];
@@ -157,7 +158,7 @@ static void drawMainMenuHud() {
     title[k] = 0;
     spr.setTextDatum(TC_DATUM);
     spr.setTextColor(sel ? C_HOT() : steel);
-    txt(title, cx, y0 + 62, 2);
+    txt(title, cx, y0 + 62, txtW(title, 2) > cw - 4 ? 1 : 2);   // длинное название — мельче
     char sub[24], big[16], small[16];
     s->subtitle(sub, sizeof(sub));
     splitSubtitle(sub, big, small, sizeof(big));
@@ -165,7 +166,7 @@ static void drawMainMenuHud() {
     spr.setTextColor(alertish ? C_ALERT() : (sel ? acc : steel));
     txt(big, cx, y0 + 82, 4);
     spr.setTextColor(dim);
-    char sm[13]; snprintf(sm, sizeof(sm), "%s", small);
+    char sm[16]; snprintf(sm, sizeof(sm), "%.*s", cw / 6, small);   // сколько влезает
     txt(sm, cx, y0 + 110, 1);
   }
 
