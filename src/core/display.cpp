@@ -75,7 +75,10 @@ void drawSubmenu(const char* title, uint16_t acc, SubItem* it, int n, int sel) {
     int y = y0 + i * rh;
     bool isSel = (i == sel);
     uint16_t bg = isSel ? C(22, 26, 38) : C_BG();
-    if (isSel) {
+    if (isSel && g_theme == THEME_HUD) {
+      hudPanel(0, y, W, rh - 2, 8, bg, true, C_BG());
+      spr.fillRect(0, y + 2, 3, rh - 12, acc);
+    } else if (isSel) {
       spr.fillRoundRect(0, y, W, rh - 2, 5, bg);
       spr.fillRoundRect(0, y + 3, 4, rh - 8, 2, acc);
     }
@@ -90,6 +93,34 @@ void drawSubmenu(const char* title, uint16_t acc, SubItem* it, int n, int sel) {
     txt(it[i].value, W - 8, ty, 2);
   }
   present();
+}
+
+void hudPanel(int x, int y, int w, int h, int cut, uint16_t col, bool filled, uint16_t bg) {
+  if (filled) {
+    spr.fillRect(x, y, w, h, col);
+    spr.fillTriangle(x + w - cut, y, x + w, y, x + w, y + cut, bg);   // срез справа сверху
+    spr.fillTriangle(x, y + h - cut, x, y + h, x + cut, y + h, bg);   // срез слева снизу
+    return;
+  }
+  spr.drawFastHLine(x, y, w - cut, col);
+  spr.drawLine(x + w - cut, y, x + w - 1, y + cut, col);
+  spr.drawFastVLine(x + w - 1, y + cut, h - cut, col);
+  spr.drawFastHLine(x + cut, y + h - 1, w - cut, col);
+  spr.drawLine(x, y + h - cut, x + cut, y + h - 1, col);
+  spr.drawFastVLine(x, y, h - cut, col);
+}
+
+void drawArcGauge(int cx, int cy, int r, int thick, int pct, uint16_t col, uint16_t track, uint16_t bg) {
+  pct = constrain(pct, 0, 100);
+  // у drawArc 0° — внизу, по часовой; верхний полукруг — от 90° до 270°
+  spr.drawArc(cx, cy, r, r - thick, 90, 270, track, bg, false);
+  int a1 = 90 + 180 * pct / 100;
+  if (a1 > 90) spr.drawArc(cx, cy, r, r - thick, 90, a1, col, bg, false);
+  for (int k = 0; k <= 12; k++) {                         // деления снаружи
+    float a = PI + k * PI / 12;
+    int r0 = r + 3, r1 = r + (k % 3 == 0 ? 9 : 6);
+    spr.drawLine(cx + cosf(a) * r0, cy + sinf(a) * r0, cx + cosf(a) * r1, cy + sinf(a) * r1, k * 100 / 12 <= pct ? col : track);
+  }
 }
 
 // --- иконки главного меню ---

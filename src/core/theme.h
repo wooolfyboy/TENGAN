@@ -6,12 +6,14 @@
 //    PHOSPHOR — зелёный люминофор: любой цвет превращается в оттенок
 //               зелёного по своей яркости, шрифт Share Tech Mono,
 //               свечение крупного текста и полосы строк, как у старого экрана;
-//    CLASSIC  — исходные цвета и встроенные шрифты.
+//    CLASSIC  — исходные цвета и встроенные шрифты;
+//    HUD      — «тактический» интерфейс: бирюзовый и стальной, оранжевый —
+//               только для тревоги; угловатый шрифт Rajdhani, уголки-скобки.
 // ============================================================
 #pragma once
 #include <Arduino.h>
 
-enum { THEME_PHOSPHOR = 0, THEME_CLASSIC = 1, N_THEMES };
+enum { THEME_PHOSPHOR = 0, THEME_CLASSIC = 1, THEME_HUD = 2, N_THEMES };
 extern int g_theme;
 const char* themeName(int t);
 void themeApply();                 // пересчитать палитру после смены темы
@@ -19,6 +21,8 @@ void themeApply();                 // пересчитать палитру по
 uint16_t C(uint8_t r, uint8_t g, uint8_t b);   // цвет с учётом темы
 uint16_t C_BG();                               // фон
 uint16_t C_HOT();                              // самый яркий (вместо белого)
+uint16_t C_ALERT();                            // тревога (HUD — оранжевый)
+uint16_t C_ACC();                              // главный акцент темы (HUD — бирюзовый)
 
 // Текст. size: 1 — мелкий пиксельный, 2 — обычный, 4 — крупный, 7 — цифры-«семисегментник».
 // Выравнивание и цвет — как обычно через spr.setTextDatum() / spr.setTextColor().
@@ -34,6 +38,8 @@ uint16_t heat(int rssi);           // -100 dBm (холодно) .. -40 dBm (го
 
 // Значок-буква (вариант C): буква в рамке; inverted — тёмная буква на светлом (тревога).
 void drawGlyph(int x, int y, char ch, uint16_t col, bool inverted);   // (x, y) — центр
+// Отметка цели на радаре: в HUD — ромб (тревога — залитый оранжевый), иначе — буква-значок.
+void drawMarker(int x, int y, char ch, uint16_t col, bool alert);
 static const int GLYPH_W = 9, GLYPH_H = 11;
 
 void present();                    // эффекты темы + вывести кадр на экран

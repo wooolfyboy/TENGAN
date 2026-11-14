@@ -34,7 +34,7 @@ def main():
             bitmap.extend(bits)
         glyphs.append((offset, w, h, adv, l, t, ch))
     out = [f"// АВТОМАТИЧЕСКИ СГЕНЕРИРОВАНО tools/gen_gfxfont.py из {path.split('/')[-1]}, {size} px.",
-           "// Шрифт: Share Tech Mono (c) Carrois Type Design, SIL Open Font License 1.1 (fonts/OFL.txt).",
+           f"// Шрифт: {path.split('/')[-1]} — SIL Open Font License 1.1 (см. fonts/).",
            "#pragma once", "#include <TFT_eSPI.h>", "",
            f"const uint8_t {name}Bitmaps[] PROGMEM = {{"]
     for i in range(0, len(bitmap), 16):

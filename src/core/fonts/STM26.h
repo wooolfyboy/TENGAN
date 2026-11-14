@@ -1,5 +1,5 @@
 // АВТОМАТИЧЕСКИ СГЕНЕРИРОВАНО tools/gen_gfxfont.py из ShareTechMono-Regular.ttf, 26 px.
-// Шрифт: Share Tech Mono (c) Carrois Type Design, SIL Open Font License 1.1 (fonts/OFL.txt).
+// Шрифт: ShareTechMono-Regular.ttf — SIL Open Font License 1.1 (см. fonts/).
 #pragma once
 #include <TFT_eSPI.h>
 

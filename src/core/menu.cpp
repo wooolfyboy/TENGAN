@@ -92,11 +92,102 @@ static void drawSectionSub(const Section* s) {
   size_t k = 0;
   for (; s->title[k] && k < sizeof(title) - 1; k++) title[k] = (char)toupper((unsigned char)s->title[k]);
   title[k] = 0;
+  if (g_theme == THEME_HUD) {                           // «// BLUETOOTH»
+    char t2[20]; snprintf(t2, sizeof(t2), "// %s", title);
+    strncpy(title, t2, sizeof(title) - 1); title[sizeof(title) - 1] = 0;
+  }
   drawSubmenu(title, C(s->r, s->g, s->b), items, n, s_subSel);
+}
+
+// подпись раздела -> крупное значение + мелкая подпись («23 devices» -> «23» / «DEVICES»)
+static void splitSubtitle(const char* sub, char* big, char* small, size_t n) {
+  const char* colon = strchr(sub, ':');
+  if (isdigit((unsigned char)sub[0])) {
+    const char* sp = strchr(sub, ' ');
+    size_t l = sp ? (size_t)(sp - sub) : strlen(sub);
+    snprintf(big, n, "%.*s", (int)l, sub);
+    snprintf(small, n, "%s", sp ? sp + 1 : "");
+  } else if (colon) {
+    snprintf(small, n, "%.*s", (int)(colon - sub), sub);
+    const char* v = colon + 1; while (*v == ' ') v++;
+    snprintf(big, n, "%s", v);
+  } else {
+    snprintf(big, n, "--");
+    snprintf(small, n, "%s", sub);
+  }
+  for (char* p = big; *p; p++) *p = (char)toupper((unsigned char)*p);
+  for (char* p = small; *p; p++) *p = (char)toupper((unsigned char)*p);
+}
+
+// главное меню HUD: четыре скошенные панели, сверху статус, снизу телеметрия
+static void drawMainMenuHud() {
+  int W = spr.width(), H = spr.height();
+  uint16_t bg = C_BG(), acc = C_ACC(), steel = C(150, 150, 165), dim = C(110, 110, 125);
+  spr.fillSprite(bg);
+  spr.setTextDatum(TL_DATUM);
+  spr.setTextColor(dim);
+  txt("// RADIO RADAR - SYS ONLINE", 8, 5, 1);
+  // заряд: «PWR 87%» и пять сегментов
+  char buf[32];
+  if (g_bat.ok) {
+    snprintf(buf, sizeof(buf), "PWR %d%%", g_bat.soc);
+    spr.setTextDatum(TR_DATUM);
+    spr.setTextColor(g_bat.soc <= 20 ? C_ALERT() : acc);
+    txt(buf, W - 44, 5, 1);
+    for (int i = 0; i < 5; i++) {
+      bool on = g_bat.soc > i * 20;
+      spr.fillRect(W - 40 + i * 7, 5, 5, 8, on ? (g_bat.soc <= 20 ? C_ALERT() : acc) : C(40, 40, 50));
+    }
+  }
+  for (int x = 8; x < W - 8; x++) {                     // линия, угасающая вправо
+    float k = 1.0f - (float)(x - 8) / (W - 16);
+    uint16_t c = acc;
+    uint8_t r = ((c >> 11) & 0x1F) << 3, g = ((c >> 5) & 0x3F) << 2, b = (c & 0x1F) << 3;
+    spr.drawPixel(x, 18, tft.color565(r * k, g * k, b * k));
+  }
+
+  const int cw = 74, ch = 128, gap = 6, y0 = 24;
+  int x0 = (W - (cw * N_SECTIONS + gap * (N_SECTIONS - 1))) / 2;
+  for (int i = 0; i < N_SECTIONS; i++) {
+    const Section* s = SECTIONS[i];
+    bool sel = (i == s_menuSel);
+    int x = x0 + i * (cw + gap), cx = x + cw / 2;
+    uint16_t pbg = sel ? tft.color565(14, 42, 52) : bg;
+    if (sel) hudPanel(x, y0, cw, ch, 12, pbg, true, bg);
+    hudPanel(x, y0, cw, ch, 12, sel ? acc : C(45, 60, 72), false, bg);
+    s->icon(cx, y0 + 30, sel ? acc : C(110, 110, 125), pbg);
+    char title[16]; size_t k = 0;
+    for (; s->title[k] && k < sizeof(title) - 1; k++) title[k] = (char)toupper((unsigned char)s->title[k]);
+    title[k] = 0;
+    spr.setTextDatum(TC_DATUM);
+    spr.setTextColor(sel ? C_HOT() : steel);
+    txt(title, cx, y0 + 62, 2);
+    char sub[24], big[16], small[16];
+    s->subtitle(sub, sizeof(sub));
+    splitSubtitle(sub, big, small, sizeof(big));
+    bool alertish = (strcmp(small, "NO CHIP") == 0);
+    spr.setTextColor(alertish ? C_ALERT() : (sel ? acc : steel));
+    txt(big, cx, y0 + 82, 4);
+    spr.setTextColor(dim);
+    char sm[13]; snprintf(sm, sizeof(sm), "%s", small);
+    txt(sm, cx, y0 + 110, 1);
+  }
+
+  // телеметрия: время работы
+  uint32_t t = millis() / 1000;
+  snprintf(buf, sizeof(buf), "T+%02lu:%02lu:%02lu", (unsigned long)(t / 3600), (unsigned long)(t / 60 % 60), (unsigned long)(t % 60));
+  spr.setTextDatum(BL_DATUM);
+  spr.setTextColor(dim);
+  txt("CLICK: OPEN   HOLD SIDE: OFF", 8, H - 4, 1);
+  spr.setTextDatum(BR_DATUM);
+  spr.setTextColor(acc);
+  txt(buf, W - 8, H - 4, 1);
+  present();
 }
 
 // главное меню — список, как на старых приборах: курсор «>», выбранная строка залита
 static void drawMainMenu() {
+  if (g_theme == THEME_HUD) { drawMainMenuHud(); return; }
   int W = spr.width(), H = spr.height();
   spr.fillSprite(C_BG());
   spr.setTextDatum(TL_DATUM);

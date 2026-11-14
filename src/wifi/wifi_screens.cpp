@@ -61,7 +61,7 @@ void drawNets(uint32_t now) {
     bool sel = (k == g_wSel);
     uint16_t bg = sel ? C(28, 38, 62) : C_BG();
     if (sel) spr.fillRoundRect(0, y, W - 4, LIST_ROWH - 1, 3, bg);
-    drawGlyph(8, y + LIST_ROWH / 2 - 1, secGlyph(a.enc), secAlert(a.enc) ? C_HOT() : C(170, 170, 185), secAlert(a.enc));
+    drawGlyph(8, y + LIST_ROWH / 2 - 1, secGlyph(a.enc), secAlert(a.enc) ? C_ALERT() : C(170, 170, 185), secAlert(a.enc));
     fitText(ssidOr(a), buf, sizeof(buf), 146, 2);
     spr.setTextDatum(TL_DATUM);
     spr.setTextColor(a.ssid[0] ? C_HOT() : C_DIM(), bg);
@@ -401,6 +401,76 @@ void drawClients(uint32_t now) {
   present();
 }
 
+// HUD-вариант поиска: дуга-шкала, крупное число по центру, MAX/MIN/AVG слева, тренд справа
+static void drawFindHud(const Ap& a, int r, bool lost, const char* word, uint16_t col, uint32_t now) {
+  int W = spr.width(), H = spr.height();
+  uint16_t bg = C_BG(), acc = C_ACC(), dim = C(110, 110, 125);
+  char buf[48];
+  spr.fillSprite(bg);
+  spr.setTextDatum(TC_DATUM);
+  spr.setTextColor(acc);
+  txt(lost ? "SEARCHING" : "TARGET LOCK", W / 2, 6, 2);
+
+  int pct = lost ? 0 : constrain((r + 95) * 100 / 60, 0, 100);
+  drawArcGauge(W / 2, 126, 86, 10, pct, lost ? dim : col, C(30, 45, 58), bg);
+
+  spr.setTextDatum(MC_DATUM);
+  spr.setTextColor(lost ? dim : C_HOT());
+  if (lost) txt("--", W / 2, 96, 4);
+  else { sprintf(buf, "%d", r); txt(buf, W / 2, 96, 4); }
+  char wu[16]; snprintf(wu, sizeof(wu), "%s", word);
+  for (char* p = wu; *p; p++) *p = (char)toupper((unsigned char)*p);
+  float d = 0;
+  if (!lost) {                                      // примерное расстояние до точки доступа
+    d = powf(10.0f, (-45.0f - r) / 25.0f);
+    snprintf(buf, sizeof(buf), "DBM - %s - ~%.0f M", wu, d < 1 ? 1.0f : d);
+  } else snprintf(buf, sizeof(buf), "%s", wu);
+  spr.setTextColor(dim);
+  txt(buf, W / 2, 118, 1);
+
+  // имя сети и канал
+  char nm[40]; fitText(ssidOr(a), nm, sizeof(nm), 190, 2);
+  spr.setTextDatum(BC_DATUM);
+  spr.setTextColor(C_HOT());
+  txt(nm, W / 2, H - 16, 2);
+  snprintf(buf, sizeof(buf), "CH %d - %s", a.ch, encName(a.enc));
+  spr.setTextColor(dim);
+  txt(buf, W / 2, H - 5, 1);
+
+  // слева: MAX / MIN / AVG по истории; справа: тренд за ~10 замеров
+  int mx = -127, mn = 0, sum = 0, n = 0;
+  for (int i = 0; i < g_fSparkN; i++) if (g_fSpark[i] > -127) {
+    mx = max(mx, (int)g_fSpark[i]); mn = min(mn, (int)g_fSpark[i]); sum += g_fSpark[i]; n++;
+  }
+  spr.setTextDatum(TL_DATUM);
+  spr.setTextColor(dim);
+  if (n) {
+    snprintf(buf, sizeof(buf), "MAX %d", mx); txt(buf, 10, 36, 1);
+    snprintf(buf, sizeof(buf), "MIN %d", mn); txt(buf, 10, 48, 1);
+    snprintf(buf, sizeof(buf), "AVG %d", sum / n); txt(buf, 10, 60, 1);
+  }
+  int recent = 0, rn = 0, older = 0, on = 0;
+  for (int i = g_fSparkN - 1; i >= 0 && i >= g_fSparkN - 5; i--) if (g_fSpark[i] > -127) { recent += g_fSpark[i]; rn++; }
+  for (int i = g_fSparkN - 6; i >= 0 && i >= g_fSparkN - 10; i--) if (g_fSpark[i] > -127) { older += g_fSpark[i]; on++; }
+  if (rn && on) {
+    int dlt = recent / rn - older / on;
+    spr.setTextDatum(TR_DATUM);
+    spr.setTextColor(dlt >= 3 ? C_ALERT() : dim);
+    txt(dlt >= 3 ? "TREND UP" : dlt <= -3 ? "TREND DOWN" : "TREND --", W - 10, 36, 1);
+    snprintf(buf, sizeof(buf), "%+d dB", dlt);
+    txt(buf, W - 10, 48, 1);
+  }
+  present();
+
+  if (g_ledEvent == 0) {                       // лента — уровень сигнала
+    int lv = pct * WS2812_N / 100;
+    strip.clear();
+    uint8_t rr = ((col >> 11) & 0x1F) << 3, gg = ((col >> 5) & 0x3F) << 2, bb = (col & 0x1F) << 3;
+    for (int i = 0; i < lv; i++) strip.setPixelColor(i, strip.Color(rr / 3, gg / 3, bb / 3));
+    strip.show();
+  }
+}
+
 void drawFind(uint32_t now) {
   int W = spr.width(), H = spr.height();
   spr.fillSprite(C_BG());
@@ -434,6 +504,11 @@ void drawFind(uint32_t now) {
   else if (r > -75)  { word = "fair";      col = heat(r); }
   else if (r > -85)  { word = "weak";      col = heat(r); }
   else               { word = "bad";       col = heat(r); }
+
+  if (g_theme == THEME_HUD) {                       // HUD: «захват цели» с дугой-шкалой
+    drawFindHud(a, r, lost, word, col, now);
+    return;
+  }
 
   // крупное число + оценка
   sprintf(buf, "%d", lost ? 0 : -r);

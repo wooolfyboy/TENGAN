@@ -32,13 +32,13 @@ void loadSettings() {
   g_thresh    = g_prefs.getInt("thresh", 7);
   g_ledBright = g_prefs.getInt("ledbr", 50);
   g_scrBright = g_prefs.getInt("scrbr", 100);
-  g_theme     = g_prefs.getInt("theme", THEME_PHOSPHOR);
+  g_theme     = g_prefs.getInt("theme2", THEME_HUD);
   g_prefs.end();
   if (g_range < 0 || g_range >= N_RANGES) g_range = 0;
   if (g_thresh < 0 || g_thresh > 30) g_thresh = 7;
   if (g_ledBright < 10 || g_ledBright > 100) g_ledBright = 50;
   if (g_scrBright < 20 || g_scrBright > 100) g_scrBright = 100;
-  if (g_theme < 0 || g_theme >= N_THEMES) g_theme = THEME_PHOSPHOR;
+  if (g_theme < 0 || g_theme >= N_THEMES) g_theme = THEME_HUD;
 }
 
 void saveSettings() {
@@ -47,7 +47,7 @@ void saveSettings() {
   g_prefs.putInt("thresh", g_thresh);
   g_prefs.putInt("ledbr", g_ledBright);
   g_prefs.putInt("scrbr", g_scrBright);
-  g_prefs.putInt("theme", g_theme);
+  g_prefs.putInt("theme2", g_theme);
   g_prefs.end();
   g_setDirty = false;
 }
@@ -84,7 +84,7 @@ void drawSettings() {
     "flash when count jumps by this",
     "brightness of the LED strip",
     "screen backlight",
-    "phosphor: green CRT look   classic: original colors",
+    "HUD: tactical   phosphor: green CRT   classic: colors",
     "",
   };
   char batLine[64]; batSummary(batLine, sizeof(batLine));

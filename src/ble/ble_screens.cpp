@@ -138,6 +138,42 @@ void drawProximity(bool have, int rssi, const Ent& best, int count) {
   else               word = "FAR";
   col = heat(rssi);                              // чем ближе, тем «горячее»
 
+  if (g_theme == THEME_HUD) {                    // HUD: дуга-шкала, «ближайшая цель»
+    char buf[48];
+    spr.fillSprite(C_BG());
+    spr.setTextDatum(TC_DATUM);
+    spr.setTextColor(C_ACC());
+    txt("NEAREST CONTACT", W / 2, 6, 2);
+    drawArcGauge(W / 2, 126, 86, 10, pct, col, C(30, 45, 58), C_BG());
+    spr.setTextDatum(MC_DATUM);
+    spr.setTextColor(C_HOT());
+    sprintf(buf, "%d", rssi);
+    txt(buf, W / 2, 96, 4);
+    float d = estDistance(rssi);
+    if (d < 10.0f) sprintf(buf, "DBM - %s - ~%.1f M", word, d);
+    else           sprintf(buf, "DBM - %s - ~%.0f M", word, d);
+    spr.setTextColor(C(110, 110, 125));
+    txt(buf, W / 2, 118, 1);
+    // кто это: значок + тип + производитель
+    char tn[16]; snprintf(tn, sizeof(tn), "%s", typeName(type));
+    for (char* p = tn; *p; p++) *p = (char)toupper((unsigned char)*p);
+    snprintf(buf, sizeof(buf), "%s - %s", tn, vendorLabel(cat, best.vkind, best.vcode));
+    char fit[40]; fitText(best.name[0] ? best.name : buf, fit, sizeof(fit), 220, 2);
+    spr.setTextDatum(BC_DATUM);
+    spr.setTextColor(type == T_TRACKER ? C_ALERT() : C_HOT());
+    txt(fit, W / 2, H - 16, 2);
+    snprintf(buf, sizeof(buf), "%d CONTACTS IN RANGE", count);
+    spr.setTextColor(C(110, 110, 125));
+    txt(buf, W / 2, H - 5, 1);
+    if (type == T_TRACKER) {
+      spr.setTextDatum(TL_DATUM);
+      spr.setTextColor(C_ALERT());
+      txt("! TRACKER", 10, 36, 2);
+    }
+    present();
+    return;
+  }
+
   int bw = W - 60, bh = 26, bx = 30, by = H / 2 - 14;
   spr.setTextDatum(BC_DATUM);
   spr.setTextColor(col, C_BG());
@@ -197,7 +233,7 @@ void drawScope(const std::vector<Blip>& bl) {
     pct = constrain(pct, 0, 100);
     int r = maxR - (maxR - 8) * pct / 100;
     int x = cx + (int)(cos(ang) * r), y = cy + (int)(sin(ang) * r);
-    drawGlyph(x, y, typeGlyph(bl[i].type), heat(bl[i].rssi), bl[i].type == T_TRACKER);
+    drawMarker(x, y, typeGlyph(bl[i].type), heat(bl[i].rssi), bl[i].type == T_TRACKER);
   }
 
   // легенда слева: сколько каких типов (по убыванию)
@@ -208,7 +244,7 @@ void drawScope(const std::vector<Blip>& bl) {
     for (int t = 0; t < T_NUM; t++) if (tc[t] > 0 && (bi < 0 || tc[t] > tc[bi])) bi = t;
     if (bi < 0) break;
     int y = 22 + row * 18;
-    drawGlyph(9, y, typeGlyph(bi), bi == T_TRACKER ? C_HOT() : C(170, 170, 185), bi == T_TRACKER);
+    drawGlyph(9, y, typeGlyph(bi), bi == T_TRACKER ? C_ALERT() : C(170, 170, 185), bi == T_TRACKER);
     char nb[8]; sprintf(nb, "%d", tc[bi]);
     spr.setTextDatum(ML_DATUM);
     spr.setTextColor(C(150, 150, 165));
@@ -317,7 +353,7 @@ static void drawTypesBars(const int* cnt, int total) {
   for (int i = 0; i < rows; i++) {
     int t = order[i], cy = y0 + i * rh + rh / 2;
     bool alert = (t == T_TRACKER);
-    uint16_t c = alert ? C_HOT() : (t == T_UNKNOWN ? C(110, 110, 125) : C(175, 175, 190));
+    uint16_t c = alert ? C_ALERT() : (t == T_UNKNOWN ? C(110, 110, 125) : C(175, 175, 190));
     drawGlyph(10, cy, typeGlyph(t), c, alert);
     spr.setTextDatum(ML_DATUM);
     spr.setTextColor(c);
@@ -458,7 +494,7 @@ void drawList(const std::map<uint32_t, Ent>& ents) {
     const Ent& e = it->second;
     uint16_t tc = typeColor(e.type);
     bool alert = (e.type == T_TRACKER);
-    drawGlyph(8, y + LIST_ROWH / 2 - 1, typeGlyph(e.type), alert ? C_HOT() : C(170, 170, 185), alert);
+    drawGlyph(8, y + LIST_ROWH / 2 - 1, typeGlyph(e.type), alert ? C_ALERT() : C(170, 170, 185), alert);
 
     fitText(e.name[0] ? e.name : typeName(e.type), buf, sizeof(buf), 128, 2);
     spr.setTextDatum(TL_DATUM);
