@@ -1,5 +1,7 @@
 # Сборка прошивки на каждый пуш. На тег вида v1.0 — ещё и GitHub Release
 # с двумя файлами: общий (шить по USB на 0x0) и firmware.bin (по Wi-Fi, вкладка Update).
+# Релиз можно сделать и без тега: Actions → build → Run workflow → release_tag = v1.1
+# (тег создастся сам на собранном коммите).
 name: build
 
 on:
@@ -8,6 +10,11 @@ on:
     tags: ['v*']
   pull_request:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Create a release with this tag (e.g. v1.1); leave empty to just build'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -51,9 +58,12 @@ jobs:
           path: dist/*.bin
 
       - name: Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != ''
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ inputs.release_tag || github.ref_name }}
+          target_commitish: ${{ github.sha }}
+          name: Radio Radar ${{ inputs.release_tag || github.ref_name }}
           files: dist/*.bin
           generate_release_notes: true
           body: |
