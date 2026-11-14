@@ -19,6 +19,11 @@ extern int g_range;                        // индекс в RANGES
 extern int g_thresh;                       // порог событий для светодиодов (0 = выкл)
 extern int g_ledBright;                    // % яркости ленты
 extern int g_scrBright;                    // % яркости экрана
+extern int g_micEn;                        // микрофон разрешён (1) / выключен (0)
+extern int g_clickEn;                      // щелчки колеса
+extern int g_bleTicks;                     // щелчки «ближе-дальше» в Bluetooth
+extern int g_wifiTicks;                    // щелчки «ближе-дальше» в Wi-Fi Find
+extern int g_wRange;                       // Wi-Fi: скрывать сети слабее (индекс в RANGES)
 extern int g_sndIdx;                       // звуки: 0 off, 1 quiet, 2 loud
 extern int g_dimIdx;                       // авто-приглушение: индекс в DIM_SECS (0 — выкл)
 static const uint16_t DIM_SECS[] = { 0, 30, 60, 300 };
@@ -28,5 +33,6 @@ void settingsBegin();                      // загрузить и примен
 void applyBrightness();
 void settingsAutosave(uint32_t now);       // сохранить через 3 с после изменения
 void settingsSaveNow();
+void settingsTouch();                      // отметить: настройки изменились (сохранить позже)
 
 extern const Section settingsSection;

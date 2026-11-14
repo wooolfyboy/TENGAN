@@ -5,6 +5,7 @@
 //  Все экраны собраны из компонентов core/ui.h по общей сетке.
 // ============================================================
 #include <esp_wifi.h>
+#include "core/settings.h"
 #include "wifi/wifi_model.h"
 #include "core/board.h"
 #include "core/display.h"
@@ -428,7 +429,7 @@ void drawFind(uint32_t now) {
   }
   uiFooter("click: next network", "side: back");
   present();
-  if (!lost) audioGeiger(pct);                     // щелчки чаще — ближе
+  if (!lost && g_wifiTicks) audioGeiger(pct);                     // щелчки чаще — ближе
 
   if (g_ledEvent == 0) {                           // лента — уровень сигнала
     int lv = pct * WS2812_N / 100;

@@ -68,6 +68,7 @@ int      g_evN = 0;
 // ---------- звук (в прошивке — audio.cpp) ----------
 AudioView g_au;
 bool  g_micOk = true;
+MicDiag g_micDiag = { 4, 0, 0, 37, 0, false };
 int   g_aMode = 0;
 float g_auHist[AU_HIST];
 int   g_auHistN = 0;
@@ -253,6 +254,11 @@ int main(int argc, char** argv) {
   navRotate(+1); navClick(); navDraw(s_now);     snap("05_sound_sub");
   navBack();
   navRotate(+1); navClick(); navDraw(s_now);     snap("06_settings");
+  { const char* pg[] = { "06a_set_general", "06b_set_ble", "06c_set_wifi", "06d_set_subghz", "06e_set_sound" };
+    for (int p = 0; p < 5; p++) {
+      if (p) navRotate(+1);
+      navClick(); if (p == 0) for (int k = 0; k < 5; k++) navClick(); navDraw(s_now); snap(pg[p]); navBack();
+    } }
   navBack();
 
   std::vector<Blip> blips;
@@ -313,6 +319,8 @@ int main(int argc, char** argv) {
   drawWave(s_now);           snap("43_sound_scope");
   g_au.level = -21; g_au.peak = -18;
   drawLevel(s_now);          snap("42b_sound_level_loud");
+  drawMicMissing();          snap("44_mic_check");
+  g_micDiag.disabled = true; drawMicMissing(); snap("45_mic_off");
 
   drawSpectrum();            snap("30_subghz_spectrum");
   drawMonitor(s_now);        snap("31_subghz_monitor");

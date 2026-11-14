@@ -29,6 +29,17 @@ extern int   g_auHistN;
 extern float g_auMax;                // максимум за время на экране
 extern float g_auAvg;                // среднее (скользящее)
 
+// диагностика микрофона (видна на экранах, если что-то не так)
+struct MicDiag {
+  int      stage;            // 0 выкл, 1 драйвер не встал, 2 пины, 3 частота, 4 работает
+  int      slot;             // 0 — левый канал, 1 — правый (пробуем оба)
+  uint32_t blocks;           // сколько блоков звука пришло
+  uint32_t timeouts;         // сколько раз не дождались данных
+  int      rawPeak;          // максимум |отсчёта| в последнем блоке (тишина ~ десятки)
+  bool     disabled;         // выключен в настройках
+};
+extern MicDiag g_micDiag;
+
 const char* levelWord(float db);     // QUIET / NORMAL / LOUD / VERY LOUD
 
 // экраны (audio_screens.cpp)
@@ -36,4 +47,4 @@ void drawAuBars(uint32_t now);
 void drawReactor(uint32_t now);
 void drawLevel(uint32_t now);
 void drawWave(uint32_t now);
-void drawMicMissing();
+void drawMicMissing();             // драйвер не встал / выключен / нет данных

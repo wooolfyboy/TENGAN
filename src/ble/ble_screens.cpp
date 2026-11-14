@@ -243,7 +243,7 @@ void drawNearest(bool have, int rssi, const Ent& best, int count) {
     txt("! TRACKER", UI_M + 8, UI_TOP + 4, 2);
   }
   present();
-  audioGeiger(pct);                                // щелчки чаще — ближе
+  if (g_bleTicks) audioGeiger(pct);                // щелчки чаще — ближе
 }
 
 // ============================================================

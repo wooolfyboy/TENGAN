@@ -8,6 +8,7 @@
 //    SPECTRUM — развёртка по полосе ±2 МГц + «водопад»
 //    MONITOR  — слушаем одну частоту и ловим всплески (брелоки, звонки, датчики)
 // ============================================================
+#include "core/settings.h"
 #include "subghz/subghz.h"
 #include "subghz/cc1101.h"
 #include "subghz/subghz_model.h"
@@ -138,7 +139,7 @@ static void subRotate(int dir) {
   g_gMode = (g_gMode + dir + G_NUM) % G_NUM;
   subStartMode();
 }
-static void subClick() { g_band = (g_band + 1) % N_BANDS; subStartMode(); }
+static void subClick() { g_band = (g_band + 1) % N_BANDS; settingsTouch(); subStartMode(); }
 
 // вызывается на каждом проходе loop(), пока открыт экран раздела
 static void subTick(uint32_t now) {

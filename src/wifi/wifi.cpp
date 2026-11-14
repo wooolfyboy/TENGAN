@@ -19,6 +19,7 @@
 #include <vector>
 #include <algorithm>
 #include <atomic>
+#include "core/settings.h"
 #include "wifi/wifi.h"
 #include "core/board.h"
 #include "core/display.h"
@@ -306,7 +307,9 @@ static void wifiOrderUpdate(bool force) {
   bool frozen = g_wDetail || (millis() - g_wTouch < 4000);
   if (frozen && !force && !g_wOrder.empty()) return;
   std::vector<uint64_t> o;
-  for (uint64_t k : g_wOrder) if (g_aps.count(k)) o.push_back(k);
+  int minDbm = RANGES[g_wRange].dbm;               // настройка Wi-Fi > Range
+  auto ok = [&](uint64_t k) { auto it = g_aps.find(k); return it != g_aps.end() && (it->second.rssiS >= minDbm || k == g_wSel); };
+  for (uint64_t k : g_wOrder) if (ok(k)) o.push_back(k);
   auto rs = [&](uint64_t k) { return (int)g_aps[k].rssiS; };
   for (size_t pass = 0; pass < o.size(); pass++) {
     bool sw = false;
@@ -315,7 +318,7 @@ static void wifiOrderUpdate(bool force) {
     if (!sw) break;
   }
   for (auto& kv : g_aps) {
-    if (std::find(o.begin(), o.end(), kv.first) != o.end()) continue;
+    if (!ok(kv.first) || std::find(o.begin(), o.end(), kv.first) != o.end()) continue;
     size_t pos = 0;
     while (pos < o.size() && rs(o[pos]) >= kv.second.rssiS) pos++;
     o.insert(o.begin() + pos, kv.first);

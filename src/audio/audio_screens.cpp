@@ -193,7 +193,7 @@ void drawWave(uint32_t now) {
     }
     px = x; py = y;
   }
-  snprintf(buf, sizeof(buf), "AUTO GAIN X%d", max(1, 16000 / amp));
+  snprintf(buf, sizeof(buf), "AUTO GAIN X%d  RAW %d  %s", max(1, 16000 / amp), g_micDiag.rawPeak, g_micDiag.slot ? "R" : "L");
   spr.setTextDatum(TL_DATUM);
   spr.setTextColor(UI_DIM());
   txt(buf, gx + 5, gy + 3, 1);
@@ -202,9 +202,32 @@ void drawWave(uint32_t now) {
 }
 
 void drawMicMissing() {
+  int W = spr.width();
+  char buf[48];
   spr.fillSprite(C_BG());
-  uiHeader("Sound", "microphone not found", true);
-  uiEmpty("no microphone", "i2s pdm on pins 39 / 42 did not start");
+  if (g_micDiag.disabled) {
+    uiHeader("Sound", "microphone off");
+    uiEmpty("microphone off", "turn on: settings > sound");
+    uiFooter("", "side: back");
+    present();
+    return;
+  }
+  static const char* const stages[] = { "not started", "driver did not start", "pins rejected",
+                                         "clock rejected", "running" };
+  uiHeader("Mic check", g_micDiag.stage == 4 ? "no sound data" : "driver error", true);
+  int x = UI_M + 8, y = UI_TOP + 4;
+  uiReadout(x, y, "driver", stages[constrain(g_micDiag.stage, 0, 4)], g_micDiag.stage == 4 ? C_HOT() : C_ALERT());
+  snprintf(buf, sizeof(buf), "%lu", (unsigned long)g_micDiag.blocks);
+  uiReadout(x, y + 30, "blocks", buf, g_micDiag.blocks ? C_HOT() : C_ALERT());
+  snprintf(buf, sizeof(buf), "%lu", (unsigned long)g_micDiag.timeouts);
+  uiReadout(x + 90, y + 30, "timeouts", buf, C_HOT());
+  snprintf(buf, sizeof(buf), "%d", g_micDiag.rawPeak);
+  uiReadout(x + 180, y + 30, "raw peak", buf, C_HOT());
+  uiReadout(x, y + 60, "channel", g_micDiag.slot ? "right" : "left", C_HOT());
+  spr.setTextDatum(TL_DATUM);
+  spr.setTextColor(UI_DIM());
+  txt("PDM MIC: CLK GPIO39, DATA GPIO42, I2S0, 16 KHZ", x, y + 96, 1);
+  txt("SEND A PHOTO OF THIS SCREEN TO THE DEVELOPER", x, y + 108, 1);
   uiFooter("", "side: back");
   present();
 }

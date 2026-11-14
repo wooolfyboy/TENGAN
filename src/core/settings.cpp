@@ -9,19 +9,60 @@
 #include "core/battery.h"
 #include "core/ui.h"
 #include "audio/audio.h"
+#include "subghz/subghz_model.h"
 
 int g_range = 0;
 int g_thresh = 7;
 int g_ledBright = 50;
 int g_scrBright = 100;
-int g_dimIdx = 0;
-int g_sndIdx = 1;                          // тихие звуки интерфейса                          // по умолчанию экран не гаснет
+int g_dimIdx = 0;                        // по умолчанию экран не гаснет
+int g_sndIdx = 1;                        // тихие звуки интерфейса
+int g_clickEn = 1;
+int g_micEn = 1;
+int g_bleTicks = 1;
+int g_wifiTicks = 1;
+int g_wRange = 0;
 
-static int      g_setItem = 0;           // выбранный пункт
+static int      g_setPage = 0;           // страница: общие / раздел
+static int      g_setItem = 0;           // выбранный пункт на странице
 static bool     g_setDirty = false;
 static uint32_t g_setChangedMs = 0;
 static Preferences g_prefs;
-static const int N_SET_ITEMS = 7;        // последний пункт — батарея (только показывает)
+
+// все пункты настроек; page — на какой странице показывать
+enum { S_SCREEN, S_DIM, S_LEDBR, S_VOLUME, S_CLICKS, S_BATTERY,
+       S_RANGE, S_LEDEV, S_BLETICK,
+       S_WRANGE, S_WTICK,
+       S_BAND,
+       S_MIC, S_NUM };
+enum { P_GENERAL, P_BLE, P_WIFI, P_SUBGHZ, P_SOUND, P_NUM };
+struct SetDef { const char* name; const char* hint; uint8_t page; };
+static const SetDef DEFS[S_NUM] = {
+  { "Screen",         "screen backlight",            P_GENERAL },
+  { "Auto dim",       "dim screen when idle",        P_GENERAL },
+  { "LED brightness", "led strip brightness",        P_GENERAL },
+  { "Volume",         "all sounds: off/quiet/loud",  P_GENERAL },
+  { "Wheel clicks",   "click on every wheel step",   P_GENERAL },
+  { "Battery",        "",                            P_GENERAL },
+  { "Range",          "ignore weaker devices",       P_BLE },
+  { "LED events",     "leds flash on count jump",    P_BLE },
+  { "Find ticks",     "ticks on nearest screen",     P_BLE },
+  { "Range",          "hide weaker networks",        P_WIFI },
+  { "Find ticks",     "ticks on find screen",        P_WIFI },
+  { "Start band",     "band when section opens",     P_SUBGHZ },
+  { "Microphone",     "mic for sound section",       P_SOUND },
+};
+static const char* const PAGE_NAMES[P_NUM] = { "General", "Bluetooth", "Wi-Fi", "Sub-GHz", "Sound" };
+static const char* const PAGE_DESCS[P_NUM] = { "screen, leds, sound, battery", "range, leds, ticks",
+                                               "range, ticks", "radio band", "microphone" };
+static const int SET_ROWS = 7;           // строк на экране (список прокручивается)
+
+// пункты текущей страницы
+static int pageItems(int page, int* out) {
+  int n = 0;
+  for (int i = 0; i < S_NUM; i++) if (DEFS[i].page == page) out[n++] = i;
+  return n;
+}
 
 // ---------- настройки ----------
 void applyBrightness() {
@@ -37,6 +78,12 @@ void loadSettings() {
   g_scrBright = g_prefs.getInt("scrbr", 100);
   g_dimIdx    = g_prefs.getInt("dim", 0);
   g_sndIdx    = g_prefs.getInt("snd", 1);
+  g_micEn     = g_prefs.getInt("mic", 1) ? 1 : 0;
+  g_clickEn   = g_prefs.getInt("click", 1) ? 1 : 0;
+  g_bleTicks  = g_prefs.getInt("bltick", 1) ? 1 : 0;
+  g_wifiTicks = g_prefs.getInt("wftick", 1) ? 1 : 0;
+  g_wRange    = g_prefs.getInt("wrange", 0);
+  g_band      = g_prefs.getInt("band", 1);
   g_prefs.end();
   if (g_range < 0 || g_range >= N_RANGES) g_range = 0;
   if (g_thresh < 0 || g_thresh > 30) g_thresh = 7;
@@ -44,6 +91,8 @@ void loadSettings() {
   if (g_scrBright < 20 || g_scrBright > 100) g_scrBright = 100;
   if (g_dimIdx < 0 || g_dimIdx >= N_DIMS) g_dimIdx = 0;
   if (g_sndIdx < 0 || g_sndIdx > 2) g_sndIdx = 1;
+  if (g_wRange < 0 || g_wRange >= N_RANGES) g_wRange = 0;
+  if (g_band < 0 || g_band >= N_BANDS) g_band = 1;
 }
 
 void saveSettings() {
@@ -54,6 +103,12 @@ void saveSettings() {
   g_prefs.putInt("scrbr", g_scrBright);
   g_prefs.putInt("dim", g_dimIdx);
   g_prefs.putInt("snd", g_sndIdx);
+  g_prefs.putInt("mic", g_micEn);
+  g_prefs.putInt("click", g_clickEn);
+  g_prefs.putInt("bltick", g_bleTicks);
+  g_prefs.putInt("wftick", g_wifiTicks);
+  g_prefs.putInt("wrange", g_wRange);
+  g_prefs.putInt("band", g_band);
   g_prefs.end();
   g_setDirty = false;
 }
@@ -62,58 +117,76 @@ void settingsSaveNow() { if (g_setDirty) saveSettings(); }
 void settingsAutosave(uint32_t now) { if (g_setDirty && now - g_setChangedMs > 3000) saveSettings(); }
 void settingsBegin() { loadSettings(); applyBrightness(); }
 
+static int curItem() {
+  int ids[S_NUM]; int n = pageItems(g_setPage, ids);
+  return n ? ids[constrain(g_setItem, 0, n - 1)] : -1;
+}
+
 void settingsAdjust(int dir) {
-  switch (g_setItem) {
-    case 0: g_range = constrain(g_range + dir, 0, N_RANGES - 1); break;
-    case 1: g_thresh = constrain(g_thresh + dir, 0, 30); break;
-    case 2: g_ledBright = constrain(g_ledBright + dir * 10, 10, 100); break;
-    case 3: g_scrBright = constrain(g_scrBright + dir * 10, 20, 100); break;
-    case 4: g_dimIdx = constrain(g_dimIdx + dir, 0, N_DIMS - 1); break;
-    case 5: g_sndIdx = constrain(g_sndIdx + dir, 0, 2); audioBeep(1400, 60); break;
+  int id = curItem();
+  switch (id) {
+    case S_RANGE:   g_range = constrain(g_range + dir, 0, N_RANGES - 1); break;
+    case S_LEDEV:   g_thresh = constrain(g_thresh + dir, 0, 30); break;
+    case S_LEDBR:   g_ledBright = constrain(g_ledBright + dir * 10, 10, 100); break;
+    case S_SCREEN:  g_scrBright = constrain(g_scrBright + dir * 10, 20, 100); break;
+    case S_DIM:     g_dimIdx = constrain(g_dimIdx + dir, 0, N_DIMS - 1); break;
+    case S_VOLUME:  g_sndIdx = constrain(g_sndIdx + dir, 0, 2); audioBeep(1400, 60); break;
+    case S_CLICKS:  g_clickEn = dir > 0; break;
+    case S_BLETICK: g_bleTicks = dir > 0; break;
+    case S_WTICK:   g_wifiTicks = dir > 0; break;
+    case S_WRANGE:  g_wRange = constrain(g_wRange + dir, 0, N_RANGES - 1); break;
+    case S_BAND:    g_band = constrain(g_band + dir, 0, N_BANDS - 1); break;
+    case S_MIC:     g_micEn = dir > 0; break;
     default: return;                       // батарея — только показывает
   }
   applyBrightness();
-  if (g_setItem == 2) { ledsEvent(+1); }   // показать яркость ленты
-  g_setDirty = true; g_setChangedMs = millis();
+  if (id == S_LEDBR) ledsEvent(+1);        // показать яркость ленты
+  settingsTouch();
+}
+
+void settingsTouch() { g_setDirty = true; g_setChangedMs = millis(); }
+
+static const char* onOff(int v) { return v ? "on" : "off"; }
+static void rangeText(char* val, int r) {
+  if (r == 0) sprintf(val, "all");
+  else sprintf(val, "%s %d dBm", RANGES[r].name, RANGES[r].dbm);
 }
 
 void drawSettings() {
   int W = spr.width();
   spr.fillSprite(C_BG());
-
-  static const char* const names[N_SET_ITEMS] = { "Range", "LED events", "LED brightness", "Screen", "Auto dim", "Sounds", "Battery" };
-  static const char* const hints[N_SET_ITEMS] = {
-    "bluetooth: ignore weaker",
-    "leds flash on count jump",
-    "led strip brightness",
-    "screen backlight",
-    "dim when idle",
-    "clicks + find ticks",
-    "",
-  };
+  int ids[S_NUM]; int n = pageItems(g_setPage, ids);
+  g_setItem = constrain(g_setItem, 0, n - 1);
+  int cur = ids[g_setItem];
   char batLine[64]; batSummary(batLine, sizeof(batLine));
-  uiHeader("Settings", g_setItem == 6 ? batLine : hints[g_setItem]);   // подсказка к выбранному пункту
+  uiHeader(PAGE_NAMES[g_setPage], cur == S_BATTERY ? batLine : DEFS[cur].hint);
   const int rh = 18;
-  for (int i = 0; i < N_SET_ITEMS; i++) {
-    int y = UI_TOP + 2 + i * rh, cy = y + rh / 2 - 1;
-    bool sel = (i == g_setItem);
+  int rows = min(n, SET_ROWS);
+  int first = constrain(g_setItem - (rows - 1), 0, n - rows);
+  for (int r = first; r < first + rows; r++) {
+    int id = ids[r];
+    int y = UI_TOP + 2 + (r - first) * rh, cy = y + rh / 2 - 1;
+    bool sel = (r == g_setItem);
     if (sel) uiRowHighlight(y, rh - 2);
     char val[32];
     bool alert = false;
-    switch (i) {
-      case 0:
-        if (g_range == 0) sprintf(val, "all");
-        else sprintf(val, "%s %d dBm", RANGES[g_range].name, RANGES[g_range].dbm);
-        break;
-      case 1: if (g_thresh == 0) sprintf(val, "off"); else sprintf(val, "+/- %d", g_thresh); break;
-      case 2: sprintf(val, "%d%%", g_ledBright); break;
-      case 3: sprintf(val, "%d%%", g_scrBright); break;
-      case 4:
+    switch (id) {
+      case S_RANGE:   rangeText(val, g_range); break;
+      case S_WRANGE:  rangeText(val, g_wRange); break;
+      case S_LEDEV:   if (g_thresh == 0) sprintf(val, "off"); else sprintf(val, "+/- %d", g_thresh); break;
+      case S_LEDBR:   sprintf(val, "%d%%", g_ledBright); break;
+      case S_SCREEN:  sprintf(val, "%d%%", g_scrBright); break;
+      case S_DIM:
         if (DIM_SECS[g_dimIdx] == 0) sprintf(val, "off");
         else if (DIM_SECS[g_dimIdx] < 60) sprintf(val, "%d s", DIM_SECS[g_dimIdx]);
         else sprintf(val, "%d min", DIM_SECS[g_dimIdx] / 60);
         break;
-      case 5: sprintf(val, "%s", g_sndIdx == 0 ? "off" : g_sndIdx == 1 ? "quiet" : "loud"); break;
+      case S_VOLUME:  sprintf(val, "%s", g_sndIdx == 0 ? "off" : g_sndIdx == 1 ? "quiet" : "loud"); break;
+      case S_CLICKS:  strcpy(val, onOff(g_clickEn)); break;
+      case S_BLETICK: strcpy(val, onOff(g_bleTicks)); break;
+      case S_WTICK:   strcpy(val, onOff(g_wifiTicks)); break;
+      case S_BAND:    strcpy(val, BANDS[g_band].name); break;
+      case S_MIC:     strcpy(val, onOff(g_micEn)); break;
       default:
         if (g_bat.ok) { sprintf(val, "%d%%  %.2f V", g_bat.soc, g_bat.mv / 1000.0f); alert = g_bat.soc <= 20; }
         else          sprintf(val, "n/a");
@@ -121,30 +194,40 @@ void drawSettings() {
     }
     spr.setTextDatum(ML_DATUM);
     spr.setTextColor(sel ? C_HOT() : UI_LABEL());
-    txt(names[i], UI_M + 8, cy, 2);
+    txt(DEFS[id].name, UI_M + 8, cy, 2);
     spr.setTextDatum(MR_DATUM);
     spr.setTextColor(alert ? C_ALERT() : (sel ? C_ACC() : C_HOT()));
     txt(val, W - UI_M - 8, cy, 2);
-    if (sel && i < 6) {                           // стрелка «крути колесо»
+    if (sel && id != S_BATTERY) {                 // стрелка «крути колесо»
       int vw = txtW(val, 2);
       spr.setTextColor(UI_DIM());
       txt("<", W - UI_M - 16 - vw, cy, 2);
     }
   }
-  uiFooter("wheel: change   click: next", "side: back");
+  uiFooter(n > 1 ? "wheel: change   click: next" : "wheel: change", "side: back");
   present();
 }
 
-// ---------- раздел «Настройки» (без подменю) ----------
-static void setSubtitle(char* out, size_t n) { snprintf(out, n, "range: %s", RANGES[g_range].name); }
-static void setEnter() { g_setItem = 0; }
+// ---------- раздел «Настройки»: подменю страниц ----------
+static void setSubtitle(char* out, size_t n) { snprintf(out, n, "general + sections"); }
+static void setEnter() { g_setPage = 0; g_setItem = 0; }
 static void setLeave() { settingsSaveNow(); }
-static void setClick() { g_setItem = (g_setItem + 1) % N_SET_ITEMS; }
+static void setInfo(int i, SubItem& it) {
+  it.name = PAGE_NAMES[i]; it.desc = PAGE_DESCS[i];
+  int ids[S_NUM]; sprintf(it.value, "%d", pageItems(i, ids));
+}
+static int  setNow() { return g_setPage; }
+static void setOpen(int p) { g_setPage = p; g_setItem = 0; }
+static void setClose() { settingsSaveNow(); }
+static void setClick() {
+  int ids[S_NUM]; int n = pageItems(g_setPage, ids);
+  g_setItem = n ? (g_setItem + 1) % n : 0;
+}
 static void setDraw(uint32_t) { drawSettings(); }
 
 const Section settingsSection = {
   "Settings", 200, 160, 90, iconGear, setSubtitle,
   setEnter, setLeave,
-  0, nullptr, nullptr, nullptr, nullptr,
+  P_NUM, setInfo, setNow, setOpen, setClose,
   setClick, settingsAdjust, nullptr, nullptr, setDraw,
 };

@@ -35,6 +35,7 @@ int   g_aMode = 0;
 float g_auHist[AU_HIST];
 int   g_auHistN = 0;
 float g_auMax = -120, g_auAvg = -90;
+MicDiag g_micDiag = {};
 
 const char* levelWord(float db) {
   if (db < -55) return "QUIET";
@@ -44,7 +45,7 @@ const char* levelWord(float db) {
 }
 
 // ---------- обмен задача микрофона -> основной цикл ----------
-struct MicBlock { float level; float bandDb[AU_BANDS]; int16_t wave[AU_WAVE]; float domHz; uint32_t seq; };
+struct MicBlock { float level; float bandDb[AU_BANDS]; int16_t wave[AU_WAVE]; float domHz; int rawPeak; uint32_t seq; };
 static MicBlock s_blk;
 static portMUX_TYPE s_mux = portMUX_INITIALIZER_UNLOCKED;
 static volatile bool s_micRun = false;
@@ -81,9 +82,10 @@ static void micTask(void*) {
   while (s_micRun) {
     size_t got = 0;
     i2s_read(I2S_NUM_0, buf, sizeof(buf), &got, pdMS_TO_TICKS(100));
-    if (got < sizeof(buf)) continue;
+    if (got < sizeof(buf)) { g_micDiag.timeouts++; continue; }
     float mean = 0;
-    for (int i = 0; i < N; i++) mean += buf[i];
+    int rawPeak = 0;
+    for (int i = 0; i < N; i++) { mean += buf[i]; rawPeak = max(rawPeak, abs((int)buf[i])); }
     mean /= N;
     double acc = 0;
     for (int i = 0; i < N; i++) {
@@ -95,6 +97,7 @@ static void micTask(void*) {
     fft(re, im, N);
     MicBlock b;
     b.level = level;
+    b.rawPeak = rawPeak;
     int domBin = 2; float domMag = 0;
     for (int k = 0; k < AU_BANDS; k++) {
       float m = 0;
@@ -116,14 +119,19 @@ static void micTask(void*) {
   vTaskDelete(nullptr);
 }
 
-static bool micStart() {
+static uint32_t s_micStartMs = 0;
+static int      s_maxRaw = 0;            // максимум с момента запуска — для автопроверки канала
+
+static bool micStart(int slot) {
   if (s_micRun) return true;
+  g_micDiag.slot = slot; g_micDiag.blocks = 0; g_micDiag.timeouts = 0; g_micDiag.rawPeak = 0;
+  s_maxRaw = 0; s_micStartMs = millis();
   i2s_config_t cfg = {};
   cfg.mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX | I2S_MODE_PDM);
   cfg.sample_rate = SR;
   cfg.bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT;
-  cfg.channel_format = I2S_CHANNEL_FMT_ONLY_LEFT;
-  cfg.communication_format = I2S_COMM_FORMAT_STAND_PCM_SHORT;
+  cfg.channel_format = slot ? I2S_CHANNEL_FMT_ONLY_RIGHT : I2S_CHANNEL_FMT_ONLY_LEFT;
+  cfg.communication_format = I2S_COMM_FORMAT_STAND_I2S;     // как в примере записи LilyGO
   cfg.intr_alloc_flags = ESP_INTR_FLAG_LEVEL1;
   cfg.dma_buf_count = 4;
   cfg.dma_buf_len = 256;
@@ -133,9 +141,14 @@ static bool micStart() {
   pins.ws_io_num = MIC_CLK;
   pins.data_out_num = I2S_PIN_NO_CHANGE;
   pins.data_in_num = MIC_DATA;
-  if (i2s_driver_install(I2S_NUM_0, &cfg, 0, nullptr) != ESP_OK) return false;
-  if (i2s_set_pin(I2S_NUM_0, &pins) != ESP_OK) { i2s_driver_uninstall(I2S_NUM_0); return false; }
+  if (i2s_driver_install(I2S_NUM_0, &cfg, 0, nullptr) != ESP_OK) { g_micDiag.stage = 1; return false; }
+  if (i2s_set_pin(I2S_NUM_0, &pins) != ESP_OK) { i2s_driver_uninstall(I2S_NUM_0); g_micDiag.stage = 2; return false; }
+  // как в примере записи LilyGO: частоту PDM задаём явно
+  if (i2s_set_clk(I2S_NUM_0, SR, I2S_BITS_PER_SAMPLE_16BIT, I2S_CHANNEL_MONO) != ESP_OK) {
+    i2s_driver_uninstall(I2S_NUM_0); g_micDiag.stage = 3; return false;
+  }
   i2s_zero_dma_buffer(I2S_NUM_0);
+  g_micDiag.stage = 4;
   // границы полос: 60 Гц .. 8 кГц логарифмически, бин = 31.25 Гц
   for (int k = 0; k < AU_BANDS; k++) {
     float f0 = 60.0f * powf(8000.0f / 60.0f, (float)k / AU_BANDS);
@@ -164,8 +177,17 @@ static void auUpdate(uint32_t now) {
   portENTER_CRITICAL(&s_mux);
   b = s_blk;
   portEXIT_CRITICAL(&s_mux);
+  // автопроверка канала: 1.5 с одной «немой» тишины на левом — пробуем правый
+  if (g_micDiag.slot == 0 && now - s_micStartMs > 1500 && s_maxRaw < 8) {
+    micStop();
+    micStart(1);
+    return;
+  }
   if (b.seq == s_lastSeq) return;
   s_lastSeq = b.seq;
+  g_micDiag.blocks++;
+  g_micDiag.rawPeak = b.rawPeak;
+  s_maxRaw = max(s_maxRaw, b.rawPeak);
 
   g_au.level = b.level;
   g_au.peak = max(b.level, g_au.peak - 0.4f);
@@ -261,7 +283,7 @@ static void push(uint16_t hz, uint16_t ms, uint8_t kind) {
   Tone t = { hz, ms, kind };
   xQueueSend(s_toneQ, &t, 0);                            // очередь полна — звук пропускаем
 }
-void audioClick()                     { push(2600, 6, 1); }
+void audioClick()                     { if (g_clickEn) push(2600, 6, 1); }
 void audioBeep(uint16_t hz, uint16_t ms) { push(hz, ms, 0); }
 void audioGeiger(int pct) {
   static uint32_t last = 0;
@@ -275,10 +297,12 @@ void audioGeiger(int pct) {
 // ============================================================
 static void sndSubtitle(char* out, size_t n) {
   if (s_micRun && g_micOk) snprintf(out, n, "%d dBfs", (int)g_au.level);
-  else                     snprintf(out, n, "mic off");
+  else                     snprintf(out, n, g_micEn ? "listen" : "mic off");
 }
 static void sndEnter() {
-  g_micOk = micStart();
+  g_micDiag.disabled = !g_micEn;
+  if (!g_micEn) { g_micOk = false; g_micDiag.stage = 0; return; }
+  g_micOk = micStart(0);
   g_auMax = -120; g_auHistN = 0;
 }
 static void sndLeave() { micStop(); ledsOff(); }
@@ -286,6 +310,7 @@ static void sndInfo(int i, SubItem& it) {
   static const char* const names[A_NUM] = { "Bars", "Reactor", "Level", "Scope" };
   static const char* const descs[A_NUM] = { "sound spectrum", "pulse animation", "noise meter", "waveform" };
   it.name = names[i]; it.desc = descs[i]; it.value[0] = 0;
+  if (!g_micEn) { strcpy(it.value, "mic off"); return; }
   if (!g_micOk) { strcpy(it.value, "no mic"); return; }
   if (i == A_LEVEL) snprintf(it.value, sizeof(it.value), "%d dBfs", (int)g_au.level);
   if (i == A_BARS && g_au.energy > 0.15f) snprintf(it.value, sizeof(it.value), "%d Hz", (int)g_au.domHz);
@@ -305,7 +330,8 @@ static void sndRotate(int dir) {
 }
 static void sndTick(uint32_t now) { if (g_micOk) auUpdate(now); }
 static void sndDraw(uint32_t now) {
-  if (!g_micOk) { drawMicMissing(); return; }
+  // нет драйвера, выключен или данные не идут больше секунды — экран диагностики
+  if (!g_micOk || (g_micDiag.blocks == 0 && now - s_micStartMs > 1000)) { drawMicMissing(); return; }
   switch (g_aMode) {
     case A_BARS:    drawAuBars(now); break;
     case A_REACTOR: drawReactor(now); break;
