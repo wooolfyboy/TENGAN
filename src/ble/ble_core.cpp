@@ -270,7 +270,7 @@ void bleUpdate(uint32_t now) {
 
   g_have = false; g_bestRssi = -127; memset(&g_bestEnt, 0, sizeof(g_bestEnt));
   memset(g_typeCnt, 0, sizeof(g_typeCnt));
-  bool wantScope = bleIs(M_SCOPE);
+  bool wantScope = bleIs(M_SCOPE) || bleIs(M_CITY);
   for (auto& kv : g_ents) {
     const Ent& e = kv.second;
     if (e.rssi > g_bestRssi) { g_bestRssi = e.rssi; g_bestEnt = e; g_have = true; }
@@ -355,12 +355,12 @@ static void bleEnter() { wifiRadioOff(); bleRadioOn(); }
 static void bleLeave() { bleRadioOff(); ledsOff(); }   // вышли — радио и лента выключены
 
 static void bleScreenInfo(int i, SubItem& it) {
-  static const char* const names[NUM_MODES] = { "Overview", "Scope", "Nearest", "Devices", "Weather" };
-  static const char* const descs[NUM_MODES] = { "count, trend, types", "radar picture", "closest device",
+  static const char* const names[NUM_MODES] = { "Overview", "Scope", "City", "Nearest", "Devices", "Weather" };
+  static const char* const descs[NUM_MODES] = { "count, trend, types", "radar picture", "3D: devices as towers", "closest device",
     "list + details", "BLE thermometers" };
   it.name = names[i]; it.desc = descs[i]; it.value[0] = 0;
   switch (i) {
-    case M_OVERVIEW: case M_LIST: sprintf(it.value, "%d", g_lastCount); break;
+    case M_OVERVIEW: case M_LIST: case M_CITY: sprintf(it.value, "%d", g_lastCount); break;
     case M_SCOPE: {
       int top = -1;
       for (int t = 1; t < T_NUM; t++) if (g_typeCnt[t] > 0 && (top < 0 || g_typeCnt[t] > g_typeCnt[top])) top = t;
@@ -386,6 +386,7 @@ static void bleClick() {
 static void bleRotate(int dir) {
   static uint32_t last = 0;
   if (g_mode == M_LIST) { g_listMove += dir; g_lastTouch = millis(); return; }
+  if (g_mode == M_CITY) { cityTurn(dir); return; }   // в городе колесо крутит камеру
   if (millis() - last < 120) return;               // экраны не проскакивают при быстром вращении
   last = millis();
   g_mode = (g_mode + dir + NUM_MODES) % NUM_MODES;
@@ -399,6 +400,7 @@ static void bleDraw(uint32_t now) {
   switch (g_mode) {
     case M_OVERVIEW: drawOverview(g_lastCount, g_lastRaw, g_typeCnt); break;
     case M_SCOPE:    drawScope(g_snap); break;
+    case M_CITY:     drawCity(g_snap, now); break;
     case M_NEAREST:  drawNearest(g_have, g_bestRssi, g_bestEnt, g_lastCount); break;
     case M_LIST:     drawListOrDetail(now); break;
     default:         drawWeather(g_sensSnap, now); break;

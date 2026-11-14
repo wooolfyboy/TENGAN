@@ -444,3 +444,145 @@ void drawWeather(const std::vector<Sensor>& ss, uint32_t now) {
   uiFooter("", "side: back");
   present();
 }
+
+// ============================================================
+//  CITY — 3D: устройства стоят башнями на круглой площадке.
+//  Ближе устройство — ближе к центру и выше башня; цвет — сила
+//  сигнала, метки (трекеры) — оранжевые. Камера медленно облетает
+//  площадку, колесо крутит её; новые башни «вырастают».
+// ============================================================
+static float s_yaw = 0.6f, s_yawTarget = 0.6f;
+static std::map<uint32_t, float> s_grow;              // текущая высота башни (анимация роста)
+
+void cityTurn(int dir) { s_yawTarget += dir * 0.26f; }
+
+static uint16_t shade(uint16_t c, int pct) {
+  uint8_t r = ((c >> 11) & 0x1F) << 3, g = ((c >> 5) & 0x3F) << 2, b = (c & 0x1F) << 3;
+  return tft.color565(r * pct / 100, g * pct / 100, b * pct / 100);
+}
+
+void drawCity(const std::vector<Blip>& bl, uint32_t now) {
+  const int W = spr.width();
+  g_fastFrame = true;
+  char buf[32];
+  spr.fillSprite(C_BG());
+
+  s_yawTarget += 0.004f;                              // медленный облёт
+  s_yaw += (s_yawTarget - s_yaw) * 0.2f;
+  const float cy_ = cosf(s_yaw), sy_ = sinf(s_yaw);
+  const float pitch = 0.62f, cp = cosf(pitch), sp = sinf(pitch);
+  const float F = 300, dist = 3.2f;
+  const int cx = W / 2, cyS = 104;
+  // мир: x, z — площадка (радиус 1), y — вверх
+  auto proj = [&](float x, float y, float z, float& sx, float& sy, float& d) {
+    float xr = x * cy_ - z * sy_, zr = x * sy_ + z * cy_;
+    float vy = y * cp + zr * sp, vz = -y * sp + zr * cp;
+    d = dist + vz;
+    sx = cx + xr * F / d; sy = cyS - vy * F / d;
+  };
+
+  // площадка: кольца, лучи и волна сканирования
+  const uint16_t ring = UI_LINE();
+  for (int k = 1; k <= 3; k++) {
+    float r = k / 3.0f, px = 0, py = 0, d;
+    for (int i = 0; i <= 48; i++) {
+      float a = i * 2 * PI / 48, sx, sy;
+      proj(cosf(a) * r, 0, sinf(a) * r, sx, sy, d);
+      if (i) spr.drawLine(px, py, sx, sy, k == 3 ? C_ACC() : ring);
+      px = sx; py = sy;
+    }
+  }
+  for (int i = 0; i < 8; i++) {
+    float a = i * PI / 4, x0, y0, x1, y1, d;
+    proj(0, 0, 0, x0, y0, d); proj(cosf(a), 0, sinf(a), x1, y1, d);
+    spr.drawLine(x0, y0, x1, y1, ring);
+  }
+  {
+    float wr = (now % 2200) / 2200.0f, px = 0, py = 0, d;     // волна от центра
+    uint16_t wc = shade(C_ACC(), (int)(70 * (1 - wr)) + 10);
+    for (int i = 0; i <= 40; i++) {
+      float a = i * 2 * PI / 40, sx, sy;
+      proj(cosf(a) * wr, 0, sinf(a) * wr, sx, sy, d);
+      if (i) spr.drawLine(px, py, sx, sy, wc);
+      px = sx; py = sy;
+    }
+  }
+
+  // башни: не больше 48 самых сильных
+  struct Tower { float x, z, h, depth; uint16_t col; bool alert; int rssi; uint8_t type; };
+  std::vector<int> idx(bl.size());
+  for (size_t i = 0; i < bl.size(); i++) idx[i] = (int)i;
+  std::sort(idx.begin(), idx.end(), [&](int a, int b) { return bl[a].rssi > bl[b].rssi; });
+  if (idx.size() > 48) idx.resize(48);
+  std::vector<Tower> tw;
+  std::map<uint32_t, float> grow;
+  for (int i : idx) {
+    const Blip& b = bl[i];
+    float pct = constrain((b.rssi + 95) / 50.0f, 0.0f, 1.0f);
+    float ang = (b.h % 360) * PI / 180.0f, r = 0.95f - 0.8f * pct;
+    float target = 0.06f + 0.62f * pct * pct;
+    auto it = s_grow.find(b.h);
+    float h = it == s_grow.end() ? 0.0f : it->second;
+    h += (target - h) * 0.18f;
+    grow[b.h] = h;
+    Tower t;
+    t.x = cosf(ang) * r; t.z = sinf(ang) * r; t.h = h;
+    float sx, sy; proj(t.x, 0, t.z, sx, sy, t.depth);
+    t.alert = (b.type == T_TRACKER);
+    t.col = t.alert ? C_ALERT() : heatV(0.2f + 0.8f * pct);
+    t.rssi = b.rssi; t.type = b.type;
+    tw.push_back(t);
+  }
+  s_grow.swap(grow);
+  std::sort(tw.begin(), tw.end(), [](const Tower& a, const Tower& b) { return a.depth > b.depth; });
+
+  const float S = 0.045f;                             // полуширина башни
+  const float CX[4] = { -S, S, S, -S }, CZ[4] = { -S, -S, S, S };
+  for (const Tower& t : tw) {
+    float bx[4], by[4], tx[4], ty[4], dd[4], d;
+    for (int k = 0; k < 4; k++) {
+      proj(t.x + CX[k], 0, t.z + CZ[k], bx[k], by[k], dd[k]);
+      proj(t.x + CX[k], t.h, t.z + CZ[k], tx[k], ty[k], d);
+    }
+    // боковые грани: дальние раньше ближних; свет — сбоку, грани разной яркости
+    int order[4] = { 0, 1, 2, 3 };
+    std::sort(order, order + 4, [&](int a, int b) {
+      return dd[a] + dd[(a + 1) % 4] > dd[b] + dd[(b + 1) % 4];
+    });
+    for (int o = 0; o < 4; o++) {
+      int a = order[o], b = (a + 1) % 4;
+      int light = (a % 2 == 0) ? 55 : 35;
+      uint16_t fc = shade(t.col, light);
+      spr.fillTriangle(bx[a], by[a], bx[b], by[b], tx[b], ty[b], fc);
+      spr.fillTriangle(bx[a], by[a], tx[b], ty[b], tx[a], ty[a], fc);
+    }
+    // крыша и рёбра
+    spr.fillTriangle(tx[0], ty[0], tx[1], ty[1], tx[2], ty[2], t.col);
+    spr.fillTriangle(tx[0], ty[0], tx[2], ty[2], tx[3], ty[3], t.col);
+    for (int k = 0; k < 4; k++) spr.drawLine(tx[k], ty[k], tx[(k + 1) % 4], ty[(k + 1) % 4], C_HOT());
+  }
+  // подписи трёх ближайших: тип и сигнал над крышей
+  spr.setTextDatum(BC_DATUM);
+  std::vector<const Tower*> top;
+  for (const Tower& t : tw) top.push_back(&t);
+  std::sort(top.begin(), top.end(), [](const Tower* a, const Tower* b) { return a->rssi > b->rssi; });
+  int lx[3], ly[3], lw[3];
+  for (size_t n = 0; n < top.size() && n < 3; n++) {
+    float sx, sy, d; proj(top[n]->x, top[n]->h, top[n]->z, sx, sy, d);
+    snprintf(buf, sizeof(buf), "%s %d", typeName(top[n]->type), top[n]->rssi);
+    int x = (int)sx, y = (int)sy - 3, w = txtW(buf, 1);
+    for (int pass = 0; pass < 3; pass++)                  // подписи не налезают друг на друга
+      for (size_t m = 0; m < n; m++)
+        if (abs(y - ly[m]) < 10 && abs(x - lx[m]) < (w + lw[m]) / 2 + 4) y = ly[m] - 10;
+    y = max(y, UI_TOP + 10);
+    lx[n] = x; ly[n] = y; lw[n] = w;
+    spr.drawLine(x, y + 1, (int)sx, (int)sy - 1, UI_DIM());   // «ножка» к крыше
+    spr.setTextColor(top[n]->alert ? C_ALERT() : C_HOT());
+    txt(buf, x, y, 1);
+  }
+
+  snprintf(buf, sizeof(buf), "%d devices", (int)bl.size());
+  uiHeader("City", buf);
+  uiFooter("wheel: turn   click: back", "side: back");
+  present();
+}

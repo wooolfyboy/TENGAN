@@ -14,6 +14,7 @@ void displayBegin();
 static const int LIST_ROWS = 7, LIST_ROWH = 18, LIST_Y0 = 26;   // сетка core/ui.h
 
 // утилиты
+extern bool g_fastFrame;     // экран просит частые кадры (3D); сбрасывается после кадра
 void fitText(const char* src, char* dst, size_t cap, int px, int font);  // обрезать с ".."
 void drawBars(int x, int y, int rssi, uint16_t col);                     // 4 столбика сигнала
 void macStr(const uint8_t* m, char* out);                                // m — младший байт первым

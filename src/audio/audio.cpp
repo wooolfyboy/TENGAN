@@ -292,8 +292,8 @@ static void sndEnter() {
 }
 static void sndLeave() { micStop(); ledsOff(); }
 static void sndInfo(int i, SubItem& it) {
-  static const char* const names[A_NUM] = { "Bars", "Reactor", "Level", "Scope" };
-  static const char* const descs[A_NUM] = { "sound spectrum", "pulse animation", "noise meter", "waveform" };
+  static const char* const names[A_NUM] = { "Bars", "Terrain", "Reactor", "Level", "Scope" };
+  static const char* const descs[A_NUM] = { "sound spectrum", "3D sound mountains", "pulse animation", "noise meter", "waveform" };
   it.name = names[i]; it.desc = descs[i]; it.value[0] = 0;
   if (!g_micEn) { strcpy(it.value, "mic off"); return; }
   if (!g_micOk) { strcpy(it.value, "no mic"); return; }
@@ -320,6 +320,7 @@ static void sndDraw(uint32_t now) {
   switch (g_aMode) {
     case A_BARS:    drawAuBars(now); break;
     case A_REACTOR: drawReactor(now); break;
+    case A_TERRAIN: drawTerrain(now); break;
     case A_LEVEL:   drawLevel(now); break;
     default:        drawWave(now); break;
   }

@@ -5,7 +5,7 @@
 #pragma once
 #include <Arduino.h>
 
-enum { A_BARS = 0, A_REACTOR, A_LEVEL, A_SCOPE, A_NUM };
+enum { A_BARS = 0, A_TERRAIN, A_REACTOR, A_LEVEL, A_SCOPE, A_NUM };
 
 #define AU_BANDS 32          // полосы спектра (логарифмически, 60 Гц .. 8 кГц)
 #define AU_WAVE  256         // точек формы волны
@@ -45,6 +45,7 @@ const char* levelWord(float db);     // QUIET / NORMAL / LOUD / VERY LOUD
 // экраны (audio_screens.cpp)
 void drawAuBars(uint32_t now);
 void drawReactor(uint32_t now);
+void drawTerrain(uint32_t now);    // 3D «звуковые горы»
 void drawLevel(uint32_t now);
 void drawWave(uint32_t now);
 void drawMicMissing();             // драйвер не встал / выключен / нет данных

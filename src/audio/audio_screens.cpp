@@ -231,3 +231,66 @@ void drawMicMissing() {
   uiFooter("", "side: back");
   present();
 }
+
+// ============================================================
+//  TERRAIN — 3D «звуковые горы»: каждый кадр спектр становится
+//  новым хребтом спереди, старые уплывают к горизонту.
+//  Низкие частоты — в центре, высокие — по краям (зеркально).
+// ============================================================
+#define TR_ROWS 22
+#define TR_PTS  (AU_BANDS * 2 - 1)
+static float    s_trH[TR_ROWS][AU_BANDS];   // история спектра (0 — самая свежая)
+static int      s_trHead = 0;
+static uint32_t s_trLast = 0;
+
+void drawTerrain(uint32_t now) {
+  const int W = spr.width(), H = spr.height();
+  g_fastFrame = true;                                    // 3D — рисуем чаще
+  if (now - s_trLast >= 45) {                            // новый хребет
+    s_trLast = now;
+    s_trHead = (s_trHead + TR_ROWS - 1) % TR_ROWS;
+    for (int k = 0; k < AU_BANDS; k++) s_trH[s_trHead][k] = g_au.bands[k];
+  }
+  char buf[40], hz[16];
+  spr.fillSprite(C_BG());
+  hzStr(g_au.domHz, hz, sizeof(hz));
+  snprintf(buf, sizeof(buf), "%d dBfs  %s", (int)g_au.level, g_au.energy > 0.15f ? hz : "--");
+
+  // камера: горизонт и «покачивание» в такт громкости
+  const float F = 120, camH = 1.2f, hy = 40 + g_au.energy * 3;
+  const int cx = W / 2;
+  auto proj = [&](float x, float y, float z, int& sx, int& sy) {
+    sx = cx + (int)(x * F / z);
+    sy = (int)(hy + (camH - y) * F / z);
+  };
+  // горизонт и «солнце» — светится от общей громкости
+  int sunR = 10 + (int)(g_au.energy * 10);
+  spr.fillCircle(cx, (int)hy + 2, sunR, dim565(C_ACC(), 18 + (int)(g_au.energy * 40)));
+  spr.drawFastHLine(0, (int)hy + 2, W, UI_DIM());
+
+  // от дальнего хребта к ближнему: заливаем фоном под линией (прячет задние), затем линия
+  for (int r = TR_ROWS - 1; r >= 0; r--) {
+    const float* h = s_trH[(s_trHead + r) % TR_ROWS];
+    float z = 1.6f + r * 0.17f;
+    int fade = 100 - r * 85 / TR_ROWS;                   // дальше — тусклее
+    int px = 0, py = 0, pbx = 0, pby = 0;
+    for (int i = 0; i < TR_PTS; i++) {
+      int k = abs(i - (AU_BANDS - 1));                   // зеркало: центр — низкие частоты
+      float v = h[k];
+      float x = (i - (TR_PTS - 1) / 2.0f) / ((TR_PTS - 1) / 2.0f) * 2.7f;
+      int sx, sy, bx, by;
+      proj(x, v * 1.0f, z, sx, sy);
+      proj(x, 0, z, bx, by);
+      if (i > 0) {
+        spr.fillTriangle(px, py, sx, sy, pbx, pby, C_BG());
+        spr.fillTriangle(sx, sy, bx, by, pbx, pby, C_BG());
+        float vv = max(v, h[abs(i - 1 - (AU_BANDS - 1))]);
+        spr.drawLine(px, py, sx, sy, dim565(heatV(0.25f + 0.75f * vv), fade));
+      }
+      px = sx; py = sy; pbx = bx; pby = by;
+    }
+  }
+  uiHeader("Terrain", buf, g_au.level >= -25);
+  uiFooter("wheel: next view", "side: back");
+  present();
+}

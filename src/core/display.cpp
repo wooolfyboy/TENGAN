@@ -25,6 +25,8 @@ void displayBegin() {
 }
 
 
+bool g_fastFrame = false;
+
 void macStr(const uint8_t* m, char* out) {   // m — младший байт первым
   sprintf(out, "%02X:%02X:%02X:%02X:%02X:%02X", m[5], m[4], m[3], m[2], m[1], m[0]);
 }

@@ -24,7 +24,7 @@ static const int      ORDER_HYST_DB = 8;            // меняем местам
 static const uint32_t ORDER_EVERY   = 2000;         // как часто обновлять порядок
 static const uint32_t ORDER_FREEZE  = 4000;         // после касания колеса порядок замирает
 
-enum { M_OVERVIEW = 0, M_SCOPE, M_NEAREST, M_LIST, M_WEATHER, NUM_MODES };
+enum { M_OVERVIEW = 0, M_SCOPE, M_CITY, M_NEAREST, M_LIST, M_WEATHER, NUM_MODES };
 enum { V_PRIV = 0, V_OTHER = 1 };                   // 2.. — бренды из таблицы BRANDS (vendors.h)
 enum { A_PUBLIC = 0, A_STATIC, A_ROTATING, A_NONRES };   // виды адресов
 
@@ -104,6 +104,8 @@ extern int      g_sparkN;
 float       estDistance(int rssi);
 void drawOverview(int count, int raw, const int* typeCnt);
 void drawScope(const std::vector<Blip>& bl);
+void drawCity(const std::vector<Blip>& bl, uint32_t now);   // 3D: устройства — башни
+void cityTurn(int dir);                                      // колесо: повернуть камеру
 void drawNearest(bool have, int rssi, const Ent& best, int count);
 void drawList(const std::map<uint32_t, Ent>& ents);
 void drawDetail(const Dev& d, const Ent& e, bool inMap, uint32_t now);

@@ -89,9 +89,9 @@ static void wifiSub(char* o, size_t n) { snprintf(o, n, "%d nets", (int)g_aps.si
 static void subSub(char* o, size_t n) { snprintf(o, n, "%s", BANDS[g_band].name); }
 static int  zero() { return 0; }
 static void bleInfo(int i, SubItem& it) {
-  static const char* const nm[] = { "Overview", "Scope", "Nearest", "Devices", "Weather" };
-  static const char* const ds[] = { "count, trend, types", "radar picture", "closest device", "list + details", "BLE thermometers" };
-  static const char* const vv[] = { "23", "phone 3", "-48 dBm", "23", "2" };
+  static const char* const nm[] = { "Overview", "Scope", "City", "Nearest", "Devices", "Weather" };
+  static const char* const ds[] = { "count, trend, types", "radar picture", "3D: devices as towers", "closest device", "list + details", "BLE thermometers" };
+  static const char* const vv[] = { "23", "phone 3", "23", "-48 dBm", "23", "2" };
   it.name = nm[i]; it.desc = ds[i]; snprintf(it.value, sizeof(it.value), "%s", vv[i]);
 }
 static void wifiInfo(int i, SubItem& it) {
@@ -112,9 +112,9 @@ const Section wifiSection = { "Wi-Fi", 70, 210, 130, iconWifi, wifiSub, noop, no
   W_NUM, wifiInfo, zero, noopI, noop, noop, noopI, noBack, noopT, noopT };
 static void sndSub(char* o, size_t n) { snprintf(o, n, "%d dBfs", (int)g_au.level); }
 static void sndInfo(int i, SubItem& it) {
-  static const char* const nm[] = { "Bars", "Reactor", "Level", "Scope" };
-  static const char* const ds[] = { "sound spectrum", "pulse animation", "noise meter", "waveform" };
-  static const char* const vv[] = { "1.2 kHz", "", "-38 dBfs", "" };
+  static const char* const nm[] = { "Bars", "Terrain", "Reactor", "Level", "Scope" };
+  static const char* const ds[] = { "sound spectrum", "3D sound mountains", "pulse animation", "noise meter", "waveform" };
+  static const char* const vv[] = { "1.2 kHz", "", "", "-38 dBfs", "" };
   it.name = nm[i]; it.desc = ds[i]; snprintf(it.value, sizeof(it.value), "%s", vv[i]);
 }
 const Section soundSection = { "Sound", 120, 200, 255, iconMic, sndSub, noop, noop,
@@ -271,6 +271,7 @@ int main(int argc, char** argv) {
   }
   g_mode = M_OVERVIEW; drawOverview((int)g_ents.size(), g_lastRaw, typeCnt); snap("10_ble_overview");
   g_mode = M_SCOPE;    drawScope(blips);                                snap("12_ble_scope");
+  g_mode = M_CITY;     for (int f = 0; f < 30; f++) drawCity(blips, s_now + f * 33); snap("13_ble_city");
   g_mode = M_NEAREST;  drawNearest(true, -48, best, g_lastCount);       snap("11_ble_nearest");
   Ent tr = g_ents[3];
   drawNearest(true, -58, tr, g_lastCount);                              snap("11b_ble_nearest_tracker");
@@ -315,6 +316,11 @@ int main(int argc, char** argv) {
   for (int i = 0; i < AU_HIST; i++) g_auHist[i] = -52 + 8 * sinf(i / 7.0f) + noise(i) * 6 + (i > 90 && i < 100 ? 30 : 0);
   g_auHistN = AU_HIST;
   drawAuBars(s_now);         snap("40_sound_bars");
+  for (int f = 0; f < 30; f++) {                        // «горы»: прокрутить историю
+    for (int k = 0; k < AU_BANDS; k++) g_au.bands[k] = constrain(0.15f + 0.7f * expf(-(k - 4 - (f % 7)) * (k - 4 - (f % 7)) / 12.0f) * (0.5f + 0.5f * sinf(f * 0.5f + k * 0.2f)) + noise(k + f) * 0.1f, 0.0f, 1.0f);
+    drawTerrain(s_now + f * 50);
+  }
+  snap("40b_sound_terrain");
   drawReactor(s_now);        snap("41_sound_reactor");
   drawLevel(s_now);          snap("42_sound_level");
   drawWave(s_now);           snap("43_sound_scope");

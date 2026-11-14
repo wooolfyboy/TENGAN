@@ -58,9 +58,11 @@ void loop() {
 
   powerIdleTick(now);
   // в приглушённом режиме кадры в 4 раза реже — меньше работы процессору и шине
-  if (now - lastDraw >= (powerIdle() ? REDRAW_MS * 4 : REDRAW_MS)) {
+  uint32_t frame = powerIdle() ? REDRAW_MS * 4 : (g_fastFrame ? 33 : REDRAW_MS);
+  if (now - lastDraw >= frame) {
     lastDraw = now;
     bleUpdate(now);                   // нужно всегда: меню показывает число устройств, лента — события
+    g_fastFrame = false;              // экран сам попросит снова, если ему нужно
     if (g_powerHold) drawPowerHold();
     else             navDraw(now);
     settingsAutosave(now);
