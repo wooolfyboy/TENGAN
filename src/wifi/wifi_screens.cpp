@@ -217,7 +217,7 @@ void drawChannels(uint32_t now) {
   std::sort(v.begin(), v.end());
   for (auto& p : v) {
     const Ap& a = g_aps[p.second];
-    uint16_t c = heat(a.rssiS), fill = dimColor(c, 18);
+    uint16_t c = heat(a.rssiS), fill = scale565(c, 18);
     int top = dbY(a.rssiS);
     float cen = apCenter(a), half = apHalf(a);
     int prevx = -1, prevy = -1;
@@ -267,7 +267,7 @@ void drawActivity(uint32_t now) {
     spr.fillRect(x + 2, pt, bw - 4, pb - pt, tft.color565(10, 18, 26));
     if (h > 0) {                                  // данные — ярко, служебные — тусклее
       uint16_t hc = heatV(0.3f + 0.7f * sqrtf(t) / smx);
-      spr.fillRect(x + 2, pb - h, bw - 4, h - hd, dimColor(hc, 40));
+      spr.fillRect(x + 2, pb - h, bw - 4, h - hd, scale565(hc, 40));
       spr.fillRect(x + 2, pb - hd, bw - 4, hd, hc);
     }
     if (c == g_hopCh) spr.fillRect(x + 2, pb + 1, bw - 4, 2, C_ACC());
@@ -289,7 +289,7 @@ void drawActivity(uint32_t now) {
   txt("DATA", UI_M + 10, pt + 2, 1);
   spr.fillRect(UI_M + 2, pt + 2, 5, 7, heatV(0.9f));
   txt("MGMT", UI_M + 10, pt + 14, 1);
-  spr.fillRect(UI_M + 2, pt + 14, 5, 7, dimColor(heatV(0.9f), 40));
+  spr.fillRect(UI_M + 2, pt + 14, 5, 7, scale565(heatV(0.9f), 40));
 
   // общий трафик за 2 минуты
   int gx = UI_M + 4, gy = UI_TOP + 92, gw = W - 2 * UI_M - 8, gh = UI_BOTTOM - gy + 2;

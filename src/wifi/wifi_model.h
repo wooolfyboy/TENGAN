@@ -54,7 +54,6 @@ extern int      g_actHistN;
 uint64_t    macKey(const uint8_t* m);
 const char* encName(uint8_t e);
 const char* genName(uint8_t g);
-uint16_t    dimColor(uint16_t c, int pct);
 const char* ssidOr(const Ap& a);                 // имя или "(hidden)"
 float       apCenter(const Ap& a);               // центр полосы, в каналах
 float       apHalf(const Ap& a);                 // полуширина: 20 МГц -> 2, 40 МГц -> 4

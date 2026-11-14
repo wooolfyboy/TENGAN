@@ -162,45 +162,142 @@ void drawPcWaiting(uint32_t now) {
   present();
 }
 
-// ---------- МУЗЫКА: пульт громкости ----------
+// ---------- МУЗЫКА: что играет + пульт ----------
+static void mmss(int s, char* out, size_t n) {
+  if (s < 0) { snprintf(out, n, "--:--"); return; }
+  if (s >= 3600) snprintf(out, n, "%d:%02d:%02d", s / 3600, s / 60 % 60, s % 60);
+  else           snprintf(out, n, "%d:%02d", s / 60, s % 60);
+}
+
+// длинное название — «бегущая строка»: окно из символов (UTF-8), которое влезает в ширину
+static void marquee(const char* s, int x, int y, int w, int font, uint32_t now) {
+  if (txtW(s, font) <= w) { txt(s, x, y, font); return; }
+  int starts[96], nc = 0, len = strlen(s);
+  for (int k = 0; k < len && nc < 96; k++) if (((uint8_t)s[k] & 0xC0) != 0x80) starts[nc++] = k;
+  int maxStart = nc - 1;                              // первый старт, с которого хвост влезает
+  for (int c = 0; c < nc; c++) if (txtW(s + starts[c], font) <= w) { maxStart = c; break; }
+  int cycle = maxStart + 8;                           // +8 шагов паузы (в начале и в конце)
+  int step = (now / 260) % cycle;
+  int c0 = constrain(step - 4, 0, maxStart);
+  char buf[100];
+  int m = 0;
+  for (int c = c0; c < nc; c++) {                     // добавляем по целому символу, пока влезает
+    int a = starts[c], b = c + 1 < nc ? starts[c + 1] : len;
+    if (m + (b - a) >= (int)sizeof(buf)) break;
+    memcpy(buf + m, s + a, b - a); buf[m + (b - a)] = 0;
+    if (txtW(buf, font) > w) { buf[m] = 0; break; }
+    m += b - a;
+  }
+  txt(buf, x, y, font);
+}
+
 void drawPcMedia(uint32_t now) {
   const PcStat& p = g_pc;
   const int W = spr.width();
-  char buf[32];
+  char buf[48], a[16], b[16];
   spr.fillSprite(C_BG());
+  bool trk = p.trk && msSince(now, p.trkT) < 10000;
+  char app[20]; snprintf(app, sizeof(app), "%s", trk && p.app[0] ? p.app : (p.host[0] ? p.host : "laptop"));
+  uiHeader("Media", app);
+
+  // ---- справа: громкость узкой полоской (ярче, когда крутишь колесо) ----
+  const int vx = W - UI_M - 16, vy = UI_TOP + 6, vh = 92, vw = 10;
   bool known = p.vol >= 0 && msSince(now, p.volT) < 15000;
-  uiHeader("Media", p.host[0] ? p.host : "laptop");
-  const int cx = W / 2, cy = 112, r = 64;
   uint32_t since = msSince(now, g_pcLastCmdMs);
-  bool fresh = since < 400;
-  uint16_t col = p.mute ? UI_DIM() : (fresh ? C_HOT() : C_ACC());
-  drawArcGauge(cx, cy, r, 10, known ? p.vol : 0, col, UI_LINE(), C_BG());
-  spr.setTextDatum(MC_DATUM);
+  bool turning = since < 700 && (g_pcLastCmd == 1 || g_pcLastCmd == -1);
+  spr.drawRect(vx, vy, vw, vh, turning ? C_ACC() : UI_LINE());
   if (known) {
-    snprintf(buf, sizeof(buf), "%d", p.vol);
-    spr.setTextColor(p.mute ? UI_DIM() : C_HOT());
-    txt(buf, cx, cy - 22, 6);
+    int h = (vh - 2) * p.vol / 100;
+    spr.fillRect(vx + 1, vy + vh - 1 - h, vw - 2, h, p.mute ? UI_DIM() : (turning ? C_HOT() : C_ACC()));
+  }
+  spr.setTextDatum(TC_DATUM);
+  spr.setTextColor(turning ? C_HOT() : UI_LABEL());
+  if (known) snprintf(buf, sizeof(buf), p.mute ? "MUTE" : "%d", p.vol); else snprintf(buf, sizeof(buf), "VOL");
+  txt(buf, vx + vw / 2, vy + vh + 4, 1);
+
+  const int tx = UI_M + 6, tw = vx - tx - 12;
+  if (!trk) {
+    // ---- нет данных о треке: крутится виниловая пластинка, рядом крупно громкость ----
+    g_fastFrame = true;
+    static float rot = 0;
+    static uint32_t lastMs = 0;
+    float dt = lastMs ? min<uint32_t>(msSince(now, lastMs), 100) * 0.001f : 0.03f;
+    lastMs = now;
+    rot += dt * (turning ? 7.0f : 1.8f);                   // крутишь колесо — пластинка разгоняется
+    const int cx = tx + 66, cy = UI_TOP + 64, R = 58;
+    spr.fillCircle(cx, cy, R, tft.color565(6, 18, 22));
+    spr.drawCircle(cx, cy, R, UI_LINE());
+    for (int r = 24; r < R - 2; r += 4) spr.drawCircle(cx, cy, r, tft.color565(12, 34, 41));   // бороздки
+    // блики: два светлых сектора на бороздках, крутятся вместе с пластинкой
+    for (int side = 0; side < 2; side++) {
+      float base = rot + side * PI;
+      for (int r = 26; r < R - 3; r += 4)
+        for (int k = -6; k <= 6; k++) {
+          float ang = base + k * 0.035f;
+          int br = 110 - abs(k) * 15;
+          spr.drawPixel(cx + (int)(cosf(ang) * r), cy + (int)(sinf(ang) * r), tft.color565(br / 3, br, br + 20 > 255 ? 255 : br + 20));
+        }
+    }
+    // яблоко пластинки с меткой, крутится
+    spr.fillCircle(cx, cy, 19, tft.color565(10, 60, 74));
+    spr.drawCircle(cx, cy, 19, C_ACC());
+    float la = rot * 1.0f;
+    spr.drawLine(cx + (int)(cosf(la) * 8), cy + (int)(sinf(la) * 8), cx + (int)(cosf(la) * 16), cy + (int)(sinf(la) * 16), C_HOT());
+    spr.fillCircle(cx, cy, 3, C_HOT());
+    // тонарм
+    const int px = cx + R + 12, py = cy - R + 6;
+    spr.fillCircle(px, py, 6, UI_LINE());
+    spr.drawCircle(px, py, 6, UI_LABEL());
+    int nx = cx + 30, ny = cy - 22;
+    spr.drawLine(px, py, nx + 6, ny - 10, UI_LABEL());
+    spr.drawLine(px + 1, py, nx + 7, ny - 10, UI_LABEL());
+    spr.fillRect(nx, ny - 12, 9, 6, C_ACC());
+    // справа от пластинки: громкость крупно
+    const int gx = px + 16;
+    spr.setTextDatum(TL_DATUM);
     spr.setTextColor(UI_LABEL());
-    txt(p.mute ? "MUTED" : "VOLUME", cx, cy + 6, 1);
-  } else {
-    spr.setTextColor(C_HOT());
-    txt("VOL", cx, cy - 22, 4);
+    txt(p.mute ? "MUTED" : "VOLUME", gx, UI_TOP + 22, 1);
+    spr.setTextColor(p.mute ? UI_DIM() : (turning ? C_HOT() : C_ACC()));
+    if (known) { snprintf(buf, sizeof(buf), "%d", p.vol); txt(buf, gx, UI_TOP + 32, 6); }
+    else txt("--", gx, UI_TOP + 32, 6);
     spr.setTextColor(UI_DIM());
-    txt("LEVEL UNKNOWN", cx, cy + 4, 1);
+    txt("NO TRACK INFO", gx, UI_TOP + 84, 1);
+    txt("WHEEL: VOLUME", gx, UI_TOP + 96, 1);
+  } else {
+    // ---- название и исполнитель ----
+    spr.setTextDatum(TL_DATUM);
+    spr.setTextColor(C_HOT());
+    marquee(p.title[0] ? p.title : "(no title)", tx, UI_TOP + 10, tw, 5, now);   // шрифты с кириллицей
+    spr.setTextColor(UI_LABEL());
+    char art[96];
+    fitText(p.artist, art, sizeof(art), tw, 3);
+    txt(art, tx, UI_TOP + 40, 3);
+    // ---- прогресс: позицию между обновлениями досчитываем сами ----
+    int pos = p.pos;
+    if (pos >= 0 && p.playing) pos += msSince(now, p.trkT) / 1000;
+    if (p.dur > 0) pos = min(pos, p.dur);
+    const int py = UI_TOP + 70;
+    spr.drawFastHLine(tx, py + 3, tw, UI_LINE());
+    if (p.dur > 0 && pos >= 0) {
+      int f = tw * pos / p.dur;
+      spr.fillRect(tx, py + 2, f, 3, C_ACC());
+      spr.fillCircle(tx + f, py + 3, 4, C_HOT());
+    }
+    mmss(pos, a, sizeof(a)); mmss(p.dur, b, sizeof(b));
+    spr.setTextColor(UI_DIM());
+    txt(a, tx, py + 11, 1);
+    spr.setTextDatum(TR_DATUM);
+    txt(b, tx + tw, py + 11, 1);
+    // ---- состояние: играет / пауза (и вспышка после нажатия) ----
+    bool flash = g_pcLastCmd == 2 && since < 500;
+    uint16_t ic = flash ? C_HOT() : C_ACC();
+    int ix = tx, iy = UI_TOP + 98;
+    if (p.playing) spr.fillTriangle(ix, iy, ix, iy + 16, ix + 14, iy + 8, ic);
+    else { spr.fillRect(ix, iy, 5, 16, ic); spr.fillRect(ix + 9, iy, 5, 16, ic); }
+    spr.setTextDatum(TL_DATUM);
+    spr.setTextColor(UI_LABEL());
+    txt(p.playing ? "PLAYING" : "PAUSED", ix + 22, iy + 4, 1);
   }
-  // отклик на действие: стрелка громче/тише или значок паузы
-  if (fresh) {
-    int k = 255 - (int)(since * 255 / 400);
-    uint16_t fc = tft.color565(k, k, k);
-    if (g_pcLastCmd == 1)  { spr.fillTriangle(cx + 84, cy - 30, cx + 74, cy - 14, cx + 94, cy - 14, fc); }
-    if (g_pcLastCmd == -1) { spr.fillTriangle(cx - 84, cy - 14, cx - 94, cy - 30, cx - 74, cy - 30, fc); }
-    if (g_pcLastCmd == 2)  { spr.fillRect(cx - 11, cy + 18, 7, 16, fc); spr.fillRect(cx + 4, cy + 18, 7, 16, fc); }
-  }
-  spr.setTextDatum(TL_DATUM);
-  spr.setTextColor(UI_DIM());
-  txt("-", UI_M + 8, cy - 4, 4);
-  spr.setTextDatum(TR_DATUM);
-  txt("+", W - UI_M - 8, cy - 4, 4);
   uiFooter("wheel: volume  click: play/pause", "side: back");
   pageDots(2);
   present();

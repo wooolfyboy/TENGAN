@@ -6,6 +6,8 @@
 #include "core/fonts/STM14.h"
 #include "core/fonts/RAJ24.h"
 #include "core/fonts/RAJ44.h"
+#include "core/fonts/JBM14.h"   // с кириллицей — для текстов «снаружи» (названия треков)
+#include "core/fonts/JBM19.h"
 
 struct Stop { float x; uint8_t r, g, b; };
 static uint16_t ramp(const Stop* s, int n, float x) {
@@ -49,8 +51,16 @@ static const GFXfont* fontFor(int size) {
     case 2: return &STM14;
     case 4: return &RAJ24;
     case 6: return &RAJ44;
+    case 3: return &JBM14;                           // кириллица, мелкий
+    case 5: return &JBM19;                           // кириллица, крупный
     default: return nullptr;                         // 1 и 7 — встроенные
   }
+}
+
+uint16_t scale565(uint16_t c, int pct) {
+  pct = constrain(pct, 0, 100);
+  uint8_t r = ((c >> 11) & 0x1F) << 3, g = ((c >> 5) & 0x3F) << 2, b = (c & 0x1F) << 3;
+  return tft.color565(r * pct / 100, g * pct / 100, b * pct / 100);
 }
 
 void txt(const char* s, int x, int y, int size) {

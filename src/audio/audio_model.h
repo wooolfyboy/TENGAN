@@ -5,7 +5,7 @@
 #pragma once
 #include <Arduino.h>
 
-enum { A_BARS = 0, A_TERRAIN, A_REACTOR, A_LEVEL, A_SCOPE, A_NUM };
+enum { A_BARS = 0, A_TERRAIN, A_REACTOR, A_LEVEL, A_SCOPE, A_XY, A_NUM };
 
 #define AU_BANDS 32          // полосы спектра (логарифмически, 60 Гц .. 8 кГц)
 #define AU_WAVE  256         // точек формы волны
@@ -40,12 +40,21 @@ struct MicDiag {
 };
 extern MicDiag g_micDiag;
 
+// звук с ноутбука (раздел PC: программа на ноуте слушает то, что играет в колонках)
+extern bool   g_auFromPc;            // сейчас картинки рисуются по звуку ноутбука, а не микрофона
+extern int    g_auSrcNow;            // источник сейчас: 0 авто, 1 микрофон, 2 ноутбук (из настроек)
+void drawPcAudioWait(uint32_t now);  // выбран «ноутбук», а звука от него нет
+#define AU_XY 64
+extern int8_t g_auXY[AU_XY][2];      // точки для XY-осциллографа: левый / правый канал
+extern bool   g_auXYStereo;
+
 const char* levelWord(float db);     // QUIET / NORMAL / LOUD / VERY LOUD
 
 // экраны (audio_screens.cpp)
 void drawAuBars(uint32_t now);
 void drawReactor(uint32_t now);
 void drawTerrain(uint32_t now);    // 3D «звуковые горы»
+void drawXY(uint32_t now);         // XY-осциллограф: левый канал по X, правый по Y
 void drawLevel(uint32_t now);
 void drawWave(uint32_t now);
 void drawMicMissing();             // драйвер не встал / выключен / нет данных

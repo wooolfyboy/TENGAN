@@ -2,19 +2,26 @@
 """Превращает TTF-шрифт в растровый шрифт формата Adafruit GFX (его понимает TFT_eSPI).
 
 Запуск:  python3 tools/gen_gfxfont.py fonts/ShareTechMono-Regular.ttf 15 STM15 > src/core/fonts/STM15.h
-Символы — печатный ASCII (0x20..0x7E). Нужен Pillow.
+Символы — печатный ASCII (0x20..0x7E). С флагом --cyr ещё и кириллица (до U+045F:
+А–я, Ё, ё и др.); коды между ними — пустые (GFX-шрифту нужна сплошная таблица).
+TFT_eSPI сам разбирает UTF-8, поэтому русский текст выводится как есть. Нужен Pillow.
 """
 import sys
 from PIL import Image, ImageDraw, ImageFont
 
 def main():
     path, size, name = sys.argv[1], int(sys.argv[2]), sys.argv[3]
+    cyr = "--cyr" in sys.argv[4:]
+    last = 0x45F if cyr else 0x7E
     font = ImageFont.truetype(path, size)
     ascent, descent = font.getmetrics()
     bitmap = bytearray()
     glyphs = []
-    for code in range(0x20, 0x7F):
+    for code in range(0x20, last + 1):
         ch = chr(code)
+        if 0x7F <= code < 0x400:                 # между ASCII и кириллицей — пустые места
+            glyphs.append((len(bitmap), 0, 0, 0, 0, 0, "?"))
+            continue
         adv = int(round(font.getlength(ch)))
         l, t, r, b = font.getbbox(ch, anchor="ls")
         w, h = max(0, r - l), max(0, b - t)
@@ -42,10 +49,10 @@ def main():
     out.append("};")
     out.append(f"const GFXglyph {name}Glyphs[] PROGMEM = {{")
     for off, w, h, adv, l, t, ch in glyphs:
-        c = ch.replace("\\", "backslash")
+        c = ch.replace("\\", "backslash") if ch != "?" or not w else "-"
         out.append(f"  {{ {off:5d}, {w:3d}, {h:3d}, {adv:3d}, {l:4d}, {t:4d} }},   // '{c}'")
     out.append("};")
-    out.append(f"const GFXfont {name} PROGMEM = {{ (uint8_t*){name}Bitmaps, (GFXglyph*){name}Glyphs, 0x20, 0x7E, {ascent + descent} }};")
+    out.append(f"const GFXfont {name} PROGMEM = {{ (uint8_t*){name}Bitmaps, (GFXglyph*){name}Glyphs, 0x20, 0x{last:X}, {ascent + descent} }};")
     print("\n".join(out))
 
 if __name__ == "__main__":

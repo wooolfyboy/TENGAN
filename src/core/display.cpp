@@ -34,11 +34,23 @@ void macStr(const uint8_t* m, char* out) {   // m — младший байт п
 // укоротить строку до ширины px (font), добавив ".."
 void fitText(const char* src, char* dst, size_t cap, int px, int font) {
   strncpy(dst, src, cap - 1); dst[cap - 1] = 0;
-  if (txtW(dst, font) <= px) return;
   size_t n = strlen(dst);
+  if (strlen(src) > n) {                                      // обрезали копированием — не оставить «пол-буквы»
+    size_t k = n;
+    while (k && ((uint8_t)dst[k - 1] & 0xC0) == 0x80) k--;    // k-1 — начало последнего символа
+    if (k) {
+      uint8_t lead = (uint8_t)dst[k - 1];
+      size_t need = lead >= 0xF0 ? 4 : lead >= 0xE0 ? 3 : lead >= 0xC0 ? 2 : 1;
+      if (n - (k - 1) < need) n = k - 1;
+    }
+    dst[n] = 0;
+  }
+  if (txtW(dst, font) <= px) return;
   while (n > 1) {
-    dst[--n] = 0;
-    char tmp[48]; snprintf(tmp, sizeof(tmp), "%s..", dst);
+    n--;                                                      // убрать последний символ целиком (UTF-8)
+    while (n > 0 && ((uint8_t)dst[n] & 0xC0) == 0x80) n--;
+    dst[n] = 0;
+    char tmp[96]; snprintf(tmp, sizeof(tmp), "%s..", dst);
     if (txtW(tmp, font) <= px) { strcpy(dst, tmp); return; }
   }
 }

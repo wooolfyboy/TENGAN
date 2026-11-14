@@ -7,11 +7,6 @@
 #include "core/theme.h"
 #include "core/ui.h"
 
-static uint16_t dim565(uint16_t c, int pct) {
-  uint8_t r = ((c >> 11) & 0x1F) << 3, g = ((c >> 5) & 0x3F) << 2, b = (c & 0x1F) << 3;
-  return tft.color565(r * pct / 100, g * pct / 100, b * pct / 100);
-}
-
 // «водопад»: v = dBm + 120; -110 почти чёрный … -40 белый
 static uint16_t wfColor(int v) {
   float x = constrain((v - 10) / 70.0f, 0.0f, 1.0f);
@@ -42,7 +37,7 @@ void drawSpectrum() {
   for (int i = 1; i < SP_N; i++) spr.drawLine(px(i - 1), py(g_spPeak[i - 1]), px(i), py(g_spPeak[i]), UI_DIM());
   for (int i = 0; i < SP_N; i++) {
     int x = px(i), y = py(g_spCur[i]);
-    spr.drawFastVLine(x, y, pb - y, dim565(heat(g_spCur[i] + 10), 25));
+    spr.drawFastVLine(x, y, pb - y, scale565(heat(g_spCur[i] + 10), 25));
   }
   for (int i = 1; i < SP_N; i++)
     spr.drawLine(px(i - 1), py(g_spCur[i - 1]), px(i), py(g_spCur[i]), heat(max(g_spCur[i - 1], g_spCur[i]) + 10));
@@ -57,7 +52,7 @@ void drawSpectrum() {
     int row = (g_wfHead - 1 - r + WF_ROWS) % WF_ROWS;
     for (int i = 0; i < SP_N; i++) {
       int x0 = px(i), x1 = (i + 1 < SP_N) ? px(i + 1) : pr + 1;
-      spr.drawFastHLine(x0, wt + r, x1 - x0, wfColor(g_wf[row][i]));
+      if (g_wf) spr.drawFastHLine(x0, wt + r, x1 - x0, wfColor(g_wf[row][i]));
     }
   }
   // ось частот

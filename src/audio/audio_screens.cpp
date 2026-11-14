@@ -7,10 +7,14 @@
 #include "core/display.h"
 #include "core/theme.h"
 #include "core/ui.h"
+#include "core/psram.h"
 
-static uint16_t dim565(uint16_t c, int pct) {
-  uint8_t r = ((c >> 11) & 0x1F) << 3, g = ((c >> 5) & 0x3F) << 2, b = (c & 0x1F) << 3;
-  return tft.color565(r * pct / 100, g * pct / 100, b * pct / 100);
+// справа в шапке — откуда звук: MIC / PC (в режиме «авто» — AUTO MIC / AUTO PC)
+static const char* src(const char* right) {
+  static char buf[56];
+  const char* tag = g_auSrcNow == 1 ? "MIC" : g_auSrcNow == 2 ? "PC" : (g_auFromPc ? "AUTO PC" : "AUTO MIC");
+  snprintf(buf, sizeof(buf), "%s  %s", tag, right ? right : "");
+  return buf;
 }
 
 static void hzStr(float hz, char* out, size_t n) {
@@ -27,7 +31,7 @@ void drawAuBars(uint32_t now) {
   spr.fillSprite(C_BG());
   hzStr(g_au.domHz, hz, sizeof(hz));
   snprintf(buf, sizeof(buf), "%d dBfs  %s", (int)g_au.level, g_au.energy > 0.15f ? hz : "--");
-  uiHeader("Sound spectrum", buf);
+  uiHeader("Sound spectrum", src(buf));
 
   const int x0 = UI_M + 8, base = 112, hMax = 84, step = (W - 2 * x0) / AU_BANDS;
   for (int k = 0; k < AU_BANDS; k++) {
@@ -37,7 +41,7 @@ void drawAuBars(uint32_t now) {
     for (int y = 0; y + 3 <= h; y += 4) {
       uint16_t c = heatV(0.25f + 0.75f * (float)y / hMax);
       spr.fillRect(x, base - y - 3, bw, 3, c);
-      if (y < 28) spr.fillRect(x, base + 3 + y, bw, 2, dim565(c, 22 - y * 3 / 4));   // отражение
+      if (y < 28) spr.fillRect(x, base + 3 + y, bw, 2, scale565(c, 22 - y * 3 / 4));   // отражение
     }
     int cy = base - (int)(g_au.caps[k] * hMax) - 5;
     spr.fillRect(x, cy, bw, 2, C_HOT());
@@ -62,7 +66,7 @@ void drawAuBars(uint32_t now) {
 void drawReactor(uint32_t now) {
   int W = spr.width();
   spr.fillSprite(C_BG());
-  uiHeader("Reactor", levelWord(g_au.level), g_au.level >= -25);
+  uiHeader("Reactor", src(levelWord(g_au.level)), g_au.level >= -25);
   int cx = W / 2, cy = 90;
   float e = g_au.energy;
   float rot = now * 0.0004f + e * 0.8f;
@@ -86,7 +90,7 @@ void drawReactor(uint32_t now) {
   }
   // ядро
   spr.drawCircle(cx, cy, r0, C_ACC());
-  spr.drawCircle(cx, cy, r0 - 4, dim565(C_ACC(), 40));
+  spr.drawCircle(cx, cy, r0 - 4, scale565(C_ACC(), 40));
   spr.fillSmoothCircle(cx, cy, max(3, (int)(r0 * 0.35f + e * 8)), heatV(0.5f + 0.5f * e), C_BG());
   // орбиты-точки
   for (int k = 0; k < 3; k++) {
@@ -116,7 +120,7 @@ void drawLevel(uint32_t now) {
   char buf[32];
   spr.fillSprite(C_BG());
   bool loud = g_au.level >= -25;
-  uiHeader("Noise meter", levelWord(g_au.level), loud);
+  uiHeader("Noise meter", src(levelWord(g_au.level)), loud);
 
   spr.setTextDatum(TL_DATUM);
   spr.setTextColor(loud ? C_ALERT() : C_HOT());
@@ -170,7 +174,7 @@ void drawWave(uint32_t now) {
   char buf[24];
   spr.fillSprite(C_BG());
   hzStr(g_au.domHz, buf, sizeof(buf));
-  uiHeader("Waveform", g_au.energy > 0.15f ? buf : "listening");
+  uiHeader("Waveform", src(g_au.energy > 0.15f ? buf : "listening"));
   int gx = UI_M + 4, gy = UI_TOP, gw = W - 2 * UI_M - 8, gh = UI_BOTTOM - UI_TOP + 2, cy = gy + gh / 2;
   uiFrame(gx, gy, gw, gh, UI_LINE());
   for (int x = gx + 4; x < gx + gw - 4; x += 4) spr.drawPixel(x, cy, UI_LINE());
@@ -188,7 +192,7 @@ void drawWave(uint32_t now) {
     int x = gx + 3 + (gw - 6) * i / (span - 1);
     int y = cy - (int)(g_au.wave[start + i] * k);
     if (px >= 0) {
-      spr.drawLine(px, py + 1, x, y + 1, dim565(C_ACC(), 35));  // «свечение»
+      spr.drawLine(px, py + 1, x, y + 1, scale565(C_ACC(), 35));  // «свечение»
       spr.drawLine(px, py, x, y, C_ACC());
     }
     px = x; py = y;
@@ -241,7 +245,7 @@ void drawMicMissing() {
 // ============================================================
 #define TR_ROWS 24
 #define TR_COLS 52
-static float    s_trH[TR_ROWS][TR_COLS];   // высоты (0 — самый свежий хребет)
+static float    (*s_trH)[TR_COLS] = nullptr;   // высоты (0 — самый свежий хребет); ~5 КБ во внешней памяти
 static int      s_trHead = 0;
 static uint32_t s_trLast = 0, s_trSeq = 0;
 static float    s_trTop = 0.3f;            // автоусиление именно для гор
@@ -285,6 +289,8 @@ static void terrainPush() {
 }
 
 void drawTerrain(uint32_t now) {
+  if (!s_trH) s_trH = (float(*)[TR_COLS])psAlloc<float>(TR_ROWS * TR_COLS);
+  if (!s_trH) return;
   const int W = spr.width();
   g_fastFrame = true;
   if (now - s_trLast >= 45) { s_trLast = now; terrainPush(); }
@@ -301,7 +307,7 @@ void drawTerrain(uint32_t now) {
   };
   // небо: «солнце» на горизонте светится от громкости
   int sunR = 12 + (int)(g_au.energy * 8);
-  spr.fillCircle(cx + 60, (int)hy - 2, sunR, dim565(C_ACC(), 20 + (int)(g_au.energy * 35)));
+  spr.fillCircle(cx + 60, (int)hy - 2, sunR, scale565(C_ACC(), 20 + (int)(g_au.energy * 35)));
   spr.drawFastHLine(0, (int)hy, W, UI_LINE());
 
   // от дальнего хребта к ближнему: каждый — залитый силуэт со светлым гребнем
@@ -318,16 +324,86 @@ void drawTerrain(uint32_t now) {
       proj(x, 0, z, bx, by);
       if (c > 0) {
         float hm = (h[c] + ph) * 0.5f;
-        uint16_t body = dim565(heatV(0.12f + 0.5f * hm), fade * 45 / 100);   // склон
+        uint16_t body = scale565(heatV(0.12f + 0.5f * hm), fade * 45 / 100);   // склон
         spr.fillTriangle(px, py, sx, sy, pbx, pby, body);
         spr.fillTriangle(sx, sy, bx, by, pbx, pby, body);
         uint16_t ridge = hm > 0.62f ? C_HOT() : heatV(0.3f + 0.7f * hm);   // высоко — «снег»
-        spr.drawLine(px, py, sx, sy, dim565(ridge, fade));
+        spr.drawLine(px, py, sx, sy, scale565(ridge, fade));
       }
       px = sx; py = sy; pbx = bx; pby = by; ph = h[c];
     }
   }
-  uiHeader("Terrain", buf, g_au.level >= -25);
-  uiFooter("wheel: next view", "side: back");
+  uiHeader("Terrain", src(buf), g_au.level >= -25);
+  uiFooter("wheel: screens", "side: back");
   present();
+}
+
+// ============================================================
+//  XY — осциллограф «X-Y»: левый канал двигает луч по горизонтали,
+//  правый — по вертикали. Моно-звук рисует диагональ, стерео — фигуры.
+//  С микрофоном (моно) — «фазовый портрет»: X = сигнал, Y = он же чуть позже.
+//  Люминофор: прошлые кадры гаснут не сразу.
+// ============================================================
+#define XY_TRAIL 4
+static int16_t s_xyHist[XY_TRAIL][AU_XY][2];
+static int     s_xyHead = 0, s_xyN = 0;
+
+void drawXY(uint32_t now) {
+  const int W = spr.width();
+  g_fastFrame = true;
+  spr.fillSprite(C_BG());
+  const int side = UI_BOTTOM - UI_TOP - 2, x0 = (W - side) / 2, y0 = UI_TOP + 2;
+  const int cx = x0 + side / 2, cy = y0 + side / 2, half = side / 2 - 4;
+  uiFrame(x0, y0, side, side, UI_LINE());
+  for (int k = 1; k < 8; k++) {                         // сетка точками
+    for (int t = 4; t < side - 4; t += 4) {
+      spr.drawPixel(x0 + k * side / 8, y0 + t, UI_LINE());
+      spr.drawPixel(x0 + t, y0 + k * side / 8, UI_LINE());
+    }
+  }
+  // точки этого кадра (в экранных координатах)
+  int16_t (&cur)[AU_XY][2] = s_xyHist[s_xyHead];
+  for (int i = 0; i < AU_XY; i++) {
+    int x, y;
+    if (g_auFromPc) { x = g_auXY[i][0]; y = g_auXY[i][1]; }
+    else {                                              // микрофон: фазовый портрет из формы волны
+      int a = i * (AU_WAVE - 12) / AU_XY;
+      x = g_au.wave[a] >> 8; y = g_au.wave[a + 10] >> 8;
+    }
+    cur[i][0] = cx + x * half / 128;
+    cur[i][1] = cy - y * half / 128;
+  }
+  s_xyHead = (s_xyHead + 1) % XY_TRAIL;
+  if (s_xyN < XY_TRAIL) s_xyN++;
+  // от старых кадров к новому: тусклее -> ярче
+  for (int f = s_xyN - 1; f >= 0; f--) {
+    int slot = (s_xyHead - 1 - f + XY_TRAIL * 2) % XY_TRAIL;
+    int16_t (&pts)[AU_XY][2] = s_xyHist[slot];
+    uint16_t col = f == 0 ? C_HOT() : scale565(C_ACC(), 70 - f * 18);
+    for (int i = 1; i < AU_XY; i++) spr.drawLine(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1], col);
+    if (f == 0) for (int i = 1; i < AU_XY; i++) spr.drawLine(pts[i - 1][0] + 1, pts[i - 1][1], pts[i][0] + 1, pts[i][1], scale565(C_ACC(), 60));
+  }
+  // подписи осей
+  spr.setTextDatum(TL_DATUM);
+  spr.setTextColor(UI_DIM());
+  txt(g_auFromPc ? "L" : "NOW", x0 + side + 6, cy - 4, 1);
+  txt(g_auFromPc ? "R" : "LATER", x0 - 30, y0 + 2, 1);
+  char buf[24];
+  snprintf(buf, sizeof(buf), "%d dBfs", (int)g_au.level);
+  spr.setTextColor(UI_LABEL());
+  txt(buf, UI_M + 6, UI_BOTTOM - 12, 1);
+  uiHeader("XY scope", src(g_auFromPc ? (g_auXYStereo ? "stereo" : "mono") : "mic phase"));
+  uiFooter("wheel: screens", "side: back");
+  present();
+  (void)now;
+}
+
+// выбран источник «ноутбук», а звук от него не приходит
+void drawPcAudioWait(uint32_t now) {
+  spr.fillSprite(C_BG());
+  uiHeader("Sound", src("waiting"));
+  uiEmpty("waiting for laptop audio", "run start_pc_monitor.bat on the laptop");
+  uiFooter("wheel: screens", "side: back");
+  present();
+  (void)now;
 }

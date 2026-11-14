@@ -9,14 +9,20 @@ Radio Radar — монитор нагрузки ноутбука.
   KEY VOLUP / KEY VOLDN — громче / тише, KEY PLAY — пауза/играть.
 Программа нажимает за тебя мультимедийные клавиши Windows.
 
+Звук ноутбука: когда на палке открыт раздел Sound, она шлёт «AUD ON» —
+программа слушает то, что играет в колонках/наушниках (без микрофона),
+считает спектр и ~30 раз в секунду отправляет палке строки «PA ...».
+
 Запускать двойным кликом по start_pc_monitor.bat (он сам всё поставит).
 Остановить — закрыть окно или нажать Ctrl+C.
 """
 import os
+import asyncio
 import socket
 import sys
 import threading
 import time
+import unicodedata
 
 try:
     import psutil
@@ -200,7 +206,375 @@ class Collector:
         return " ".join(parts) + "\n", cpu, vm.percent
 
 
-def reader(port, wake):
+# ---------- что сейчас играет (Windows: панель «Сейчас воспроизводится») ----------
+# Нужна библиотека winrt (её ставит start_pc_monitor.bat); без неё палка просто
+# не покажет название трека — всё остальное работает.
+_media_mgr_cls = None
+_media_import_err = ""
+try:
+    from winrt.windows.media.control import GlobalSystemMediaTransportControlsSessionManager as _media_mgr_cls
+except Exception as e1:
+    try:
+        from winsdk.windows.media.control import GlobalSystemMediaTransportControlsSessionManager as _media_mgr_cls
+    except Exception:
+        _media_mgr_cls = None
+        _media_import_err = "%s: %s" % (type(e1).__name__, e1)
+
+PUNCT = {"\u2014": "-", "\u2013": "-", "\u2012": "-", "\u2212": "-", "\u2018": "'", "\u2019": "'", "\u201c": '"',
+         "\u201d": '"', "\u00ab": '"', "\u00bb": '"', "\u2026": "...", "\u00a0": " ", "\u00d7": "x", "\u2022": "*"}
+
+
+def screen_text(text, limit):
+    """Оставить то, что палка умеет рисовать: латиница, цифры, знаки и русские буквы."""
+    out = []
+    for ch in text or "":
+        ch = PUNCT.get(ch, ch)
+        if len(ch) > 1:
+            out.append(ch)
+            continue
+        o = ord(ch)
+        if 0x20 <= o < 0x7F or 0x400 <= o <= 0x45F:
+            out.append(ch)
+        elif ch in "\t\r\n":
+            out.append(" ")
+        else:                                     # é -> e, остальное (иероглифы, эмодзи) — пропускаем
+            base = unicodedata.normalize("NFKD", ch)[0]
+            if 0x20 <= ord(base) < 0x7F:
+                out.append(base)
+    s = " ".join("".join(out).split())
+    while len(s.encode("utf-8")) > limit:
+        s = s[:-1]
+    return s
+
+
+def app_name(aumid):
+    a = (aumid or "").lower()
+    for key, name in (("spotify", "Spotify"), ("chrome", "Chrome"), ("msedge", "Edge"), ("firefox", "Firefox"),
+                      ("yandex", "Yandex"), ("opera", "Opera"), ("vlc", "VLC"), ("telegram", "Telegram"),
+                      ("zune", "Media Player"), ("music", "Music"), ("aimp", "AIMP"), ("foobar", "foobar"),
+                      ("308046b0af4a39cb", "Firefox")):
+        if key in a:
+            return name
+    tail = a.replace("\\", "!").split("!")[-1].split(".exe")[0]
+    return screen_text(tail[:14] or "player", 14)
+
+
+def window_track():
+    """Запасной способ: название из заголовка окна (Spotify, вкладка YouTube)."""
+    if not IS_WIN:
+        return None
+    found = []
+    titles = []
+
+    @ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
+    def cb(hwnd, _):
+        if _user32.IsWindowVisible(hwnd):
+            n = _user32.GetWindowTextLengthW(hwnd)
+            if n > 0:
+                buf = ctypes.create_unicode_buffer(n + 1)
+                _user32.GetWindowTextW(hwnd, buf, n + 1)
+                pid = ctypes.c_ulong()
+                _user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+                titles.append((buf.value, pid.value))
+        return True
+    _user32.EnumWindows(cb, 0)
+    for title, pid in titles:
+        try:
+            pname = psutil.Process(pid).name().lower()
+        except Exception:
+            pname = ""
+        if pname == "spotify.exe" and " - " in title:          # играет: «Исполнитель - Песня»
+            artist, song = title.split(" - ", 1)
+            found.append(("Spotify", song, artist))
+        elif " - YouTube" in title:                             # вкладка YouTube: «Песня - YouTube - Google Chrome»
+            found.append(("YouTube", title.split(" - YouTube")[0], ""))
+        else:                                                   # вкладка Яндекс Музыки: «Песня — Исполнитель — Яндекс Музыка»
+            low = title.lower()
+            for mark in ("яндекс музык", "yandex music", "яндекс.музык"):
+                k = low.find(mark)
+                if k > 0:
+                    head = title[:k].rstrip(" -—–|·")
+                    parts = [x.strip() for x in head.replace("—", "\u0001").replace(" - ", "\u0001").split("\u0001") if x.strip()]
+                    if parts and parts[0].lower() not in ("главная", "моя волна", "коллекция", "поиск"):
+                        found.append(("Yandex", parts[0], parts[1] if len(parts) > 1 else ""))
+                    break
+    if not found:
+        return None
+    app, song, artist = found[0]
+    return "PM\t1\t-1\t-1\t%s\t%s\t%s\n" % (app, screen_text(song, 90), screen_text(artist, 70))
+
+
+class NowPlaying:
+    """В отдельном потоке раз в секунду узнаёт, что играет, и пишет в окно, что нашёл."""
+    def __init__(self):
+        self.line = None                          # готовая строка для палки
+        self.ok = _media_mgr_cls is not None or IS_WIN
+        self.err = None
+        self.shown = None
+        if self.ok:
+            threading.Thread(target=self._run, daemon=True).start()
+
+    def _note(self, text):
+        say("")
+        say("     " + text)
+
+    def _run(self):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        mgr = None
+        while True:
+            line, how = None, ""
+            if _media_mgr_cls is not None:
+                try:
+                    if mgr is None:
+                        mgr = loop.run_until_complete(self._request())
+                    line = loop.run_until_complete(self._read(mgr))
+                    how = "Windows"
+                    if self.err:
+                        self.err = None
+                except Exception as e:
+                    mgr = None
+                    msg = "%s: %s" % (type(e).__name__, e)
+                    if msg != self.err:                      # одну и ту же ошибку пишем один раз
+                        self.err = msg
+                        self._note("[трек] системная панель не ответила: " + msg[:150])
+            if (line is None or line == "PM\n") and IS_WIN:
+                try:
+                    w = window_track()
+                    if w:
+                        line, how = w, "заголовок окна"
+                except Exception as e:
+                    msg = "window: %s" % e
+                    if msg != self.err:
+                        self.err = msg
+                        self._note("[трек] " + msg[:150])
+            self.line = line or "PM\n"
+            shown = self.line.strip().split("\t")[4:6]
+            if shown != self.shown:                          # трек сменился — написать в окно
+                self.shown = shown
+                self._note("[трек] " + (" | ".join(shown) + "  (" + how + ")" if shown else "ничего не играет"))
+            time.sleep(1)
+
+    @staticmethod
+    async def _request():
+        return await _media_mgr_cls.request_async()
+
+    @staticmethod
+    async def _read(mgr):
+        # Источников бывает несколько (браузер, плеер...). «Текущий» по мнению Windows —
+        # тот, что трогали последним, а не тот, что играет. Поэтому берём играющий.
+        s = None
+        try:
+            sessions = list(mgr.get_sessions())
+        except Exception:
+            sessions = []
+        for cand in sessions:
+            try:
+                if int(cand.get_playback_info().playback_status) == 4:
+                    s = cand
+                    break
+            except Exception:
+                pass
+        if s is None:
+            s = mgr.get_current_session()
+        if s is None:
+            return "PM\n"
+        props = await s.try_get_media_properties_async()
+        info = s.get_playback_info()
+        tl = s.get_timeline_properties()
+        playing = 1 if int(info.playback_status) == 4 else 0      # 4 — играет, 5 — пауза
+
+        def secs(v):
+            try:
+                return int(v.total_seconds())
+            except Exception:
+                try:
+                    return int(v.duration / 10000000)             # старые версии: 100-нс тики
+                except Exception:
+                    return -1
+        pos, dur = secs(tl.position), secs(tl.end_time)
+        # приложение обновляет позицию редко; Windows помнит, КОГДА она была записана —
+        # досчитываем, сколько прошло с тех пор (иначе время на палке отстаёт)
+        if playing and pos >= 0:
+            try:
+                import datetime as _dt
+                upd = tl.last_updated_time
+                if upd is not None and upd.year > 2000:
+                    if upd.tzinfo is None:
+                        upd = upd.replace(tzinfo=_dt.timezone.utc)
+                    late = (_dt.datetime.now(_dt.timezone.utc) - upd).total_seconds()
+                    if 0 < late < 3600:
+                        pos += int(late)
+            except Exception:
+                pass
+        if dur <= 0:
+            pos = dur = -1
+        elif pos > dur:
+            pos = dur
+        title = screen_text(props.title, 90)
+        artist = screen_text(props.artist or props.album_artist, 70)
+        if not title and not artist:
+            return "PM\n"
+        return "PM\t%d\t%d\t%d\t%s\t%s\t%s\n" % (playing, pos, dur, app_name(s.source_app_user_model_id), title, artist)
+
+
+# ---------- запись в порт из нескольких потоков — по очереди ----------
+_write_lock = threading.Lock()
+
+
+def send(port, data):
+    with _write_lock:
+        port.write(data)
+
+
+# ---------- звук ноутбука (то, что играет в колонках) ----------
+# Нужны numpy и PyAudioWPatch (их ставит start_pc_monitor.bat). Без них всё
+# остальное работает, а палка просто показывает звук со своего микрофона.
+class AudioTap:
+    FPS = 30
+    NFFT = 2048
+
+    def __init__(self):
+        self.port = None
+        self.want_until = 0.0                   # палка просит звук до этого момента
+        self.err_shown = False
+        self.thread = None
+
+    def request(self):
+        """Палка прислала «AUD ON» (повторяет каждые 1.5 с, пока открыт раздел Sound)."""
+        first = time.time() > self.want_until
+        self.want_until = time.time() + 4.0
+        if first:
+            say("")
+            say("     [звук] палка просит звук ноутбука — начинаю слушать колонки")
+        if self.thread is None or not self.thread.is_alive():
+            self.thread = threading.Thread(target=self._run, daemon=True)
+            self.thread.start()
+
+    def stop(self):
+        if time.time() < self.want_until:
+            say("")
+            say("     [звук] палка закрыла раздел Sound — перестаю слушать")
+        self.want_until = 0.0
+
+    def _run(self):
+        try:
+            import numpy as np
+            import pyaudiowpatch as pyaudio
+        except Exception as e:
+            if not self.err_shown:
+                self.err_shown = True
+                say("")
+                say("     [звук] нет библиотек для звука ноутбука (%s). Палка покажет микрофон." % e)
+            return
+        pa = pyaudio.PyAudio()
+        try:
+            while time.time() < self.want_until:
+                try:
+                    self._capture(np, pyaudio, pa)
+                except Exception as e:
+                    say("")
+                    say("     [звук] ошибка: %s — пробую снова" % str(e)[:120])
+                    time.sleep(1)
+        finally:
+            pa.terminate()
+
+    @staticmethod
+    def _loopback_device(pyaudio, pa):
+        wasapi = pa.get_host_api_info_by_type(pyaudio.paWASAPI)
+        spk = pa.get_device_info_by_index(wasapi["defaultOutputDevice"])
+        if spk.get("isLoopbackDevice"):
+            return spk
+        for lb in pa.get_loopback_device_info_generator():
+            if spk["name"] in lb["name"]:
+                return lb
+        raise RuntimeError("не нашёл «петлю» для устройства вывода %s" % spk["name"])
+
+    def _capture(self, np, pyaudio, pa):
+        dev = self._loopback_device(pyaudio, pa)
+        rate = int(dev["defaultSampleRate"])
+        ch = max(1, min(2, int(dev["maxInputChannels"])))
+        block = rate // self.FPS
+        stream = pa.open(format=pyaudio.paInt16, channels=ch, rate=rate, input=True,
+                         input_device_index=dev["index"], frames_per_buffer=block)
+        say("")
+        say("     [звук] слушаю: %s (%d Гц, %s)" % (dev["name"][:60], rate, "стерео" if ch == 2 else "моно"))
+        name = dev["name"]
+        mono = np.zeros(self.NFFT, dtype=np.float32)
+        win = np.hanning(self.NFFT).astype(np.float32)
+        freqs = np.fft.rfftfreq(self.NFFT, 1.0 / rate)
+        edges = np.geomspace(60, min(8000, rate / 2 - 1), 33)     # как у микрофона палки — совпадают подписи частот
+        idx = [(max(1, int(np.searchsorted(freqs, edges[k]))), max(1, int(np.searchsorted(freqs, edges[k + 1])))) for k in range(32)]
+        top = -40.0
+        gain = 120.0 / 8000.0
+        silent_since = None
+        try:
+            while time.time() < self.want_until:
+                # в тишине Windows не присылает звук совсем — не ждём, шлём «пусто»
+                avail = stream.get_read_available()
+                if avail < block:
+                    if silent_since is None:
+                        silent_since = time.time()
+                    if time.time() - silent_since > 0.15:
+                        data = np.zeros((block, ch), dtype=np.float32)
+                    else:
+                        time.sleep(0.005)
+                        continue
+                else:
+                    silent_since = None
+                    raw = stream.read(block, exception_on_overflow=False)
+                    data = np.frombuffer(raw, dtype=np.int16).astype(np.float32).reshape(-1, ch)
+                if self._device_changed(pyaudio, pa, name):
+                    return                                   # переключили колонки/наушники — откроем заново
+                m = data.mean(axis=1)
+                mono = np.concatenate((mono, m))[-self.NFFT:]
+                # громкость
+                rms = float(np.sqrt(np.mean(m * m))) / 32768.0
+                level = 20 * np.log10(rms + 1e-7)
+                # спектр: 32 полосы 40 Гц..16 кГц, автоусиление
+                spec = np.abs(np.fft.rfft(mono * win))
+                db = np.array([20 * np.log10(spec[a:max(b, a + 1)].max() / (self.NFFT * 8192.0) + 1e-9) for a, b in idx])
+                top = max(float(db.max()), top - 0.25, -60.0)
+                bands = np.clip((db - (top - 48)) / 48.0, 0, 1)
+                k = int(np.argmax(spec[2:])) + 2
+                hz = int(freqs[k]) if level > -60 else 0
+                # форма волны и XY: 64 точки, «автоусиление» чтобы фигура была во весь экран
+                pk = float(np.abs(data).max()) if data.size else 0.0
+                target = 120.0 / max(pk * 1.05, 400.0)
+                gain = target if target < gain else gain + (target - gain) * 0.2   # громче — сразу, тише — плавно
+                tail = mono[-512:][::8]
+                wave = np.clip(tail * gain, -127, 127).astype(np.int8)
+                st = data[-256:] if len(data) >= 256 else data
+                stp = st[::max(1, len(st) // 64)][:64]
+                if len(stp) < 64:
+                    stp = np.vstack([stp, np.zeros((64 - len(stp), ch), dtype=np.float32)])
+                lr = stp if ch == 2 else np.repeat(stp, 2, axis=1)
+                xy = np.clip(lr * gain, -127, 127).astype(np.int8)
+                line = "PA %d %d %s %s %s %d\n" % (int(level * 10), hz, (bands * 255).astype(np.uint8).tobytes().hex(),
+                                                    wave.tobytes().hex(), xy.tobytes().hex(), 1 if ch == 2 else 0)
+                port = self.port
+                if port is not None:
+                    try:
+                        send(port, line.encode())
+                    except Exception:
+                        pass
+        finally:
+            stream.stop_stream()
+            stream.close()
+
+    _dev_check_t = 0.0
+
+    def _device_changed(self, pyaudio, pa, name):
+        if time.time() - self._dev_check_t < 3:
+            return False
+        self._dev_check_t = time.time()
+        try:
+            return self._loopback_device(pyaudio, pa)["name"] != name
+        except Exception:
+            return False
+
+
+def reader(port, wake, tap):
     """Отдельный поток: слушает команды от палки и сразу их выполняет."""
     while True:
         try:
@@ -210,6 +584,12 @@ def reader(port, wake):
         if not raw:
             continue
         line = raw.decode("ascii", "ignore").strip()
+        if line == "AUD ON":
+            tap.request()
+            continue
+        if line == "AUD OFF":
+            tap.stop()
+            continue
         if line.startswith("KEY "):
             name = line[4:].strip()
             press(name)
@@ -229,6 +609,14 @@ def main():
     say("  Остановить — закрыть окно (или Ctrl+C).")
     say("=" * 56)
     col = Collector()
+    media = NowPlaying()
+    tap = AudioTap()
+    if IS_WIN:
+        if _media_mgr_cls is not None:
+            say("  Название трека: через системную панель Windows (winrt).")
+        else:
+            say("  Название трека: winrt не загрузился (%s)." % _media_import_err[:120])
+            say("  Беру название из заголовка окна Spotify / вкладки YouTube.")
     port = None
     warned = False
     next_t = time.monotonic()
@@ -251,7 +639,8 @@ def main():
                 say("[OK] Палка найдена: %s. Отправляю данные. Открой на палке раздел PC." % name)
                 say("     Колесо громкости: в разделе PC прокрути колесом до страницы Media.")
                 warned = False
-                threading.Thread(target=reader, args=(port, wake), daemon=True).start()
+                tap.port = port
+                threading.Thread(target=reader, args=(port, wake, tap), daemon=True).start()
             except Exception as e:
                 text = str(e).lower()
                 if "denied" in text or "busy" in text or "permission" in text or "отказано" in text:
@@ -268,19 +657,22 @@ def main():
                 time.sleep(0.05)                 # Windows нужно мгновение, чтобы применить
                 v = read_volume()
                 if v:
-                    port.write(("PV vol=%d mute=%d\n" % (v[0], 1 if v[1] else 0)).encode())
+                    send(port, ("PV vol=%d mute=%d\n" % (v[0], 1 if v[1] else 0)).encode())
                 wake.wait(max(0.0, next_t - time.monotonic()))   # и дальше ждём до своей секунды
                 continue
             line, cpu, ram = col.line()
-            port.write(line.encode("ascii", "replace"))
+            send(port, line.encode("ascii", "replace"))
             v = read_volume()
             if v:
-                port.write(("PV vol=%d mute=%d\n" % (v[0], 1 if v[1] else 0)).encode())
+                send(port, ("PV vol=%d mute=%d\n" % (v[0], 1 if v[1] else 0)).encode())
+            if media.line:
+                send(port, media.line.encode("utf-8"))
             sys.stdout.write("\r     CPU %3d%%   RAM %3d%%   -> %s   " % (cpu, ram, port.port))
             sys.stdout.flush()
         except Exception:
             say("")
             say("[..] Связь с палкой пропала (кабель отключили?). Жду, когда вернётся...")
+            tap.port = None
             try:
                 port.close()
             except Exception:

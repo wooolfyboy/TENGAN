@@ -4,13 +4,14 @@
 #include "core/timeutil.h"
 #include "pc/pc.h"
 #include "core/display.h"
+#include "audio/audio.h"
 
 PcStat g_pc;
 int    g_pcPage = 0;
 int      g_pcLastCmd = 0;
 uint32_t g_pcLastCmdMs = 0;
 
-static char   s_line[512];
+static char   s_line[1024];
 static size_t s_len = 0;
 
 static void parseList(const char* v, uint8_t* out, int& n) {
@@ -32,8 +33,46 @@ static void parseVol(char* s) {                      // "PV vol=35 mute=0" — �
   g_pc.volT = millis();
 }
 
+// "PM\t<играет 0/1>\t<поз>\t<длит>\t<прил.>\t<название>\t<исполнитель>" (поля через TAB:
+// в названиях бывают пробелы). Пустое "PM" — ничего не играет.
+static void copyField(char* dst, size_t cap, const char* src) { strncpy(dst, src ? src : "", cap - 1); dst[cap - 1] = 0; }
+static void parseMedia(char* s) {
+  PcStat& p = g_pc;
+  char* f[7] = {};
+  int n = 0;
+  char* save = nullptr;
+  for (char* tok = strtok_r(s, "\t", &save); tok && n < 7; tok = strtok_r(nullptr, "\t", &save)) f[n++] = tok;
+  p.trkT = millis();
+  if (n < 6) { p.trk = false; p.title[0] = p.artist[0] = p.app[0] = 0; return; }
+  p.trk = true;
+  p.playing = atoi(f[1]) != 0;
+  p.pos = atoi(f[2]); p.dur = atoi(f[3]);
+  copyField(p.app, sizeof(p.app), f[4]);
+  copyField(p.title, sizeof(p.title), f[5]);
+  copyField(p.artist, sizeof(p.artist), n > 6 ? f[6] : "");
+}
+
+// "PA <громкость*10> <частота> <32 полосы hex> <64 отсчёта hex> <64 пары L,R hex> <стерео 0/1>"
+static int hexv(char c) { return c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 : c >= 'A' && c <= 'F' ? c - 'A' + 10 : 0; }
+static bool unhex(const char* h, uint8_t* out, int n) {
+  if ((int)strlen(h) < n * 2) return false;
+  for (int i = 0; i < n; i++) out[i] = (uint8_t)(hexv(h[2 * i]) << 4 | hexv(h[2 * i + 1]));
+  return true;
+}
+static void parseAudio(char* s) {
+  char* f[7] = {};
+  int n = 0; char* save = nullptr;
+  for (char* tok = strtok_r(s + 3, " ", &save); tok && n < 7; tok = strtok_r(nullptr, " ", &save)) f[n++] = tok;
+  if (n < 6) return;
+  static uint8_t bands[32], wave[64], xy[128];
+  if (!unhex(f[2], bands, 32) || !unhex(f[3], wave, 64) || !unhex(f[4], xy, 128)) return;
+  audioPcFrame(atoi(f[0]) / 10.0f, atoi(f[1]), bands, (const int8_t*)wave, (const int8_t*)xy, atoi(f[5]) != 0);
+}
+
 static void parseLine(char* s) {
+  if (!strncmp(s, "PA ", 3)) { parseAudio(s); return; }
   if (!strncmp(s, "PV ", 3)) { parseVol(s); return; }
+  if (!strncmp(s, "PM", 2) && (s[2] == '\t' || s[2] == 0)) { parseMedia(s); return; }
   if (strncmp(s, "PC ", 3) != 0) return;            // не наша строка — пропускаем
   PcStat& p = g_pc;
   char* save = nullptr;
@@ -70,7 +109,7 @@ static void parseLine(char* s) {
 }
 
 void pcPoll(uint32_t) {
-  int budget = 600;                                  // не застревать, если данных много
+  int budget = 2048;                                 // не застревать, если данных много (звук ноута — ~15 КБ/с)
   while (Serial.available() && budget--) {
     char c = (char)Serial.read();
     if (c == '\n' || c == '\r') {
@@ -90,6 +129,13 @@ static void pcSend(const char* cmd, int code) {
   if (!pcLive(millis())) return;                     // программа не запущена — некому слать
   if (Serial.availableForWrite() < 16) return;       // не ждать, если ноут не читает
   Serial.print(cmd);
+  Serial.print('\n');
+}
+
+void pcSendLine(const char* s) {
+  if (!pcLive(millis())) return;                     // программа не запущена — некому слать
+  if (Serial.availableForWrite() < (int)strlen(s) + 2) return;
+  Serial.print(s);
   Serial.print('\n');
 }
 
