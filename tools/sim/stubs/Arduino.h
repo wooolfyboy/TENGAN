@@ -59,6 +59,20 @@ class String {
   char operator[](unsigned i) const { return s[i]; }
   bool operator==(const char* o) const { return s == o; }
   void toCharArray(char* buf, unsigned n) const { strncpy(buf, s.c_str(), n); if (n) buf[n - 1] = 0; }
+  String(float v, int d) { char b[32]; snprintf(b, sizeof(b), "%.*f", d, v); s = b; }
+  String(double v, int d) { char b[32]; snprintf(b, sizeof(b), "%.*f", d, v); s = b; }
+  String(int v) : s(std::to_string(v)) {}
+  String(unsigned v) : s(std::to_string(v)) {}
+  String(long v) : s(std::to_string(v)) {}
+  String(unsigned long v) : s(std::to_string(v)) {}
+  void reserve(unsigned) {}
+  String& operator+=(char c) { s += c; return *this; }
+  String& operator+=(const char* c) { s += c; return *this; }
+  String& operator+=(const String& o) { s += o.s; return *this; }
+  String& operator+=(int v) { s += std::to_string(v); return *this; }
+  String& operator+=(unsigned v) { s += std::to_string(v); return *this; }
+  String& operator+=(long v) { s += std::to_string(v); return *this; }
+  String& operator+=(unsigned long v) { s += std::to_string(v); return *this; }
 };
 class Print {
  public:

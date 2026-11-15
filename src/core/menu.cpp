@@ -143,9 +143,7 @@ static void drawMainMenuHud() {
   }
   for (int x = 8; x < W - 8; x++) {                     // линия, угасающая вправо
     float k = 1.0f - (float)(x - 8) / (W - 16);
-    uint16_t c = acc;
-    uint8_t r = ((c >> 11) & 0x1F) << 3, g = ((c >> 5) & 0x3F) << 2, b = (c & 0x1F) << 3;
-    spr.drawPixel(x, 18, tft.color565(r * k, g * k, b * k));
+    spr.drawPixel(x, 18, scale565(acc, (int)(k * 100)));
   }
 
   // видно 5 карточек; если разделов больше — лента сдвигается за выбранной
@@ -161,7 +159,7 @@ static void drawMainMenuHud() {
     const Section* s = SECTIONS[i];
     bool sel = (i == s_menuSel);
     int x = x0 + (i - first) * (cw + gap), cx = x + cw / 2;
-    uint16_t pbg = sel ? tft.color565(14, 42, 52) : bg;
+    uint16_t pbg = sel ? UI_PANEL() : bg;
     if (sel) hudPanel(x, y0, cw, ch, 12, pbg, true, bg);
     hudPanel(x, y0, cw, ch, 12, sel ? acc : C(45, 60, 72), false, bg);
     s->icon(cx, y0 + 30, sel ? acc : C(110, 110, 125), pbg);

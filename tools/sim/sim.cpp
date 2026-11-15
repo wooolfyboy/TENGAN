@@ -260,11 +260,13 @@ static void fillSub() {
   g_evN = 3;
 }
 
+extern int g_theme;
 int main(int argc, char** argv) {
   if (argc > 1) s_outDir = argv[1];
   spr.setColorDepth(16);
   spr.createSprite(320, 170);
   settingsBegin();
+  if (getenv("SIM_THEME")) g_theme = atoi(getenv("SIM_THEME"));   // 1 — тема SUMI (тушь)
   g_bat.ok = true; g_bat.soc = 87; g_bat.mv = 3980; g_bat.ma = -132; g_bat.tte = 250; g_bat.chgOk = true;
   fillBle(); fillWifi(); fillSub();
 

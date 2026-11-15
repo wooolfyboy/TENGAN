@@ -139,7 +139,7 @@ void bootFrame(uint32_t t) {
   if (t >= 1640) {
     const int sx = blockX + titleW + SEAL_GAP, sy = cy - SEAL_H / 2;
     float k = seg(t, 1640, 1820);                          // 0 — удар, 1 — успокоилась
-    uint16_t ink = k < 0.25f ? hot : acc;
+    uint16_t ink = k < 0.25f ? hot : C_SEAL();
     for (int y = 0; y < SEAL_H; y++)
       for (int xx = 0; xx < SEAL_W; xx++)
         if ((SEAL_BITS[y * (SEAL_W / 8) + xx / 8] >> (7 - xx % 8)) & 1) spr.drawPixel(sx + xx, sy + y, ink);

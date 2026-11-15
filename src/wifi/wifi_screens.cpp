@@ -264,7 +264,7 @@ void drawActivity(uint32_t now) {
     float t = g_ppsMgmt[c] + g_ppsData[c];
     int h = (int)((pb - pt) * sqrtf(t) / smx);
     int hd = t > 0 ? (int)(h * g_ppsData[c] / t) : 0;
-    spr.fillRect(x + 2, pt, bw - 4, pb - pt, tft.color565(10, 18, 26));
+    spr.fillRect(x + 2, pt, bw - 4, pb - pt, TC(10, 18, 26));
     if (h > 0) {                                  // данные — ярко, служебные — тусклее
       uint16_t hc = heatV(0.3f + 0.7f * sqrtf(t) / smx);
       spr.fillRect(x + 2, pb - h, bw - 4, h - hd, scale565(hc, 40));

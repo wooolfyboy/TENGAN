@@ -15,6 +15,8 @@ static const int N_RANGES = sizeof(RANGES) / sizeof(RANGES[0]);
 static const int RANGE_HYST_DB = 5;
 static const uint32_t MIN_PKTS = 2;        // одиночный случайный пакет не считается
 
+enum { THEME_TENGAN = 0, THEME_SUMI = 1 };
+extern int g_theme;                        // оформление (THEME_*), меняется в General
 extern int g_range;                        // индекс в RANGES
 extern int g_thresh;                       // порог событий для светодиодов (0 = выкл)
 extern int g_ledBright;                    // % яркости ленты

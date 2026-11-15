@@ -79,7 +79,7 @@ void drawSky(uint32_t now) {
 
   DomeView v = { 86, 88, 58, s_skyRot };
   s_lblN = 0;
-  spr.fillCircle(v.cx, v.cy, v.R, day ? tft.color565(8, 30, 44) : night ? tft.color565(3, 10, 16) : tft.color565(5, 20, 30));
+  spr.fillCircle(v.cx, v.cy, v.R, day ? TC(8, 30, 44) : night ? TC(3, 10, 16) : TC(5, 20, 30));
   for (int alt = 30; alt < 90; alt += 30) {                    // круги высоты 30° и 60°
     int r = (int)(v.R * tanf((90 - alt) * D2R / 2));
     for (int k = 0; k < 72; k++) { float a = k * 5 * D2R; spr.drawPixel(v.cx + (int)(r * cosf(a)), v.cy + (int)(r * sinf(a)), UI_LINE()); }
@@ -247,7 +247,7 @@ void drawGlobe(uint32_t now) {
   float sLon = sun.ra - (float)gmstDeg(jd), sLat = sun.dec;      // подсолнечная точка
   float sx = cosf(sLat * D2R) * cosf(sLon * D2R), sy = cosf(sLat * D2R) * sinf(sLon * D2R), sz = sinf(sLat * D2R);
   float cl0 = cosf(g.lon0 * D2R), sl0 = sinf(g.lon0 * D2R);
-  const uint16_t dayC = tft.color565(10, 38, 54), nightC = tft.color565(3, 11, 17), twiC = tft.color565(6, 22, 32);
+  const uint16_t dayC = TC(10, 38, 54), nightC = TC(3, 11, 17), twiC = TC(6, 22, 32);
   for (int yy = -g.R; yy <= g.R; yy++) {
     int half = (int)sqrtf((float)(g.R * g.R - yy * yy));
     for (int xx = -half; xx <= half; xx++) {

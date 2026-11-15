@@ -23,11 +23,13 @@
 #include <Arduino.h>
 
 uint16_t C(uint8_t r, uint8_t g, uint8_t b);   // цвет, приведённый к палитре
-uint16_t scale565(uint16_t c, int pct);         // тот же цвет темнее: pct% яркости (100 — как есть)
+uint16_t scale565(uint16_t c, int pct);         // тот же цвет тусклее (ближе к фону): pct% (100 — как есть)
 uint16_t C_BG();
 uint16_t C_HOT();
 uint16_t C_ALERT();
 uint16_t C_ACC();
+uint16_t C_SEAL();                              // цвет печати 天眼 (киноварь в теме SUMI)
+uint16_t TC(uint8_t r, uint8_t g, uint8_t b);   // буквальный цвет; в SUMI — оттенок туши по яркости
 
 // size: 1 встроенный мелкий, 2 STM14, 4 RAJ24, 6 RAJ44, 7 «семисегментный»;
 //       3 JBM14 и 5 JBM19 — с русскими буквами (UTF-8), для текстов с ноутбука/телефона
