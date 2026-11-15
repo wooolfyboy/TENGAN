@@ -131,7 +131,7 @@ T.views.push({
     this.dcam.frame(w / 2, (top + bot) / 2 + u * 2, Math.min(w, h) * 1.1);
     this.dust.draw(g, this.dcam);
     const Aa = this.ph * 0.8, Bb = this.ph * 0.45, cA = Math.cos(Aa), sA = Math.sin(Aa), cB = Math.cos(Bb), sB = Math.sin(Bb);
-    const R1 = 1, R2 = 2.1, K2 = 6.5, K1 = Math.min(w, bot - top) * 1.15, cx = w / 2, cy = (top + bot) / 2, U = 120, V = 30;
+    const R1 = 1, R2 = 2.1, K2 = 6.5, K1 = Math.min(w, bot - top) * 0.88, cx = w / 2, cy = (top + bot) / 2, U = 120, V = 30;
     const pts = this.tp || (this.tp = new Float32Array(U * V * 4));
     let n = 0;
     for (let i = 0; i < V; i++) {
@@ -407,7 +407,7 @@ T.views.push({
       draw: () => {
         // панель справа (или снизу в портрете)
         const pw = portrait ? w - 2 * m : Math.min(u * 22, w - cx - R - m - u * 5), px = portrait ? m : w - m - pw;
-        const py = portrait ? cy + R + u * 3 : top + u * 0.4, ph = portrait ? Math.max(u * 10, bot - py - u * 3.4) : Math.min(bot - top - u * 3.6, u * (18 + 1.5 * (plUp.length + A.sats().length)));
+        const py = portrait ? cy + R + u * 3 : top + u * 0.4, ph = portrait ? Math.min(u * 24, Math.max(u * 10, bot - py - u * 3.4)) : Math.min(bot - top - u * 3.6, u * (18 + 1.5 * (plUp.length + A.sats().length)));
         if (pw < u * 10) return;
         T.panel(g, px, py, pw, ph, u);
         let y = py + u * 3.4;
@@ -558,7 +558,7 @@ T.views.push({
       hint: 'drag: rotate  ·  tap satellite / home: follow', right: 'kepler + j2 · ' + new Date().toLocaleTimeString('ru-RU'),
       draw: () => {
         const pw = portrait ? w - 2 * m : Math.min(u * 22, w - cx - R - m - u * 6), px = portrait ? m : w - m - pw;
-        const py = portrait ? cy + R + u * 3.2 : top + u * 0.4, ph = portrait ? Math.max(u * 9, bot - py - u * 3.4) : Math.min(bot - top - u * 3.6, u * 22);
+        const py = portrait ? cy + R + u * 3.2 : top + u * 0.4, ph = portrait ? Math.min(u * 24, Math.max(u * 9, bot - py - u * 3.4)) : Math.min(bot - top - u * 3.6, u * 22);
         if (pw < u * 10) return;
         T.panel(g, px, py, pw, ph, u);
         let y = py + u * 2;
