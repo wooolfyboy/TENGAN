@@ -224,10 +224,34 @@ void bleRadioOn() {
   g_cooldownMs = millis() + 10000;          // и не мигать, пока список наполняется
 }
 
+bool bleRadioActive() { return g_bleActive; }
+
 void bleRadioOff() {
   if (!g_bleActive) return;
   NimBLEDevice::getScan()->stop();
   g_bleActive = false;
+}
+
+// ---------- «спокойный» сигнал для экранов ----------
+// Сигнал одного и того же устройства всё время дрожит на ±2–3 dB — пользы в
+// этом нет, а цели на Scope и башни City от этого дёргаются. Поэтому:
+//  - цель сдвигается, только если сглаженный сигнал ушёл от неё на STEADY_DB;
+//  - показанное значение плавно «перетекает» к цели (~0.7 с), без скачков.
+// Красота важнее точности: сортировка и фильтры по-прежнему по rssiS.
+struct Steady { float shown; int8_t target; uint32_t t; };
+static std::map<uint32_t, Steady> g_steady;
+static const int STEADY_DB = 4;
+static const int BEST_HYST_DB = 3;            // «ближайший» меняется, только если другой сильнее на 3 dB
+static uint32_t g_steadyMs = 0, g_bestId = 0;
+
+static int steadyRssi(uint32_t id, int rs, uint32_t now, float k) {
+  auto it = g_steady.find(id);
+  if (it == g_steady.end()) { g_steady[id] = { (float)rs, (int8_t)rs, now }; return rs; }
+  Steady& s = it->second;
+  s.t = now;
+  if (abs(rs - s.target) >= STEADY_DB) s.target = (int8_t)rs;
+  s.shown += (s.target - s.shown) * k;
+  return (int)lroundf(s.shown);
 }
 
 // ---------- каждый кадр: адреса -> физические устройства ----------
@@ -270,16 +294,28 @@ void bleUpdate(uint32_t now) {
     xSemaphoreGive(g_lock);
   }
 
+  // спокойные значения для всех экранов
+  float dt = g_steadyMs ? msSince(now, g_steadyMs) / 1000.0f : 0.0f;
+  g_steadyMs = now;
+  float k = 1.0f - expf(-dt / 0.7f);
+  for (auto& kv : g_ents) kv.second.rssi = steadyRssi(kv.first, kv.second.rssiS, now, k);
+  for (auto it = g_steady.begin(); it != g_steady.end(); )
+    if (msSince(now, it->second.t) > REMEMBER_MS) it = g_steady.erase(it); else ++it;
+
   g_have = false; g_bestRssi = -127; memset(&g_bestEnt, 0, sizeof(g_bestEnt));
   memset(g_typeCnt, 0, sizeof(g_typeCnt));
   bool wantScope = bleIs(M_SCOPE) || bleIs(M_CITY);
+  auto prevBest = g_ents.find(g_bestId);
+  int prevR = prevBest != g_ents.end() ? prevBest->second.rssi + BEST_HYST_DB : -127;
+  if (prevBest != g_ents.end()) { g_bestRssi = prevR; g_bestEnt = prevBest->second; g_have = true; }
   for (auto& kv : g_ents) {
     const Ent& e = kv.second;
-    if (e.rssi > g_bestRssi) { g_bestRssi = e.rssi; g_bestEnt = e; g_have = true; }
+    if (e.rssi > g_bestRssi) { g_bestRssi = e.rssi; g_bestEnt = e; g_bestId = kv.first; g_have = true; }
     g_typeCnt[e.type < T_NUM ? (int)e.type : (int)T_UNKNOWN]++;
     // угол блипа — от id физического устройства: не прыгает при смене MAC
     if (wantScope) g_snap.push_back({ e.rssi, kv.first * 2654435761u, e.cat, e.type });
   }
+  if (g_have) g_bestRssi = g_bestEnt.rssi;            // убрать фору гистерезиса
   g_lastCount = (int)g_ents.size();
   g_lastRaw = raw;
 }
@@ -521,4 +557,25 @@ void bleLowDuty(bool low) {
   if (was) s->stop();
   s->setWindow(low ? 45 : 99);
   if (was) s->start(0, false);
+}
+
+// для планшета (поток SSE): компактно — массивы вместо объектов, до 80 устройств
+// {"n":число,"m":адресов,"d":[[id,rssi,"тип","производитель","имя",возраст_с,адресов],...]}
+void bleStreamJson(String& o) {
+  uint32_t now = millis();
+  std::vector<std::pair<uint32_t, const Ent*>> v;
+  for (auto& kv : g_ents) v.push_back({ kv.first, &kv.second });
+  std::sort(v.begin(), v.end(), [](const std::pair<uint32_t, const Ent*>& a, const std::pair<uint32_t, const Ent*>& b) { return a.second->rssiS > b.second->rssiS; });
+  if (v.size() > 80) v.resize(80);
+  o.reserve(48 + v.size() * 64);
+  o = "{\"on\":"; o += g_bleActive ? 1 : 0;
+  o += ",\"n\":"; o += g_lastCount; o += ",\"m\":"; o += g_lastRaw; o += ",\"d\":[";
+  for (size_t i = 0; i < v.size(); i++) {
+    const Ent* e = v[i].second;
+    if (i) o += ',';
+    o += '['; o += v[i].first; o += ','; o += e->rssi; o += ',';   // «спокойное» значение
+    jsonStr(o, typeName(e->type)); o += ','; jsonStr(o, vendorLabel(e->cat, e->vkind, e->vcode)); o += ',';
+    jsonStr(o, e->name); o += ','; o += msSince(now, e->first) / 1000; o += ','; o += e->nMacs; o += ']';
+  }
+  o += "]}";
 }

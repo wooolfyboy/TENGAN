@@ -30,6 +30,7 @@
 #include "ble/ble.h"
 
 #include "wifi/wifi_model.h"
+static const int WIFI_STEADY_DB = 3;
 
 
 bool g_wOn = false;
@@ -208,7 +209,7 @@ static void wifiScanTick(uint32_t now) {
     if (it == g_aps.end()) {
       Ap a; memset(&a, 0, sizeof(a));
       memcpy(a.bssid, r->bssid, 6);
-      a.first = now; a.rssiS = a.rmin = a.rmax = r->rssi;
+      a.first = now; a.rssi = a.rssiS = a.rmin = a.rmax = r->rssi;
       a.vendor = ouiName(r->bssid);
       it = g_aps.insert({ k, a }).first;
     }
@@ -219,8 +220,9 @@ static void wifiScanTick(uint32_t now) {
     a.sec = r->second == WIFI_SECOND_CHAN_ABOVE ? 1 : r->second == WIFI_SECOND_CHAN_BELOW ? -1 : 0;
     a.gen = r->phy_11ax ? 6 : r->phy_11n ? 4 : r->phy_11g ? 3 : 1;
     a.hotspot = looksLikeHotspot(a.ssid, a.vendor);
-    a.rssi  = r->rssi;
     a.rssiS = (int8_t)((a.rssiS + r->rssi) / 2);
+    // на экран — «спокойное» значение: дрожь ±2 dB не показываем (красота важнее точности)
+    if (abs(a.rssiS - a.rssi) >= WIFI_STEADY_DB) a.rssi = a.rssiS;
     if (r->rssi < a.rmin) a.rmin = r->rssi;
     if (r->rssi > a.rmax) a.rmax = r->rssi;
     a.t = now;

@@ -29,6 +29,7 @@ void satFromLine(char* line);                         // строка «TLE\t...
 bool satPos(const Sat& s, double unixUtc, SatPos& out);
 void satLook(const SatPos& p, float lat, float lon, float& elDeg, float& azDeg);   // как видно из города
 float satAgeDays(const Sat& s, double unixUtc);
+void satJson(String& o);                              // элементы орбит для планшета
 
 // ближайший пролёт над городом (выше minEl): старт, конец, максимум
 struct Pass { bool found; double rise, set; float maxEl; float azRise; };

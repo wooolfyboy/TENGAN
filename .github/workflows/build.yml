@@ -39,6 +39,9 @@ jobs:
       - name: Install PlatformIO and esptool
         run: pip install platformio "esptool==4.8.1"
 
+      - name: Tablet page is up to date
+        run: python tools/webapp/build.py --check
+
       - name: Build
         run: pio run
 

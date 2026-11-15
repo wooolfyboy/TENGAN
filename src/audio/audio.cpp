@@ -438,3 +438,22 @@ void audioJson(String& o) {
   }
   o += '}';
 }
+
+// для планшета (поток SSE, ~25 раз в секунду): полосы и волна — в hex, чтобы строка была короткой
+// {"ok":1,"lv":-38.2,"pk":-31.0,"hz":1187,"e":0.45,"b":"<32 байта 0..255>","w":"<64 отсчёта int8>"}
+void audioStreamJson(String& o) {
+  bool live = s_micRun && g_micOk && g_micDiag.blocks > 0;
+  o.reserve(300);
+  o = "{\"en\":"; o += g_micEn ? 1 : 0; o += ",\"ok\":"; o += live ? 1 : 0;
+  if (live) {
+    static const char HX[] = "0123456789abcdef";
+    o += ",\"lv\":"; o += String(g_au.level, 1); o += ",\"pk\":"; o += String(g_au.peak, 1);
+    o += ",\"hz\":"; o += (int)g_au.domHz; o += ",\"e\":"; o += String(g_au.energy, 2);
+    o += ",\"b\":\"";
+    for (int k = 0; k < AU_BANDS; k++) { int v = constrain((int)(g_au.bands[k] * 255), 0, 255); o += HX[v >> 4]; o += HX[v & 15]; }
+    o += "\",\"w\":\"";
+    for (int i = 0; i < 64; i++) { int v = constrain(g_au.wave[i * AU_WAVE / 64] >> 8, -127, 127); uint8_t u = (uint8_t)(int8_t)v; o += HX[u >> 4]; o += HX[u & 15]; }
+    o += '"';
+  }
+  o += '}';
+}

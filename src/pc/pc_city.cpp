@@ -13,6 +13,7 @@
 #include "core/theme.h"
 #include "core/ui.h"
 #include "core/timeutil.h"
+#include "core/jsonutil.h"
 
 #define CITY_MAX 24
 #define CITY_GRID 6                          // площадь 6x6 мест
@@ -70,6 +71,20 @@ void pcCityLine(char* s) {
     t.cpu = atoi(c1 + 1) / 10.0f; t.ram = atof(c2 + 1); t.fg = atoi(c3 + 1) != 0; t.alive = true;
   }
   s_cityT = millis();
+}
+
+// для планшета: [[имя,cpu,МБ,активна,место],...]
+void pcCityJson(String& o) {
+  o += '[';
+  bool first = true;
+  for (auto& t : s_tw) {
+    if (!t.alive) continue;
+    if (!first) o += ',';
+    first = false;
+    o += '['; jsonStr(o, t.name); o += ','; o += String(t.cpu, 1); o += ','; o += (int)t.ram;
+    o += ','; o += t.fg ? 1 : 0; o += ','; o += t.slot; o += ']';
+  }
+  o += ']';
 }
 
 static float s_yaw = 0.7f;

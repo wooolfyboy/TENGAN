@@ -2,6 +2,7 @@
 //  sat.cpp — разбор TLE и упрощённый расчёт орбиты (Кеплер + J2)
 // ============================================================
 #include "gallery/sat.h"
+#include "core/jsonutil.h"
 #include "gallery/astro.h"
 #include <Preferences.h>
 
@@ -150,4 +151,19 @@ Pass satNextPass(const Sat& s, double from, float lat, float lon, float minEl, f
   }
   if (up) ps.set = end;
   return ps;
+}
+
+// для планшета: элементы орбит, дальше считает браузер (тот же Кеплер + J2)
+// [[имя,эпоха_unix,n0,ndot2,inc,raan0,ecc,argp0,m0,a],...]
+void satJson(String& o) {
+  o += '[';
+  for (int i = 0; i < g_nSats; i++) {
+    const Sat& s = g_sats[i];
+    if (i) o += ',';
+    o += '['; jsonStr(o, s.name); o += ','; o += String(s.epochUnix, 0);
+    const double v[] = { s.n0, s.ndot2, s.inc, s.raan0, s.ecc, s.argp0, s.m0, s.a };
+    for (double x : v) { char b[24]; snprintf(b, sizeof(b), ",%.10g", x); o += b; }
+    o += ']';
+  }
+  o += ']';
 }
