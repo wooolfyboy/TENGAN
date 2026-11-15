@@ -3,7 +3,8 @@
 // свечение, глубина, фосфорный след. Sky и Globe — небо и Земля прямо сейчас
 // (T.astro: та же математика, что в прошивке; город и орбиты присылает палка).
 T.views.push({
-  id: 'gal', title: 'Gallery', want: 'st', subs: ['Tesseract', 'Torus', 'Life', 'Pendulum', 'Sky', 'Globe'], sub: 0,
+  id: 'gal', title: 'Gallery', subs: ['Tesseract', 'Torus', 'Life', 'Pendulum', 'Sky', 'Globe', 'Weather'], sub: 0,
+  want() { return this.sub === 6 ? 'wx' : 'st'; },   // радиопогоде нужна палка, остальное считает планшет
   mount(main) {
     this.root = T.el('div', 'view');
     const st = T.el('div', 'stage'); this.root.appendChild(st); this.cv = T.canvas(st);
@@ -55,8 +56,9 @@ T.views.push({
     else if (this.sub === 2) st = this.lifeF(g, w, h, L, dt);
     else if (this.sub === 3) st = this.pend(g, w, h, L, dt);
     else if (this.sub === 4) st = this.sky(g, w, h, L, dt, t);
-    else st = this.globe(g, w, h, L, dt, t);
-    T.bloom(o, this.sub === 2 ? 0.7 : this.sub >= 4 ? 0.6 : 0.85);
+    else if (this.sub === 5) st = this.globe(g, w, h, L, dt, t);
+    else st = this.weather(g, w, h, L, dt, t);                 // views/weather.js
+    T.bloom(o, this.sub === 2 ? 0.7 : this.sub === 6 ? (T.theme === 'sumi' ? 0.35 : 0.8) : this.sub >= 4 ? 0.6 : 0.85);
     // HUD поверх — плоский и чёткий
     T.header(g, m, y0, w - 2 * m, u, this.subs[this.sub], st.status);
     T.dots(g, m, y0 + u * 2.75, u, this.subs.length, this.sub);

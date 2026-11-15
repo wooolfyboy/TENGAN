@@ -11,6 +11,7 @@ void bleSample(uint32_t now);    // раз в секунду: история TIM
 void bleRadioOn();               // Wi-Fi и Bluetooth делят антенну —
 void bleRadioOff();              // работает что-то одно
 bool bleRadioActive();           // сканирует ли сейчас (для строки состояния планшета)
+int  bleEntityIds(uint32_t* out, int max);   // id устройств в эфире сейчас (радиопогода)
 
 void bleJson(String& out);       // устройства и термометры для веб-страницы
 void bleDevJson(uint32_t id, String& out);   // подробности одного устройства

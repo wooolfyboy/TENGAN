@@ -12,6 +12,7 @@
 #include "core/display.h"
 #include "core/theme.h"
 #include "core/ui.h"
+#include "core/version.h"
 
 static const uint32_t BOOT_MS = 2700;
 
@@ -134,6 +135,9 @@ void bootFrame(uint32_t t) {
     spr.setTextDatum(TC_DATUM);
     spr.setTextColor(UI_LABEL());
     txt(buf, titleCx, cy + 20, 1);
+    spr.setTextDatum(BR_DATUM);                        // версия прошивки — мелко в углу
+    spr.setTextColor(UI_DIM());
+    txt("v" FW_VERSION, W - 6, H - 4, 1);
   }
   // печать 天眼 «ставится» с ударом: вспышка и расходящаяся рамка, потом спокойно
   if (t >= 1640) {

@@ -226,6 +226,13 @@ void bleRadioOn() {
 
 bool bleRadioActive() { return g_bleActive; }
 
+// id физических устройств в эфире сейчас (для «радиопогоды»: кто пришёл, кто ушёл)
+int bleEntityIds(uint32_t* out, int max) {
+  int n = 0;
+  for (auto& kv : g_ents) { if (n >= max) break; out[n++] = kv.first; }
+  return n;
+}
+
 void bleRadioOff() {
   if (!g_bleActive) return;
   NimBLEDevice::getScan()->stop();

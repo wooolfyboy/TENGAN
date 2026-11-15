@@ -303,6 +303,8 @@ Sub-GHz (спектр, водопад, журнал) · Sound · System (бат�
 
 ## 🛠 Для разработчиков
 
+**Версия** — одна на всё, в файле `VERSION` (палка: заставка и Settings → Version; планшет: угол экрана запуска; APK: versionName). Перед релизом поменять `VERSION`, потом Run workflow с `release_tag = vX.Y`.
+
 <details>
 <summary><b>Сборка</b></summary>
 

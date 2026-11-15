@@ -71,12 +71,19 @@ S.onPc = d => {
   if (was !== undefined && was !== !!d.live) S.event('PC', d.live ? 'laptop online' : 'laptop stopped', !d.live);
 };
 S.onSat = d => { S.sky = d; };
+// радиопогода (событие wx, раз в секунду): rx — что пришло, wxs — плавные значения для сцены
+S.wxs = { clouds: 0, wind: 0, rain: 0, storm: 0, trend: 0 }; S.wxBolt = 0;
+S.onWx = d => {
+  const prev = S.wx; S.wx = d; S.wxT = performance.now();
+  if (d.thunder && !(prev && prev.thunder)) S.wxBolt++;          // новый раскат — сцена рисует молнию
+};
 S.onSt = d => {
   const prev = S.st; S.st = d;
   if (prev && prev.bat >= 0 && d.bat >= 0 && prev.bat > 15 && d.bat <= 15) S.event('PWR', 'battery ' + d.bat + '%', true);
 };
 // каждый кадр: всё, что приходит рывками, перетекает плавно
 S.tick = dt => {
+  if (S.wx) { const k = T.ease(dt, 1.4); for (const key in S.wxs) { const v = +S.wx[key] || 0; S.wxs[key] += (v - S.wxs[key]) * k; } }
   const k = 1 - Math.pow(0.001, dt);
   for (const e of S.dev.values()) {
     e.rs = e.st.tick(dt);

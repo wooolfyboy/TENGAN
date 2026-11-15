@@ -22,8 +22,10 @@
 #include "core/settings.h"
 #include "gallery/astro.h"
 #include "gallery/sat.h"
+#include "gallery/weather.h"
 
-enum { G_TESS = 0, G_TORUS, G_LIFE, G_PEND, G_SKY, G_GLOBE, G_NUM };
+enum { G_TESS = 0, G_TORUS, G_LIFE, G_PEND, G_SKY, G_GLOBE, G_WX, G_NUM };
+static bool s_wxOpen = false;                   // Weather открыт — его радио работают
 static int   g_gal = 0;
 static float s_speed = 1.0f;                // множитель скорости (колесо)
 static float s_phase = 0;                   // «время» анимации с учётом скорости
@@ -343,20 +345,25 @@ void drawPendulum(uint32_t now) {
 // ---------- раздел ----------
 static void galSubtitle(char* out, size_t n) { snprintf(out, n, "%d demos", G_NUM); }
 static void galEnter() { s_lastMs = 0; }
-static void galLeave() {}
+static void galLeave() { if (s_wxOpen) { wxStop(); s_wxOpen = false; } }
 static void galInfo(int i, SubItem& it) {
-  static const char* const names[G_NUM] = { "Tesseract", "Torus", "Life", "Pendulum", "Sky", "Globe" };
-  static const char* const descs[G_NUM] = { "4D hypercube", "donut of points", "game of life", "double pendulum chaos", "stars over you now", "ISS and satellites" };
+  static const char* const names[G_NUM] = { "Tesseract", "Torus", "Life", "Pendulum", "Sky", "Globe", "Weather" };
+  static const char* const descs[G_NUM] = { "4D hypercube", "donut of points", "game of life", "double pendulum chaos", "stars over you now", "ISS and satellites", "radio weather" };
   it.name = names[i]; it.desc = descs[i]; it.value[0] = 0;
   if (i == G_TESS)       strcpy(it.value, "4D");
   else if (i == G_TORUS) strcpy(it.value, "3D");
   else if (s_lfGen && i == G_LIFE) snprintf(it.value, sizeof(it.value), "gen %lu", (unsigned long)s_lfGen);
   else if (i == G_SKY)   snprintf(it.value, sizeof(it.value), "%s", curCity().name);
   else if (i == G_GLOBE) snprintf(it.value, sizeof(it.value), "%d sats", g_nSats);
+  else if (i == G_WX && g_wx.ok) snprintf(it.value, sizeof(it.value), "%s", g_wx.cond);
 }
 static int  galNow() { return g_gal; }
-static void galOpen(int m) { g_gal = m; s_lastMs = 0; s_trailN = 0; }
-static void galClose() {}
+static void galOpen(int m) {
+  g_gal = m; s_lastMs = 0; s_trailN = 0;
+  if (m == G_WX) { wxStart(); s_wxOpen = true; }      // радиопогода: включить её источники (BLE, CC1101 433, микрофон)
+}
+static void galClose() { if (s_wxOpen) { wxStop(); s_wxOpen = false; } }
+static void galTick(uint32_t now) { if (s_wxOpen) { wxRadiosTick(now); wxUpdate(now); } }
 static void galClick() {                                // в «Жизни» — новый мир, в маятнике — новый запуск
   if (g_gal == G_LIFE) lfSeed(); else if (g_gal == G_PEND) pdReset();   // у фигур нажатия нет
   else if (g_gal == G_SKY) skyClick(); else if (g_gal == G_GLOBE) globeClick();
@@ -364,17 +371,18 @@ static void galClick() {                                // в «Жизни» —
 static void galRotate(int dir) {
   if (g_gal == G_SKY) { skyTurn(dir); return; }              // небо и Земля — колесо крутит вид
   if (g_gal == G_GLOBE) { globeTurn(dir); return; }
+  if (g_gal == G_WX) { wxTurn(dir); return; }
   s_speed = constrain(s_speed + dir * 0.25f, 0.0f, 4.0f);
 }
 static void galDraw(uint32_t now) {
   if (g_gal == G_TESS) drawTesseract(now); else if (g_gal == G_TORUS) drawTorus(now);
   else if (g_gal == G_LIFE) drawLife(now); else if (g_gal == G_PEND) drawPendulum(now);
-  else if (g_gal == G_SKY) drawSky(now); else drawGlobe(now);
+  else if (g_gal == G_SKY) drawSky(now); else if (g_gal == G_GLOBE) drawGlobe(now); else drawWeather(now);
 }
 
 const Section gallerySection = {
   "Gallery", 150, 120, 255, iconCube, galSubtitle,
   galEnter, galLeave,
   G_NUM, galInfo, galNow, galOpen, galClose,
-  galClick, galRotate, nullptr, nullptr, galDraw,
+  galClick, galRotate, nullptr, galTick, galDraw,
 };

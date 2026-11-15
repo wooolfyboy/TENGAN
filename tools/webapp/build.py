@@ -63,6 +63,8 @@ def build():
         return slim(code, "css" if path.endswith(".css") else "js")
     html = re.sub(r"/\*@INLINE ([^*]+?)\*/", inline, html)
     html = html.replace("/*@DATA*/", data_js())
+    ver = open(os.path.join(HERE, "..", "..", "VERSION")).read().strip()
+    html = html.replace("@@VERSION@@", ver)                      # версия TENGAN (файл VERSION)
     assert "@INLINE" not in html
     assert not re.search(r'(src|href)="https?://', html), "внешние ссылки запрещены: страница должна работать без интернета"
     return html
@@ -71,7 +73,10 @@ def build():
 def main():
     html = build()
     if "--html" in sys.argv:
-        open(sys.argv[sys.argv.index("--html") + 1], "w", encoding="utf-8").write(html)
+        out = sys.argv[sys.argv.index("--html") + 1]
+        open(out, "w", encoding="utf-8").write(html)
+        # рядом — версия страницы: приложение сравнивает её с палкой (/api/pagever)
+        open(os.path.join(os.path.dirname(os.path.abspath(out)), "pagever.txt"), "w").write(hashlib.sha256(html.encode("utf-8")).hexdigest())
         if "--only-html" in sys.argv:                  # для разработки: прошивку не трогать
             print("tablet: %d КБ HTML" % (len(html) // 1024)); return
     gz = gzip.compress(html.encode("utf-8"), compresslevel=9, mtime=0)   # mtime=0 — одинаковый результат при пересборке
@@ -83,7 +88,9 @@ def main():
              "static const uint8_t TABLET_GZ[] PROGMEM = {"]
     for i in range(0, len(gz), 20):
         lines.append("  " + ",".join("0x%02x" % b for b in gz[i:i + 20]) + ",")
-    lines += ["};", "static const size_t TABLET_GZ_LEN = %d;" % len(gz), ""]
+    lines += ["};", "static const size_t TABLET_GZ_LEN = %d;" % len(gz),
+              "// версия страницы (sha256 несжатого HTML): по ней приложение планшета понимает, что пора обновиться",
+              'static const char TABLET_HTML_SHA[] = "%s";' % digest, ""]
     data = "\n".join(lines)
     if "--check" in sys.argv:                          # для CI: исходники и прошивка не разъехались
         # сравниваем сам HTML (по хэшу), а не сжатые байты: zlib разных версий жмёт чуть по-разному

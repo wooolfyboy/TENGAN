@@ -30,7 +30,9 @@
 #include "pc/pc.h"
 #include "gallery/astro.h"
 #include "gallery/sat.h"
+#include "gallery/weather.h"
 #include "core/settings.h"
+#include "core/version.h"
 #include "core/battery.h"
 #include "core/display.h"
 #include "core/leds.h"
@@ -264,10 +266,10 @@ static void otaDone() {
 #define SSE_MAX 2
 struct SseCli {
   NetworkClient c;
-  bool on = false, ble = false, wifi = false, snd = false, sub = false, pc = false, satSent = false;
+  bool on = false, ble = false, wifi = false, snd = false, sub = false, pc = false, wx = false, satSent = false;
   int8_t sm = 0, sb = 1;                         // режим и полоса Sub-GHz
   String pend;                                   // не отправленный хвост (докидываем без ожидания)
-  uint32_t tSt = 0, tBle = 0, tSnd = 0, tSub = 0, tPc = 0, wifiSeen = 0;
+  uint32_t tSt = 0, tBle = 0, tSnd = 0, tSub = 0, tPc = 0, tWx = 0, wifiSeen = 0;
 };
 static NetworkServer* s_sseSrv = nullptr;
 static SseCli s_sse[SSE_MAX];
@@ -313,7 +315,7 @@ static void sseAccept() {
   k.c = nc; k.c.setNoDelay(true); k.on = true;
   int q = req.indexOf("want="); String want = q >= 0 ? req.substring(q + 5, req.indexOf(' ', q)) : String("ble,wifi");
   k.ble = want.indexOf("ble") >= 0; k.wifi = want.indexOf("wifi") >= 0; k.snd = want.indexOf("snd") >= 0;
-  k.sub = want.indexOf("sub") >= 0; k.pc = want.indexOf("pc") >= 0;
+  k.sub = want.indexOf("sub") >= 0; k.pc = want.indexOf("pc") >= 0; k.wx = want.indexOf("wx") >= 0;
   auto qInt = [&](const char* key, int def) { int p = req.indexOf(key); return p >= 0 ? req.substring(p + strlen(key)).toInt() : def; };
   k.sm = (int8_t)qInt("sm=", 0); k.sb = (int8_t)qInt("sb=", 1);
   k.pend = "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\n"
@@ -324,9 +326,9 @@ static void sseAccept() {
 }
 
 // что сейчас нужно планшетам (для выключения ненужного радио)
-static int sseClients(bool& ble, bool& wifi, bool& snd, int& subM, int& subB) {
-  int n = 0; ble = wifi = snd = false; subM = -1; subB = 1;
-  for (auto& k : s_sse) if (k.on) { n++; ble |= k.ble; wifi |= k.wifi; snd |= k.snd; if (k.sub) { subM = k.sm; subB = k.sb; } }
+static int sseClients(bool& ble, bool& wifi, bool& snd, int& subM, int& subB, bool& wx) {
+  int n = 0; ble = wifi = snd = wx = false; subM = -1; subB = 1;
+  for (auto& k : s_sse) if (k.on) { n++; ble |= k.ble; wifi |= k.wifi; snd |= k.snd; wx |= k.wx; if (k.sub) { subM = k.sm; subB = k.sb; } }
   return n;
 }
 
@@ -344,6 +346,8 @@ static void sseTick(uint32_t now) {
       o += ",\"usb\":"; o += g_bat.bus ? 1 : 0; o += ",\"chg\":"; o += g_bat.chg;
       o += ",\"cli\":"; o += WiFi.softAPgetStationNum(); o += ",\"heap\":"; o += ESP.getFreeHeap() / 1024;
       o += ",\"theme\":\""; o += g_theme == THEME_SUMI ? "sumi" : "denko"; o += '"';
+    o += ",\"ver\":\"" FW_VERSION "\"";
+      o += ",\"ver\":\"" FW_VERSION "\"";
       o += ",\"radio\":\""; o += bleRadioActive() ? "b" : ""; o += s_scanMs && now - s_scanMs < 25000 ? "w" : "";
       o += s_subOn ? "s" : ""; o += s_sndOn ? "m" : ""; o += pcLive(now) ? "p" : ""; o += '"';
       o += '}';
@@ -362,6 +366,7 @@ static void sseTick(uint32_t now) {
     if (k.snd && now - k.tSnd >= 40) { k.tSnd = now; String o; audioStreamJson(o); sseEvent(k, "snd", o, true); }
     if (k.sub && s_subOn && now - k.tSub >= 140) { k.tSub = now; String o; subJson(o); sseEvent(k, "sub", o, true); }
     if (k.pc && now - k.tPc >= 1000) { k.tPc = now; String o; pcStreamJson(o); sseEvent(k, "pc", o, false); }
+    if (k.wx && now - k.tWx >= 1000) { k.tWx = now; String o; wxJson(o); sseEvent(k, "wx", o, false); }
   }
 }
 
@@ -407,6 +412,11 @@ static void webStart() {
     String o; audioJson(o); sendJson(o);
   });
   // приложение планшета присылает свой GPS: небо и глобус палки считаются «отсюда»
+  // версия страницы планшета: приложение сверяет её и, если на палке новее, забирает /full
+  s_srv->on("/api/pagever", [] {
+    String o = "{\"sha\":\""; o += TABLET_HTML_SHA; o += "\",\"gz\":"; o += TABLET_GZ_LEN; o += '}';
+    sendJson(o);
+  });
   s_srv->on("/api/loc", [] {
     float lat = s_srv->arg("lat").toFloat(), lon = s_srv->arg("lon").toFloat();
     bool ok = s_srv->hasArg("lat") && s_srv->hasArg("lon") && fabsf(lat) <= 90 && fabsf(lon) <= 180 && (lat != 0 || lon != 0);
@@ -427,6 +437,7 @@ static void webStart() {
     o += ",\"nets\":"; o += s_netCount;
     o += ",\"build\":\"" __DATE__ " " __TIME__ "\"";
     o += ",\"theme\":\""; o += g_theme == THEME_SUMI ? "sumi" : "denko"; o += '"';
+    o += ",\"ver\":\"" FW_VERSION "\"";
     o += ",\"ssid\":\""; o += s_ssid; o += "\"}";
     sendJson(o);
   });
@@ -472,8 +483,13 @@ static void webTick(uint32_t now) {
   s_srv->handleClient();
   scanCollect();
   sseTick(millis());
-  bool sBle, sWifi, sSnd; int subM, subB;
-  int nSse = sseClients(sBle, sWifi, sSnd, subM, subB);
+  bool sBle, sWifi, sSnd, sWx; int subM, subB;
+  int nSse = sseClients(sBle, sWifi, sSnd, subM, subB, sWx);
+  // радиопогода на планшете: Bluetooth + CC1101 монитор 433.92 + микрофон (Wi-Fi не трогаем — мешал бы)
+  if (nSse && sWx) {
+    sBle = true; sSnd = true;
+    if (subM < 0) { subM = 1; subB = 1; }             // Sub-GHz никто не смотрит отдельно — монитор (режим 1) на 433.92 (полоса 1)
+  }
   if (nSse && sSnd) { s_sndMs = millis(); if (!s_sndOn) s_sndOn = audioWebUse(); }   // планшет смотрит звук
   if (nSse && subM >= 0) { s_subMs = millis(); s_subOn = subWebUse(subM, subB); }    // планшет смотрит Sub-GHz
   // работает только то, что нужно открытой вкладке, остальное молчит:
@@ -482,6 +498,7 @@ static void webTick(uint32_t now) {
   // пока никто ничего не смотрит — радио молчит (железное правило: что работает, то и читается)
   bool wantBle = tabIs("overview") || tabIs("bluetooth");
   if (nSse) wantBle = sBle;                          // планшет подключён — решают его подписки
+  if (nSse && sWx) wxUpdate(millis());               // пересчёт погоды раз в секунду (источники включены выше)
   if ((int8_t)wantBle != s_bleWanted) { s_bleWanted = wantBle; if (wantBle) bleRadioOn(); else bleRadioOff(); }
   bool wantScan = tabIs("overview") || tabIs("wi-fi");
   if (nSse) wantScan = sWifi;
