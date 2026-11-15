@@ -233,13 +233,38 @@ T.views.push({
   city(g, w, h, u, m, y0, portrait, dt, t) {
     this.camStep(dt);
     const c = this.cam;
-    c.frame(w * 0.5, y0 + (h - y0) * (portrait ? 0.5 : 0.6), portrait ? w * 1.0 : Math.min((h - y0) * 1.5, w * 0.9));
-    for (const id of [...this.slots.keys()]) if (!S.dev.has(id)) this.slots.delete(id);
-    T.floorGrid(g, c, 1.6, 0.32 / 2);
+    c.frame(w * 0.5, y0 + (h - y0) * (portrait ? 0.5 : 0.58), portrait ? w * 0.78 : Math.min((h - y0) * 1.2, w * 0.72));
+    // радиальная сетка: кольца = пороги дальности палки (settings.h RANGES), спицы через 30°
+    const RINGS = [[-60, 'VERY NEAR'], [-70, 'NEAR'], [-80, 'ROOM'], [-90, 'FAR']], RMAX = 1.55;
+    const ringR = db => { const P = [[-45, 0.22], [-60, 0.42], [-70, 0.68], [-80, 0.96], [-90, 1.24], [-100, 1.5]];
+      if (db >= P[0][0]) return P[0][1]; for (let i = 1; i < P.length; i++) if (db >= P[i][0]) { const a = P[i - 1], b = P[i]; return b[1] + (a[1] - b[1]) * (db - b[0]) / (a[0] - b[0]); } return P[P.length - 1][1]; };
+    const ring = (r, col, lw) => { g.beginPath(); for (let i = 0; i <= 96; i++) { const a = i / 96 * T.TAU, q = c.p(Math.cos(a) * r, 0, Math.sin(a) * r); i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); } g.strokeStyle = col; g.lineWidth = lw; g.stroke(); };
+    g.lineWidth = 1; g.strokeStyle = 'rgba(32,50,64,.55)'; g.beginPath();
+    for (let a = 0; a < 360; a += 30) { const r = a * Math.PI / 180, p0 = c.p(Math.cos(r) * 0.1, 0, Math.sin(r) * 0.1), p1 = c.p(Math.cos(r) * RMAX, 0, Math.sin(r) * RMAX); g.moveTo(p0[0], p0[1]); g.lineTo(p1[0], p1[1]); }
+    g.stroke();
+    RINGS.forEach(([db], i) => ring(ringR(db), i === 3 ? 'rgba(62,230,255,.35)' : 'rgba(90,112,128,.4)', 1));
+    ring(RMAX, 'rgba(62,230,255,.5)', 1.4);
+    for (const [db, name] of [...RINGS, [-127, 'ALL']]) {             // подписи колец — на ближней стороне
+      const r = db < -100 ? RMAX : ringR(db), a = -c.yaw - Math.PI / 2 + 0.22, q = c.p(Math.cos(a) * r, 0, Math.sin(a) * r);
+      T.txt(g, name + (db > -100 ? '  ' + db : ''), q[0] + u * 0.3, q[1] - u * 0.3, u * 0.66, db === -90 || db < -100 ? T.C.acc : T.C.dim);
+    }
     const list = BU.list(), rank = [...list].sort((a, b) => b.rs - a.rs);
     const SZ = { computer: 0.09, TV: 0.1, tv: 0.1, phone: 0.065, audio: 0.06, watch: 0.05, band: 0.045, tracker: 0.045, sensor: 0.05 };
+    // место башни: расстояние от центра — по силе сигнала (кольца), угол — по id с небольшим разбросом;
+    // соседи расталкиваются, всё плавно перетекает
+    for (const e of list) {
+      const ang = (T.hash(e.id) % 3600) / 3600 * T.TAU, rr = ringR(e.rs) + (((T.hash(e.id * 7 + 3) & 255) / 255) - 0.5) * 0.12;
+      e._tx = Math.cos(ang) * rr; e._tz = Math.sin(ang) * rr;
+      if (e._cx == null) { e._cx = e._tx; e._cz = e._tz; }
+    }
+    for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
+      const a = list[i], b = list[j], dx = b._tx - a._tx, dz = b._tz - a._tz, d = Math.hypot(dx, dz) || 1e-3, min = 0.26;
+      if (d < min) { const k = (min - d) / 2 / d; a._tx -= dx * k; a._tz -= dz * k; b._tx += dx * k; b._tz += dz * k; }
+    }
+    const ke = T.ease(dt, 0.9);
+    for (const e of list) { e._cx += (e._tx - e._cx) * ke; e._cz += (e._tz - e._cz) * ke; }
     const towers = list.map(e => {
-      const [gx, gz] = this.slot(e.id).split(',').map(Number), x = gx * 0.3, z = gz * 0.3;
+      const x = e._cx, z = e._cz;
       const sg = T.pct(e.rs); e._ch = e._ch == null ? 0 : e._ch + ((0.05 + 0.7 * Math.pow(sg, 1.3)) * e.h - e._ch) * T.ease(dt, 0.6);
       return { e, x, z, s: SZ[e.type] || 0.055, hh: e._ch, sg, d: c.p(x, 0, z)[3] };
     }).sort((a, b) => b.d - a.d);
