@@ -10,6 +10,7 @@ void bleUpdate(uint32_t now);    // каждый кадр: свести адре
 void bleSample(uint32_t now);    // раз в секунду: история TIMELINE и события для ленты
 void bleRadioOn();               // Wi-Fi и Bluetooth делят антенну —
 void bleRadioOff();              // работает что-то одно
+bool bleRadioActive();           // сканирует ли сейчас (для строки состояния планшета)
 
 void bleJson(String& out);       // устройства и термометры для веб-страницы
 void bleDevJson(uint32_t id, String& out);   // подробности одного устройства

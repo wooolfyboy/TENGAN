@@ -2,6 +2,7 @@
 //  pc.cpp — раздел PC: приём строк с ноутбука по USB и сам раздел
 // ============================================================
 #include "core/timeutil.h"
+#include "core/jsonutil.h"
 #include "pc/pc.h"
 #include "core/display.h"
 #include "core/ui.h"
@@ -186,3 +187,35 @@ const Section pcSection = {
   0, nullptr, nullptr, nullptr, nullptr,
   pcClick, pcRotate, pcBack, nullptr, pcDraw,
 };
+
+// ---------- для планшета (поток SSE, раз в секунду) ----------
+// {"live":1,"host":..,"cpu":..,"c":[..],"ram":..,"ru":..,"rt":..,"disk":..,"dr":..,"dw":..,"nd":..,"nu":..,
+//  "bat":..,"plug":..,"up":..,"top":..,"trk":{...},"city":[...]}
+void pcStreamJson(String& o) {
+  uint32_t now = millis();
+  const PcStat& p = g_pc;
+  o.reserve(900);
+  o = "{\"live\":"; o += pcLive(now) ? 1 : 0;
+  if (!p.have) { o += '}'; return; }
+  o += ",\"age\":"; o += msSince(now, p.t) / 1000;
+  o += ",\"host\":"; jsonStr(o, p.host);
+  o += ",\"cpu\":"; o += String(p.cpu, 1); o += ",\"ghz\":"; o += String(p.freq, 2);
+  o += ",\"c\":[";
+  for (int i = 0; i < p.nCores && i < PC_CORES; i++) { if (i) o += ','; o += p.core[i]; }
+  o += "],\"ram\":"; o += String(p.ram, 1); o += ",\"ru\":"; o += String(p.ramU, 1); o += ",\"rt\":"; o += String(p.ramT, 1);
+  o += ",\"disk\":"; o += String(p.disk, 0); o += ",\"dr\":"; o += String(p.dR, 1); o += ",\"dw\":"; o += String(p.dW, 1);
+  o += ",\"nd\":"; o += String(p.nD, 0); o += ",\"nu\":"; o += String(p.nU, 0);
+  o += ",\"bat\":"; o += p.bat; o += ",\"plug\":"; o += p.plug ? 1 : 0; o += ",\"up\":"; o += p.up;
+  o += ",\"top\":"; jsonStr(o, p.top);
+  o += ",\"vol\":"; o += p.vol; o += ",\"mute\":"; o += p.mute ? 1 : 0;
+  if (p.trk) {
+    int pos = p.pos;
+    if (pos >= 0 && p.playing) pos += msSince(now, p.trkT) / 1000;   // досчитываем, как экран Media
+    if (p.dur > 0 && pos > p.dur) pos = p.dur;
+    o += ",\"trk\":{\"t\":"; jsonStr(o, p.title); o += ",\"a\":"; jsonStr(o, p.artist);
+    o += ",\"app\":"; jsonStr(o, p.app); o += ",\"play\":"; o += p.playing ? 1 : 0;
+    o += ",\"pos\":"; o += pos; o += ",\"dur\":"; o += p.dur; o += '}';
+  }
+  if (pcCityLive(now)) { o += ",\"city\":"; pcCityJson(o); }
+  o += '}';
+}

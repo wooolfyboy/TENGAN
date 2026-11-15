@@ -53,5 +53,8 @@ void drawPcMedia(uint32_t now);
 void drawPcCity(uint32_t now);       // город процессов (pc_city.cpp)
 void pcCityLine(char* s);            // строка «PP ...» с ноутбука
 void pcCityNext();                   // нажатие: прожектор на следующую башню
+void pcCityJson(String& o);          // башни для планшета (дописывает в o)
+bool pcCityLive(uint32_t now);
+void pcStreamJson(String& o);        // всё про ноутбук для планшета (поток SSE)
 
 extern const Section pcSection;

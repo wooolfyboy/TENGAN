@@ -213,12 +213,12 @@ void drawChannels(uint32_t now) {
 
   // «холмики» реальной ширины (20 / 40 МГц), слабые снизу, «жар» — сила
   std::vector<std::pair<int, uint64_t>> v;
-  for (auto& kv : g_aps) if (kv.second.ch >= 1 && kv.second.ch <= CH_MAX) v.push_back({ kv.second.rssiS, kv.first });
+  for (auto& kv : g_aps) if (kv.second.ch >= 1 && kv.second.ch <= CH_MAX) v.push_back({ kv.second.rssi, kv.first });
   std::sort(v.begin(), v.end());
   for (auto& p : v) {
     const Ap& a = g_aps[p.second];
-    uint16_t c = heat(a.rssiS), fill = scale565(c, 18);
-    int top = dbY(a.rssiS);
+    uint16_t c = heat(a.rssi), fill = scale565(c, 18);
+    int top = dbY(a.rssi);
     float cen = apCenter(a), half = apHalf(a);
     int prevx = -1, prevy = -1;
     for (int s = 0; s <= 24; s++) {
@@ -238,7 +238,7 @@ void drawChannels(uint32_t now) {
     upperCopy(nm, nu, sizeof(nu));
     spr.setTextDatum(BC_DATUM);
     spr.setTextColor(C_HOT());
-    txt(nu, constrain(chX(apCenter(a)), pl + 30, pr - 30), dbY(a.rssiS) - 2, 1);
+    txt(nu, constrain(chX(apCenter(a)), pl + 30, pr - 30), dbY(a.rssi) - 2, 1);
   }
   present();
 }
