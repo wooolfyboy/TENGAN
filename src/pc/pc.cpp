@@ -6,6 +6,8 @@
 #include "core/display.h"
 #include "core/ui.h"
 #include "audio/audio.h"
+#include "gallery/astro.h"
+#include "gallery/sat.h"
 
 PcStat g_pc;
 int    g_pcPage = 0;
@@ -72,10 +74,12 @@ static void parseAudio(char* s) {
 
 static void parseLine(char* s) {
   if (!strncmp(s, "PA ", 3)) { parseAudio(s); return; }
+  if (!strncmp(s, "TLE\t", 4)) { satFromLine(s); return; }   // орбиты спутников с ноутбука
   if (!strncmp(s, "PV ", 3)) { parseVol(s); return; }
   if (!strncmp(s, "PM", 2) && (s[2] == '\t' || s[2] == 0)) { parseMedia(s); return; }
   if (strncmp(s, "PC ", 3) != 0) return;            // не наша строка — пропускаем
   PcStat& p = g_pc;
+  uint32_t ts = 0; long tz = 0;
   char* save = nullptr;
   for (char* tok = strtok_r(s + 3, " ", &save); tok; tok = strtok_r(nullptr, " ", &save)) {
     char* eq = strchr(tok, '=');
@@ -99,7 +103,10 @@ static void parseLine(char* s) {
     else if (!strcmp(k, "up"))   p.up = (uint32_t)f;
     else if (!strcmp(k, "top"))  { strncpy(p.top, v, sizeof(p.top) - 1); p.top[sizeof(p.top) - 1] = 0; }
     else if (!strcmp(k, "host")) { strncpy(p.host, v, sizeof(p.host) - 1); p.host[sizeof(p.host) - 1] = 0; }
+    else if (!strcmp(k, "ts"))   ts = strtoul(v, nullptr, 10);
+    else if (!strcmp(k, "tz"))   tz = atol(v);
   }
+  if (ts > 1700000000) astroSetTime(ts, (int32_t)tz);    // точное время — для неба и спутников
   p.have = true;
   p.t = millis();
   if (p.histN < PC_HIST) { p.cpuH[p.histN] = p.cpu; p.ramH[p.histN] = p.ram; p.histN++; }

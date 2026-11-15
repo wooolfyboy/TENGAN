@@ -200,6 +200,8 @@ class Collector:
             "up=%d" % up,
             "top=" + self.top,
             "host=" + self.host,
+            "ts=%d" % int(time.time()),                       # точное время для неба и спутников на палке
+            "tz=%d" % (time.localtime().tm_gmtoff or 0),
         ]
         if bat is not None:
             parts += ["bat=%d" % bat.percent, "plug=%d" % (1 if bat.power_plugged else 0)]
@@ -574,6 +576,57 @@ class AudioTap:
             return False
 
 
+# ---------- орбиты спутников для Gallery › Globe ----------
+# Раз в 6 часов скачиваем свежие элементы орбит (TLE) с CelesTrak и раз в минуту
+# отдаём палке; кэш в файле рядом с программой — работает и без интернета.
+SATS = [("ISS", 25544), ("Tiangong", 48274), ("Hubble", 20580)]
+TLE_CACHE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tle_cache.txt")
+
+
+class Orbits:
+    def __init__(self):
+        self.lines = []                         # готовые строки «TLE\t...»
+        self._load_cache()
+        threading.Thread(target=self._run, daemon=True).start()
+
+    def _load_cache(self):
+        try:
+            with open(TLE_CACHE, encoding="ascii") as f:
+                self.lines = [l.rstrip("\n") + "\n" for l in f if l.startswith("TLE\t")]
+        except Exception:
+            pass
+
+    def _fetch(self):
+        import urllib.request
+        got = []
+        for name, num in SATS:
+            url = "https://celestrak.org/NORAD/elements/gp.php?CATNR=%d&FORMAT=TLE" % num
+            req = urllib.request.Request(url, headers={"User-Agent": "tengan-pc-monitor"})
+            with urllib.request.urlopen(req, timeout=15) as r:
+                rows = [x.strip() for x in r.read().decode("ascii", "ignore").splitlines() if x.strip()]
+            l1 = next((x for x in rows if x.startswith("1 ")), None)
+            l2 = next((x for x in rows if x.startswith("2 ")), None)
+            if l1 and l2:
+                got.append("TLE\t%s\t%s\t%s\n" % (name, l1, l2))
+        return got
+
+    def _run(self):
+        while True:
+            try:
+                got = self._fetch()
+                if got:
+                    self.lines = got
+                    with open(TLE_CACHE, "w", encoding="ascii") as f:
+                        f.writelines(got)
+                    say("")
+                    say("     [спутники] свежие орбиты: " + ", ".join(n for n, _ in SATS))
+                time.sleep(6 * 3600)
+            except Exception as e:
+                say("")
+                say("     [спутники] не скачал орбиты (%s) — беру сохранённые" % str(e)[:80])
+                time.sleep(15 * 60)
+
+
 def reader(port, wake, tap):
     """Отдельный поток: слушает команды от палки и сразу их выполняет."""
     while True:
@@ -611,6 +664,8 @@ def main():
     col = Collector()
     media = NowPlaying()
     tap = AudioTap()
+    orbits = Orbits()
+    last_tle = 0.0
     if IS_WIN:
         if _media_mgr_cls is not None:
             say("  Название трека: через системную панель Windows (winrt).")
@@ -667,6 +722,10 @@ def main():
                 send(port, ("PV vol=%d mute=%d\n" % (v[0], 1 if v[1] else 0)).encode())
             if media.line:
                 send(port, media.line.encode("utf-8"))
+            if orbits.lines and time.time() - last_tle > 60:       # орбиты — раз в минуту
+                last_tle = time.time()
+                for l in orbits.lines:
+                    send(port, l.encode("ascii", "ignore"))
             sys.stdout.write("\r     CPU %3d%%   RAM %3d%%   -> %s   " % (cpu, ram, port.port))
             sys.stdout.flush()
         except Exception:

@@ -65,5 +65,6 @@ gallery([("01_menu", "главное меню"), ("13_ble_city", "Bluetooth · C
          ("16_ble_detail", "Bluetooth · подробности"), ("22_wifi_channels", "Wi-Fi · каналы"), ("25_wifi_find", "Wi-Fi · Find"),
          ("30_subghz_spectrum", "Sub-GHz · спектр + водопад"), ("40b_sound_terrain", "Sound · Terrain (3D)"), ("45b_sound_xy_pc", "Sound · XY по звуку ноута"),
          ("71_pc_overview", "PC · монитор ноутбука"), ("73_pc_media", "PC · что играет"), ("60_web", "Web · подключение телефона"),
-         ("50_gallery_tesseract", "Gallery · тессеракт"), ("53_gallery_pendulum", "Gallery · двойной маятник"), ("08_power_hold", "выключение")],
+         ("50_gallery_tesseract", "Gallery · тессеракт"), ("53_gallery_pendulum", "Gallery · двойной маятник"), ("08_power_hold", "выключение"),
+         ("54b_gallery_sky_stars", "Gallery · Sky — небо сейчас"), ("55_gallery_globe", "Gallery · Globe — МКС"), ("54_gallery_sky", "Gallery · Sky — созвездия")],
         "screens.png")

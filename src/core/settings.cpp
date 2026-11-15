@@ -10,6 +10,7 @@
 #include "core/ui.h"
 #include "audio/audio.h"
 #include "subghz/subghz_model.h"
+#include "gallery/astro.h"
 
 int g_range = 0;
 int g_thresh = 7;
@@ -20,6 +21,8 @@ int g_sndIdx = 1;                        // тихие звуки интерфе
 int g_clickEn = 1;
 int g_micEn = 1;
 int g_auSrc = 0;
+int g_city = 0;
+int g_tzOff = 10800;
 int g_auLeds = 0;
 int g_bleTicks = 1;
 int g_wifiTicks = 1;
@@ -32,7 +35,7 @@ static uint32_t g_setChangedMs = 0;
 static Preferences g_prefs;
 
 // все пункты настроек; page — на какой странице показывать
-enum { S_SCREEN, S_DIM, S_LEDBR, S_VOLUME, S_CLICKS, S_BATTERY,
+enum { S_SCREEN, S_DIM, S_LEDBR, S_VOLUME, S_CLICKS, S_CITY, S_BATTERY,
        S_RANGE, S_LEDEV, S_BLETICK,
        S_WRANGE, S_WTICK,
        S_BAND,
@@ -45,6 +48,7 @@ static const SetDef DEFS[S_NUM] = {
   { "LED brightness", "led strip brightness",        P_GENERAL },
   { "Volume",         "all sounds: off/quiet/loud",  P_GENERAL },
   { "Wheel clicks",   "click on every wheel step",   P_GENERAL },
+  { "City",           "for sky map and satellites",  P_GENERAL },
   { "Battery",        "",                            P_GENERAL },
   { "Range",          "ignore weaker devices",       P_BLE },
   { "LED events",     "leds flash on count jump",    P_BLE },
@@ -57,7 +61,7 @@ static const SetDef DEFS[S_NUM] = {
   { "Source",         "auto / mic / laptop audio",   P_SOUND },
 };
 static const char* const PAGE_NAMES[P_NUM] = { "General", "Bluetooth", "Wi-Fi", "Sub-GHz", "Sound" };
-static const char* const PAGE_DESCS[P_NUM] = { "screen, leds, sound, battery", "range, leds, ticks",
+static const char* const PAGE_DESCS[P_NUM] = { "screen, leds, sound, city", "range, leds, ticks",
                                                "range, ticks", "radio band", "source, mic, leds" };
 static const int SET_ROWS = 7;           // строк на экране (список прокручивается)
 
@@ -86,6 +90,8 @@ void loadSettings() {
   g_clickEn   = g_prefs.getInt("click", 1) ? 1 : 0;
   g_auLeds    = g_prefs.getInt("auled", 0) ? 1 : 0;
   g_auSrc     = constrain(g_prefs.getInt("ausrc", 0), 0, 2);
+  g_city      = constrain(g_prefs.getInt("city", 0), 0, N_CITIES - 1);
+  g_tzOff     = g_prefs.getInt("tz", 10800);
   g_bleTicks  = g_prefs.getInt("bltick", 1) ? 1 : 0;
   g_wifiTicks = g_prefs.getInt("wftick", 1) ? 1 : 0;
   g_wRange    = g_prefs.getInt("wrange", 0);
@@ -113,6 +119,8 @@ void saveSettings() {
   g_prefs.putInt("click", g_clickEn);
   g_prefs.putInt("auled", g_auLeds);
   g_prefs.putInt("ausrc", g_auSrc);
+  g_prefs.putInt("city", g_city);
+  g_prefs.putInt("tz", g_tzOff);
   g_prefs.putInt("bltick", g_bleTicks);
   g_prefs.putInt("wftick", g_wifiTicks);
   g_prefs.putInt("wrange", g_wRange);
@@ -147,6 +155,7 @@ void settingsAdjust(int dir) {
     case S_MIC:     g_micEn = dir > 0; break;
     case S_AULED:   g_auLeds = dir > 0; if (!g_auLeds) ledsOff(); break;
     case S_AUSRC:   g_auSrc = constrain(g_auSrc + dir, 0, 2); break;
+    case S_CITY:    g_city = (g_city + dir + N_CITIES) % N_CITIES; break;
     default: return;                       // батарея — только показывает
   }
   applyBrightness();
@@ -199,6 +208,7 @@ void drawSettings() {
       case S_MIC:     strcpy(val, onOff(g_micEn)); break;
       case S_AULED:   strcpy(val, onOff(g_auLeds)); break;
       case S_AUSRC:   strcpy(val, g_auSrc == 0 ? "auto" : g_auSrc == 1 ? "mic" : "laptop"); break;
+      case S_CITY:    snprintf(val, sizeof(val), "%s", CITIES[g_city].name); break;
       default:
         if (g_bat.ok) { sprintf(val, "%d%%  %.2f V", g_bat.soc, g_bat.mv / 1000.0f); alert = g_bat.soc <= 20; }
         else          sprintf(val, "n/a");

@@ -13,6 +13,8 @@
 #include "core/battery.h"
 #include "core/settings.h"
 #include "gallery/gallery.h"
+#include "gallery/astro.h"
+#include "gallery/sat.h"
 #include "web/web.h"
 #include "pc/pc.h"
 #include "core/power.h"
@@ -372,6 +374,13 @@ int main(int argc, char** argv) {
   for (int f = 0; f < 10; f++) drawTorus(s_now + 1500 + f * 33); snap("51_gallery_torus");
   for (int f = 0; f < 60; f++) drawLife(s_now + 2000 + f * 120); snap("52_gallery_life");
   for (int f = 0; f < 160; f++) drawPendulum(s_now + 9000 + f * 33); snap("53_gallery_pendulum");
+  { char l1[] = "TLE\tISS\t1 25544U 98067A   26318.50000000  .00016717  00000+0  30472-3 0  9990\t2 25544  51.6400 120.0000 0003000  90.0000 270.0000 15.50000000400000";
+    char l2[] = "TLE\tTiangong\t1 48274U 21035A   26318.40000000  .00020000  00000+0  25000-3 0  9990\t2 48274  41.4700 210.0000 0005000  30.0000 330.0000 15.60000000300000";
+    satFromLine(l1); satFromLine(l2);
+    astroSetTime((uint32_t)astroUnixNow(), 10800);
+    for (int f = 0; f < 3; f++) drawSky(s_now + f * 40);   snap("54_gallery_sky");
+    skyClick(); drawSky(s_now);                           snap("54b_gallery_sky_stars"); skyClick(); skyClick();
+    for (int f = 0; f < 60; f++) drawGlobe(s_now + f * 40); snap("55_gallery_globe"); }
   { uint8_t qr[29 * 29]; for (int i = 0; i < 29 * 29; i++) qr[i] = (noise(i) > 0.5f) || ((i % 29 < 7 || i % 29 > 21) && (i / 29 < 7) && !((i % 29 == 1 || i % 29 == 5 || i % 29 == 23 || i % 29 == 27) && i / 29 > 0 && i / 29 < 6));
     WebView v = { "TENGAN-3F2A", "48213907", "192.168.4.1", 1, 214, true, "sub-ghz" };
     drawWebScreen(v, qr, 29); snap("60_web"); }

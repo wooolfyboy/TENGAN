@@ -4,3 +4,4 @@
 # готовые прошивки — в GitHub Releases (собирает CI), не в истории
 release/
 dist/
+tle_cache.txt
