@@ -105,6 +105,27 @@ def sat():
                      ["HUBBLE", int(epoch), 15.09 * 2 * math.pi / 1440, 0, r(28.47), r(200.0), 0.0002, r(40.0), r(10.0), 6917.0]]}
 
 
+WX = {"hist": [], "histT": 0}
+
+
+def wx():
+    # радиопогода: медленно плывущие значения + цикл «ясно → облака → дождь → гроза» (~2 минуты)
+    t = time.time()
+    ph = (t / 120) % 1
+    if __import__('os').environ.get('WX') == 'storm': ph = 0.44        # для картинок: гроза прямо сейчас
+    storm = max(0.0, math.sin(ph * math.pi * 2 - 1.2)) ** 2
+    clouds = min(1, 0.25 + 0.5 * (0.5 + 0.5 * math.sin(t / 37)) + storm * 0.4)
+    rain = min(1, storm * 1.1 + max(0, math.sin(t / 23)) * 0.15)
+    wind = 0.3 + 0.3 * math.sin(t / 17) + storm * 0.3
+    thunder = 1 if storm > 0.55 and int(t) % 7 == 0 else 0
+    cond = "storm" if storm > 0.5 else "rain" if rain > 0.35 else "windy" if wind > 0.6 else "overcast" if clouds > 0.75 else "cloudy" if clouds > 0.4 else "clear" if clouds > 0.1 else "calm"
+    if t - WX["histT"] > 1:
+        WX["histT"] = t; WX["hist"].append([round(clouds, 2), round(rain, 2)]); WX["hist"] = WX["hist"][-60:]
+    return {"ok": 1, "cond": cond, "clouds": round(clouds, 3), "wind": round(wind, 3), "rain": round(rain, 3), "storm": round(storm, 3),
+            "thunder": thunder, "trend": round(-math.cos(ph * math.pi * 2 - 1.2), 2), "ble": int(8 + clouds * 40), "turn": int(wind * 20),
+            "sub": int(rain * 9), "subPk": int(-70 + rain * 25), "snd": int(-50 + storm * 30), "pk": int(-40 + storm * 30), "hist": WX["hist"]}
+
+
 def st():
     return {"name": "TENGAN", "up": int(time.time() - T0) + 3600, "bat": 87, "mv": 3980, "usb": 0, "chg": 0, "cli": 1, "heap": 180, "radio": "bwsmp", "theme": THEME}
 
@@ -145,7 +166,7 @@ class Sse(http.server.BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Origin", "*"); self.end_headers()
 
         def ev(name, d): self.wfile.write(("event: %s\ndata: %s\n\n" % (name, json.dumps(d, ensure_ascii=False))).encode()); self.wfile.flush()
-        tb = tw = ts = tsub = tpc = 0
+        tb = tw = ts = tsub = tpc = twx = 0
         sent_sat = False
         try:
             while True:
@@ -158,6 +179,7 @@ class Sse(http.server.BaseHTTPRequestHandler):
                 if "snd" in want: ev("snd", snd())
                 if "sub" in want and now - tsub > 0.14: tsub = now; ev("sub", sub(sm, sb))
                 if "pc" in want and now - tpc > 1: tpc = now; ev("pc", pc())
+                if "wx" in want and now - twx > 1: twx = now; ev("wx", wx())
                 time.sleep(0.04)
         except Exception:
             pass
