@@ -66,7 +66,7 @@ BU.scene = (g, cam, sw, opt) => {
     const col = BU.rgb(e, 0.35 + 0.65 * sg);
     const gr = g.createLinearGradient(p0[0], p0[1], p1[0], p1[1]); gr.addColorStop(0, T.rgb(col, 0.05 * fog)); gr.addColorStop(1, T.rgb(col, (0.5 + 0.5 * ph) * fog));
     g.strokeStyle = gr; g.lineWidth = Math.max(1.5, p0[2] * 0.016); g.lineCap = 'round'; g.beginPath(); g.moveTo(p0[0], p0[1]); g.lineTo(p1[0], p1[1]); g.stroke(); g.lineCap = 'butt';
-    const rr = p1[2] * (0.014 + 0.02 * sg) * (1 + 0.6 * Math.max(0, 1 - pa * 2));
+    const rr = Math.max(0.5, p1[2] * (0.014 + 0.02 * sg) * (1 + 0.6 * Math.max(0, 1 - pa * 2)) || 0);
     g.fillStyle = T.rgb(BU.tr(e) ? col : T.heatRGB(0.55 + 0.45 * ph), fog); g.beginPath(); g.arc(p1[0], p1[1], rr, 0, T.TAU); g.fill();
     g.fillStyle = T.rgb(col, 0.5 * fog); g.beginPath(); g.ellipse(p0[0], p0[1], p0[2] * 0.02, p0[2] * 0.02 * Math.sin(cam.pitch), 0, 0, T.TAU); g.fill();
     if (opt.hits) { T.hits.circle(p1[0], p1[1], Math.max(u * 1.6, rr * 2.5), { k: 'dev', id: e.id }); T.hits.circle((p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2, u * 1.2, { k: 'dev', id: e.id }); }
@@ -190,7 +190,7 @@ T.views.push({
     this.cam = T.orbit(0.5, 0.98, 3.2); this.camT = { yaw: 0.5, D: 3.2 };
     this.drag = T.drag(this.cv.cv, this.cam, { minPitch: 0.5, maxPitch: 1.35 });
     this.drag.onTap = (x, y) => this.tap(x, y);
-    this.sw = BU.sweeper(); this.dust = T.dust(220); this.sel = null; this.sticky = BU.sticky(); this.slots = new Map(); this.info = null; this.infoT = 0;
+    this.sw = BU.sweeper(); this.dust = T.dust(220); this.sel = null; this.sticky = BU.sticky(); this.info = null; this.infoT = 0;
     this.onSub(this.sub);
   },
   unmount() { this.cv.dispose(); this.root.remove(); },
@@ -260,37 +260,30 @@ T.views.push({
     if (selTop) BU.card(g, selTop.p, selTop.e, u, portrait ? w : w * 0.7, h, y0 + u * 4);
     T.footer(g, m, h - u * 2.4, w - 2 * m, u, 'drag: orbit  ·  tap pillar: focus', 'height = signal · ring = sweep hit');
   },
-  // пагода тушью (SUMI): корпус-размывка, крыши-мазки с загнутыми краями, конёк. Возвращает точку верха
-  pagoda(g, c, x, z, hh, sg, fog, tr, id, u) {
-    const I = T.ink, b = c.p(x, 0, z), t = c.p(x, Math.max(hh, 0.04), z), sc = b[2] / 260, col = tr ? [194, 58, 43] : [27, 24, 20], al = 0.3 + 0.65 * fog;
-    const tiers = 1 + Math.round(sg * sg * 4), H = Math.max(u * 1.2, b[1] - t[1]), th = H / tiers, w0 = u * (1.5 + 1.2 * sg) * sc * 1.4;
-    let y = b[1];
-    I.stroke(g, [[b[0] - w0 * 0.9, y + 1], [b[0] + w0 * 0.9, y]], u * 0.35 * sc, { seed: id + 200, taper: [0.2, 0.4], dry: 0.5, alpha: al * 0.6 });
-    for (let k = 0; k < tiers; k++) {
-      const w = w0 * (1 - k * 0.12), bw = w * 0.62, top = y - th;
-      const gr = g.createLinearGradient(0, top, 0, y); I.raw(g, 'fillStyle', 'rgba(0,0,0,0)');
-      const tt = T.theme; T.theme = 'raw'; gr.addColorStop(0, `rgba(${col},${al * 0.32})`); gr.addColorStop(1, `rgba(${col},${al * 0.12})`); g.fillStyle = gr; T.theme = tt;
-      g.fillRect(b[0] - bw / 2, top + th * 0.12, bw, th * 0.88);
-      I.pen(g, [[b[0] - bw / 2, y], [b[0] - bw / 2, top + th * 0.14]], 1, `rgba(${col},${al * 0.7})`);
-      I.pen(g, [[b[0] + bw / 2, y], [b[0] + bw / 2, top + th * 0.14]], 1, `rgba(${col},${al * 0.7})`);
-      const ey = top + th * 0.06, lift = Math.min(th * 0.3, u * 0.5 * sc * 1.4);
-      I.stroke(g, [[b[0] - w, ey - lift], [b[0] - w * 0.7, ey + lift * 0.1], [b[0], ey - lift * 0.1], [b[0] + w * 0.7, ey + lift * 0.1], [b[0] + w, ey - lift]],
-        Math.max(1.5, u * 0.42 * sc * 1.3), { seed: id * 13 + k, taper: [0.12, 0.12], dry: 0.6, alpha: al, col: `rgb(${col})` });
-      y = top;
+  // бамбук тушью (SUMI): стебель из колен — чем сильнее сигнал, тем выше и больше колен; у сильных — листья.
+  // Дёшево: несколько fillRect и пара треугольников на устройство, без мазков с кистью.
+  bamboo(g, c, x, z, hh, sg, fog, tr, id, u) {
+    const b = c.p(x, 0, z), t = c.p(x, Math.max(hh, 0.04), z), sc = b[2] / 260, al = 0.35 + 0.6 * fog;
+    const col = tr ? '194,58,43' : '27,24,20', H = Math.max(u * 1.2, b[1] - t[1]), segs = 2 + Math.round(sg * 4);
+    const w = Math.max(1.5, u * (0.32 + 0.3 * sg) * sc * 1.4), lean = ((T.hash(id) % 5) - 2) * u * 0.12 * sc, sh = H / segs;
+    g.fillStyle = `rgba(${col},${al * 0.85})`;
+    for (let k = 0; k < segs; k++) {                       // колено: стебель чуть сужается кверху, между коленами — просвет
+      const y1 = b[1] - k * sh, x1 = b[0] + lean * k / segs, ww = w * (1 - k * 0.06);
+      g.fillRect(x1 - ww / 2, y1 - sh + sh * 0.08, ww, sh * 0.84);
+      g.fillRect(x1 - ww * 0.75, y1 - sh + sh * 0.02, ww * 1.5, Math.max(1, sh * 0.05));   // узел
     }
-    I.stroke(g, [[b[0] - w0 * 0.3, y + 1], [b[0], y - u * 0.5 * sc], [b[0] + w0 * 0.3, y + 1]], Math.max(1.2, u * 0.3 * sc), { seed: id + 500, taper: [0.2, 0.2], dry: 0.3, alpha: al, col: `rgb(${col})` });
-    return [b[0], y - u * 0.5 * sc, t[2]];
+    const tx = b[0] + lean, ty = b[1] - H;
+    if (sg > 0.45) {                                      // листья: узкие треугольники от верхнего узла
+      g.fillStyle = `rgba(${col},${al * 0.7})`;
+      for (const [ang, len] of [[-2.4, 1.0], [-0.6, 0.85], [-2.0, 0.7]]) {
+        const L = u * 2.2 * sc * 1.3 * len, ex = tx + Math.cos(ang) * L, ey = ty + sh * 0.3 + Math.sin(ang) * L * 0.6, nx = -Math.sin(ang) * w * 0.55, ny = Math.cos(ang) * w * 0.55;
+        g.beginPath(); g.moveTo(tx + nx, ty + sh * 0.3 + ny); g.lineTo(ex, ey); g.lineTo(tx - nx, ty + sh * 0.3 - ny); g.closePath(); g.fill();
+      }
+    }
+    g.fillStyle = `rgba(${col},${al * 0.25})`; g.fillRect(b[0] - w * 1.6, b[1] - 1, w * 3.2, 2);   // тень у основания
+    return [tx, ty, t[2]];
   },
   // ---------- CITY ----------
-  slot(id) {
-    let s = this.slots.get(id); if (s != null) return s;
-    const used = new Set(this.slots.values()), N = 9;
-    // спираль от центра; место выбирается по хэшу, чтобы город был «тот же» после переподключения
-    const sp = []; for (let r = 0; r <= 4; r++) for (let x = -r; x <= r; x++) for (let z = -r; z <= r; z++) if (Math.max(Math.abs(x), Math.abs(z)) === r) sp.push([x, z]);
-    const start = T.hash(id) % 9;
-    for (let k = 0; k < sp.length; k++) { const i = (k < 9 ? (start + k) % 9 : k); const key = sp[i][0] + ',' + sp[i][1]; if (!used.has(key)) { this.slots.set(id, key); return key; } }
-    this.slots.set(id, '0,0'); return '0,0';
-  },
   city(g, w, h, u, m, y0, portrait, dt, t) {
     this.camStep(dt);
     const c = this.cam;
@@ -337,8 +330,8 @@ T.views.push({
     }
     for (const tw of towers) {
       const { e, x, z, s, hh, sg } = tw, tr = BU.tr(e), fog = T.clamp(1.2 - (tw.d + 1) * 0.3, 0.3, 1) * T.clamp(e.h);
-      if (ink) {                                           // пагода: ярусов тем больше, чем сильнее сигнал
-        const bot = c.p(x, 0, z), top = this.pagoda(g, c, x, z, hh, sg, fog, tr, e.id, u);
+      if (ink) {                                           // бамбук: выше и больше колен — сильнее сигнал
+        const bot = c.p(x, 0, z), top = this.bamboo(g, c, x, z, hh, sg, fog, tr, e.id, u);
         T.hits.circle(top[0], top[1], Math.max(u * 1.6, top[2] * 0.06), { k: 'dev', id: e.id });
         T.hits.rect(bot[0] - bot[2] * 0.05, top[1], bot[2] * 0.1, Math.max(4, bot[1] - top[1]), { k: 'dev', id: e.id });
         if (e.id === this.sel) selP = { p: top, e };
@@ -375,7 +368,7 @@ T.views.push({
     T.bloom(this.cv);
     this.hud(g, w, h, u, m, y0, 'City', `${list.length} towers · height = signal`);
     if (selP) BU.card(g, selP.p, selP.e, u, w, h, y0 + u * 4);
-    T.footer(g, m, h - u * 2.4, w - 2 * m, u, 'drag: orbit  ·  tap tower: focus', 'roof orange = tracker');
+    T.footer(g, m, h - u * 2.4, w - 2 * m, u, 'drag: orbit  ·  tap tower: focus', (T.theme === 'sumi' ? 'red = tracker' : 'roof orange = tracker'));
   },
   // ---------- DEVICES ----------
   devices(g, w, h, u, m, y0, portrait, dt, t) {

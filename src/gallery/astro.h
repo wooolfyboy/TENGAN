@@ -24,6 +24,11 @@ double gmstDeg(double jd);             // звёздное время по Гр�
 struct RaDec { float ra, dec; };       // градусы
 struct AltAz { float alt, az; };       // градусы; az: 0 — север, 90 — восток
 AltAz  toAltAz(float raDeg, float decDeg, double jd, float latDeg, float lonDeg);
+// быстрый вариант для сотен звёзд за кадр: звёздное время и широта считаются один раз (skyFrame),
+// дальше — только float (у ESP32-S3 аппаратный float, а double считается программно и медленно)
+struct SkyFrame { float lst, sinLat, cosLat; };
+SkyFrame skyFrame(double jd, float latDeg, float lonDeg);
+AltAz  toAltAzF(const SkyFrame& f, float raDeg, float decDeg);
 
 // Солнце, Луна, планеты (точность — доли градуса, для картинки хватает)
 RaDec  sunRaDec(double jd);

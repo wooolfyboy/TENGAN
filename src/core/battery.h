@@ -25,5 +25,4 @@ void batTick(uint32_t now);                  // раз в 2 с перечиты�
 bool batUsb();                               // подключён USB
 bool batCharging();                          // идёт зарядка
 uint16_t batColor();
-void drawBatteryIcon(int x, int y);          // (x, y) — правый верхний угол
 void batSummary(char* out, size_t n);        // одна строка о питании

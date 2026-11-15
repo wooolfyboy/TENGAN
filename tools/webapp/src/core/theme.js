@@ -19,7 +19,6 @@
     FT: "'Noto Serif','Liberation Serif',Georgia,serif",
   };
   T.THEMES = { denko: DENKO, sumi: SUMI };
-  T.THEME_NAMES = { denko: ['電光', 'DENKO'], sumi: ['墨', 'SUMI'] };
   T.theme = 'denko';
   T.KANJI = { ov: '観', ble: '藍', wifi: '網', sub: '波', snd: '音', pc: '機', gal: '画' };
 
@@ -70,12 +69,12 @@
     if (!on) { for (const k in orig) Object.defineProperty(P, k, orig[k]); G.addColorStop = origAdd; return; }
     for (const prop of ['fillStyle', 'strokeStyle', 'shadowColor']) {
       const d = orig[prop];
-      Object.defineProperty(P, prop, { configurable: true, get() { return d.get.call(this); }, set(v) { d.set.call(this, typeof v === 'string' ? remap(v) : v); } });
+      Object.defineProperty(P, prop, { configurable: true, get() { return d.get.call(this); }, set(v) { d.set.call(this, typeof v === 'string' && T.theme !== 'raw' ? remap(v) : v); } });
     }
     { const d = orig.globalCompositeOperation;
       Object.defineProperty(P, 'globalCompositeOperation', { configurable: true, get() { return d.get.call(this); },
-        set(v) { d.set.call(this, (v === 'lighter' || v === 'screen') && !this.canvas.__raw ? 'multiply' : v); } }); }
-    G.addColorStop = function (o, c) { return origAdd.call(this, o, typeof c === 'string' ? remap(c) : c); };
+        set(v) { d.set.call(this, (v === 'lighter' || v === 'screen') && T.theme !== 'raw' && !this.canvas.__raw ? 'multiply' : v); } }); }
+    G.addColorStop = function (o, c) { return origAdd.call(this, o, typeof c === 'string' && T.theme !== 'raw' ? remap(c) : c); };
   };
 
   // ---- бумага (одна текстура на всё) ----
@@ -146,6 +145,7 @@
   };
   // капля туши: неровное пятно + ореол
   I.blot = (g, x, y, rad, a, seed, col = [27, 24, 20]) => {
+    if (!(rad > 0.05) || !isFinite(rad)) return;             // нулевой/отрицательный размер — нечего рисовать
     const r = rng(seed), h = g.createRadialGradient(x, y, rad * 0.4, x, y, rad * 2.6);
     const t = T.theme; T.theme = 'raw';
     h.addColorStop(0, `rgba(${col},${a * 0.22})`); h.addColorStop(1, `rgba(${col},0)`); g.fillStyle = h;
@@ -189,9 +189,12 @@
 
   // ---- эффекты сцены в SUMI ----
   const oBackdrop = T.backdrop, oFinish = T.finish, oBloom = T.bloom, oDust = T.dust, oHeader = T.header;
+  const paperPats = new WeakMap();
   T.backdrop = (g, W, H, fx, fy) => {
     if (T.theme !== 'sumi') return oBackdrop(g, W, H, fx, fy);
-    const t = T.theme; T.theme = 'raw'; g.fillStyle = g.createPattern(paperTex(), 'repeat'); T.theme = t; g.fillRect(0, 0, W, H);
+    let pat = paperPats.get(g);                          // узор бумаги — один на холст, не каждый кадр (иначе копятся текстуры)
+    if (!pat) { pat = g.createPattern(paperTex(), 'repeat'); paperPats.set(g, pat); }
+    const t = T.theme; T.theme = 'raw'; g.fillStyle = pat; T.theme = t; g.fillRect(0, 0, W, H);
   };
   T.finish = (g, W, H) => {
     if (T.theme !== 'sumi') return oFinish(g, W, H);

@@ -212,7 +212,8 @@ void drawChannels(uint32_t now) {
   if (best) spr.fillTriangle(chX(best), pb + 14, chX(best) - 4, pb + 19, chX(best) + 4, pb + 19, C_ACC());
 
   // «холмики» реальной ширины (20 / 40 МГц), слабые снизу, «жар» — сила
-  std::vector<std::pair<int, uint64_t>> v;
+  static std::vector<std::pair<int, uint64_t>> v;      // static: без выделения памяти каждый кадр
+  v.clear();
   for (auto& kv : g_aps) if (kv.second.ch >= 1 && kv.second.ch <= CH_MAX) v.push_back({ kv.second.rssi, kv.first });
   std::sort(v.begin(), v.end());
   for (auto& p : v) {
@@ -323,7 +324,8 @@ void drawClients(uint32_t now) {
   char buf[48];
   std::map<uint64_t, int> per;
   for (auto& kv : g_stas) per[kv.second.bssid]++;
-  std::vector<std::pair<int, uint64_t>> v;
+  static std::vector<std::pair<int, uint64_t>> v;
+  v.clear();
   for (auto& kv : per) v.push_back({ -kv.second, kv.first });
   std::sort(v.begin(), v.end());
 
@@ -388,7 +390,7 @@ void drawFind(uint32_t now) {
   int sum = 0, cnt = 0;
   for (int i = g_fSparkN - 1; i >= 0 && i >= g_fSparkN - 5; i--)
     if (g_fSpark[i] > -127) { sum += g_fSpark[i]; cnt++; }
-  bool lost = (cnt == 0) || (now - g_fLastHit > 4000);
+  bool lost = (cnt == 0) || (msSince(now, g_fLastHit) > 4000);
   int r = cnt ? sum / cnt : a.rssi;
   const char* word = lost ? "NO SIGNAL" : r > -55 ? "EXCELLENT" : r > -67 ? "GOOD" : r > -75 ? "FAIR" : r > -85 ? "WEAK" : "BAD";
   uint16_t col = lost ? UI_DIM() : heat(r);

@@ -26,15 +26,12 @@ def c_array(text, name):
 
 def data_js():
     """Данные с палки для планшета — берутся прямо из заголовков прошивки, чтобы не разъезжались:
-    звёзды, линии созвездий, контуры суши (gallery/astrodata.h) и печать 天眼 (core/seal.h)."""
+    звёзды, линии созвездий, контуры суши (gallery/astrodata.h)."""
     a = open(os.path.join(FW, "gallery", "astrodata.h"), encoding="utf-8").read()
-    seal = open(os.path.join(FW, "core", "seal.h"), encoding="utf-8").read()
     con = re.search(r"CON_NAMES\[\]\s*=\s*\{(.*?)\};", a, re.S).group(1)
     cons = [[int(r), int(d), ab, ru] for r, d, ab, ru in re.findall(r'\{\s*(-?\d+),\s*(-?\d+),\s*"([^"]*)",\s*"([^"]*)"\s*\}', con)]
     names = re.search(r"STAR_NAMES\[\]\s*=\s*\{(.*?)\};", a, re.S).group(1)
     snames = [[int(i), n] for i, n in re.findall(r'\{\s*(\d+),\s*"([^"]*)"\s*\}', names)]
-    w = int(re.search(r"SEAL_W\s*=\s*(\d+)", seal).group(1)); h = int(re.search(r"SEAL_H\s*=\s*(\d+)", seal).group(1))
-    bits = "".join("%02x" % v for v in c_array(seal, "SEAL_BITS"))
     d = {
         "stars": c_array(a, "STARS"),            # тройки: ra*100, dec*100, (mag+2)*10
         "starNames": snames,
@@ -43,7 +40,6 @@ def data_js():
         "con": cons,                             # [ra*100, dec*100, "Ori", "Орион"]
         "land": c_array(a, "LAND_PTS"),          # пары (как в gallery_sky.cpp)
         "landStart": c_array(a, "LAND_START"),
-        "seal": {"w": w, "h": h, "bits": bits},
     }
     return "T.DATA=" + json.dumps(d, ensure_ascii=False, separators=(",", ":")) + ";"
 

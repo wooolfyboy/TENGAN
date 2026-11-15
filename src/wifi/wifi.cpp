@@ -275,7 +275,7 @@ static void wifiHopTick(uint32_t now) {
     }
   }
 
-  uint32_t dt = now - g_hopMs;
+  uint32_t dt = msSince(now, g_hopMs);
   if (dt < HOP_MS) return;
   uint32_t m = g_pMgmt, d = g_pData;
   float sm = (m - g_lastMgmt) * 1000.0f / dt, sd = (d - g_lastData) * 1000.0f / dt;
@@ -292,7 +292,7 @@ static void wifiHopTick(uint32_t now) {
   esp_wifi_set_channel(g_hopCh, WIFI_SECOND_CHAN_NONE);
   g_hopMs = now;
 
-  if (now - g_actHistMs >= 1000) {
+  if (msSince(now, g_actHistMs) >= 1000) {
     g_actHistMs = now;
     float tot = 0;
     for (int c = 1; c <= CH_MAX; c++) tot += g_ppsMgmt[c] + g_ppsData[c];
@@ -301,7 +301,7 @@ static void wifiHopTick(uint32_t now) {
     for (auto it = g_stas.begin(); it != g_stas.end(); )
       if (msSince(now, it->second.t) > STA_REMEMBER_MS) it = g_stas.erase(it); else ++it;
     for (auto it = g_probes.begin(); it != g_probes.end(); )
-      if (now - it->second > STA_REMEMBER_MS) it = g_probes.erase(it); else ++it;
+      if (msSince(now, it->second) > STA_REMEMBER_MS) it = g_probes.erase(it); else ++it;
   }
 }
 

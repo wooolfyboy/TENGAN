@@ -72,6 +72,7 @@ void drawSky(uint32_t now) {
   bool timeOk = astroTimeKnown();
   double t = astroUnixNow();
   double jd = julianDate(t);
+  const SkyFrame sf = skyFrame(jd, c.lat, c.lon);       // один раз на кадр — дальше звёзды считаются быстро
 
   RaDec sun = sunRaDec(jd);
   AltAz sunA = toAltAz(sun.ra, sun.dec, jd, c.lat, c.lon);
@@ -91,7 +92,7 @@ void drawSky(uint32_t now) {
   for (int k = 0; k < N_CL; k++) {
     int px = 0, py = 0; bool have = false;
     for (int i = CL_START[k]; i < CL_START[k + 1]; i++) {
-      AltAz a = toAltAz(CL_PTS[i][0] / 100.0f, (int16_t)CL_PTS[i][1] / 100.0f, jd, c.lat, c.lon);
+      AltAz a = toAltAzF(sf, CL_PTS[i][0] / 100.0f, (int16_t)CL_PTS[i][1] / 100.0f);
       int x, y;
       if (domeXY(v, a.alt, a.az, x, y)) { if (have) spr.drawLine(px, py, x, y, clCol); px = x; py = y; have = true; }
       else have = false;
@@ -102,7 +103,7 @@ void drawSky(uint32_t now) {
   for (int i = 0; i < N_STARS; i++) {
     float mag = STARS[i].mag / 10.0f - 2;
     if (mag > magLimit) break;                                   // отсортированы по яркости
-    AltAz a = toAltAz(STARS[i].ra / 100.0f, STARS[i].dec / 100.0f, jd, c.lat, c.lon);
+    AltAz a = toAltAzF(sf, STARS[i].ra / 100.0f, STARS[i].dec / 100.0f);
     int x, y;
     if (!domeXY(v, a.alt, a.az, x, y)) continue;
     if (mag < 0.5f)      spr.fillCircle(x, y, 2, C_HOT());
@@ -131,7 +132,7 @@ void drawSky(uint32_t now) {
   if (s_skyLabels == 0) {
     spr.setTextColor(scale565(C_ACC(), 70));
     for (int i = 0; i < N_CON_NAMES; i++) {
-      AltAz a = toAltAz(CON_NAMES[i].ra / 100.0f, CON_NAMES[i].dec / 100.0f, jd, c.lat, c.lon);
+      AltAz a = toAltAzF(sf, CON_NAMES[i].ra / 100.0f, CON_NAMES[i].dec / 100.0f);
       int x, y;
       if (a.alt > 12 && domeXY(v, a.alt, a.az, x, y)) label(CON_NAMES[i].ab, x, y);
     }
@@ -139,7 +140,7 @@ void drawSky(uint32_t now) {
     spr.setTextColor(UI_LABEL());
     for (int i = 0; i < N_STAR_NAMES; i++) {
       const AStar& s = STARS[STAR_NAMES[i].star];
-      AltAz a = toAltAz(s.ra / 100.0f, s.dec / 100.0f, jd, c.lat, c.lon);
+      AltAz a = toAltAzF(sf, s.ra / 100.0f, s.dec / 100.0f);
       int x, y;
       if (a.alt > 5 && domeXY(v, a.alt, a.az, x, y)) label(STAR_NAMES[i].name, x, y - 7);
     }
@@ -286,11 +287,22 @@ void drawGlobe(uint32_t now) {
   for (int i = 0; i < g_nSats; i++) {
     if (!spOk[i]) continue;
     bool main = (i == (satIdx >= 0 ? satIdx : 0));
+    // след пересчитываем раз в 20 с (61 расчёт орбиты в double — дорого для каждого кадра);
+    // за 20 с он сдвигается незаметно, а текущая точка спутника считается каждый кадр
+    static struct { double t = -1e12, epoch = 0; int n = 0; float la[61], lo[61]; } trk[SAT_MAX];
+    auto& tc = trk[i];
+    if (fabs(t - tc.t) > 20 || tc.epoch != g_sats[i].epochUnix) {
+      tc.t = t; tc.epoch = g_sats[i].epochUnix; tc.n = 0;
+      for (int m = -30; m <= 90; m += 2) {
+        SatPos q; if (!satPos(g_sats[i], t + m * 60, q)) break;
+        tc.la[tc.n] = q.lat; tc.lo[tc.n] = q.lon; tc.n++;
+      }
+    }
     int px = 0, py = 0; bool have = false;
-    for (int m = -30; m <= 90; m += 2) {
-      SatPos q; if (!satPos(g_sats[i], t + m * 60, q)) break;
+    for (int k = 0; k < tc.n; k++) {
+      const int m = -30 + k * 2;
       int x, y;
-      if (globeXY(g, q.lat, q.lon, x, y)) {
+      if (globeXY(g, tc.la[k], tc.lo[k], x, y)) {
         if (have) spr.drawLine(px, py, x, y, m < 0 ? scale565(C_ACC(), 35) : (main ? C_ACC() : scale565(C_ACC(), 55)));
         px = x; py = y; have = true;
       } else have = false;

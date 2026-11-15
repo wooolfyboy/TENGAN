@@ -168,7 +168,8 @@ void drawScope(const std::vector<Blip>& bl) {
   txt("5M", cx + 3, cy - 2 * maxR / 3 + 2, 1);
 
   // цели: слабые снизу, сильные поверх; метки — тревога
-  std::vector<int> idx(bl.size());
+  static std::vector<int> idx;                         // static: без выделения памяти каждый кадр
+  idx.resize(bl.size());
   for (size_t i = 0; i < bl.size(); i++) idx[i] = (int)i;
   std::sort(idx.begin(), idx.end(), [&](int a, int b) { return bl[a].rssi < bl[b].rssi; });
   for (int i : idx) {

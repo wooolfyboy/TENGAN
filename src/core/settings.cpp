@@ -2,6 +2,7 @@
 //  settings.cpp — настройки и их экран
 // ============================================================
 #include <Preferences.h>
+#include "core/timeutil.h"
 #include "core/settings.h"
 #include "core/display.h"
 #include "core/theme.h"
@@ -134,7 +135,7 @@ void saveSettings() {
 }
 
 void settingsSaveNow() { if (g_setDirty) saveSettings(); }
-void settingsAutosave(uint32_t now) { if (g_setDirty && now - g_setChangedMs > 3000) saveSettings(); }
+void settingsAutosave(uint32_t now) { if (g_setDirty && msSince(now, g_setChangedMs) > 3000) saveSettings(); }
 void settingsBegin() { loadSettings(); applyBrightness(); }
 
 static int curItem() {

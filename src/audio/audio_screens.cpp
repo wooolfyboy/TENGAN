@@ -4,6 +4,7 @@
 //  BARS (спектр) · REACTOR (анимация) · LEVEL (шумомер) · SCOPE (волна)
 // ============================================================
 #include "audio/audio_model.h"
+#include "core/timeutil.h"
 #include "core/display.h"
 #include "core/theme.h"
 #include "core/settings.h"
@@ -172,7 +173,7 @@ void drawLevel(uint32_t now) {
 // ============================================================
 void drawWave(uint32_t now) {
   int W = spr.width();
-  char buf[24];
+  char buf[40];                                  // «AUTO GAIN X16000  RAW 32767  L» — 30 символов
   spr.fillSprite(C_BG());
   hzStr(g_au.domHz, buf, sizeof(buf));
   uiHeader("Waveform", src(g_au.energy > 0.15f ? buf : "listening"));
@@ -207,7 +208,6 @@ void drawWave(uint32_t now) {
 }
 
 void drawMicMissing() {
-  int W = spr.width();
   char buf[48];
   spr.fillSprite(C_BG());
   if (g_micDiag.disabled) {
@@ -294,7 +294,7 @@ void drawTerrain(uint32_t now) {
   if (!s_trH) return;
   const int W = spr.width();
   g_fastFrame = true;
-  if (now - s_trLast >= 45) { s_trLast = now; terrainPush(); }
+  if (msSince(now, s_trLast) >= 45) { s_trLast = now; terrainPush(); }
   char buf[40], hz[16];
   spr.fillSprite(C_BG());
   hzStr(g_au.domHz, hz, sizeof(hz));

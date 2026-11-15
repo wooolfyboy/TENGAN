@@ -4,10 +4,14 @@ T._cvs = new Set();
 T.canvas = (parent, maxDpr = 3) => {
   const cv = document.createElement('canvas');
   parent.appendChild(cv);
-  const g = cv.getContext('2d');
+  // непрозрачный холст (alpha:false): браузеру не нужно смешивать его со страницей — дешевле (MDN «Optimizing canvas»).
+  // Каждый вид сам заливает фон целиком, прозрачных мест нет.
+  const g = cv.getContext('2d', { alpha: false });
   const o = { cv, g, w: 0, h: 0, dpr: 1 };
   const fit = () => {
-    const r = parent.getBoundingClientRect(), d = Math.min(window.devicePixelRatio || 1, maxDpr, T.RES / Math.max(1, r.width, r.height));
+    const r = parent.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2) return;           // раздел спрятан — холст не трогаем (не терять картинку и память на пересоздание)
+    const d = Math.min(window.devicePixelRatio || 1, maxDpr, T.RES / Math.max(1, r.width, r.height));
     const W = Math.max(1, Math.round(r.width * d)), H = Math.max(1, Math.round(r.height * d));
     if (W !== cv.width || H !== cv.height) { cv.width = W; cv.height = H; }
     o.w = r.width; o.h = r.height; o.dpr = d;

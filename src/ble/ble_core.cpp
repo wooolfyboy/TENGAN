@@ -256,7 +256,8 @@ static int steadyRssi(uint32_t id, int rs, uint32_t now, float k) {
 
 // ---------- каждый кадр: адреса -> физические устройства ----------
 void bleUpdate(uint32_t now) {
-  g_ents.clear();
+  // узлы карты не пересоздаём каждый кадр (меньше работы куче): обнуляем, а кого не нашли — убираем ниже
+  for (auto& kv : g_ents) memset(&kv.second, 0, sizeof(Ent));
   g_sensSnap.clear();
   g_snap.clear();
   if (g_detFor != g_sel) { g_detValid = false; g_detFor = g_sel; }
@@ -276,7 +277,7 @@ void bleUpdate(uint32_t now) {
       if (d.t >= e.t) { e.t = d.t; e.rssi = d.rssi; e.rssiS = d.rssiS; e.key = it->first; }
       if (!e.first || d.first < e.first) e.first = d.first;
       if (d.pkts > e.pkts) e.pkts = d.pkts;
-      e.nMacs++;
+      if (e.nMacs < 255) e.nMacs++;                // uint8_t: не перекручиваться в 0
       if (d.type != T_UNKNOWN) e.type = d.type;
       if (d.vscore > e.vscore) { e.cat = d.cat; e.vkind = d.vkind; e.vcode = d.vcode; e.vscore = d.vscore; }
       if (d.name[0] && !e.name[0]) memcpy(e.name, d.name, sizeof(e.name));
@@ -293,6 +294,8 @@ void bleUpdate(uint32_t now) {
     }
     xSemaphoreGive(g_lock);
   }
+  for (auto it = g_ents.begin(); it != g_ents.end(); )   // в этом кадре не встретились — ушли
+    if (it->second.t == 0) it = g_ents.erase(it); else ++it;
 
   // спокойные значения для всех экранов
   float dt = g_steadyMs ? msSince(now, g_steadyMs) / 1000.0f : 0.0f;
@@ -326,8 +329,8 @@ static void listUpdate(uint32_t now) {
   //  - пока крутишь колесо или открыты подробности — порядок заморожен;
   //  - соседи меняются местами, только если разница сигнала > ORDER_HYST_DB;
   //  - новые устройства вставляются на своё место, ушедшие убираются.
-  bool frozen = g_detail || (now - g_lastTouch < ORDER_FREEZE);
-  if (g_order.empty() || (!frozen && now - g_orderMs >= ORDER_EVERY)) {
+  bool frozen = g_detail || (msSince(now, g_lastTouch) < ORDER_FREEZE);
+  if (g_order.empty() || (!frozen && msSince(now, g_orderMs) >= ORDER_EVERY)) {
     auto rs = [&](uint32_t id) { return g_ents[id].rssiS; };
     std::vector<uint32_t> o;
     o.reserve(g_ents.size());
@@ -372,7 +375,7 @@ static void drawListOrDetail(uint32_t now) {
   bool inMap = it != g_ents.end();
   // история сигнала выбранного: точка раз в 0.5 с
   if (g_sparkEnt != g_sel) { g_sparkEnt = g_sel; g_sparkN = 0; g_sparkMs = 0; }
-  if (now - g_sparkMs >= 500) {
+  if (msSince(now, g_sparkMs) >= 500) {
     g_sparkMs = now;
     int8_t v = (inMap && msSince(now, it->second.t) < 3000) ? (int8_t)it->second.rssi : (int8_t)-127;
     if (g_sparkN < SPARK_N) g_spark[g_sparkN++] = v;
@@ -457,6 +460,7 @@ const Section bleSection = {
 void bleJson(String& o) {
   uint32_t now = millis();
   std::vector<std::pair<uint32_t, const Ent*>> v;
+  v.reserve(g_ents.size());
   for (auto& kv : g_ents) v.push_back({ kv.first, &kv.second });
   std::sort(v.begin(), v.end(), [](const std::pair<uint32_t, const Ent*>& a, const std::pair<uint32_t, const Ent*>& b) { return a.second->rssiS > b.second->rssiS; });
   if (v.size() > 150) v.resize(150);
@@ -564,6 +568,7 @@ void bleLowDuty(bool low) {
 void bleStreamJson(String& o) {
   uint32_t now = millis();
   std::vector<std::pair<uint32_t, const Ent*>> v;
+  v.reserve(g_ents.size());
   for (auto& kv : g_ents) v.push_back({ kv.first, &kv.second });
   std::sort(v.begin(), v.end(), [](const std::pair<uint32_t, const Ent*>& a, const std::pair<uint32_t, const Ent*>& b) { return a.second->rssiS > b.second->rssiS; });
   if (v.size() > 80) v.resize(80);

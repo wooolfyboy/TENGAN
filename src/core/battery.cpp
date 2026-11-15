@@ -7,6 +7,7 @@
 //  Шина I2C: SDA 8, SCL 18 (по utilities.h из репозитория LilyGO).
 // ============================================================
 #include <Wire.h>
+#include "core/timeutil.h"
 #include "core/battery.h"
 #include "core/display.h"
 #include "core/theme.h"
@@ -62,7 +63,7 @@ void batBegin() {
 }
 
 void batTick(uint32_t now) {
-  if (now - g_bat.t < 2000) return;
+  if (msSince(now, g_bat.t) < 2000) return;
   g_bat.t = now;
   batRead();
 }
@@ -77,26 +78,6 @@ uint16_t batColor() {
   return C(235, 80, 80);
 }
 
-// маленький значок батареи; (x, y) — правый верхний угол
-void drawBatteryIcon(int x, int y) {
-  if (!g_bat.ok) return;
-  uint16_t c = batColor();
-  int w = 22, h = 11, bx = x - w - 2;
-  spr.drawRoundRect(bx, y, w, h, 2, C(140, 140, 155));
-  spr.fillRect(bx + w, y + 3, 2, h - 6, C(140, 140, 155));
-  int fw = (w - 4) * g_bat.soc / 100;
-  if (fw > 0) spr.fillRect(bx + 2, y + 2, fw, h - 4, c);
-  if (batCharging()) {                          // молния
-    int cx = bx + w / 2, cy = y + h / 2;
-    spr.fillTriangle(cx + 1, y + 1, cx - 3, cy + 1, cx, cy + 1, C_HOT());
-    spr.fillTriangle(cx - 1, y + h - 1, cx + 3, cy - 1, cx, cy - 1, C_HOT());
-  }
-  char buf[8];
-  sprintf(buf, "%d%%", g_bat.soc);
-  spr.setTextDatum(TR_DATUM);
-  spr.setTextColor(c, C_BG());
-  txt(buf, bx - 4, y + 2, 1);
-}
 
 // одна строка о питании (для настроек)
 void batSummary(char* out, size_t n) {

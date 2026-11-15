@@ -59,6 +59,24 @@ AltAz toAltAz(float ra, float dec, double jd, float lat, float lon) {
   return r;
 }
 
+SkyFrame skyFrame(double jd, float lat, float lon) {
+  SkyFrame f;
+  f.lst = (float)norm360(gmstDeg(jd) + lon);           // местное звёздное время, градусы
+  f.sinLat = sinf(lat * (float)D2R); f.cosLat = cosf(lat * (float)D2R);
+  return f;
+}
+AltAz toAltAzF(const SkyFrame& f, float ra, float dec) {
+  const float d2r = (float)D2R, r2d = (float)R2D;
+  float H = (f.lst - ra) * d2r, d = dec * d2r;
+  float sd = sinf(d), cd = cosf(d), cH = cosf(H);
+  float sa = f.sinLat * sd + f.cosLat * cd * cH;
+  float alt = asinf(sa < -1 ? -1 : sa > 1 ? 1 : sa);
+  float az = atan2f(-cd * sinf(H), sd * f.cosLat - cd * f.sinLat * cH) * r2d;
+  if (az < 0) az += 360;
+  AltAz r = { alt * r2d, az };
+  return r;
+}
+
 // ---------- эклиптика -> экватор ----------
 static RaDec eclToEq(double lonDeg, double latDeg) {
   const double eps = 23.43928 * D2R;

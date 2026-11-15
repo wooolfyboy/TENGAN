@@ -175,7 +175,7 @@ static void auUpdate(uint32_t now) {
   b = s_blk;
   portEXIT_CRITICAL(&s_mux);
   // автопроверка канала: 1.5 с одной «немой» тишины на левом — пробуем правый
-  if (g_micDiag.slot == 0 && now - s_micStartMs > 1500 && s_maxRaw < 8) {
+  if (g_micDiag.slot == 0 && msSince(now, s_micStartMs) > 1500 && s_maxRaw < 8) {
     micStop();
     micStart(1);
     return;
@@ -203,7 +203,7 @@ static void auUpdate(uint32_t now) {
   g_au.energy = e / AU_BANDS;
   g_auMax = max(g_auMax, b.level);
   g_auAvg = g_auAvg * 0.97f + b.level * 0.03f;
-  if (now - s_histMs >= 500) {
+  if (msSince(now, s_histMs) >= 500) {
     s_histMs = now;
     if (g_auHistN < AU_HIST) g_auHist[g_auHistN++] = b.level;
     else { memmove(g_auHist, g_auHist + 1, sizeof(float) * (AU_HIST - 1)); g_auHist[AU_HIST - 1] = b.level; }
@@ -317,7 +317,7 @@ void audioPcFrame(float level, int hz, const uint8_t* bands, const int8_t* wave,
   g_auXYStereo = stereo;
   g_auMax = max(g_auMax, level);
   g_auAvg = g_auAvg * 0.97f + level * 0.03f;
-  if (now - s_histMs >= 500) {
+  if (msSince(now, s_histMs) >= 500) {
     s_histMs = now;
     if (g_auHistN < AU_HIST) g_auHist[g_auHistN++] = level;
     else { memmove(g_auHist, g_auHist + 1, sizeof(float) * (AU_HIST - 1)); g_auHist[AU_HIST - 1] = level; }
@@ -446,14 +446,17 @@ void audioStreamJson(String& o) {
   o.reserve(300);
   o = "{\"en\":"; o += g_micEn ? 1 : 0; o += ",\"ok\":"; o += live ? 1 : 0;
   if (live) {
+    // ~25 раз в секунду: собираем в буфер на стеке и добавляем одним куском (без временных String)
     static const char HX[] = "0123456789abcdef";
-    o += ",\"lv\":"; o += String(g_au.level, 1); o += ",\"pk\":"; o += String(g_au.peak, 1);
-    o += ",\"hz\":"; o += (int)g_au.domHz; o += ",\"e\":"; o += String(g_au.energy, 2);
-    o += ",\"b\":\"";
-    for (int k = 0; k < AU_BANDS; k++) { int v = constrain((int)(g_au.bands[k] * 255), 0, 255); o += HX[v >> 4]; o += HX[v & 15]; }
-    o += "\",\"w\":\"";
-    for (int i = 0; i < 64; i++) { int v = constrain(g_au.wave[i * AU_WAVE / 64] >> 8, -127, 127); uint8_t u = (uint8_t)(int8_t)v; o += HX[u >> 4]; o += HX[u & 15]; }
-    o += '"';
+    char buf[320];
+    int n = snprintf(buf, sizeof(buf), ",\"lv\":%.1f,\"pk\":%.1f,\"hz\":%d,\"e\":%.2f,\"b\":\"",
+                     constrain(g_au.level, -200.0f, 50.0f), constrain(g_au.peak, -200.0f, 50.0f),
+                     constrain((int)g_au.domHz, 0, 99999), constrain(g_au.energy, 0.0f, 99.0f));   // числа ограничены — буфер не переполнится
+    for (int k = 0; k < AU_BANDS; k++) { int v = constrain((int)(g_au.bands[k] * 255), 0, 255); buf[n++] = HX[v >> 4]; buf[n++] = HX[v & 15]; }
+    buf[n++] = '"'; buf[n++] = ','; buf[n++] = '"'; buf[n++] = 'w'; buf[n++] = '"'; buf[n++] = ':'; buf[n++] = '"';
+    for (int i = 0; i < 64; i++) { int v = constrain(g_au.wave[i * AU_WAVE / 64] >> 8, -127, 127); uint8_t u = (uint8_t)(int8_t)v; buf[n++] = HX[u >> 4]; buf[n++] = HX[u & 15]; }
+    buf[n++] = '"'; buf[n] = 0;
+    o += buf;
   }
   o += '}';
 }

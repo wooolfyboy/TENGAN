@@ -12,6 +12,7 @@
 #include "subghz/subghz.h"
 #include "subghz/cc1101.h"
 #include "subghz/subghz_model.h"
+#include "core/timeutil.h"
 #include "core/board.h"
 #include "core/display.h"
 #include "core/theme.h"
@@ -219,7 +220,7 @@ void subJson(String& o) {
     o += "],\"ev\":[";
     for (int i = g_evN - 1; i >= 0; i--) {
       if (i < g_evN - 1) o += ',';
-      o += "{\"ago\":"; o += (now - g_ev[i].t) / 1000; o += ",\"ms\":"; o += g_ev[i].durMs; o += ",\"pk\":"; o += g_ev[i].peak; o += '}';
+      o += "{\"ago\":"; o += msSince(now, g_ev[i].t) / 1000; o += ",\"ms\":"; o += g_ev[i].durMs; o += ",\"pk\":"; o += g_ev[i].peak; o += '}';
     }
     o += ']';
   }
