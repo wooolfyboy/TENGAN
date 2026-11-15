@@ -22,6 +22,8 @@ IPA = "/usr/share/fonts/opentype/ipafont-gothic/ipag.ttf"
 
 ASCII = "".join(chr(c) for c in range(0x20, 0x7F))
 EXTRA = "°·—–…‹›«»×←→↑↓▲▼◆◇●○■□♪⚡±≈≤≥µ№™✓✕▸◂"
+# печать и знаки разделов темы SUMI (IPAGothic)
+SEAL_TEXT = "天眼観藍網波音機画街始動結棒数記近良選山水走査概並遠空星球命振時間解析受信"
 CYR = "".join(chr(c) for c in range(0x410, 0x450)) + "ЁёІіЇїЄєҐґ"
 
 
@@ -53,7 +55,7 @@ def main():
         face("JetBrains Mono", 500, woff2(os.path.join(FONTS, "JetBrainsMono-Medium.ttf"), ASCII + EXTRA + CYR)),
     ]
     if os.path.exists(IPA):
-        parts.append(face("Tengan Seal", 400, woff2(IPA, "天眼")))
+        parts.append(face("Tengan Seal", 400, woff2(IPA, SEAL_TEXT)))
     else:
         print("нет %s — печать 天眼 останется системным шрифтом" % IPA)
     css = "/* АВТОМАТИЧЕСКИ СГЕНЕРИРОВАНО tools/webapp/make_fonts.py — шрифты OFL; печать 天眼 — IPAGothic (IPA Font License), см. fonts/ */\n" + "\n".join(parts) + "\n"

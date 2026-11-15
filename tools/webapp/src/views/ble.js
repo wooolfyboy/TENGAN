@@ -76,6 +76,46 @@ BU.scene = (g, cam, sw, opt) => {
   return selTop;
 };
 
+// ---- SUMI: тот же радар тушью — энсо, размывка луча, капли туши на полу ----
+BU.sceneInk = (g, cam, sw, opt) => {
+  const { u, t } = opt, I = T.ink, s = sw.a;
+  const ell = (r, N = 72) => { const p = []; for (let k = 0; k <= N; k++) { const a = k / N * T.TAU, q = cam.p(Math.cos(a) * r, 0, Math.sin(a) * r); p.push([q[0], q[1]]); } return p; };
+  for (let i = 1; i <= 3; i++) I.pen(g, ell(i / 4), 1, I.ink(0.16));
+  // крестовина — две сухие черты
+  { const a = cam.p(-1, 0, 0), b = cam.p(1, 0, 0), c = cam.p(0, 0, -1), d = cam.p(0, 0, 1);
+    I.stroke(g, [[a[0], a[1]], [b[0], b[1]]], u * 0.22, { seed: 13, taper: [0.2, 0.2], dry: 0.9, alpha: 0.28 });
+    I.stroke(g, [[c[0], c[1]], [d[0], d[1]]], u * 0.22, { seed: 14, taper: [0.2, 0.2], dry: 0.9, alpha: 0.28 }); }
+  // размывка луча: клин тушью, растекается назад
+  const tail = 1.5, N = 30, o = cam.p(0, 0, 0);
+  for (let i = 0; i < N; i++) {
+    const a0 = s - tail * (1 - i / N), a1 = s - tail * (1 - (i + 1) / N), v = (i + 1) / N, p = cam.p(Math.cos(a0), 0, Math.sin(a0)), q = cam.p(Math.cos(a1), 0, Math.sin(a1));
+    I.raw(g, 'fillStyle', I.ink(0.16 * v * v)); g.beginPath(); g.moveTo(o[0], o[1]); g.lineTo(p[0], p[1]); g.lineTo(q[0], q[1]); g.closePath(); g.fill();
+  }
+  { const b = cam.p(Math.cos(s), 0, Math.sin(s)), m = cam.p(Math.cos(s) * 0.5, 0, Math.sin(s) * 0.5);
+    I.stroke(g, [[o[0], o[1]], [m[0], m[1]], [b[0], b[1]]], u * 0.35, { seed: 77, taper: [0.02, 0.5], dry: 0.4, alpha: 0.8 }); }
+  // энсо — внешнее кольцо одним мазком (точки в перспективе)
+  { const pts = []; for (let k = 0; k <= 110; k++) { const a = -2.2 + T.TAU * 0.94 * k / 110, rr = 1.04 * (1 + 0.012 * Math.sin(k * 0.5)), q = cam.p(Math.cos(a) * rr, 0, Math.sin(a) * rr); pts.push([q[0], q[1]]); }
+    I.stroke(g, pts, u * 0.75, { seed: 8, taper: [0.08, 0.3], dry: 0.9, alpha: 0.9 }); }
+  for (let a = 0; a < 360; a += 30) { const r = a * Math.PI / 180, p = cam.p(Math.cos(r) * 1.1, 0, Math.sin(r) * 1.1), q = cam.p(Math.cos(r) * 1.16, 0, Math.sin(r) * 1.16); I.stroke(g, [[p[0], p[1]], [q[0], q[1]]], u * 0.25, { seed: a, taper: [0.3, 0.5], dry: 0, alpha: 0.6 }); }
+  // капли: дальние раньше
+  const list = BU.list(), rank = [...list].sort((a, b) => b.rs - a.rs);
+  const items = list.map(e => { const r = BU.rad(e.rs), a = BU.ang(e.id), x = Math.cos(a) * r, z = Math.sin(a) * r; return { e, x, z, p: cam.p(x, 0, z) }; }).sort((a, b) => b.p[3] - a.p[3]);
+  let selTop = null;
+  for (const it of items) {
+    const e = it.e, sg = T.pct(e.rs), p = it.p, tr = BU.tr(e), col = tr ? [194, 58, 43] : [27, 24, 20];
+    const since = (((s - BU.ang(e.id)) % T.TAU) + T.TAU) % T.TAU / T.TAU, fresh = 1 - since, pa = sw.ping(e.id, t);
+    const rad = p[2] * (0.012 + 0.02 * sg);
+    if (pa < 1.3) { I.raw(g, 'strokeStyle', `rgba(${col},${0.4 * (1 - pa / 1.3) * e.h})`); g.lineWidth = 1.2; g.beginPath(); g.ellipse(p[0], p[1], rad + p[2] * pa * 0.12, (rad + p[2] * pa * 0.12) * Math.sin(cam.pitch), 0, 0, T.TAU); g.stroke(); }
+    const a = (0.45 + 0.5 * Math.max(sg * 0.6, fresh)) * e.h;
+    g.save(); g.translate(p[0], p[1]); g.scale(1, 0.55 + 0.45 * Math.sin(cam.pitch)); I.blot(g, 0, 0, rad, a, (e.id % 997) + 3, col); g.restore();
+    if (opt.hits) T.hits.circle(p[0], p[1], Math.max(u * 1.6, rad * 2.5), { k: 'dev', id: e.id });
+    if (e.id === opt.sel) { selTop = { p: [p[0], p[1] - rad, p[2]], e }; I.hanko(g, p[0] - u * 1.2, p[1] - u * 1.2, u * 2.4, [''], { filled: false, seed: 5 }); }
+    else if (opt.labels && rank.indexOf(e) < opt.labels && opt.sel == null) { g.font = `500 ${u * 0.72}px ${T.FC}`; T.txt(g, T.fit(g, BU.label(e), u * 9), p[0] + rad + u * 0.6, p[1] - u * 0.4, u * 0.75, tr ? T.C.alert : T.C.label, 'c'); }
+  }
+  return selTop;
+};
+BU.sceneAny = (g, cam, sw, opt) => (T.theme === 'sumi' ? BU.sceneInk : BU.scene)(g, cam, sw, opt);
+
 // выноска-карточка у цели (Scope и City)
 BU.card = (g, p, e, u, W, H, top) => {
   const sg = T.pct(e.rs), bw = u * 15, bh = u * 8.2;
@@ -202,7 +242,7 @@ T.views.push({
     this.camStep(dt);
     const c = this.cam;
     c.frame(portrait ? w * 0.5 : w * 0.37, portrait ? y0 + (h - y0) * 0.27 : y0 + (h - y0) * 0.55, portrait ? w * 0.9 : Math.min((h - y0) * 1.42, w * 0.95));
-    const selTop = BU.scene(g, c, this.sw, { u, t, sel: this.sel, labels: 3, hits: true });
+    const selTop = BU.sceneAny(g, c, this.sw, { u, t, sel: this.sel, labels: 3, hits: true });
     this.dust.draw(g, c);
     T.bloom(this.cv);
     const list = BU.list(), trk = list.some(BU.tr);
@@ -219,6 +259,27 @@ T.views.push({
     }
     if (selTop) BU.card(g, selTop.p, selTop.e, u, portrait ? w : w * 0.7, h, y0 + u * 4);
     T.footer(g, m, h - u * 2.4, w - 2 * m, u, 'drag: orbit  ·  tap pillar: focus', 'height = signal · ring = sweep hit');
+  },
+  // пагода тушью (SUMI): корпус-размывка, крыши-мазки с загнутыми краями, конёк. Возвращает точку верха
+  pagoda(g, c, x, z, hh, sg, fog, tr, id, u) {
+    const I = T.ink, b = c.p(x, 0, z), t = c.p(x, Math.max(hh, 0.04), z), sc = b[2] / 260, col = tr ? [194, 58, 43] : [27, 24, 20], al = 0.3 + 0.65 * fog;
+    const tiers = 1 + Math.round(sg * sg * 4), H = Math.max(u * 1.2, b[1] - t[1]), th = H / tiers, w0 = u * (1.5 + 1.2 * sg) * sc * 1.4;
+    let y = b[1];
+    I.stroke(g, [[b[0] - w0 * 0.9, y + 1], [b[0] + w0 * 0.9, y]], u * 0.35 * sc, { seed: id + 200, taper: [0.2, 0.4], dry: 0.5, alpha: al * 0.6 });
+    for (let k = 0; k < tiers; k++) {
+      const w = w0 * (1 - k * 0.12), bw = w * 0.62, top = y - th;
+      const gr = g.createLinearGradient(0, top, 0, y); I.raw(g, 'fillStyle', 'rgba(0,0,0,0)');
+      const tt = T.theme; T.theme = 'raw'; gr.addColorStop(0, `rgba(${col},${al * 0.32})`); gr.addColorStop(1, `rgba(${col},${al * 0.12})`); g.fillStyle = gr; T.theme = tt;
+      g.fillRect(b[0] - bw / 2, top + th * 0.12, bw, th * 0.88);
+      I.pen(g, [[b[0] - bw / 2, y], [b[0] - bw / 2, top + th * 0.14]], 1, `rgba(${col},${al * 0.7})`);
+      I.pen(g, [[b[0] + bw / 2, y], [b[0] + bw / 2, top + th * 0.14]], 1, `rgba(${col},${al * 0.7})`);
+      const ey = top + th * 0.06, lift = Math.min(th * 0.3, u * 0.5 * sc * 1.4);
+      I.stroke(g, [[b[0] - w, ey - lift], [b[0] - w * 0.7, ey + lift * 0.1], [b[0], ey - lift * 0.1], [b[0] + w * 0.7, ey + lift * 0.1], [b[0] + w, ey - lift]],
+        Math.max(1.5, u * 0.42 * sc * 1.3), { seed: id * 13 + k, taper: [0.12, 0.12], dry: 0.6, alpha: al, col: `rgb(${col})` });
+      y = top;
+    }
+    I.stroke(g, [[b[0] - w0 * 0.3, y + 1], [b[0], y - u * 0.5 * sc], [b[0] + w0 * 0.3, y + 1]], Math.max(1.2, u * 0.3 * sc), { seed: id + 500, taper: [0.2, 0.2], dry: 0.3, alpha: al, col: `rgb(${col})` });
+    return [b[0], y - u * 0.5 * sc, t[2]];
   },
   // ---------- CITY ----------
   slot(id) {
@@ -269,8 +330,21 @@ T.views.push({
       return { e, x, z, s: SZ[e.type] || 0.055, hh: e._ch, sg, d: c.p(x, 0, z)[3] };
     }).sort((a, b) => b.d - a.d);
     let selP = null; const labels = [];
+    const ink = T.theme === 'sumi';
+    if (ink) {                                             // тушь: далёкие горы в тумане за городом
+      const far = c.p(Math.sin(c.yaw) * 1.7, 0, Math.cos(c.yaw) * 1.7);     // за дальним краем колец
+      T.ink.mountains(g, w, Math.max(y0 + u * 8, far[1] - u * 0.5), u);
+    }
     for (const tw of towers) {
       const { e, x, z, s, hh, sg } = tw, tr = BU.tr(e), fog = T.clamp(1.2 - (tw.d + 1) * 0.3, 0.3, 1) * T.clamp(e.h);
+      if (ink) {                                           // пагода: ярусов тем больше, чем сильнее сигнал
+        const bot = c.p(x, 0, z), top = this.pagoda(g, c, x, z, hh, sg, fog, tr, e.id, u);
+        T.hits.circle(top[0], top[1], Math.max(u * 1.6, top[2] * 0.06), { k: 'dev', id: e.id });
+        T.hits.rect(bot[0] - bot[2] * 0.05, top[1], bot[2] * 0.1, Math.max(4, bot[1] - top[1]), { k: 'dev', id: e.id });
+        if (e.id === this.sel) selP = { p: top, e };
+        else if (this.sel == null && rank.indexOf(e) < 5) labels.push([top, e]);
+        continue;
+      }
       const col = BU.rgb(e, 0.35 + 0.65 * sg);
       const P = [[-s, -s], [s, -s], [s, s], [-s, s]].map(([a, b]) => [c.p(x + a, 0, z + b), c.p(x + a, hh, z + b)]);
       // боковые грани: видимые (обход по часовой на экране), дальние раньше

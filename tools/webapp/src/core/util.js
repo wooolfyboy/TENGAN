@@ -54,10 +54,10 @@ T.steady = (db = 4, tau = 0.7) => ({
 
 // ---- текст ----
 T.txt = (g, s, x, y, px, col, f = 'm', al = 'left', bl = 'alphabetic') => {
-  g.font = f === 't' ? `600 ${px}px ${T.FT}` : f === 'c' ? `500 ${px}px ${T.FC}` : `${px}px ${T.FM}`;
+  g.font = f === 't' ? `600 ${px}px ${T.FT}` : f === 'c' ? `500 ${px}px ${T.FC}` : f === 'k' ? `${px}px ${T.SEAL_FONT}` : `${px}px ${T.FM}`;
   g.fillStyle = col; g.textAlign = al; g.textBaseline = bl; g.fillText(s, x, y);
 };
-T.tw = (g, s, px, f = 'm') => { g.font = f === 't' ? `600 ${px}px ${T.FT}` : f === 'c' ? `500 ${px}px ${T.FC}` : `${px}px ${T.FM}`; return g.measureText(s).width; };
+T.tw = (g, s, px, f = 'm') => { g.font = f === 't' ? `600 ${px}px ${T.FT}` : f === 'c' ? `500 ${px}px ${T.FC}` : f === 'k' ? `${px}px ${T.SEAL_FONT}` : `${px}px ${T.FM}`; return g.measureText(s).width; };
 T.fit = (g, s, max) => { s = String(s); if (g.measureText(s).width <= max) return s; while (s.length > 1 && g.measureText(s + '…').width > max) s = s.slice(0, -1); return s + '…'; };
 // совместимость со старыми видами
 T.font = (px, bold) => `${bold ? '600 ' : ''}${px}px ${bold ? T.FT : T.FM}`;
@@ -135,7 +135,7 @@ T.bigNum = (g, v, x, y, px, col, unit, al = 'left') => {
 // печать 天眼 векторная: заливка цветом, знаки «вырезаны» цветом фона (шрифт Tengan Seal —
 // два знака IPAGothic в fonts.css). Чёткая при любом размере. Возвращает ширину.
 T.SEAL_FONT = "'Tengan Seal','Noto Sans CJK JP','Noto Sans JP',sans-serif";
-T.drawSeal = (g, x, y, h, col = T.C.acc, bg = T.C.bg) => {
+T.drawSeal = (g, x, y, h, col = T.C.seal || T.C.acc, bg = T.C.bg) => {
   const w = h * 0.56, c = h * 0.1;
   T.cutPath(g, x, y, w, h, c); g.fillStyle = col; g.fill();
   g.strokeStyle = bg; g.lineWidth = Math.max(1, h * 0.03);
@@ -146,7 +146,7 @@ T.drawSeal = (g, x, y, h, col = T.C.acc, bg = T.C.bg) => {
   return w;
 };
 // печать на один знак (квадратная): filled — залитая с вырезанным знаком, иначе контур
-T.drawSealChar = (g, x, y, sz, ch, col = T.C.acc, filled = true, bg = T.C.bg) => {
+T.drawSealChar = (g, x, y, sz, ch, col = T.C.seal || T.C.acc, filled = true, bg = T.C.bg) => {
   const c = sz * 0.14;
   T.cutPath(g, x, y, sz, sz, c);
   if (filled) { g.fillStyle = col; g.fill(); g.strokeStyle = bg; g.lineWidth = Math.max(1, sz * 0.035); T.cutPath(g, x + sz * 0.08, y + sz * 0.08, sz * 0.84, sz * 0.84, c * 0.6); g.stroke(); }

@@ -21,7 +21,7 @@ T.views.push({
     const rr = portrait ? { x: m, y: top, w: w - 2 * m, h: (h - top) * 0.42 } : { x: m, y: top, w: w * 0.44, h: h - top - u * 3 };
     this.cam.yaw += dt * 0.06;
     this.cam.frame(rr.x + rr.w / 2, rr.y + rr.h * 0.56, Math.min(rr.w * 0.95, rr.h * 1.55));
-    BU.scene(g, this.cam, this.sw, { u, t, sel: null, labels: 2, hits: false });
+    BU.sceneAny(g, this.cam, this.sw, { u, t, sel: null, labels: 2, hits: false });
     this.dust.draw(g, this.cam);
     T.bloom(this.cv, 0.75);
     T.hits.rect(rr.x, rr.y, rr.w, rr.h, { go: 'ble' });

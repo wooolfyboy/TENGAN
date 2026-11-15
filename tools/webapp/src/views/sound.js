@@ -61,7 +61,7 @@
       else if (this.sub === 2) this.reactor(g, area, u, dt, t);
       else if (this.sub === 3) this.scope(g, area, u, dt);
       else this.xy(g, area, u, dt);
-      T.bloom(o, this.sub === 1 ? 0.6 : 0.85);
+      if (!(T.theme === 'sumi' && this.sub === 1)) T.bloom(o, this.sub === 1 ? 0.6 : 0.85);   // рельеф тушью уже «растёкся»
       // HUD поверх
       const hz = S.hz >= 1000 ? (S.hz / 1000).toFixed(1) + ' kHz' : S.hz + ' Hz';
       const word = this.lvS < -55 ? 'quiet' : this.lvS < -40 ? 'normal' : this.lvS < -15 ? 'loud' : 'very loud';
@@ -127,6 +127,7 @@
         let rm = 0; for (let c = 0; c < C; c++) rm = Math.max(rm, row[c]); row.max = rm;
         this.rows.unshift(row); if (this.rows.length > this.ROWS) this.rows.pop();
       }
+      if (T.theme === 'sumi') return this.terrainInk(g, w, h, u, top);
       const hy = top + (h - top) * (0.16 - this.tilt * 0.12), camH = 1.25 + this.tilt * 0.6, cx = w / 2;
       const F = Math.max(Math.min(w, h * 1.6) * 0.62, (h * 0.97 - hy) * 1.5 / camH);
       // солнце-резонатор на горизонте
@@ -147,6 +148,35 @@
         g.fill();
         g.strokeStyle = T.heat(0.3 + 0.7 * (row.max || 0), fade); g.lineWidth = r < 3 ? 2 : 1.1; g.stroke();
       }
+    },
+    // SUMI: история спектра — гряды гор (сансуй): ближние тёмные, дальние тают в тумане, красное солнце
+    terrainInk(g, w, h, u, top) {
+      // «фейк»: кистью рисуем в слой ~15 раз в секунду, в остальные кадры кладём готовую картинку
+      const cv = this.cv.cv, now = performance.now();
+      if (!this.inkL) { this.inkL = document.createElement('canvas'); this.inkG = this.inkL.getContext('2d'); }
+      if (this.inkL.width !== cv.width || this.inkL.height !== cv.height) { this.inkL.width = cv.width; this.inkL.height = cv.height; this.inkT = 0; }
+      if (now - (this.inkT || 0) > 66) {
+        this.inkT = now; const lg = this.inkG; lg.setTransform(1, 0, 0, 1, 0, 0); lg.clearRect(0, 0, cv.width, cv.height); lg.setTransform(this.cv.dpr, 0, 0, this.cv.dpr, 0, 0);
+        this.terrainInkDraw(lg, w, h, u, top);
+      }
+      g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(this.inkL, 0, 0); g.restore();
+    },
+    terrainInkDraw(g, w, h, u, top) {
+      const I = T.ink, hz = top + (h - top) * 0.22, N = 14, step = Math.max(1, Math.floor(this.rows.length / N));
+      const lv = this.rows[0] ? this.rows[0].max : 0, sr = u * (2.6 + lv * 2.4);
+      I.raw(g, 'fillStyle', I.shu(0.85)); g.beginPath(); g.arc(w * 0.7, hz + u * 1.5, sr, 0, T.TAU); g.fill();
+      const idx = []; for (let k = 0; k < N && k * step < this.rows.length; k++) idx.push(k * step);
+      for (let j = idx.length - 1; j >= 0; j--) {
+        const row = this.rows[idx[j]], t = j / Math.max(1, N - 1), y0 = hz + u * 2 + Math.pow(1 - t, 1.6) * (h - hz) * 0.82;
+        const amp = u * (5 + 13 * (1 - t)), al = 0.1 + 0.75 * Math.pow(1 - t, 1.6), C = this.COLS, pts = [];
+        for (let c = 0; c < C; c += 2) pts.push([-u * 2 + (w + u * 4) * c / (C - 1), y0 - amp * row[c] * 1.4]);
+        I.raw(g, 'fillStyle', '#ece4d4'); g.beginPath(); g.moveTo(-u * 2, h); for (const p of pts) g.lineTo(p[0], p[1]); g.lineTo(w + u * 2, h); g.closePath(); g.fill();
+        let mn = 1e9; for (const p of pts) mn = Math.min(mn, p[1]);
+        const gr = g.createLinearGradient(0, mn, 0, y0 + u * 6), tt = T.theme; T.theme = 'raw'; gr.addColorStop(0, I.ink(al * 0.55)); gr.addColorStop(1, I.ink(0)); g.fillStyle = gr; T.theme = tt; g.fill();
+        I.stroke(g, pts, u * (0.18 + 0.7 * (1 - t)), { seed: idx[j] * 31 + 7, taper: [0.02, 0.08], dry: 0.9, alpha: al });
+        I.mist(g, y0 + u * 1.2, u * 2.2, w, 0.35 * (t + 0.2));
+      }
+      I.hanko(g, w - u * 6.5, h - u * 7.5, u * 2.2, ['音'], { seed: 12, rot: -0.04 });
     },
     // реактор: ядро пульсирует уровнем, круговой спектр, частицы вылетают на басах
     reactor(g, a, u, dt, t) {

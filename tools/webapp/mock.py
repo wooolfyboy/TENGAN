@@ -2,7 +2,7 @@
 """Пробная «палка» для разработки приложения планшета без железа.
 
     python3 tools/webapp/build.py --html /tmp/tablet.html
-    python3 tools/webapp/mock.py /tmp/tablet.html [8090]
+    python3 tools/webapp/mock.py /tmp/tablet.html [8090] [tengan|sumi]
     открыть http://127.0.0.1:8090/tablet?host=127.0.0.1:8090&sse=8091
 
 :8090 — /tablet и /api/*, :8091 — поток SSE /stream (как «вторая дверь» на порту 81).
@@ -13,6 +13,7 @@ from urllib.parse import urlparse, parse_qs
 
 HTML = open(sys.argv[1] if len(sys.argv) > 1 else "tablet.html", "rb").read()
 PORT = int(sys.argv[2]) if len(sys.argv) > 2 else 8090          # API; поток SSE — на PORT+1
+THEME = sys.argv[3] if len(sys.argv) > 3 else "tengan"        # тема, которую «выбрали на палке»: tengan / sumi
 T0 = time.time()
 TYPES = ["phone", "audio", "watch", "tracker", "computer", "unknown", "TV", "sensor", "band", "phone"]
 NAMES = ["iPhone", "AirPods Pro", "Galaxy Watch5", "AirTag", "ThinkPad X1", "", "[TV] Samsung Q7", "LYWSD03MMC", "Mi Band 7", "Pixel 7"]
@@ -105,7 +106,7 @@ def sat():
 
 
 def st():
-    return {"name": "TENGAN", "up": int(time.time() - T0) + 3600, "bat": 87, "mv": 3980, "usb": 0, "chg": 0, "cli": 1, "heap": 180, "radio": "bwsmp"}
+    return {"name": "TENGAN", "up": int(time.time() - T0) + 3600, "bat": 87, "mv": 3980, "usb": 0, "chg": 0, "cli": 1, "heap": 180, "radio": "bwsmp", "theme": THEME}
 
 
 class Api(http.server.BaseHTTPRequestHandler):
