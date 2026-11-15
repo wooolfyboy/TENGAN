@@ -274,8 +274,8 @@ int main(int argc, char** argv) {
     for (int i = 0; i < 7; i++) { char nm[32]; snprintf(nm, sizeof nm, "00_boot_%04u", (unsigned)ts[i]); bootFrame(ts[i]); snap(nm); } }
   navBegin(); navDraw(s_now);                    snap("01_menu");
   g_powerHold = 1500; drawPowerHold();           snap("08_power_hold"); g_powerHold = 0;
-  { const uint32_t ts[] = { 300, 760, 1000, 1250 };
-    for (int i = 0; i < 4; i++) { char nm[32]; snprintf(nm, sizeof nm, "09_power_off_%04u", (unsigned)ts[i]); shutFrame(ts[i]); spr.pushSprite(0, 0); snap(nm); } }
+  { const uint32_t ts[] = { 300, 760, 1000, 1250, 1400 };
+    for (int i = 0; i < 5; i++) { char nm[32]; snprintf(nm, sizeof nm, "09_power_off_%04u", (unsigned)ts[i]); shutFrame(ts[i]); spr.pushSprite(0, 0); snap(nm); } }
   navClick(); navDraw(s_now);                    snap("02_ble_sub");
   navBack();
   navRotate(+1); navClick(); navDraw(s_now);     snap("03_wifi_sub");

@@ -6,6 +6,7 @@
 #include "audio/audio_model.h"
 #include "core/display.h"
 #include "core/theme.h"
+#include "core/settings.h"
 #include "core/ui.h"
 #include "core/psram.h"
 
@@ -307,7 +308,9 @@ void drawTerrain(uint32_t now) {
   };
   // небо: «солнце» на горизонте светится от громкости
   int sunR = 12 + (int)(g_au.energy * 8);
-  spr.fillCircle(cx + 60, (int)hy - 2, sunR, scale565(C_ACC(), 20 + (int)(g_au.energy * 35)));
+  // в DENKO — светящийся диск цветом акцента; в SUMI — красное солнце киноварью, как на картинах тушью
+  uint16_t sunC = g_theme == THEME_SUMI ? scale565(C_SEAL(), 70 + (int)(g_au.energy * 30)) : scale565(C_ACC(), 20 + (int)(g_au.energy * 35));
+  spr.fillCircle(cx + 60, (int)hy - 2, sunR, sunC);
   spr.drawFastHLine(0, (int)hy, W, UI_LINE());
 
   // от дальнего хребта к ближнему: каждый — залитый силуэт со светлым гребнем

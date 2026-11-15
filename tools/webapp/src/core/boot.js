@@ -96,9 +96,6 @@ T.boot = (first) => {
     const bw = Math.min(W * 0.66, u * 46), x = cx - bw / 2, sz = u * 3.4, gap = u * 1.1;
     const barX = x + sz + gap, barW = bw - 2 * (sz + gap), barY = cy - u * 0.55, ready = L.bar > 0.97;
     T.header(g, x, cy - u * 8.6, bw, u, 'Starting', view.title, false);
-    { const nm = (T.THEME_NAMES || {})[T.theme] || ['', ''];   // тема: знаки + латиница, внизу по центру
-      const kw = T.tw(g, nm[0], u * 1.3, 'k'), lw = T.tw(g, nm[1] + ' · THEME', u * 0.75), tx = cx - (kw + u * 0.6 + lw) / 2, ty = H - u * 3;
-      T.txt(g, nm[0], tx, ty, u * 1.3, T.C.alert === '#c23a2b' ? T.C.alert : T.C.acc, 'k'); T.txt(g, nm[1] + ' · THEME', tx + kw + u * 0.6, ty - u * 0.15, u * 0.75, T.C.dim); }
     T.txt(g, 'INITIALIZING', barX, cy - u * 1.6, u * 0.8, T.C.dim);
     T.txt(g, Math.round(L.bar * 100) + '%', barX + barW, cy - u * 1.35, u * 1.9, T.C.hot, 't', 'right');
     if (T.theme === 'sumi') {                          // тушь: 天 и 眼 — печати, шкала — мазок, который пишется кистью
