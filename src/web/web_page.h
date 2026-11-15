@@ -42,7 +42,7 @@ tr.cl{cursor:pointer}tr.cl:hover td{background:#0a1d24}
 .x{float:right;background:none;border:1px solid var(--line);color:var(--steel);font:inherit;padding:4px 10px;cursor:pointer}
 .empty{color:var(--steel);padding:24px 0;text-align:center}
 </style></head><body>
-<header><div class="top"><h1>// TENGAN</h1><span class="sp"></span><span id="bat" class="mut"></span><span id="up" class="dim"></span></div>
+<header><div class="top"><h1>// TENGAN</h1><span class="sp"></span><a href="/tablet" style="color:var(--acc);text-decoration:none;border:1px solid var(--line);padding:4px 10px">TABLET</a><span id="bat" class="mut"></span><span id="up" class="dim"></span></div>
 <nav id="nav"></nav></header>
 <main>
 <section id="p-ov"><div class="grid">

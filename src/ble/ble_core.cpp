@@ -522,3 +522,24 @@ void bleLowDuty(bool low) {
   s->setWindow(low ? 45 : 99);
   if (was) s->start(0, false);
 }
+
+// для планшета (поток SSE): компактно — массивы вместо объектов, до 80 устройств
+// {"n":число,"m":адресов,"d":[[id,rssi,"тип","производитель","имя",возраст_с,адресов],...]}
+void bleStreamJson(String& o) {
+  uint32_t now = millis();
+  std::vector<std::pair<uint32_t, const Ent*>> v;
+  for (auto& kv : g_ents) v.push_back({ kv.first, &kv.second });
+  std::sort(v.begin(), v.end(), [](const std::pair<uint32_t, const Ent*>& a, const std::pair<uint32_t, const Ent*>& b) { return a.second->rssiS > b.second->rssiS; });
+  if (v.size() > 80) v.resize(80);
+  o.reserve(48 + v.size() * 64);
+  o = "{\"on\":"; o += g_bleActive ? 1 : 0;
+  o += ",\"n\":"; o += g_lastCount; o += ",\"m\":"; o += g_lastRaw; o += ",\"d\":[";
+  for (size_t i = 0; i < v.size(); i++) {
+    const Ent* e = v[i].second;
+    if (i) o += ',';
+    o += '['; o += v[i].first; o += ','; o += e->rssiS; o += ',';
+    jsonStr(o, typeName(e->type)); o += ','; jsonStr(o, vendorLabel(e->cat, e->vkind, e->vcode)); o += ',';
+    jsonStr(o, e->name); o += ','; o += msSince(now, e->first) / 1000; o += ','; o += e->nMacs; o += ']';
+  }
+  o += "]}";
+}

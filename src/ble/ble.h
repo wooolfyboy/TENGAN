@@ -13,6 +13,7 @@ void bleRadioOff();              // работает что-то одно
 
 void bleJson(String& out);       // устройства и термометры для веб-страницы
 void bleDevJson(uint32_t id, String& out);   // подробности одного устройства
+void bleStreamJson(String& out); // компактно — для планшета (поток SSE)
 void bleLowDuty(bool low);       // веб-режим: слушать реже, делить эфир с Wi-Fi
 
 extern const Section bleSection;

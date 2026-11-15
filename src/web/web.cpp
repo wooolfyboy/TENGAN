@@ -18,7 +18,10 @@
 #include <esp_ota_ops.h>
 #include "core/jsonutil.h"
 #include "web/web.h"
+#include "core/board.h"
 #include "web/web_page.h"
+#include "web/tablet_page.h"    // приложение для планшета (gzip, собирается tools/webapp/build.py)
+#include <lwip/sockets.h>
 #include "ble/ble.h"
 #include "wifi/wifi.h"
 #include "wifi/wifi_model.h"
@@ -35,6 +38,7 @@ static char       s_ssid[24], s_pass[12];
 static uint32_t   s_reqs = 0, s_scanMs = 0;
 static bool       s_scanned = false;
 static String     s_wifiJson = "{\"scanned\":false,\"nets\":[]}";
+static uint32_t   s_wifiGen = 0;              // растёт при каждом новом результате скана (поток планшета)
 static uint8_t    s_qr[45 * 45];
 static int        s_qrN = 0;
 static int        s_netCount = 0;
@@ -105,6 +109,7 @@ static void scanCollect() {
   o += "]}";
   s_wifiJson = o;
   s_netCount = n;
+  s_wifiGen++;
   s_scanned = true;
   WiFi.scanDelete();
 }
@@ -207,6 +212,103 @@ static void otaDone() {
   bleRadioOn();
 }
 
+// ============================================================
+//  «Вторая дверь» для планшета: поток SSE на порту 81.
+//  Планшет открывает http://192.168.4.1:81/stream?want=ble,wifi,snd и не
+//  закрывает — палка сама толкает туда события:
+//    event: st    раз в 2 с    (батарея, аптайм, клиенты)
+//    event: ble   раз в 1 с    (устройства, компактно)
+//    event: wifi  после скана  (сети)
+//    event: snd   ~25 раз в с  (полосы, уровень, волна) — только если просили
+//  Отправка без ожидания: если планшет не успевает принимать, кадр звука
+//  пропускается, а палка не «зависает» на записи.
+// ============================================================
+#define SSE_MAX 2
+struct SseCli {
+  NetworkClient c;
+  bool on = false, ble = false, wifi = false, snd = false;
+  String pend;                                   // не отправленный хвост (докидываем без ожидания)
+  uint32_t tSt = 0, tBle = 0, tSnd = 0, wifiSeen = 0;
+};
+static NetworkServer* s_sseSrv = nullptr;
+static SseCli s_sse[SSE_MAX];
+
+static bool sseFlush(SseCli& k) {                // true — всё ушло
+  while (k.pend.length()) {
+    int n = send(k.c.fd(), k.pend.c_str(), k.pend.length(), MSG_DONTWAIT);
+    if (n > 0) { k.pend.remove(0, n); continue; }
+    if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) return false;   // буфер полон — позже
+    k.on = false; k.c.stop(); return false;      // соединение умерло
+  }
+  return true;
+}
+static void sseEvent(SseCli& k, const char* ev, const String& data, bool droppable) {
+  if (!k.on) return;
+  if (k.pend.length() && droppable) { sseFlush(k); return; }   // не успевает — кадр звука пропускаем
+  if (k.pend.length() > 24000) { k.on = false; k.c.stop(); return; }
+  k.pend += "event: "; k.pend += ev; k.pend += "\ndata: "; k.pend += data; k.pend += "\n\n";
+  sseFlush(k);
+}
+
+static void sseAccept() {
+  NetworkClient nc = s_sseSrv->accept();
+  if (!nc) return;
+  // запрос приходит сразу за подключением: читаем первую строку и заголовки (до 300 мс)
+  String req; uint32_t t0 = millis(); bool done = false;
+  nc.setTimeout(300);
+  while (millis() - t0 < 300 && nc.connected()) {
+    if (!nc.available()) { delay(1); continue; }
+    String line = nc.readStringUntil('\n');
+    if (!req.length()) req = line;
+    if (line == "\r" || line.length() == 0) { done = true; break; }
+  }
+  if (!done || !req.startsWith("GET /stream")) {
+    nc.print("HTTP/1.1 404 Not Found\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: 0\r\n\r\n");
+    nc.stop(); return;
+  }
+  int slot = 0;
+  for (int i = 0; i < SSE_MAX; i++) if (!s_sse[i].on) { slot = i; break; }   // оба заняты — вытесняем первого
+  SseCli& k = s_sse[slot];
+  if (k.on) k.c.stop();
+  k = SseCli();
+  k.c = nc; k.c.setNoDelay(true); k.on = true;
+  int q = req.indexOf("want="); String want = q >= 0 ? req.substring(q + 5, req.indexOf(' ', q)) : String("ble,wifi");
+  k.ble = want.indexOf("ble") >= 0; k.wifi = want.indexOf("wifi") >= 0; k.snd = want.indexOf("snd") >= 0;
+  k.pend = "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\n"
+           "Connection: keep-alive\r\nAccess-Control-Allow-Origin: *\r\n\r\nretry: 1500\n\n";
+  sseFlush(k);
+  k.tSt = k.tBle = 0; k.wifiSeen = 0;
+  s_reqs++;
+}
+
+// что сейчас нужно планшетам (для выключения ненужного радио)
+static int sseClients(bool& ble, bool& wifi, bool& snd) {
+  int n = 0; ble = wifi = snd = false;
+  for (auto& k : s_sse) if (k.on) { n++; ble |= k.ble; wifi |= k.wifi; snd |= k.snd; }
+  return n;
+}
+
+static void sseTick(uint32_t now) {
+  if (!s_sseSrv) return;
+  sseAccept();
+  for (auto& k : s_sse) {
+    if (!k.on) continue;
+    if (!k.c.connected()) { k.on = false; k.c.stop(); continue; }
+    if (k.pend.length()) sseFlush(k);
+    if (!k.tSt || now - k.tSt >= 2000) {
+      k.tSt = now;
+      String o = "{\"name\":\"" DEVICE_NAME "\",\"up\":"; o += millis() / 1000;
+      o += ",\"bat\":"; o += g_bat.ok ? g_bat.soc : -1; o += ",\"mv\":"; o += g_bat.mv;
+      o += ",\"usb\":"; o += g_bat.bus ? 1 : 0; o += ",\"chg\":"; o += g_bat.chg;
+      o += ",\"cli\":"; o += WiFi.softAPgetStationNum(); o += ",\"heap\":"; o += ESP.getFreeHeap() / 1024; o += '}';
+      sseEvent(k, "st", o, false);
+    }
+    if (k.ble && (!k.tBle || now - k.tBle >= 1000)) { k.tBle = now; String o; bleStreamJson(o); sseEvent(k, "ble", o, false); }
+    if (k.wifi && k.wifiSeen != s_wifiGen) { k.wifiSeen = s_wifiGen; sseEvent(k, "wifi", s_wifiJson, false); }
+    if (k.snd && now - k.tSnd >= 40) { k.tSnd = now; String o; audioStreamJson(o); sseEvent(k, "snd", o, true); }
+  }
+}
+
 static void webStart() {
   if (s_on) return;
   wifiRadioOff();                                  // раздел Wi-Fi мог оставить радио в своём режиме
@@ -221,6 +323,12 @@ static void webStart() {
   s_dns.start(53, "*", ip);                        // любые адреса -> на палку (страница откроется сама)
   s_srv = new WebServer(80);
   s_srv->on("/", [] { s_reqs++; s_srv->send_P(200, "text/html", WEB_PAGE); });
+  s_srv->on("/tablet", [] {                        // приложение для планшета: один файл, сжатый gzip
+    s_reqs++;
+    s_srv->sendHeader("Content-Encoding", "gzip");
+    s_srv->sendHeader("Cache-Control", "no-cache");
+    s_srv->send_P(200, "text/html", (const char*)TABLET_GZ, TABLET_GZ_LEN);
+  });
   s_srv->on("/api/ble", [] { String o; bleJson(o); sendJson(o); });
   s_srv->on("/api/bledev", [] { String o; bleDevJson((uint32_t)strtoul(s_srv->arg("id").c_str(), nullptr, 10), o); sendJson(o); });
   s_srv->on("/api/wifi", [] { sendJson(s_wifiJson); });
@@ -262,6 +370,9 @@ static void webStart() {
     s_srv->send(302, "text/plain", "");
   });
   s_srv->begin();
+  s_sseSrv = new NetworkServer(81);                  // «вторая дверь» — поток для планшета
+  s_sseSrv->begin();
+  s_sseSrv->setNoDelay(true);
   s_scanMs = millis() - 15000;                     // первый скан — через пару секунд
   s_on = true;
 }
@@ -269,6 +380,8 @@ static void webStart() {
 static void webStop() {
   if (!s_on) return;
   if (s_srv) { s_srv->stop(); delete s_srv; s_srv = nullptr; }
+  for (auto& k : s_sse) { if (k.on) k.c.stop(); k = SseCli(); }
+  if (s_sseSrv) { s_sseSrv->end(); delete s_sseSrv; s_sseSrv = nullptr; }
   s_dns.stop();
   WiFi.scanDelete();
   WiFi.softAPdisconnect(true);
@@ -286,13 +399,19 @@ static void webTick(uint32_t now) {
   s_dns.processNextRequest();
   s_srv->handleClient();
   scanCollect();
+  sseTick(millis());
+  bool sBle, sWifi, sSnd;
+  int nSse = sseClients(sBle, sWifi, sSnd);
+  if (nSse && sSnd) { s_sndMs = millis(); if (!s_sndOn) s_sndOn = audioWebUse(); }   // планшет смотрит звук
   // работает только то, что нужно открытой вкладке, остальное молчит:
   //  Bluetooth — на «Обзоре» и «Bluetooth»; скан сетей — на «Обзоре» и «Wi-Fi»;
   //  CC1101 и микрофон — только на своих вкладках (ниже)
   static bool bleWanted = true;
   bool wantBle = s_tab[0] == 0 || tabIs("overview") || tabIs("bluetooth");
+  if (nSse) wantBle = sBle;                          // планшет подключён — решают его подписки
   if (wantBle != bleWanted) { bleWanted = wantBle; if (wantBle) bleRadioOn(); else bleRadioOff(); }
   bool wantScan = s_tab[0] == 0 || tabIs("overview") || tabIs("wi-fi");
+  if (nSse) wantScan = sWifi;
   // CC1101 и микрофон работают, только пока их вкладку смотрят на телефоне
   // время берём заново: запрос мог прийти уже после того, как посчитали now,
   // и тогда now - s_sndMs «перекручивается» в огромное число (микрофон гас сразу)
