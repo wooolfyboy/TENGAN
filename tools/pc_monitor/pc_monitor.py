@@ -6,7 +6,7 @@ TENGAN — монитор нагрузки ноутбука.
 и отправляет это на палку по USB-кабелю. Палка показывает всё в разделе PC.
 
 Обратно палка присылает команды пульта (страница «Media» в разделе PC):
-  KEY VOLUP / KEY VOLDN — громче / тише, KEY PLAY — пауза/играть.
+  KEY VOLUP / KEY VOLDN — громче / тише, KEY PLAY — пауза/играть, KEY NEXT / KEY PREV — трек, KEY MUTE — без звука.
 Программа нажимает за тебя мультимедийные клавиши Windows.
 
 Звук ноутбука: когда на палке открыт раздел Sound, она шлёт «AUD ON» —
@@ -679,7 +679,7 @@ def reader(port, wake, tap):
         if line.startswith("KEY "):
             name = line[4:].strip()
             press(name)
-            label = {"VOLUP": "громче", "VOLDN": "тише", "PLAY": "пауза/играть"}.get(name, name)
+            label = {"VOLUP": "громче", "VOLDN": "тише", "PLAY": "пауза/играть", "NEXT": "следующий трек", "PREV": "предыдущий трек", "MUTE": "без звука"}.get(name, name)
             sys.stdout.write("\r     пульт: %-14s                              " % label)
             sys.stdout.flush()
             wake.set()                           # сразу отправить новую громкость

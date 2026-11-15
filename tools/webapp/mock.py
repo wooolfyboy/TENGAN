@@ -146,6 +146,9 @@ class Api(http.server.BaseHTTPRequestHandler):
         elif u.path == "/api/pagever":             # версия страницы — для самообновления приложения
             import hashlib
             body, ct = json.dumps({"sha": hashlib.sha256(HTML).hexdigest(), "gz": 0}).encode(), "application/json"
+        elif u.path == "/api/pckey":               # пульт музыки
+            print("key", q.get("k"), flush=True)
+            body, ct = b'{"ok":true}', "application/json"
         elif u.path == "/api/loc":                 # GPS с приложения планшета
             print("loc", q.get("lat"), q.get("lon"), flush=True)
             body, ct = b'{"ok":true}', "application/json"

@@ -44,6 +44,7 @@ extern uint32_t g_pcLastCmdMs;
 
 void pcPoll(uint32_t now);            // каждый проход loop(): читать USB
 void pcSendLine(const char* s);       // отправить строку программе на ноуте (если она запущена)
+bool pcKey(const char* name);         // пульт с планшета: VOLUP VOLDN MUTE PLAY NEXT PREV -> медиа-клавиша на ноуте
 bool pcLive(uint32_t now);            // данные свежие (< 3 с)
 
 void drawPc(uint32_t now);

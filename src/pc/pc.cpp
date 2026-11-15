@@ -142,6 +142,17 @@ static void pcSend(const char* cmd, int code) {
   Serial.print('\n');
 }
 
+// пульт с планшета (/api/pckey): только разрешённые клавиши
+bool pcKey(const char* name) {
+  static const struct { const char* n; int code; } K[] = { { "VOLUP", 1 }, { "VOLDN", -1 }, { "PLAY", 2 }, { "MUTE", 3 }, { "NEXT", 4 }, { "PREV", 5 } };
+  for (auto& k : K) if (!strcmp(name, k.n)) {
+    char cmd[16]; snprintf(cmd, sizeof(cmd), "KEY %s", k.n);
+    pcSend(cmd, k.code);
+    return pcLive(millis());
+  }
+  return false;
+}
+
 void pcSendLine(const char* s) {
   if (!pcLive(millis())) return;                     // программа не запущена — некому слать
   if (Serial.availableForWrite() < (int)strlen(s) + 2) return;

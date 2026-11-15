@@ -419,6 +419,11 @@ static void webStart() {
     String o = "{\"sha\":\""; o += TABLET_HTML_SHA; o += "\",\"gz\":"; o += TABLET_GZ_LEN; o += '}';
     sendJson(o);
   });
+  // пульт музыки с планшета: палка передаёт медиа-клавишу ноутбуку по USB
+  s_srv->on("/api/pckey", [] {
+    bool ok = pcKey(s_srv->arg("k").c_str());
+    sendJson(ok ? "{\"ok\":true}" : "{\"ok\":false}");
+  });
   s_srv->on("/api/loc", [] {
     float lat = s_srv->arg("lat").toFloat(), lon = s_srv->arg("lon").toFloat();
     bool ok = s_srv->hasArg("lat") && s_srv->hasArg("lon") && fabsf(lat) <= 90 && fabsf(lon) <= 180 && (lat != 0 || lon != 0);
