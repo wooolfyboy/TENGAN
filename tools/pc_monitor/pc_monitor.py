@@ -124,6 +124,7 @@ class Collector:
         self.disk = psutil.disk_io_counters()
         self.net = psutil.net_io_counters()
         self.top = "-"
+        self.city = None                      # строка «PP ...» для города процессов
         self.procs = {}
         # поиск «прожорливого» процесса — в отдельном потоке: на Windows перебор
         # сотен процессов занимает 1-2 с и иначе задерживал бы отправку
@@ -137,25 +138,57 @@ class Collector:
                 self._find_top()
             except Exception:
                 pass
-            time.sleep(4)
+            time.sleep(2)
+
+    @staticmethod
+    def _foreground_pid():
+        """Программа, в окне которой ты сейчас работаешь (только Windows)."""
+        if not IS_WIN:
+            return -1
+        try:
+            hwnd = _user32.GetForegroundWindow()
+            pid = ctypes.c_ulong()
+            _user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+            return pid.value
+        except Exception:
+            return -1
 
     def _find_top(self):
-        """Самый «прожорливый» процесс."""
+        """Самый «прожорливый» процесс + город процессов (по программам, не по окнам)."""
         best, best_cpu = "-", -1.0
         seen = {}
-        for p in psutil.process_iter(["name"]):
+        apps = {}                                  # имя программы -> [cpu, память МБ, активна?]
+        fg = self._foreground_pid()
+        ncpu = psutil.cpu_count() or 1
+        for p in psutil.process_iter(["name", "memory_info"]):
             try:
                 if p.pid == 0:
                     continue              # «System Idle Process» — это простой, а не нагрузка
                 proc = self.procs.get(p.pid) or p
-                cpu = proc.cpu_percent(interval=None)
+                cpu = proc.cpu_percent(interval=None) / ncpu      # % от всего процессора
                 seen[p.pid] = proc
+                name = clean((p.info["name"] or "-").replace(".exe", ""), 18)
+                mem = (p.info["memory_info"].rss if p.info["memory_info"] else 0) / 1048576
+                a = apps.setdefault(name, [0.0, 0.0, 0])
+                a[0] += cpu; a[1] += mem
+                if p.pid == fg:
+                    a[2] = 1
                 if cpu > best_cpu:
-                    best, best_cpu = p.info["name"] or "-", cpu
+                    best, best_cpu = name, cpu
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 pass
         self.procs = seen
-        self.top = clean(best.replace(".exe", ""))
+        self.top = best
+        # в город — 24 программы: самые занятые процессором, потом самые большие по памяти, и активная
+        items = sorted(apps.items(), key=lambda kv: (-kv[1][0], -kv[1][1]))
+        pick = [kv for kv in items if kv[1][0] >= 0.3][:16]
+        names = {k for k, _ in pick}
+        for k, v in sorted(apps.items(), key=lambda kv: -kv[1][1]):
+            if len(pick) >= 24:
+                break
+            if k not in names and (v[1] > 40 or v[2]):
+                pick.append((k, v)); names.add(k)
+        self.city = "PP\t" + "\t".join("%s,%d,%d,%d" % (k, int(v[0] * 10), int(v[1]), v[2]) for k, v in pick) + "\n"
 
     def line(self):
         now = time.time()
@@ -722,6 +755,8 @@ def main():
                 send(port, ("PV vol=%d mute=%d\n" % (v[0], 1 if v[1] else 0)).encode())
             if media.line:
                 send(port, media.line.encode("utf-8"))
+            if col.city:
+                send(port, col.city.encode("ascii", "replace"))
             if orbits.lines and time.time() - last_tle > 60:       # орбиты — раз в минуту
                 last_tle = time.time()
                 for l in orbits.lines:

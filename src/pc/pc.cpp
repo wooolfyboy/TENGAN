@@ -75,6 +75,7 @@ static void parseAudio(char* s) {
 static void parseLine(char* s) {
   if (!strncmp(s, "PA ", 3)) { parseAudio(s); return; }
   if (!strncmp(s, "TLE\t", 4)) { satFromLine(s); return; }   // орбиты спутников с ноутбука
+  if (!strncmp(s, "PP\t", 3)) { pcCityLine(s); return; }      // программы для города процессов
   if (!strncmp(s, "PV ", 3)) { parseVol(s); return; }
   if (!strncmp(s, "PM", 2) && (s[2] == '\t' || s[2] == 0)) { parseMedia(s); return; }
   if (strncmp(s, "PC ", 3) != 0) return;            // не наша строка — пропускаем
@@ -155,18 +156,19 @@ static void pcSubtitle(char* out, size_t n) {
 static void pcEnter() { g_pcPage = 0; }
 static void pcLeave() {}
 static void pcClick() {
-  if (g_pcPage == 2) pcSend("KEY PLAY", 2);          // на странице музыки — пауза/играть
-  else g_pcPage = (g_pcPage + 1) % PC_PAGES;
+  if (g_pcPage == 3) pcSend("KEY PLAY", 2);          // на странице музыки — пауза/играть
+  else if (g_pcPage == 2) pcCityNext();             // город — прожектор на следующую башню
+  // на обзоре и ядрах у нажатия нет действия (страницы листает колесо)
 }
 static void pcRotate(int dir) {
-  if (g_pcPage == 2) { pcSend(dir > 0 ? "KEY VOLUP" : "KEY VOLDN", dir > 0 ? 1 : -1); return; }   // колесо = громкость
+  if (g_pcPage == 3) { pcSend(dir > 0 ? "KEY VOLUP" : "KEY VOLDN", dir > 0 ? 1 : -1); return; }   // колесо = громкость
   static uint32_t last = 0;
   if (millis() - last < 150) return;
   last = millis();
   g_pcPage = (g_pcPage + dir + PC_PAGES) % PC_PAGES;
 }
 static bool pcBack() {                               // со страницы музыки боковая — на обзор, а не из раздела
-  if (g_pcPage == 2) { g_pcPage = 0; return true; }
+  if (g_pcPage == 3) { g_pcPage = 0; return true; }
   return false;
 }
 static void pcDraw(uint32_t now) {
@@ -174,6 +176,7 @@ static void pcDraw(uint32_t now) {
   if (!pcLive(now)) drawPcWaiting(now);
   else if (g_pcPage == 0) drawPc(now);
   else if (g_pcPage == 1) drawPcCores(now);
+  else if (g_pcPage == 2) drawPcCity(now);
   else drawPcMedia(now);
 }
 

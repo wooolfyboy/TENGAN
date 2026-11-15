@@ -395,6 +395,12 @@ int main(int argc, char** argv) {
   g_pc.t = s_now;
   drawPc(s_now);             snap("71_pc_overview");
   drawPcCores(s_now);        snap("72_pc_cores");
+  Serial.feed("PP\tchrome,384,2840,1\tCode,121,1240,0\tTelegram,45,410,0\tsvchost,38,620,0\tDiscord,72,780,0\tYandexMusic,64,520,0\t"
+              "explorer,12,210,0\tMsMpEng,95,380,0\tdwm,52,160,0\tpython,31,120,0\tSteam,8,340,0\tSearchHost,4,180,0\tOneDrive,6,90,0\t"
+              "audiodg,18,40,0\tTeams,22,690,0\tNVIDIA,9,150,0\tgame,612,3100,0\n");
+  for (int f = 0; f < 50; f++) { pcPoll(0); drawPcCity(s_now + f * 33); }
+  snap("72b_pc_city");
+  pcCityNext(); drawPcCity(s_now + 2000); snap("72c_pc_city_spot");
   Serial.feed("PV vol=42 mute=0\n"); pcPoll(0); g_pc.volT = s_now;
   g_pcLastCmd = 1; g_pcLastCmdMs = s_now - 120;
   Serial.feed("PM\t1\t63\t215\tSpotify\tГруппа крови (Remastered 2024 Edition)\tКино\n"); pcPoll(0); g_pc.trkT = s_now;
