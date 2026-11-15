@@ -23,7 +23,7 @@ T.boot = (first) => {
   let phase = 'launch', L = null;
   let pick = null, picks = [], pickT = 0;
   // выбор устройства — только при входе на палку («/»); по /tablet планшет уже выбран — сразу в раздел
-  const askDevice = !/\/(tablet|full)\/?$/.test(location.pathname);
+  const askDevice = !T.native && !/\/(tablet|full)\/?$/.test(location.pathname);   // в приложении выбор не нужен
   const afterAnim = now => askDevice ? toChoice(now) : end();
   const toChoice = now => { phase = 'choice'; pickT = now; T.app.hold = false; box.style.background = 'transparent'; };   // сцена оживает под шторкой
   box.addEventListener('pointerdown', e => {

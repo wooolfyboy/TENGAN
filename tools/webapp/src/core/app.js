@@ -55,6 +55,8 @@ document.getElementById('fs').onclick = () => {
 // Свечение — единственный тяжёлый эффект: если 3 с подряд меньше 45 кадров, оно гаснет
 // (страховка; на нормальном планшете не срабатывает).
 const FPS_CAP = 60, STEP = 1000 / FPS_CAP;
+const SHOT = new URLSearchParams(location.search).has('shot');   // для картинок в README: все эффекты, без счётчика кадров
+if (SHOT) document.getElementById('fps').style.display = 'none';
 let last = performance.now(), next = last, fpsN = 0, fpsT = 0, slow = 0;
 const loop = now => {
   requestAnimationFrame(loop);
@@ -66,7 +68,7 @@ const loop = now => {
   fpsN++; fpsT += dt;
   if (fpsT >= 1) {
     const fps = Math.round(fpsN / fpsT); T.fps = fps;
-    if (!document.hidden) { slow = fps < 45 ? slow + 1 : 0; if (slow >= 3 && T.Q.bloom) { T.Q.bloom = 0; T.Q.scan = 0; } }
+    if (!document.hidden && !SHOT) { slow = fps < 45 ? slow + 1 : 0; if (slow >= 3 && T.Q.bloom) { T.Q.bloom = 0; T.Q.scan = 0; } }
     document.getElementById('fps').textContent = fps + ' FPS' + (T.Q.bloom ? '' : ' · LITE');
     fpsN = 0; fpsT = 0;
   }

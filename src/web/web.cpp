@@ -165,6 +165,7 @@ static void sendJson(const String& s) {
   // перед вторым (алгоритм Нейгла + отложенное подтверждение TCP)
   s_srv->client().setNoDelay(true);
   s_srv->sendHeader("Cache-Control", "no-store");
+  s_srv->sendHeader("Access-Control-Allow-Origin", "*");   // приложение планшета живёт на своём адресе (localhost)
   s_srv->send(200, "application/json", s);
 }
 
@@ -349,7 +350,7 @@ static void sseTick(uint32_t now) {
       sseEvent(k, "st", o, false);
       if (!k.satSent) {                          // один раз: город и орбиты — небо и глобус считает планшет
         k.satSent = true;
-        const City& c = CITIES[g_city];
+        const City& c = curCity();
         String a = "{\"city\":"; jsonStr(a, c.name);
         a += ",\"lat\":"; a += String(c.lat, 3); a += ",\"lon\":"; a += String(c.lon, 3);
         a += ",\"sats\":"; satJson(a); a += '}';
@@ -404,6 +405,13 @@ static void webStart() {
     s_sndMs = millis();
     s_sndOn = audioWebUse();
     String o; audioJson(o); sendJson(o);
+  });
+  // приложение планшета присылает свой GPS: небо и глобус палки считаются «отсюда»
+  s_srv->on("/api/loc", [] {
+    float lat = s_srv->arg("lat").toFloat(), lon = s_srv->arg("lon").toFloat();
+    bool ok = s_srv->hasArg("lat") && s_srv->hasArg("lon") && fabsf(lat) <= 90 && fabsf(lon) <= 180 && (lat != 0 || lon != 0);
+    if (ok) setGpsCity(lat, lon);
+    sendJson(ok ? "{\"ok\":true}" : "{\"ok\":false}");
   });
   s_srv->on("/api/info", [] {
     String o; o.reserve(400);

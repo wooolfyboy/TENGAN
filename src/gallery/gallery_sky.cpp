@@ -68,7 +68,7 @@ void drawSky(uint32_t now) {
   g_fastFrame = true;
   s_skyRot += (s_skyRotT - s_skyRot) * 0.25f;
   spr.fillSprite(C_BG());
-  const City& c = CITIES[g_city];
+  const City& c = curCity();
   bool timeOk = astroTimeKnown();
   double t = astroUnixNow();
   double jd = julianDate(t);
@@ -226,7 +226,7 @@ static bool globeXY(const GlobeView& g, float lat, float lon, int& x, int& y) {
 void drawGlobe(uint32_t now) {
   g_fastFrame = true;
   spr.fillSprite(C_BG());
-  const City& c = CITIES[g_city];
+  const City& c = curCity();
   bool timeOk = astroTimeKnown();
   double t = astroUnixNow();
   double jd = julianDate(t);

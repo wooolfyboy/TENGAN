@@ -351,7 +351,7 @@ static void galInfo(int i, SubItem& it) {
   if (i == G_TESS)       strcpy(it.value, "4D");
   else if (i == G_TORUS) strcpy(it.value, "3D");
   else if (s_lfGen && i == G_LIFE) snprintf(it.value, sizeof(it.value), "gen %lu", (unsigned long)s_lfGen);
-  else if (i == G_SKY)   snprintf(it.value, sizeof(it.value), "%s", CITIES[g_city].name);
+  else if (i == G_SKY)   snprintf(it.value, sizeof(it.value), "%s", curCity().name);
   else if (i == G_GLOBE) snprintf(it.value, sizeof(it.value), "%d sats", g_nSats);
 }
 static int  galNow() { return g_gal; }
