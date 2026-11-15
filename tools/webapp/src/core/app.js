@@ -47,6 +47,7 @@ App.rewant = () => {
   if (want !== T.Stream.want) T.Stream.connect(want);
 };
 T.views.forEach(v => { const b = T.el('button', '', v.title); b.dataset.id = v.id; b.onclick = () => App.go(v.id); nav.appendChild(b); });
+document.getElementById('upd').onclick = () => { const UP = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.TenganUpdate; if (UP) UP.check().catch(() => {}); };
 document.getElementById('fs').onclick = () => {
   const d = document.documentElement;
   if (document.fullscreenElement) document.exitFullscreen(); else (d.requestFullscreen || d.webkitRequestFullscreen).call(d);
@@ -70,6 +71,9 @@ const loop = now => {
     const fps = Math.round(fpsN / fpsT); T.fps = fps;
     if (!document.hidden && !SHOT) { slow = fps < 45 ? slow + 1 : 0; if (slow >= 3 && T.Q.bloom) { T.Q.bloom = 0; T.Q.scan = 0; } }
     document.getElementById('fps').textContent = fps + ' FPS' + (T.Q.bloom ? '' : ' · LITE');
+    // приложение: состояние обновления страницы от палки (диагностика) — тап по нему = проверить сейчас
+    const UP = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.TenganUpdate;
+    if (UP) UP.status().then(r => { const el = document.getElementById('upd'); if (el) el.textContent = 'UPD ' + r.status; }).catch(() => {});
     fpsN = 0; fpsT = 0;
   }
   if (T.Stream.mode === 'live' && now - T.Stream.lastMsg > 6000) T.Stream.setLink('off');
