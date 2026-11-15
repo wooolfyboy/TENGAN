@@ -13,6 +13,7 @@
 #include "core/battery.h"
 #include "core/settings.h"
 #include "gallery/gallery.h"
+#include "gallery/weather.h"
 #include "gallery/astro.h"
 #include "gallery/sat.h"
 #include "web/web.h"
@@ -54,6 +55,14 @@ int8_t   g_spark[SPARK_N];
 int      g_sparkN = 0;
 void bleRadioOff() {}
 void bleRadioOn() {}
+bool bleRadioActive() { return true; }
+int  bleEntityIds(uint32_t*, int) { return 0; }
+bool subWebUse(int, int) { return true; }
+void subWebTick(uint32_t) {}
+void subWebStop() {}
+bool audioWebUse() { return true; }
+void audioWebTick(uint32_t) {}
+void audioWebStop() {}
 void wifiRadioOff() {}
 
 // ---------- состояние Sub-GHz (в прошивке — subghz.cpp) ----------
@@ -383,6 +392,16 @@ int main(int argc, char** argv) {
     for (int f = 0; f < 3; f++) drawSky(s_now + f * 40);   snap("54_gallery_sky");
     skyClick(); drawSky(s_now);                           snap("54b_gallery_sky_stars"); skyClick(); skyClick();
     for (int f = 0; f < 60; f++) drawGlobe(s_now + f * 40); snap("55_gallery_globe"); }
+  { // радиопогода: подставные значения (расчёт на палке — wxUpdate)
+    WxState& w = g_wx; w.ok = true; w.cond = "rain"; w.clouds = 0.62f; w.wind = 0.35f; w.rain = 0.55f; w.storm = 0.4f;
+    w.ble = 31; w.turn = 9; w.sub = 3; w.subPk = -61; w.subOk = true; w.snd = -38; w.pk = -24; w.sndOk = true; w.trend = 0.5f;
+    w.histN = WX_HIST; for (int i = 0; i < WX_HIST; i++) { w.hist[i][0] = 0.3f + 0.3f * i / WX_HIST + 0.05f * sinf(i * 0.5f); w.hist[i][1] = (i % 13 < 3) ? 0.6f : 0.08f; }
+    drawWeather(s_now);                                  snap("56_gallery_weather");
+    w.cond = "storm"; w.storm = 0.8f; w.rain = 0.9f; w.thunder = true; w.thunderMs = s_now - 120; w.clouds = 0.85f;
+    drawWeather(s_now);                                  snap("56b_gallery_weather_storm");
+    w.cond = "clear"; w.storm = 0; w.rain = 0; w.thunder = false; w.thunderMs = 0; w.clouds = 0.2f; w.wind = 0.1f;
+    drawWeather(s_now);                                  snap("56c_gallery_weather_clear");
+    wxTurn(1); drawWeather(s_now);                       snap("56d_gallery_weather_chart"); wxTurn(1); }
   { uint8_t qr[29 * 29]; for (int i = 0; i < 29 * 29; i++) qr[i] = (noise(i) > 0.5f) || ((i % 29 < 7 || i % 29 > 21) && (i / 29 < 7) && !((i % 29 == 1 || i % 29 == 5 || i % 29 == 23 || i % 29 == 27) && i / 29 > 0 && i / 29 < 6));
     WebView v = { "TENGAN-3F2A", "48213907", "192.168.4.1", 1, 214, true, "sub-ghz" };
     drawWebScreen(v, qr, 29); snap("60_web"); }
