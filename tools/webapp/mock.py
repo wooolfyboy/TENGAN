@@ -13,7 +13,7 @@ from urllib.parse import urlparse, parse_qs
 
 HTML = open(sys.argv[1] if len(sys.argv) > 1 else "tablet.html", "rb").read()
 PORT = int(sys.argv[2]) if len(sys.argv) > 2 else 8090          # API; поток SSE — на PORT+1
-THEME = sys.argv[3] if len(sys.argv) > 3 else "tengan"        # тема, которую «выбрали на палке»: tengan / sumi
+THEME = sys.argv[3] if len(sys.argv) > 3 else "denko"         # тема, которую «выбрали на палке»: denko / sumi
 T0 = time.time()
 TYPES = ["phone", "audio", "watch", "tracker", "computer", "unknown", "TV", "sensor", "band", "phone"]
 NAMES = ["iPhone", "AirPods Pro", "Galaxy Watch5", "AirTag", "ThinkPad X1", "", "[TV] Samsung Q7", "LYWSD03MMC", "Mi Band 7", "Pixel 7"]

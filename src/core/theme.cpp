@@ -52,7 +52,7 @@ uint16_t C(uint8_t r, uint8_t g, uint8_t b) {
   }
   return s_lut[(77 * r + 150 * g + 29 * b) >> 8];    // яркость по восприятию глаза
 }
-// TC — «буквальный» цвет: в TENGAN как есть, в SUMI — оттенок туши по яркости
+// TC — «буквальный» цвет: в DENKO как есть, в SUMI — оттенок туши по яркости
 uint16_t TC(uint8_t r, uint8_t g, uint8_t b) { return sumi() ? C(r, g, b) : tft.color565(r, g, b); }
 uint16_t C_BG()    { return sumi() ? tft.color565(236, 228, 212) : tft.color565(5, 8, 13); }
 uint16_t C_HOT()   { return sumi() ? tft.color565(27, 24, 20) : tft.color565(235, 250, 255); }
@@ -75,7 +75,7 @@ static const GFXfont* fontFor(int size) {
   }
 }
 
-// «тусклее»: смешать с фоном (в TENGAN фон почти чёрный — то же, что затемнить; в SUMI — к бумаге)
+// «тусклее»: смешать с фоном (в DENKO фон почти чёрный — то же, что затемнить; в SUMI — к бумаге)
 uint16_t scale565(uint16_t c, int pct) {
   pct = constrain(pct, 0, 100);
   uint8_t r = ((c >> 11) & 0x1F) << 3, g = ((c >> 5) & 0x3F) << 2, b = (c & 0x1F) << 3;

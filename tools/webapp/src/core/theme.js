@@ -1,14 +1,15 @@
-// ---- темы: TENGAN (голограмма HUD) и SUMI (тушь на рисовой бумаге) ----
+// ---- темы: DENKO 電光 (электрический свет, HUD) и SUMI 墨 (тушь на рисовой бумаге) ----
+// TENGAN — имя прошивки, не темы.
 // Тему выбирают на палке («Основные настройки» → Theme), она приходит в событии st.
 // Для проверки: ?theme=sumi в адресе. Последняя тема помнится — запуск сразу в ней.
 //
 // Как SUMI перекрашивает всё сразу: холсту подменены сеттеры fillStyle/strokeStyle/
-// shadowColor и addColorStop у градиентов. Цвета палитры TENGAN (бирюза, белый, фон,
+// shadowColor и addColorStop у градиентов. Цвета палитры DENKO (бирюза, белый, фон,
 // панели, линии) на лету становятся тушью, бумагой и киноварью; «свет» (режим lighter)
 // становится «тушью» (multiply). Отдельные сцены (радар, город, рельеф, запуск) в SUMI
 // рисуются по-своему — кистью (T.ink).
 (() => {
-  const TENGAN = { C: Object.assign({}, T.C, { seal: T.C.acc }), HEAT: T.HEAT, COOL: T.COOL, ALERT: T.ALERT, FT: T.FT };
+  const DENKO = { C: Object.assign({}, T.C, { seal: T.C.acc }), HEAT: T.HEAT, COOL: T.COOL, ALERT: T.ALERT, FT: T.FT };
   const SUMI = {
     C: { bg: '#ece4d4', acc: '#1b1814', hot: '#1b1814', alert: '#c23a2b', label: '#4a433b', dim: '#8a8174', line: '#c9bfae', panel: '#e2d4c2',
       steel: '#4a433b', seal: '#c23a2b' },
@@ -17,11 +18,12 @@
     ALERT: [194, 58, 43],
     FT: "'Noto Serif','Liberation Serif',Georgia,serif",
   };
-  T.THEMES = { tengan: TENGAN, sumi: SUMI };
-  T.theme = 'tengan';
+  T.THEMES = { denko: DENKO, sumi: SUMI };
+  T.THEME_NAMES = { denko: ['電光', 'DENKO'], sumi: ['墨', 'SUMI'] };
+  T.theme = 'denko';
   T.KANJI = { ov: '観', ble: '藍', wifi: '網', sub: '波', snd: '音', pc: '機', gal: '画' };
 
-  // ---- перекраска палитры TENGAN -> SUMI ----
+  // ---- перекраска палитры DENKO -> SUMI ----
   const INK = [27, 24, 20], PAPER = [236, 228, 212];
   const MAP = {
     '62,230,255': INK, '235,250,255': INK, '255,255,255': INK, '234,252,255': INK,
@@ -58,7 +60,7 @@
     cache.set(s, r); return r;
   };
   T.remap = remap;
-  // перехват цветов холста ставится только в SUMI; в TENGAN — родные сеттеры браузера, без накладных расходов
+  // перехват цветов холста ставится только в SUMI; в DENKO — родные сеттеры браузера, без накладных расходов
   const P = CanvasRenderingContext2D.prototype, G = CanvasGradient.prototype;
   const orig = {}; for (const k of ['fillStyle', 'strokeStyle', 'shadowColor', 'globalCompositeOperation']) orig[k] = Object.getOwnPropertyDescriptor(P, k);
   const origAdd = G.addColorStop;
@@ -239,7 +241,8 @@
   // ---- переключение ----
   const css = document.documentElement.style;
   T.setTheme = name => {
-    const th = T.THEMES[name] ? name : 'tengan', D = T.THEMES[th];
+    if (name === 'tengan') name = 'denko';                // старое имя (до v1.4)
+    const th = T.THEMES[name] ? name : 'denko', D = T.THEMES[th];
     if (th === T.theme && T._themeSet) return;
     T._themeSet = 1; T.theme = th; T.hookCanvas(th === 'sumi');
     Object.assign(T.C, D.C); T.HEAT = D.HEAT; T.COOL = D.COOL; T.ALERT = D.ALERT; T.FT = D.FT;
@@ -257,7 +260,7 @@
   };
   const urlTheme = new URLSearchParams(location.search).get('theme');
   let start = urlTheme; if (!start) { try { start = localStorage.getItem('theme'); } catch (e) {} }
-  T.setTheme(start || 'tengan');
+  T.setTheme(start || 'denko');
   // тема с палки: применяем, если в адресе не задана своя
   setInterval(() => { const st = T.S && T.S.st; if (!urlTheme && st && st.theme && st.theme !== T.theme) T.setTheme(st.theme); }, 400);
 })();

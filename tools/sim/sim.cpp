@@ -266,7 +266,7 @@ int main(int argc, char** argv) {
   spr.setColorDepth(16);
   spr.createSprite(320, 170);
   settingsBegin();
-  if (getenv("SIM_THEME")) g_theme = atoi(getenv("SIM_THEME"));   // 1 — тема SUMI (тушь)
+  if (getenv("SIM_THEME")) g_theme = atoi(getenv("SIM_THEME"));   // 0 — DENKO, 1 — SUMI (тушь)
   g_bat.ok = true; g_bat.soc = 87; g_bat.mv = 3980; g_bat.ma = -132; g_bat.tte = 250; g_bat.chgOk = true;
   fillBle(); fillWifi(); fillSub();
 
