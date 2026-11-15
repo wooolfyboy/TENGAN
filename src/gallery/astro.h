@@ -11,6 +11,13 @@
 struct City { const char* name; float lat, lon; };
 extern const City CITIES[];
 extern const int  N_CITIES;
+// «GPS» — особый город с индексом N_CITIES: координаты присылает приложение планшета (/api/loc).
+// Есть в списке, только когда координаты известны.
+extern City g_gpsCity;
+extern bool g_gpsKnown;
+const City& curCity();                  // текущий город для Sky / Globe (с учётом GPS)
+int  cityCount();                       // сколько вариантов в настройках (N_CITIES или N_CITIES + 1)
+void setGpsCity(float lat, float lon);  // пришли координаты с планшета: запомнить и выбрать «GPS»
 
 // время
 void   astroSetTime(uint32_t unixUtc, int32_t tzOffsetSec);   // пришло с ноутбука

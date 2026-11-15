@@ -122,6 +122,9 @@ class Api(http.server.BaseHTTPRequestHandler):
         elif u.path == "/api/bledev":
             body, ct = json.dumps({"addr": [{"mac": "4A:11:22:33:44:55", "kind": "rotating (private)", "r": -52, "ago": 1}], "n": "AirPods Pro", "t": "audio", "v": "Apple",
                                    "r": -52, "rmin": -71, "rmax": -44, "pk": 812, "age": 720, "cid": "0x004C", "uu": [{"u": "FD6F", "o": "Exposure"}], "mfr": "4C0012"}).encode(), "application/json"
+        elif u.path == "/api/loc":                 # GPS с приложения планшета
+            print("loc", q.get("lat"), q.get("lon"), flush=True)
+            body, ct = b'{"ok":true}', "application/json"
         elif u.path == "/api/sub":
             body, ct = json.dumps(sub(int(q.get("m", ["0"])[0]), int(q.get("b", ["1"])[0]))).encode(), "application/json"
         else:

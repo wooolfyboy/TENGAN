@@ -18,6 +18,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--hot);font:16px/1
 #nav button.on::before{content:'// ';color:var(--acc)}
 .stat{display:flex;align-items:center;gap:14px;color:var(--label);font-size:13px;letter-spacing:.06em;white-space:nowrap;font-variant-numeric:tabular-nums}
 #radios{display:flex;gap:8px}#radios i{font-style:normal;color:var(--dim)}#radios i.on{color:var(--acc)}
+#gps{color:var(--dim)}#gps.on{color:var(--acc)}#gps:empty{display:none}
 #clock{font:600 20px/1 var(--ft);color:var(--hot)}
 .dot{width:9px;height:9px;transform:rotate(45deg);background:var(--dim)}
 .dot.live{background:var(--acc);box-shadow:0 0 10px var(--acc)}.dot.poll{background:var(--label)}.dot.off{background:var(--alert)}

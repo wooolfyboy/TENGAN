@@ -22,6 +22,16 @@ const City CITIES[] = {
 };
 const int N_CITIES = sizeof(CITIES) / sizeof(CITIES[0]);
 
+City g_gpsCity = { "GPS", 0, 0 };
+bool g_gpsKnown = false;
+const City& curCity() { return (g_city == N_CITIES && g_gpsKnown) ? g_gpsCity : CITIES[g_city < N_CITIES ? g_city : 0]; }
+int  cityCount() { return g_gpsKnown ? N_CITIES + 1 : N_CITIES; }
+void setGpsCity(float lat, float lon) {
+  g_gpsCity.lat = lat; g_gpsCity.lon = lon; g_gpsKnown = true;
+  g_city = N_CITIES;
+  settingsTouch();                      // сохранится вместе с остальными настройками
+}
+
 static const double D2R = PI / 180.0, R2D = 180.0 / PI;
 static double norm360(double a) { a = fmod(a, 360.0); return a < 0 ? a + 360.0 : a; }
 

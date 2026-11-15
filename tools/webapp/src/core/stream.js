@@ -1,8 +1,8 @@
 // ---- канал с палкой: «вторая дверь» (SSE, порт 81), запасной — опрос /api/* ----
 const Stream = T.Stream = { es: null, want: '', mode: 'off', lastMsg: 0, pollT: null };
-const host = () => new URLSearchParams(location.search).get('host') || location.hostname || '192.168.4.1';
+const host = () => T.stickHost();
 const ssePort = () => new URLSearchParams(location.search).get('sse') || '81';
-const apiBase = () => { const h = new URLSearchParams(location.search).get('host'); return h ? `http://${h}` : ''; };
+const apiBase = () => T.apiBase();
 
 Stream.setLink = (mode) => {
   Stream.mode = mode;

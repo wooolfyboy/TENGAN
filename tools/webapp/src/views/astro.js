@@ -110,7 +110,9 @@ T.astro = (() => {
     return ps;
   };
   // город и спутники: из потока палки, без палки — Москва
-  A.place = () => { const k = T.S && T.S.sky; return k && k.lat != null ? { city: k.city || '', lat: k.lat, lon: k.lon } : { city: 'Moscow', lat: 55.756, lon: 37.617 }; };
+  A.place = () => {                                   // где мы: GPS планшета (приложение) > город с палки > Москва
+    if (T.gps) return { city: 'GPS', lat: T.gps.lat, lon: T.gps.lon, gps: true };
+    const k = T.S && T.S.sky; return k && k.lat != null ? { city: k.city || '', lat: k.lat, lon: k.lon } : { city: 'Moscow', lat: 55.756, lon: 37.617 }; };
   A.sats = () => {
     const k = T.S && T.S.sky;
     if (!k || !k.sats) return [];

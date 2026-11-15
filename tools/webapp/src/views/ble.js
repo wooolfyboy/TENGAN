@@ -11,7 +11,7 @@ BU.tr = e => e.type === 'tracker';
 BU.rgb = (e, v) => BU.tr(e) ? T.ALERT : T.heatRGB(v);
 BU.crossed = (a, b, x) => b >= a ? (x > a && x <= b) : (x > a || x <= b);
 BU.dist = r => { const d = Math.pow(10, (-59 - r) / 20); return d < 10 ? d.toFixed(1) : String(Math.round(d)); };
-BU.apiBase = () => { const h = new URLSearchParams(location.search).get('host'); return h ? `http://${h}` : ''; };
+BU.apiBase = () => T.apiBase();
 // число, которое не мигает: новое значение принимается, только если продержалось 1.5 с
 BU.hold = (ms = 1500) => ({ v: null, c: null, t: 0, set(x, now) { if (this.v == null) { this.v = x; return x; } if (x === this.v) { this.c = null; return x; } if (x !== this.c) { this.c = x; this.t = now; } else if (now - this.t > ms) { this.v = x; this.c = null; } return this.v; } });
 

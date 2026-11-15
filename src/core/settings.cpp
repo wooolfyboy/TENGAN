@@ -94,7 +94,9 @@ void loadSettings() {
   g_theme     = g_prefs.getInt("theme", THEME_DENKO) == THEME_SUMI ? THEME_SUMI : THEME_DENKO;
   g_auLeds    = g_prefs.getInt("auled", 0) ? 1 : 0;
   g_auSrc     = constrain(g_prefs.getInt("ausrc", 0), 0, 2);
-  g_city      = constrain(g_prefs.getInt("city", 0), 0, N_CITIES - 1);
+  g_gpsKnown  = g_prefs.getBool("gpsok", false);
+  g_gpsCity.lat = g_prefs.getFloat("gpslat", 0); g_gpsCity.lon = g_prefs.getFloat("gpslon", 0);
+  g_city      = constrain(g_prefs.getInt("city", 0), 0, cityCount() - 1);
   g_tzOff     = g_prefs.getInt("tz", 10800);
   g_bleTicks  = g_prefs.getInt("bltick", 1) ? 1 : 0;
   g_wifiTicks = g_prefs.getInt("wftick", 1) ? 1 : 0;
@@ -125,6 +127,7 @@ void saveSettings() {
   g_prefs.putInt("auled", g_auLeds);
   g_prefs.putInt("ausrc", g_auSrc);
   g_prefs.putInt("city", g_city);
+  g_prefs.putBool("gpsok", g_gpsKnown); g_prefs.putFloat("gpslat", g_gpsCity.lat); g_prefs.putFloat("gpslon", g_gpsCity.lon);
   g_prefs.putInt("tz", g_tzOff);
   g_prefs.putInt("bltick", g_bleTicks);
   g_prefs.putInt("wftick", g_wifiTicks);
@@ -161,7 +164,7 @@ void settingsAdjust(int dir) {
     case S_MIC:     g_micEn = dir > 0; break;
     case S_AULED:   g_auLeds = dir > 0; if (!g_auLeds) ledsOff(); break;
     case S_AUSRC:   g_auSrc = constrain(g_auSrc + dir, 0, 2); break;
-    case S_CITY:    g_city = (g_city + dir + N_CITIES) % N_CITIES; break;
+    case S_CITY:    g_city = (g_city + dir + cityCount()) % cityCount(); break;
     default: return;                       // батарея — только показывает
   }
   applyBrightness();
@@ -215,7 +218,7 @@ void drawSettings() {
       case S_MIC:     strcpy(val, onOff(g_micEn)); break;
       case S_AULED:   strcpy(val, onOff(g_auLeds)); break;
       case S_AUSRC:   strcpy(val, g_auSrc == 0 ? "auto" : g_auSrc == 1 ? "mic" : "laptop"); break;
-      case S_CITY:    snprintf(val, sizeof(val), "%s", CITIES[g_city].name); break;
+      case S_CITY:    snprintf(val, sizeof(val), "%s", curCity().name); break;
       default:
         if (g_bat.ok) { sprintf(val, "%d%%  %.2f V", g_bat.soc, g_bat.mv / 1000.0f); alert = g_bat.soc <= 20; }
         else          sprintf(val, "n/a");

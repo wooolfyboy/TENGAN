@@ -37,6 +37,11 @@ T.hex8 = (h, signed) => {
   return a;
 };
 T.el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+// внутри приложения для планшета (Capacitor): страница своя, палка — по её адресу в сети TENGAN
+T.native = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+T.STICK = '192.168.4.1';
+T.stickHost = () => new URLSearchParams(location.search).get('host') || (T.native ? T.STICK : location.hostname || T.STICK);
+T.apiBase = () => { const h = new URLSearchParams(location.search).get('host'); return h ? `http://${h}` : T.native ? `http://${T.STICK}` : ''; };
 T.reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 // ---- качество: фиксированное (стабильный режим). Холст ~1920 px по длинной стороне,
 // свечение, пыль и сканлайны включены; app.js гасит свечение, только если совсем не тянет.
