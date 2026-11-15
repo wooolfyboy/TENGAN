@@ -92,16 +92,33 @@ T.boot = (first) => {
     const target = Math.min(1, (L.step + (L.step < 5 ? 0.6 * Math.min(1, (now - L.stepT) / 1500) : 0)) / 5);
     L.bar += (target - L.bar) * 0.12;
     g.fillStyle = T.C.bg; g.fillRect(0, 0, W, H);
-    const bw = Math.min(W * 0.6, u * 40), x = cx - bw / 2;
-    T.header(g, x, cy - u * 9, bw, u, 'Starting', view.title, false);
-    T.drawSeal(g, x + bw - u * 3 * 0.56, cy - u * 6.2, u * 3);
-    T.segBar(g, x, cy - u * 1.5, bw, u * 1.1, L.bar, 32, true);
-    T.txt(g, Math.round(L.bar * 100) + '%', x + bw, cy - u * 2.4, u * 1.6, T.C.hot, 't', 'right');
+    // композиция: шапка · проценты · [天] шкала [眼] · шаги. 眼 «открывается», когда всё готово
+    const bw = Math.min(W * 0.66, u * 46), x = cx - bw / 2, sz = u * 3.4, gap = u * 1.1;
+    const barX = x + sz + gap, barW = bw - 2 * (sz + gap), barY = cy - u * 0.55, ready = L.bar > 0.97;
+    T.header(g, x, cy - u * 8.6, bw, u, 'Starting', view.title, false);
+    T.txt(g, 'INITIALIZING', barX, cy - u * 1.6, u * 0.8, T.C.dim);
+    T.txt(g, Math.round(L.bar * 100) + '%', barX + barW, cy - u * 1.35, u * 1.9, T.C.hot, 't', 'right');
+    T.drawSealChar(g, x, cy - sz / 2, sz, '天', T.C.acc, true);
+    T.drawSealChar(g, x + bw - sz, cy - sz / 2, sz, '眼', ready ? T.C.acc : T.C.dim, ready);
+    T.segBar(g, barX, barY, barW, u * 1.1, L.bar, 32, true);
+    const horiz = bw > u * 36, sy0 = cy + u * 4.2;
     L.steps.forEach((s, i) => {
-      const y = cy + u * 2.2 + i * u * 1.5, done = i < L.step, cur = i === L.step;
-      T.diamond(g, x + u * 0.4, y - u * 0.3, u * 0.32, done ? (s.ok === false ? T.C.alert : T.C.acc) : cur ? T.C.hot : T.C.line, done || cur);
-      T.txt(g, s[0], x + u * 1.4, y, u * 0.9, done ? T.C.label : cur ? T.C.hot : T.C.dim);
-      T.txt(g, s[1] + (done ? (s.ok === false ? ' · skipped' : ' · ok') : cur ? ((now / 300 | 0) % 2 ? ' …' : '') : ''), x + u * 6.5, y, u * 0.9, done && s.ok === false ? T.C.alert : done ? T.C.label : cur ? T.C.hot : T.C.dim, 'c');
+      const done = i < L.step, cur = i === L.step, bad = done && s.ok === false;
+      const col = bad ? T.C.alert : done ? T.C.acc : cur ? T.C.hot : T.C.dim;
+      const note = done ? (bad ? 'skipped' : 'ok') : cur ? ((now / 300 | 0) % 2 ? '…' : '') : '';
+      if (horiz) {                                         // в ряд под шкалой: ромб, код, что поднимаем
+        const cw = barW / L.steps.length, sx = barX + cw * i + cw / 2;
+        T.diamond(g, sx, sy0, u * 0.36, col, done || cur);
+        T.txt(g, s[0], sx, sy0 + u * 1.6, u * 0.85, done || cur ? T.C.hot : T.C.dim, 'm', 'center');
+        T.txt(g, s[1], sx, sy0 + u * 2.7, u * 0.72, done ? T.C.label : cur ? T.C.hot : T.C.dim, 'c', 'center');
+        T.txt(g, note, sx, sy0 + u * 3.7, u * 0.7, bad ? T.C.alert : T.C.dim, 'm', 'center');
+        if (i < L.steps.length - 1) { g.fillStyle = done ? 'rgba(62,230,255,.4)' : T.C.line; g.fillRect(sx + u * 0.7, sy0 - 0.5, cw - u * 1.4, 1); }
+      } else {                                             // узко (телефон): списком
+        const y = sy0 + i * u * 1.5;
+        T.diamond(g, x + u * 0.4, y - u * 0.3, u * 0.32, col, done || cur);
+        T.txt(g, s[0], x + u * 1.4, y, u * 0.9, done || cur ? T.C.hot : T.C.dim);
+        T.txt(g, s[1] + (note ? ' · ' + note : ''), x + u * 6.5, y, u * 0.9, bad ? T.C.alert : done ? T.C.label : cur ? T.C.hot : T.C.dim, 'c');
+      }
     });
     if (L.step >= 5 && L.bar > 0.985) { if (T.reduce) { afterAnim(now); return false; } phase = 'anim'; t0 = now; T.app.hold = true; return false; }   // всё поднято — сцену на паузу, заставка
     return true;

@@ -145,6 +145,17 @@ T.drawSeal = (g, x, y, h, col = T.C.acc, bg = T.C.bg) => {
   for (const [ch, k] of [['天', 0.29], ['眼', 0.71]]) { g.fillText(ch, x + w / 2, y + h * k); g.strokeText(ch, x + w / 2, y + h * k); }
   return w;
 };
+// печать на один знак (квадратная): filled — залитая с вырезанным знаком, иначе контур
+T.drawSealChar = (g, x, y, sz, ch, col = T.C.acc, filled = true, bg = T.C.bg) => {
+  const c = sz * 0.14;
+  T.cutPath(g, x, y, sz, sz, c);
+  if (filled) { g.fillStyle = col; g.fill(); g.strokeStyle = bg; g.lineWidth = Math.max(1, sz * 0.035); T.cutPath(g, x + sz * 0.08, y + sz * 0.08, sz * 0.84, sz * 0.84, c * 0.6); g.stroke(); }
+  else { g.strokeStyle = col; g.lineWidth = Math.max(1, sz * 0.04); g.stroke(); }
+  const ink = filled ? bg : col;
+  g.fillStyle = ink; g.strokeStyle = ink; g.lineWidth = sz * 0.02; g.lineJoin = 'round';
+  g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = `${sz * 0.62}px ${T.SEAL_FONT}`;
+  g.fillText(ch, x + sz / 2, y + sz * 0.53); g.strokeText(ch, x + sz / 2, y + sz * 0.53);
+};
 // (старое) печать 天眼 из прошивки (core/seal.h) — пиксельная, для экрана палки — кэшируется по размеру и цвету
 T.sealImg = (() => {
   const cache = {};
