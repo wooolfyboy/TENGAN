@@ -17,6 +17,7 @@
 #include <Update.h>
 #include <esp_ota_ops.h>
 #include "core/jsonutil.h"
+#include "core/timeutil.h"
 #include "web/web.h"
 #include "core/board.h"
 #include "web/web_page.h"
@@ -264,6 +265,7 @@ static void otaDone() {
 //  пропускается, а палка не «зависает» на записи.
 // ============================================================
 #define SSE_MAX 2
+static uint32_t s_sseBytes = 0;                  // всего отправлено планшетам (для экрана связи)
 struct SseCli {
   NetworkClient c;
   bool on = false, ble = false, wifi = false, snd = false, sub = false, pc = false, wx = false, satSent = false;
@@ -277,7 +279,7 @@ static SseCli s_sse[SSE_MAX];
 static bool sseFlush(SseCli& k) {                // true — всё ушло
   while (k.pend.length()) {
     int n = send(k.c.fd(), k.pend.c_str(), k.pend.length(), MSG_DONTWAIT);
-    if (n > 0) { k.pend.remove(0, n); continue; }
+    if (n > 0) { k.pend.remove(0, n); s_sseBytes += n; continue; }
     if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) return false;   // буфер полон — позже
     k.on = false; k.c.stop(); return false;      // соединение умерло
   }
@@ -515,9 +517,26 @@ static void webTick(uint32_t now) {
   }
 }
 
-static void webDraw(uint32_t) {
+// экран: пока подключён планшет — анимация связи; колесо или нажатие показывают QR и пароль
+// (чтобы подключить ещё кого-то или вспомнить пароль), через 30 с без касаний — снова анимация
+static bool     s_showInfo = false;
+static uint32_t s_infoMs = 0;
+static void webDraw(uint32_t now) {
   WebView v = { s_ssid, s_pass, "192.168.4.1", s_ok ? (int)WiFi.softAPgetStationNum() : 0, s_reqs, s_ok, s_tab };
-  drawWebScreen(v, s_qr, s_qrN);
+  int tablets = 0; bool b = false, w = false, sn = false, su = false, pc = false, wx = false;
+  for (auto& k : s_sse) if (k.on) { tablets++; b |= k.ble; w |= k.wifi; sn |= k.snd; su |= k.sub; pc |= k.pc; wx |= k.wx; }
+  if (s_showInfo && msSince(now, s_infoMs) > 30000) s_showInfo = false;
+  if (!s_ok || !tablets || s_showInfo) { drawWebScreen(v, s_qr, s_qrN); return; }
+  // скорость: байт за последнюю секунду (плавно)
+  static uint32_t lastBytes = 0, lastMs = 0; static float bps = 0;
+  if (!lastMs) { lastMs = now; lastBytes = s_sseBytes; }
+  uint32_t dt = msSince(now, lastMs);
+  if (dt >= 250) { bps = bps * 0.6f + 0.4f * (s_sseBytes - lastBytes) * 1000.0f / dt; lastBytes = s_sseBytes; lastMs = now; }
+  char st[48] = "";
+  if (b) strcat(st, "BLE  "); if (w) strcat(st, "WIFI  "); if (su) strcat(st, "SUB  "); if (sn) strcat(st, "SND  "); if (pc) strcat(st, "PC  "); if (wx) strcat(st, "WX  ");
+  if (!st[0]) strcpy(st, "STATUS");
+  WebLink l = { tablets, st, (uint32_t)bps, s_sseBytes };
+  drawWebLink(l, now);
 }
 
 static void webSubtitle(char* out, size_t n) {
@@ -526,8 +545,8 @@ static void webSubtitle(char* out, size_t n) {
 }
 static void webEnter() { webStart(); }
 static void webLeave() { webStop(); ledsOff(); }
-static void webClick() {}
-static void webRotate(int) {}
+static void webClick() { s_showInfo = !s_showInfo; s_infoMs = millis(); }
+static void webRotate(int) { s_showInfo = !s_showInfo; s_infoMs = millis(); }
 
 const Section webSection = {
   "Web", 90, 200, 230, iconPhone, webSubtitle,

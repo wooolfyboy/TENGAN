@@ -405,6 +405,9 @@ int main(int argc, char** argv) {
   { uint8_t qr[29 * 29]; for (int i = 0; i < 29 * 29; i++) qr[i] = (noise(i) > 0.5f) || ((i % 29 < 7 || i % 29 > 21) && (i / 29 < 7) && !((i % 29 == 1 || i % 29 == 5 || i % 29 == 23 || i % 29 == 27) && i / 29 > 0 && i / 29 < 6));
     WebView v = { "TENGAN-3F2A", "48213907", "192.168.4.1", 1, 214, true, "sub-ghz" };
     drawWebScreen(v, qr, 29); snap("60_web"); }
+  { WebLink l = { 1, "BLE  WX  ", 3400, 0 };              // планшет подключён: живая картинка по теме
+    char nm[32];
+    for (int f = 0; f < 48; f++) { drawWebLink(l, 2000 + f * 70); snprintf(nm, sizeof nm, "anim_link_%03d", f); snap(nm); } }
   drawPcWaiting(s_now);      snap("70_pc_waiting");
   for (int i = 0; i < 60; i++) {                        // минута «настоящих» строк с ноутбука
     char ln[300];
