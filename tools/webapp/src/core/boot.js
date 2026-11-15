@@ -3,14 +3,13 @@
 //    Bluetooth), первые данные и сцену (несколько кадров под шторкой) — пока идёт шкала.
 // 2) ЗАСТАВКА (как core/boot.cpp на палке): всё уже поднято, сцена на паузе — анимация идёт
 //    одна и не лагает. Прицел, кольца, луч, «расшифровка» названия, печать 天眼, развёртка.
-// 3) ВЫБОР: PHONE / TABLET. Пока выбираешь, под шторкой уже живёт Bluetooth › City —
+// 3) ВЫБОР: LITE / FULL. Пока выбираешь, под шторкой уже живёт Bluetooth › City —
 //    башни растут и набирают данные, так что после TABLET город не поднимается с нуля.
-//    PHONE — лёгкая телефонная страница палки (/).
+//    LITE — лёгкая телефонная страница палки (/lite), FULL — эта сцена.
 T.boot = (first) => {
   const box = document.getElementById('boot'), cv = document.getElementById('bootCv');
-  let skip = false;
-  try { skip = sessionStorage.getItem('booted') === '1'; sessionStorage.setItem('booted', '1'); } catch (e) {}
-  if (skip || T.reduce) { box.remove(); T.app.go((T.views.find(v => v.id === first) || T.views[0]).id); return; }
+  // запуск и выбор — при каждом открытии страницы; без анимаций (настройка системы) заставка пропускается
+  if (new URLSearchParams(location.search).has('noboot')) { box.remove(); T.app.go((T.views.find(v => v.id === first) || T.views[0]).id); return; }   // для разработки
   // полный старт всегда ведёт в Bluetooth › City (его и прогреваем на экране выбора)
   const view = T.views.find(v => v.id === 'ble') || T.views[0];
   try { localStorage.setItem('sub_ble', '1'); } catch (e) {}
@@ -23,14 +22,17 @@ T.boot = (first) => {
   const end = () => { phase = 'done'; T.app.hold = false; box.classList.add('done'); setTimeout(() => box.remove(), 400); };
   let phase = 'launch', L = null;
   let pick = null, picks = [], pickT = 0;
+  // выбор устройства — только при входе на палку («/»); по /tablet планшет уже выбран — сразу в раздел
+  const askDevice = !/\/(tablet|full)\/?$/.test(location.pathname);
+  const afterAnim = now => askDevice ? toChoice(now) : end();
   const toChoice = now => { phase = 'choice'; pickT = now; T.app.hold = false; box.style.background = 'transparent'; };   // сцена оживает под шторкой
   box.addEventListener('pointerdown', e => {
-    if (phase === 'anim') { toChoice(performance.now()); return; }               // тап — пропустить заставку
+    if (phase === 'anim') { afterAnim(performance.now()); return; }              // тап — пропустить заставку
     if (phase !== 'choice') return;
     const h = picks.find(p => e.clientX >= p.x && e.clientX <= p.x + p.w && e.clientY >= p.y && e.clientY <= p.y + p.h);
     if (!h) return;
     pick = h.id;
-    if (h.id === 'phone') { const q = new URLSearchParams(location.search).get('host'); location.href = (q ? `http://${q}` : '') + '/'; }
+    if (h.id === 'phone') { const q = new URLSearchParams(location.search).get('host'); location.href = (q ? `http://${q}` : '') + '/lite'; }
     else end();
   });
   // экран выбора: две панели с силуэтами устройств
@@ -47,7 +49,7 @@ T.boot = (first) => {
     T.txt(g, '// SELECT DEVICE', cx, cy - u * (portrait ? 17 : 11), u * 1.9, T.C.acc, 't', 'center');
     T.txt(g, 'CITY IS WARMING UP · ' + T.S.dev.size + ' DEVICES', cx, cy - u * (portrait ? 15 : 9), u * 0.9, T.C.label, 'm', 'center');
     const pw = portrait ? Math.min(W * 0.7, u * 22) : Math.min(W * 0.3, u * 20), ph = portrait ? u * 11 : u * 14, gap = u * 2.5;
-    const items = [{ id: 'phone', t: 'PHONE', s: 'light page' }, { id: 'tablet', t: 'TABLET', s: 'full scene' }];
+    const items = [{ id: 'phone', t: 'LITE', s: 'light page · phone' }, { id: 'tablet', t: 'FULL', s: 'full scene · tablet' }];
     picks = items.map((it, i) => {
       const x = portrait ? cx - pw / 2 : cx + (i ? gap / 2 : -gap / 2 - pw), y = portrait ? cy - u * 12 + i * (ph + gap) : cy - ph / 2 + u * 2;
       return { ...it, x, y: y + (1 - eo) * u * 2, w: pw, h: ph };
@@ -101,7 +103,7 @@ T.boot = (first) => {
       T.txt(g, s[0], x + u * 1.4, y, u * 0.9, done ? T.C.label : cur ? T.C.hot : T.C.dim);
       T.txt(g, s[1] + (done ? (s.ok === false ? ' · skipped' : ' · ok') : cur ? ((now / 300 | 0) % 2 ? ' …' : '') : ''), x + u * 6.5, y, u * 0.9, done && s.ok === false ? T.C.alert : done ? T.C.label : cur ? T.C.hot : T.C.dim, 'c');
     });
-    if (L.step >= 5 && L.bar > 0.985) { phase = 'anim'; t0 = now; T.app.hold = true; return false; }   // всё поднято — сцену на паузу, заставка
+    if (L.step >= 5 && L.bar > 0.985) { if (T.reduce) { afterAnim(now); return false; } phase = 'anim'; t0 = now; T.app.hold = true; return false; }   // всё поднято — сцену на паузу, заставка
     return true;
   };
   let lastDraw = 0;
@@ -115,7 +117,7 @@ T.boot = (first) => {
     g.setTransform(d, 0, 0, d, 0, 0);
     if (phase === 'launch') { launchFrame(now, W, H, T.unit(W, H)); return; }
     if (phase === 'choice') { choiceFrame(now, W, H, T.unit(W, H)); return; }
-    if (now - t0 > MS) { toChoice(now); return; }
+    if (now - t0 > MS) { afterAnim(now); return; }
     const t = now - t0;
     const cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.36, u = T.unit(W, H);
     g.fillStyle = T.C.bg; g.fillRect(0, 0, W, H);

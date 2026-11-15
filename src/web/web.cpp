@@ -376,13 +376,21 @@ static void webStart() {
   s_dns.setErrorReplyCode(DNSReplyCode::NoError);
   s_dns.start(53, "*", ip);                        // любые адреса -> на палку (страница откроется сама)
   s_srv = new WebServer(80);
-  s_srv->on("/", [] { s_reqs++; s_srv->send_P(200, "text/html", WEB_PAGE); });
-  s_srv->on("/tablet", [] {                        // приложение для планшета: один файл, сжатый gzip
+  // вход: «/» — запуск, заставка и выбор LITE / FULL (то же приложение, что /full);
+  // «/lite» — лёгкая телефонная страница; «/full» — сразу полная сцена, без выбора.
+  // Старые адреса /phone и /tablet оставлены и ведут туда же.
+  static auto sendApp = [] {                       // приложение для планшета: один файл, сжатый gzip
     s_reqs++;
     s_srv->sendHeader("Content-Encoding", "gzip");
     s_srv->sendHeader("Cache-Control", "no-cache");
     s_srv->send_P(200, "text/html", (const char*)TABLET_GZ, TABLET_GZ_LEN);
-  });
+  };
+  s_srv->on("/", [] { sendApp(); });
+  s_srv->on("/full", [] { sendApp(); });
+  s_srv->on("/tablet", [] { sendApp(); });
+  static auto sendLite = [] { s_reqs++; s_srv->send_P(200, "text/html", WEB_PAGE); };
+  s_srv->on("/lite", [] { sendLite(); });
+  s_srv->on("/phone", [] { sendLite(); });
   s_srv->on("/api/ble", [] { String o; bleJson(o); sendJson(o); });
   s_srv->on("/api/bledev", [] { String o; bleDevJson((uint32_t)strtoul(s_srv->arg("id").c_str(), nullptr, 10), o); sendJson(o); });
   s_srv->on("/api/wifi", [] { sendJson(s_wifiJson); });
