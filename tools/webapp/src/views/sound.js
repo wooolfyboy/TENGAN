@@ -1,91 +1,238 @@
-// ---- SOUND: спектр, 3D-горы, шумомер — по живому звуку микрофона палки (~25 кадров/с) ----
-T.views.push({
-  id: 'snd', title: 'Sound', want: 'snd', subs: ['Spectrum', 'Terrain', 'Level'], sub: 1, full: true,
-  mount(main) {
-    const v = this.root = T.el('div', 'view full');
-    const st = T.el('div', 'stage'); v.appendChild(st); this.cv = T.canvas(st, 1.5);   // горы — много заливки: 1.5x хватает глазу и вдвое легче
-    this.msg = T.el('div', 'empty hide'); st.appendChild(this.msg);
-    main.appendChild(v);
-    this.ROWS = 40; this.COLS = 72; this.rows = []; this.rowT = 0; this.top = 0.3;
-  },
-  unmount() { this.cv.dispose(); this.root.remove(); },
-  frame(dt, t) {
-    const { g, w, h } = this.cv; this.cv.clear();
-    const d = S.snd, fresh = d && performance.now() - S.sndT < 1500;
-    const bad = !d ? 'waiting for sound…' : !d.en ? 'microphone is off on the device' : !d.ok ? 'starting microphone…' : !fresh ? 'no sound data' : '';
-    this.msg.classList.toggle('hide', !bad);
-    if (bad) { this.msg.innerHTML = `<b>${bad.toUpperCase()}</b>${d && !d.en ? '<span>Settings › Sound › Microphone: on</span>' : ''}`; return; }
-    if (this.sub === 0) this.spectrum(g, w, h); else if (this.sub === 1) this.terrain(g, w, h, dt); else this.level(g, w, h);
-    T.corners(g, 8, 8, w - 16, h - 16);
-    const hz = S.hz >= 1000 ? (S.hz / 1000).toFixed(1) + ' kHz' : S.hz + ' Hz';
-    T.text(g, ['// SPECTRUM', '// TERRAIN', '// NOISE METER'][this.sub], 18, 34, 15, T.C.acc, 'left', 'alphabetic', true);
-    T.text(g, `${Math.round(S.level)} dBFS   ${S.energy > 0.15 ? hz : ''}`, w - 22, 34, 15, S.level > -25 ? T.C.alert : T.C.hot, 'right', 'alphabetic', true);
-  },
-  spectrum(g, w, h) {
-    const L = 40, Rr = 40, top = 70, base = h * 0.72, n = 32, bw = (w - L - Rr) / n, seg = 9;
-    for (let i = 0; i < n; i++) {
-      const v = S.bands[i], x = L + i * bw, bh = v * (base - top), segs = Math.floor(bh / seg);
-      for (let s = 0; s < segs; s++) {
-        const y = base - (s + 1) * seg; g.fillStyle = T.heat(0.2 + 0.8 * (s * seg) / (base - top));
-        g.fillRect(x + 2, y + 1, bw - 4, seg - 2);
-        g.fillStyle = T.heat(0.2 + 0.8 * (s * seg) / (base - top), 0.12); g.fillRect(x + 2, base + (base - y) * 0.45 - seg + 2, bw - 4, seg - 3);   // отражение
+// ---- SOUND (версия B): спектр на глянцевом полу, 3D-рельеф, реактор, осциллограф, XY ----
+// Данные — живой звук микрофона палки (~25 кадров/с), между кадрами всё перетекает плавно.
+(() => {
+  // «послесвечение» люминофора: свой холст, каждый кадр гасится и рисуется заново
+  const trail = o => {
+    const c = document.createElement('canvas'), x = c.getContext('2d');
+    return {
+      c, x,
+      fit() { if (c.width !== o.cv.width || c.height !== o.cv.height) { c.width = o.cv.width; c.height = o.cv.height; x.fillStyle = '#000'; x.fillRect(0, 0, c.width, c.height); } x.setTransform(o.dpr, 0, 0, o.dpr, 0, 0); },
+      fade(a) { x.save(); x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = `rgba(0,0,0,${a})`; x.fillRect(0, 0, c.width, c.height); x.restore(); },
+      draw(g) { g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'lighter'; g.drawImage(c, 0, 0); g.restore(); },   // чёрное не добавляет света
+    };
+  };
+  const NAMES = ['Sound spectrum', 'Terrain', 'Reactor', 'Waveform', 'XY scope'];
+
+  T.views.push({
+    id: 'snd', title: 'Sound', want: 'snd', subs: ['Spectrum', 'Terrain', 'Reactor', 'Waveform', 'XY'], sub: 0,
+    mount(main) {
+      this.root = T.el('div', 'view');
+      const st = T.el('div', 'stage'); this.root.appendChild(st);
+      this.cv = T.canvas(st, 2);
+      main.appendChild(this.root);
+      this.ROWS = 40; this.COLS = 72; this.rows = []; this.rowT = 0; this.top = 0.3;
+      this.tilt = 0; this.wave = new Float32Array(64);
+      this.parts = []; this.bassPrev = 0; this.spin = 0; this.lvS = -90; this.pkS = -90; this.pkHold = -90; this.pkT = 0;
+      this.trW = trail(this.cv); this.trX = trail(this.cv);
+      // пальцем по рельефу — наклон
+      let d = null;
+      const cv = this.cv.cv;
+      cv.addEventListener('pointerdown', e => { d = { y: e.offsetY, t: this.tilt }; cv.setPointerCapture(e.pointerId); });
+      cv.addEventListener('pointermove', e => { if (d) this.tilt = T.clamp(d.t + (e.offsetY - d.y) / (this.cv.h || 1) * 1.4, -0.6, 0.6); });
+      const up = () => { d = null; }; cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+    },
+    unmount() { this.cv.dispose(); this.root.remove(); },
+    onSub() { this.trW.fade(1); this.trX.fade(1); },
+    frame(dt, t) {
+      const o = this.cv, { g, w, h } = o; o.clear();
+      const u = T.unit(w, h), m = u * 1.6, y0 = 50;
+      T.backdrop(g, w, h, 0.5, 0.6);
+      const d = S.snd, fresh = d && performance.now() - S.sndT < 1500;
+      let bad = null;
+      if (!d) bad = ['SOUND', 'waiting for sound'];
+      else if (!d.en) bad = ['MIC OFF', 'settings › sound › microphone: on'];
+      else if (!d.ok) bad = ['STARTING', 'starting microphone'];
+      else if (!fresh) bad = ['NO SOUND DATA', 'microphone is silent', true];
+      if (bad) {
+        T.header(g, m, y0, w - 2 * m, u, NAMES[this.sub], 'mic', false);
+        T.emptyState(g, w, h, u, bad[0], bad[1], bad[2]);
+        T.finish(g, w, h); return;
       }
-      const cy = base - S.caps[i] * (base - top) - 4; g.fillStyle = T.C.hot; g.fillRect(x + 2, cy, bw - 4, 3);
-    }
-    g.strokeStyle = T.C.line; g.beginPath(); g.moveTo(L, base + 1); g.lineTo(w - Rr, base + 1); g.stroke();
-    [[100, 4], [500, 14], [1000, 19], [4000, 28]].forEach(([f, i]) => T.text(g, f >= 1000 ? f / 1000 + 'k' : f, L + (i + 0.5) * bw, h - 24, 13, T.C.steel, 'center'));
-  },
-  terrain(g, w, h, dt) {
-    // новый хребет 40 раз в секунду из сглаженных полос; басы слева, высокие справа
-    this.rowT += dt;
-    while (this.rowT > 0.025) {
-      this.rowT -= 0.025;
-      const raw = new Float32Array(this.COLS);
-      for (let c = 0; c < this.COLS; c++) { const k = c * 31 / (this.COLS - 1), k0 = Math.floor(k), f = k - k0; const b = S.bands[k0] * (1 - f) + S.bands[Math.min(31, k0 + 1)] * f; raw[c] = b * b; }
-      for (let pass = 0; pass < 2; pass++) for (let c = 1; c < this.COLS - 1; c++) raw[c] = (raw[c - 1] + 2 * raw[c] + raw[c + 1]) / 4;
-      const mx = Math.max(...raw); this.top = Math.max(mx, this.top * 0.992, 0.12);
-      const prev = this.rows[0], row = new Float32Array(this.COLS), loud = T.clamp(S.energy * 1.6, 0, 1);
-      for (let c = 0; c < this.COLS; c++) {
-        const v = 1 - Math.exp(-2.2 * raw[c] / this.top), edge = Math.sin(Math.PI * (c + 0.5) / this.COLS);
-        let hh = v * (0.35 + 0.65 * loud) * (0.45 + 0.55 * edge) + 0.04 + 0.05 * ((T.hash(this.rows.length * 977 + c) & 255) / 255) * (0.3 + v);
-        row[c] = prev ? prev[c] * 0.35 + hh * 0.65 : hh;
+      // уровень: плавно, пик держится секунду
+      this.lvS = T.lerp(this.lvS, S.level, T.ease(dt, 0.08));
+      if (S.peak >= this.pkHold || t - this.pkT > 1.2) { this.pkHold = Math.max(S.peak, this.lvS); this.pkT = t; }
+      for (let i = 0; i < 64; i++) this.wave[i] = T.lerp(this.wave[i], S.wave[i], T.ease(dt, 0.03));
+      const loud = this.lvS >= -15;
+      const top = y0 + u * 3.2, bot = h - m * 0.6 - u * 1.8;
+      const mx = w - m - u * 1.2;                         // справа — шкала уровня
+      const area = { x: m, y: top, w: mx - u * 1.6 - m, h: bot - top };
+      if (this.sub === 0) this.spectrum(g, area, u);
+      else if (this.sub === 1) this.terrain(g, w, h, dt, u, top);
+      else if (this.sub === 2) this.reactor(g, area, u, dt, t);
+      else if (this.sub === 3) this.scope(g, area, u, dt);
+      else this.xy(g, area, u, dt);
+      T.bloom(o, this.sub === 1 ? 0.6 : 0.85);
+      // HUD поверх
+      const hz = S.hz >= 1000 ? (S.hz / 1000).toFixed(1) + ' kHz' : S.hz + ' Hz';
+      const word = this.lvS < -55 ? 'quiet' : this.lvS < -40 ? 'normal' : this.lvS < -15 ? 'loud' : 'very loud';
+      T.header(g, m, y0, w - 2 * m, u, NAMES[this.sub], `mic · ${Math.round(this.lvS)} dBFS · ${word}${S.energy > 0.15 ? ' · ' + hz : ''}`, loud);
+      T.dots(g, m, y0 + u * 2.75, u, 5, this.sub);
+      this.meter(g, mx, top + u * 0.4, u * 1.2, bot - top - u * 0.8, u);
+      T.footer(g, m, bot + u * 0.2, w - 2 * m, u, ['32 bands · 25 fps', 'drag: tilt', 'bass: burst', 'phosphor trace', 'phase figure'][this.sub], 'sse snd 25 hz');
+      T.finish(g, w, h);
+    },
+    // вертикальная шкала уровня с удержанием пика
+    meter(g, x, y, mw, mh, u) {
+      const v = T.clamp((this.lvS + 60) / 60), pk = T.clamp((this.pkHold + 60) / 60), n = 24, sh = mh / n;
+      for (let k = 0; k < n; k++) {
+        const lit = k < Math.round(v * n), hot = (k / n) * 60 - 60 >= -15;
+        g.fillStyle = lit ? (hot ? T.C.alert : T.heat(0.3 + 0.7 * k / n)) : T.C.line;
+        g.fillRect(x, y + mh - (k + 1) * sh + sh * 0.2, mw, sh * 0.6);
       }
-      let rm = 0; for (let c = 0; c < this.COLS; c++) rm = Math.max(rm, row[c]); row.max = rm;   // для цвета гребня
-      this.rows.unshift(row); if (this.rows.length > this.ROWS) this.rows.pop();
-    }
-    const hy = h * 0.3, camH = 1.25, cx = w / 2;
-    const F = Math.max(Math.min(w, h * 1.6) * 0.62, (h * 0.97 - hy) * 1.5 / camH);   // в портрете горы — до низа экрана
-    const sunR = 26 + S.energy * 30;
-    const sg = g.createRadialGradient(w * 0.68, hy, 0, w * 0.68, hy, sunR * 2.2);
-    sg.addColorStop(0, T.rgba(T.C.acc, 0.55)); sg.addColorStop(0.45, T.rgba(T.C.acc, 0.18)); sg.addColorStop(1, T.rgba(T.C.acc, 0));
-    g.fillStyle = sg; g.beginPath(); g.arc(w * 0.68, hy, sunR * 2.2, 0, Math.PI * 2); g.fill();
-    g.strokeStyle = T.C.line; g.beginPath(); g.moveTo(0, hy); g.lineTo(w, hy); g.stroke();
-    for (let r = this.rows.length - 1; r >= 0; r--) {
-      const row = this.rows[r], z = 1.5 + r * 0.12, fade = 1 - r / this.ROWS * 0.8;
-      const pts = [];
-      for (let c = 0; c < this.COLS; c++) { const x = (c / (this.COLS - 1) * 2 - 1) * 3.2; pts.push([cx + x * F / z, hy + (camH - row[c] * 1.15) * F / z]); }
-      const by = hy + camH * F / z;
-      // один путь на хребет: заливка склона (сплошной тёмный тон — без градиента, быстрее) + гребень
-      g.beginPath(); g.moveTo(pts[0][0], by); for (const p of pts) g.lineTo(p[0], p[1]); g.lineTo(pts[pts.length - 1][0], by); g.closePath();
-      const sh = T.heatRGB(0.4); g.fillStyle = `rgba(${Math.round(sh[0] * 0.16 * fade + 2)},${Math.round(sh[1] * 0.16 * fade + 9)},${Math.round(sh[2] * 0.16 * fade + 11)},1)`; g.fill();
-      g.beginPath(); for (let i = 0; i < pts.length; i++) i ? g.lineTo(pts[i][0], pts[i][1]) : g.moveTo(pts[i][0], pts[i][1]);
-      g.strokeStyle = T.heat(0.3 + 0.7 * (row.max || 0), fade); g.lineWidth = r < 3 ? 2 : 1.2; g.stroke();
-    }
-  },
-  level(g, w, h) {
-    const cx = w / 2, cy = h * 0.55, R = Math.min(w * 0.32, h * 0.38), v = T.clamp((S.level + 90) / 90, 0, 1), pk = T.clamp((S.peak + 90) / 90, 0, 1);
-    const a0 = Math.PI * 0.8, a1 = Math.PI * 2.2;
-    g.lineWidth = 18; g.strokeStyle = T.C.line; g.beginPath(); g.arc(cx, cy, R, a0, a1); g.stroke();
-    g.strokeStyle = S.level > -25 ? T.C.alert : T.C.acc; g.beginPath(); g.arc(cx, cy, R, a0, a0 + (a1 - a0) * v); g.stroke();
-    g.lineWidth = 3; g.strokeStyle = T.C.hot; const pa = a0 + (a1 - a0) * pk; g.beginPath(); g.arc(cx, cy, R + 14, pa - 0.02, pa + 0.02); g.stroke();
-    for (let k = 0; k <= 9; k++) { const a = a0 + (a1 - a0) * k / 9; g.lineWidth = 1; g.strokeStyle = T.C.dim; g.beginPath(); g.moveTo(cx + Math.cos(a) * (R - 22), cy + Math.sin(a) * (R - 22)); g.lineTo(cx + Math.cos(a) * (R - 30), cy + Math.sin(a) * (R - 30)); g.stroke(); T.text(g, -90 + k * 10, cx + Math.cos(a) * (R - 46), cy + Math.sin(a) * (R - 46) + 4, 11, T.C.dim, 'center'); }
-    T.text(g, Math.round(S.level), cx, cy + 10, Math.round(R * 0.5), T.C.hot, 'center', 'alphabetic', true);
-    const word = S.level < -55 ? 'QUIET' : S.level < -40 ? 'NORMAL' : S.level < -25 ? 'LOUD' : 'VERY LOUD';
-    T.text(g, 'dBFS · ' + word, cx, cy + 44, 18, S.level > -25 ? T.C.alert : T.C.steel, 'center');
-    // график громкости за 2 минуты
-    const H0 = h - 70, gh = 50, a = S.lvHist; if (a.length > 2) {
-      g.beginPath(); a.forEach((lv, i) => { const x = 30 + i / (25 * 120) * (w - 60), y = H0 + gh - T.clamp((lv + 90) / 90, 0, 1) * gh; i ? g.lineTo(x, y) : g.moveTo(x, y); });
-      g.strokeStyle = T.C.acc; g.lineWidth = 1.5; g.stroke(); T.text(g, '2 MIN', 30, H0 - 6, 11, T.C.dim);
-    }
-  },
-});
+      const py = y + mh * (1 - pk);
+      g.fillStyle = this.pkHold >= -15 ? T.C.alert : T.C.hot; g.fillRect(x - u * 0.25, py - 1, mw + u * 0.5, 2);
+      T.txt(g, 'dB', x + mw / 2, y - u * 0.5, u * 0.7, T.C.dim, 'm', 'center');
+      [0, -15, -30, -45, -60].forEach(db => T.txt(g, db, x - u * 0.4, y + mh * (-db / 60) + u * 0.25, u * 0.62, db === -15 ? T.C.alert : T.C.dim, 'm', 'right'));
+    },
+    // 32 сегментные полосы, отражение на глянцевом полу, шапки пиков
+    spectrum(g, a, u) {
+      const n = 32, L = a.x + u * 1.6, bw = (a.w - u * 1.6) / n, base = a.y + a.h * 0.7, H = base - a.y - u, seg = Math.max(4, u * 0.55);
+      // пол
+      const fl = g.createLinearGradient(0, base, 0, a.y + a.h);
+      fl.addColorStop(0, 'rgba(62,230,255,.10)'); fl.addColorStop(1, 'rgba(62,230,255,0)');
+      g.fillStyle = fl; g.fillRect(L, base, bw * n, a.y + a.h - base);
+      g.strokeStyle = 'rgba(32,50,64,.5)'; g.lineWidth = 1;
+      for (let k = 1; k <= 4; k++) { const y = base - H * k / 4; g.beginPath(); g.moveTo(L, y); g.lineTo(L + bw * n, y); g.stroke(); }
+      for (let i = 0; i < n; i++) {
+        const v = S.bands[i], x = L + i * bw, segs = Math.floor(v * H / seg);
+        for (let s = 0; s < segs; s++) {
+          const y = base - (s + 1) * seg, c = T.heat(0.25 + 0.75 * (s * seg) / H);
+          g.fillStyle = c; g.fillRect(x + bw * 0.12, y + seg * 0.15, bw * 0.76, seg * 0.7);
+          const ry = base + s * seg * 0.55 + seg * 0.2;                     // отражение: короче и тусклее
+          if (ry < a.y + a.h) { g.globalAlpha = 0.16 * (1 - s / (segs + 1)); g.fillRect(x + bw * 0.12, ry, bw * 0.76, seg * 0.4); g.globalAlpha = 1; }
+        }
+        const cy = base - S.caps[i] * H - seg * 0.4;
+        g.fillStyle = T.C.hot; g.fillRect(x + bw * 0.12, cy, bw * 0.76, Math.max(2, seg * 0.22));
+      }
+      g.fillStyle = T.C.acc; g.fillRect(L, base, bw * n, 1);
+      [[100, 4], [500, 14], [1000, 19], [4000, 28]].forEach(([f, i]) => T.txt(g, f >= 1000 ? f / 1000 + 'k' : f, L + (i + 0.5) * bw, a.y + a.h - u * 0.3, u * 0.8, T.C.label, 'm', 'center'));
+      T.txt(g, 'Hz', L + bw * n, a.y + a.h - u * 0.3, u * 0.7, T.C.dim, 'm', 'right');
+    },
+    // 3D-рельеф: новый хребет 40 раз в секунду, дальние — в тумане
+    terrain(g, w, h, dt, u, top) {
+      this.rowT += dt;
+      while (this.rowT > 0.025) {
+        this.rowT -= 0.025;
+        const C = this.COLS, raw = new Float32Array(C);
+        for (let c = 0; c < C; c++) { const k = c * 31 / (C - 1), k0 = Math.floor(k), f = k - k0; const b = S.bands[k0] * (1 - f) + S.bands[Math.min(31, k0 + 1)] * f; raw[c] = b * b; }
+        for (let pass = 0; pass < 2; pass++) for (let c = 1; c < C - 1; c++) raw[c] = (raw[c - 1] + 2 * raw[c] + raw[c + 1]) / 4;
+        let mx = 0; for (let c = 0; c < C; c++) mx = Math.max(mx, raw[c]);
+        this.top = Math.max(mx, this.top * 0.992, 0.12);
+        const prev = this.rows[0], row = new Float32Array(C), loud = T.clamp(S.energy * 1.6, 0, 1);
+        for (let c = 0; c < C; c++) {
+          const v = 1 - Math.exp(-2.2 * raw[c] / this.top), edge = Math.sin(Math.PI * (c + 0.5) / C);
+          const hh = v * (0.35 + 0.65 * loud) * (0.45 + 0.55 * edge) + 0.04 + 0.05 * ((T.hash(this.rows.length * 977 + c) & 255) / 255) * (0.3 + v);
+          row[c] = prev ? prev[c] * 0.35 + hh * 0.65 : hh;
+        }
+        let rm = 0; for (let c = 0; c < C; c++) rm = Math.max(rm, row[c]); row.max = rm;
+        this.rows.unshift(row); if (this.rows.length > this.ROWS) this.rows.pop();
+      }
+      const hy = top + (h - top) * (0.16 - this.tilt * 0.12), camH = 1.25 + this.tilt * 0.6, cx = w / 2;
+      const F = Math.max(Math.min(w, h * 1.6) * 0.62, (h * 0.97 - hy) * 1.5 / camH);
+      // солнце-резонатор на горизонте
+      const sx = w * 0.68, sunR = u * (1.8 + S.energy * 2.2);
+      const sg = g.createRadialGradient(sx, hy, 0, sx, hy, sunR * 2.4);
+      sg.addColorStop(0, 'rgba(235,250,255,.75)'); sg.addColorStop(0.25, 'rgba(62,230,255,.45)'); sg.addColorStop(1, 'rgba(62,230,255,0)');
+      g.fillStyle = sg; g.beginPath(); g.arc(sx, hy, sunR * 2.4, 0, T.TAU); g.fill();
+      for (let k = 1; k < 6; k++) { g.fillStyle = 'rgba(5,8,13,.85)'; g.fillRect(sx - sunR * 2.4, hy - k * sunR * 0.28, sunR * 4.8, Math.max(1, k * 0.6)); }
+      g.fillStyle = T.C.line; g.fillRect(0, hy, w, 1);
+      const sh = T.heatRGB(0.4);
+      for (let r = this.rows.length - 1; r >= 0; r--) {
+        const row = this.rows[r], z = 1.5 + r * 0.12, fade = 1 - r / this.ROWS * 0.85;
+        const by = hy + camH * F / z, xs = 3.2 * F / z;
+        g.beginPath(); g.moveTo(cx - xs, by);
+        for (let c = 0; c < this.COLS; c++) g.lineTo(cx + (c / (this.COLS - 1) * 2 - 1) * xs, hy + (camH - row[c] * 1.15) * F / z);
+        g.lineTo(cx + xs, by); g.closePath();
+        g.fillStyle = `rgb(${Math.round(sh[0] * 0.14 * fade + 4)},${Math.round(sh[1] * 0.14 * fade + 8)},${Math.round(sh[2] * 0.14 * fade + 12)})`;
+        g.fill();
+        g.strokeStyle = T.heat(0.3 + 0.7 * (row.max || 0), fade); g.lineWidth = r < 3 ? 2 : 1.1; g.stroke();
+      }
+    },
+    // реактор: ядро пульсирует уровнем, круговой спектр, частицы вылетают на басах
+    reactor(g, a, u, dt, t) {
+      const cx = a.x + a.w / 2, cy = a.y + a.h / 2, Rm = Math.min(a.w, a.h) * 0.42;
+      const lv = T.clamp((this.lvS + 60) / 60), bass = (S.bands[0] + S.bands[1] + S.bands[2] + S.bands[3]) / 4;
+      if (bass - this.bassPrev > 0.05 && !T.reduce) {
+        const k = Math.min(60, 15 + (bass - this.bassPrev) * 300);
+        for (let i = 0; i < k; i++) { const an = Math.random() * T.TAU, sp = Rm * (0.5 + Math.random() * 1.1) * (0.6 + bass); this.parts.push({ x: cx, y: cy, vx: Math.cos(an) * sp, vy: Math.sin(an) * sp, life: 1, s: 0.6 + Math.random() * 1.6 }); }
+        if (this.parts.length > 700) this.parts.splice(0, this.parts.length - 700);
+      }
+      this.bassPrev = T.lerp(this.bassPrev, bass, T.ease(dt, 0.12));
+      this.spin += dt * (0.25 + lv * 1.2);
+      const R0 = Rm * (0.2 + lv * 0.12);
+      // орбиты: наклонённые эллипсы
+      for (let k = 0; k < 3; k++) {
+        const rr = Rm * (0.55 + k * 0.17), tilt = 0.32 + k * 0.12, rot = this.spin * (k % 2 ? -0.4 : 0.3) + k;
+        g.save(); g.translate(cx, cy); g.rotate(rot); g.scale(1, tilt);
+        g.strokeStyle = k === 2 ? 'rgba(62,230,255,.55)' : 'rgba(90,112,128,.45)'; g.lineWidth = 1.2 / Math.sqrt(tilt);
+        g.beginPath(); g.arc(0, 0, rr, 0, T.TAU); g.stroke();
+        g.restore();
+        const pa = t * (0.6 + k * 0.3) * (k % 2 ? -1 : 1), ex = Math.cos(pa) * rr, ey = Math.sin(pa) * rr * tilt;   // «спутник» — без растяжения
+        g.fillStyle = T.C.hot; g.beginPath(); g.arc(cx + ex * Math.cos(rot) - ey * Math.sin(rot), cy + ex * Math.sin(rot) + ey * Math.cos(rot), u * 0.25, 0, T.TAU); g.fill();
+      }
+      // круговой спектр
+      const n = 32;
+      for (let i = 0; i < n * 2; i++) {
+        const b = S.bands[i < n ? i : 2 * n - 1 - i], an = this.spin * 0.2 + i / (n * 2) * T.TAU - Math.PI / 2;
+        const r1 = R0 * 1.35, r2 = r1 + b * Rm * 0.38;
+        g.strokeStyle = T.heat(0.3 + 0.7 * b); g.lineWidth = Math.max(2, R0 * 0.09);
+        g.beginPath(); g.moveTo(cx + Math.cos(an) * r1, cy + Math.sin(an) * r1); g.lineTo(cx + Math.cos(an) * r2, cy + Math.sin(an) * r2); g.stroke();
+      }
+      // ядро
+      const cg = g.createRadialGradient(cx, cy, 0, cx, cy, R0 * 1.25);
+      cg.addColorStop(0, 'rgba(235,250,255,1)'); cg.addColorStop(0.45, this.lvS >= -15 ? 'rgba(255,122,26,.9)' : 'rgba(62,230,255,.9)'); cg.addColorStop(1, 'rgba(62,230,255,0)');
+      g.fillStyle = cg; g.beginPath(); g.arc(cx, cy, R0 * 1.25, 0, T.TAU); g.fill();
+      g.strokeStyle = T.C.acc; g.lineWidth = 2; g.beginPath(); g.arc(cx, cy, R0 * 1.25, this.spin, this.spin + Math.PI * 1.4); g.stroke();
+      // частицы
+      g.fillStyle = T.C.acc;
+      for (let i = this.parts.length - 1; i >= 0; i--) {
+        const p = this.parts[i];
+        p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= Math.exp(-dt * 1.4); p.vy *= Math.exp(-dt * 1.4); p.life -= dt * 0.75;
+        if (p.life <= 0) { this.parts.splice(i, 1); continue; }
+        g.globalAlpha = p.life; g.fillRect(p.x - p.s, p.y - p.s, p.s * 2, p.s * 2);
+      }
+      g.globalAlpha = 1;
+      T.bigNum(g, Math.round(this.lvS), cx, cy + Rm * 1.02, u * 2.2, this.lvS >= -15 ? T.C.alert : T.C.hot, 'dBFS');
+    },
+    // осциллограф: гладкая линия, люминофор держит прошлые кадры
+    scope(g, a, u, dt) {
+      const tr = this.trW; tr.fit(); tr.fade(Math.min(1, dt * 11));
+      const x = tr.x, mid = a.y + a.h / 2, amp = a.h * 0.42, gain = 1 / Math.max(0.15, Math.min(1, Math.max(...this.wave.map(Math.abs)) * 1.1));
+      // сетка (на основном холсте — не размазывается)
+      g.strokeStyle = 'rgba(32,50,64,.6)'; g.lineWidth = 1;
+      for (let k = 0; k <= 10; k++) { const gx = a.x + a.w * k / 10; g.beginPath(); g.moveTo(gx, a.y); g.lineTo(gx, a.y + a.h); g.stroke(); }
+      for (let k = 0; k <= 8; k++) { const gy = a.y + a.h * k / 8; g.beginPath(); g.moveTo(a.x, gy); g.lineTo(a.x + a.w, gy); g.stroke(); }
+      g.strokeStyle = 'rgba(90,112,128,.6)'; g.beginPath(); g.moveTo(a.x, mid); g.lineTo(a.x + a.w, mid); g.stroke();
+      x.beginPath();
+      const P = i => [a.x + i / 63 * a.w, mid - T.clamp(this.wave[i] * gain, -1, 1) * amp];
+      let p0 = P(0); x.moveTo(p0[0], p0[1]);
+      for (let i = 1; i < 64; i++) { const p = P(i), mx = (p0[0] + p[0]) / 2, my = (p0[1] + p[1]) / 2; x.quadraticCurveTo(p0[0], p0[1], mx, my); p0 = p; }
+      x.lineTo(p0[0], p0[1]);
+      x.strokeStyle = 'rgba(62,230,255,.9)'; x.lineWidth = Math.max(2, u * 0.16); x.stroke();
+      x.strokeStyle = 'rgba(235,250,255,.9)'; x.lineWidth = Math.max(1, u * 0.06); x.stroke();
+      tr.draw(g);
+      T.brackets(g, a.x, a.y, a.w, a.h, u * 1.2, 'rgba(62,230,255,.6)');
+      T.txt(g, `×${gain.toFixed(1)}`, a.x + u * 0.6, a.y + u * 1.4, u * 0.8, T.C.label);
+    },
+    // XY: фигура из волны и её сдвинутой копии, с послесвечением
+    xy(g, a, u, dt) {
+      const tr = this.trX; tr.fit(); tr.fade(Math.min(1, dt * 4));
+      const x = tr.x, s = Math.min(a.w, a.h) * 0.46, cx = a.x + a.w / 2, cy = a.y + a.h / 2, k = 16;
+      const mx = Math.max(0.15, Math.max(...this.wave.map(Math.abs)));
+      g.strokeStyle = 'rgba(32,50,64,.6)'; g.lineWidth = 1;
+      g.strokeRect(cx - s, cy - s, s * 2, s * 2);
+      g.beginPath(); g.moveTo(cx - s, cy); g.lineTo(cx + s, cy); g.moveTo(cx, cy - s); g.lineTo(cx, cy + s); g.stroke();
+      g.beginPath(); g.arc(cx, cy, s, 0, T.TAU); g.stroke();
+      x.beginPath();
+      for (let i = 0; i <= 64; i++) {
+        const j = i % 64, px = cx + this.wave[j] / mx * s * 0.92, py = cy - this.wave[(j + k) % 64] / mx * s * 0.92;
+        i ? x.lineTo(px, py) : x.moveTo(px, py);
+      }
+      x.strokeStyle = 'rgba(62,230,255,.85)'; x.lineWidth = Math.max(1.5, u * 0.13); x.lineJoin = 'round'; x.stroke();
+      x.strokeStyle = 'rgba(235,250,255,.8)'; x.lineWidth = Math.max(0.8, u * 0.05); x.stroke();
+      tr.draw(g);
+      T.brackets(g, cx - s, cy - s, s * 2, s * 2, u * 1.2, 'rgba(62,230,255,.6)');
+      T.txt(g, 'X: t   Y: t + 90°', cx - s + u * 0.6, cy - s + u * 1.4, u * 0.8, T.C.label);
+    },
+  });
+})();
