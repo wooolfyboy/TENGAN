@@ -22,34 +22,42 @@ Stream.connect = (want) => {
   on('st', d => { S.onSt(d); T.app && T.app.status(); });
   on('ble', S.onBle); on('wifi', S.onWifi); on('snd', S.onSnd); on('sub', S.onSub); on('pc', S.onPc); on('sat', S.onSat);
   es.onerror = () => { if (Stream.mode === 'live') Stream.setLink('off'); };
-  setTimeout(() => { if (!opened && Stream.es === es) { es.close(); Stream.es = null; Stream.poll(want); } }, 3500);
+  setTimeout(() => { if (!opened && Stream.es === es) { es.close(); Stream.es = null; Stream.poll(want); } }, 5000);
 };
 // запасной путь: те же данные через старые /api/* (медленнее, но работает)
 Stream.poll = (want) => {
   Stream.setLink('poll');
-  const tab = want.includes('snd') ? 'snd' : want.includes('wifi') && !want.includes('ble') ? 'wifi' : 'ble';
+  // палка включает радио по вкладке: строго то, что смотрим, остальное молчит
+  const has = k => want.split(/[,&]/).includes(k);
+  const tab = has('snd') ? 'snd' : has('sub') ? 'sub' : has('ble') && has('wifi') ? 'ov' : has('ble') ? 'ble' : has('wifi') ? 'wifi' : 'sys';
   const J = u => fetch(apiBase() + u + (u.includes('?') ? '&' : '?') + 'tab=' + tab, { cache: 'no-store' }).then(r => r.json());
-  let n = 0;
+  let n = 0, busy = false;
   const step = async () => {
+    if (busy) return;                                    // палка не успела ответить — не заваливаем её запросами
+    busy = true;
     try {
       n++;
-      if (want.includes('snd')) {
+      if (has('snd')) {
         const j = await J('/api/snd');
         S.onSnd({ en: j.en ? 1 : 0, ok: j.ok ? 1 : 0, lv: j.lv, pk: j.pk, hz: j.hz, e: j.e,
           b: (j.b || []).map(v => Math.round(v * 2.55).toString(16).padStart(2, '0')).join(''), w: '' });
       }
-      if (want.includes('ble') && n % 8 === 1) {
+      if (has('ble') && n % 8 === 1) {
         const j = await J('/api/ble');
         S.onBle({ on: j.on ? 1 : 0, n: j.count, m: j.macs, d: j.dev.map(d => [d.id, d.r, d.t, d.v, d.n, d.age, d.m]) });
       }
-      if (want.includes('wifi') && n % 40 === 1) S.onWifi(await J('/api/wifi'));
-      if (want.includes('sub') && n % 2 === 1) {
+      if (has('wifi') && n % 40 === 1) S.onWifi(await J('/api/wifi'));
+      if (has('sub') && n % 2 === 1) {
         const m = /sm=(\d+)/.exec(want), b = /sb=(\d+)/.exec(want);
         S.onSub(await J('/api/sub?m=' + (m ? m[1] : 0) + '&b=' + (b ? b[1] : 1)));
       }
       if (n % 16 === 1) { const i = await J('/api/info'); S.onSt({ name: 'TENGAN', up: i.up, bat: i.bat.ok ? i.bat.soc : -1, usb: i.bat.usb ? 1 : 0, cli: i.cli }); T.app.status(); }
       Stream.lastMsg = performance.now();
     } catch (e) { Stream.setLink('off'); }
+    busy = false;
   };
   Stream.pollT = setInterval(step, 125); step();
+  // запасной путь — временный: через 8 с снова пробуем нормальный поток
+  clearTimeout(Stream.retryT);
+  Stream.retryT = setTimeout(() => { if (Stream.mode === 'poll' && Stream.want === want) Stream.connect(want); }, 8000);
 };

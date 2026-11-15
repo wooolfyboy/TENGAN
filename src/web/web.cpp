@@ -48,7 +48,8 @@ static int        s_qrN = 0;
 static int        s_netCount = 0;
 static uint32_t   s_subMs = 0, s_sndMs = 0;     // когда вкладки Sub-GHz / Sound последний раз спрашивали
 static bool       s_subOn = false, s_sndOn = false;
-static const char* s_tab = "";                  // что сейчас смотрят на телефоне (для экрана палки)
+static const char* s_tab = "";
+static int8_t      s_bleWanted = -1;            // что webTick последний раз решил про Bluetooth (-1 — пересчитать)
 
 // ---------- обновление прошивки по Wi-Fi (OTA) ----------
 // Принимаем и обычный firmware.bin, и «общий» файл для прошивки на 0x0
@@ -213,7 +214,7 @@ static void otaDone() {
     ESP.restart();
   }
   s_otaPct = -1;
-  bleRadioOn();
+  s_bleWanted = -1;                                // радио вернёт webTick — по тому, что смотрят
 }
 
 // ============================================================
@@ -337,7 +338,7 @@ static void webStart() {
   if (s_on) return;
   wifiRadioOff();                                  // раздел Wi-Fi мог оставить радио в своём режиме
   bleLowDuty(true);
-  bleRadioOn();                                    // Bluetooth слушает (реже — делит эфир с точкой)
+  s_bleWanted = -1;                                // Bluetooth включит webTick, только если его смотрят (реже — делит эфир с точкой)
   WiFi.mode(WIFI_AP_STA);
   makeNames();                                     // MAC известен после включения Wi-Fi
   s_ok = WiFi.softAP(s_ssid, s_pass, 6, 0, 4);
@@ -431,11 +432,11 @@ static void webTick(uint32_t now) {
   // работает только то, что нужно открытой вкладке, остальное молчит:
   //  Bluetooth — на «Обзоре» и «Bluetooth»; скан сетей — на «Обзоре» и «Wi-Fi»;
   //  CC1101 и микрофон — только на своих вкладках (ниже)
-  static bool bleWanted = true;
-  bool wantBle = s_tab[0] == 0 || tabIs("overview") || tabIs("bluetooth");
+  // пока никто ничего не смотрит — радио молчит (железное правило: что работает, то и читается)
+  bool wantBle = tabIs("overview") || tabIs("bluetooth");
   if (nSse) wantBle = sBle;                          // планшет подключён — решают его подписки
-  if (wantBle != bleWanted) { bleWanted = wantBle; if (wantBle) bleRadioOn(); else bleRadioOff(); }
-  bool wantScan = s_tab[0] == 0 || tabIs("overview") || tabIs("wi-fi");
+  if ((int8_t)wantBle != s_bleWanted) { s_bleWanted = wantBle; if (wantBle) bleRadioOn(); else bleRadioOff(); }
+  bool wantScan = tabIs("overview") || tabIs("wi-fi");
   if (nSse) wantScan = sWifi;
   // CC1101 и микрофон работают, только пока их вкладку смотрят на телефоне
   // время берём заново: запрос мог прийти уже после того, как посчитали now,

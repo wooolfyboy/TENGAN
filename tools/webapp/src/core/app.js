@@ -20,6 +20,7 @@ App.renderSubs = () => {
   });
 };
 App.go = id => {
+  Gv.bad = Gv.good = 0;
   const v = T.views.find(x => x.id === id) || T.views[0];
   if (App.cur) App.cur.unmount();
   App.cur = v;
@@ -41,6 +42,22 @@ document.getElementById('fs').onclick = () => {
   const d = document.documentElement;
   if (document.fullscreenElement) document.exitFullscreen(); else (d.requestFullscreen || d.webkitRequestFullscreen).call(d);
 };
+// подбор качества: держим плавность. Экран 144/120/60 Гц — ориентир берём по лучшему
+// замеченному fps. Тормозит 2 с подряд — шаг вниз; запас 8 с — пробуем шаг вверх,
+// но не на уровень, который уже не потянул (минуту).
+const Gv = { best: 0, bad: 0, good: 0, failed: {} };
+const govern = fps => {
+  if (document.hidden) return;
+  Gv.best = Math.max(Gv.best * 0.999, fps);
+  const target = Math.min(Gv.best, 144);
+  if (fps < Math.max(40, target * 0.7)) { Gv.bad++; Gv.good = 0; } else if (fps > target * 0.9) { Gv.good++; Gv.bad = 0; } else { Gv.bad = Gv.good = 0; }
+  if (Gv.bad >= 2 && T.qLevel < T.QL.length - 1) { Gv.failed[T.qLevel] = performance.now(); T.setQuality(T.qLevel + 1); Gv.bad = 0; }
+  if (Gv.good >= 8 && T.qLevel > 0) {
+    const up = T.qLevel - 1, f = Gv.failed[up];
+    if (!f || performance.now() - f > 60000) T.setQuality(up);
+    Gv.good = 0;
+  }
+};
 // цикл кадров: рисует планшет, данные «перетекают» между пакетами
 let last = performance.now(), fpsN = 0, fpsT = 0;
 const loop = now => {
@@ -48,7 +65,7 @@ const loop = now => {
   S.tick(dt);
   if (App.cur) App.cur.frame(dt, now / 1000);
   fpsN++; fpsT += dt;
-  if (fpsT >= 1) { document.getElementById('fps').textContent = fpsN + ' FPS'; T.fps = fpsN; fpsN = 0; fpsT = 0; }
+  if (fpsT >= 1) { T.fps = fpsN; govern(fpsN / fpsT); document.getElementById('fps').textContent = fpsN + ' FPS · Q' + T.qLevel; fpsN = 0; fpsT = 0; }
   if (T.Stream.mode === 'live' && now - T.Stream.lastMsg > 6000) T.Stream.setLink('off');
   requestAnimationFrame(loop);
 };

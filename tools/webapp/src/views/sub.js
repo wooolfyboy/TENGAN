@@ -4,7 +4,7 @@
 (() => {
 const BANDS = ['315', '433.92', '868', '915'];
 const lvl = v => T.clamp((v + 120 - 10) / 70);          // как wfColor на палке
-const ROWS = 48, BINS = 96;
+const ROWS = 36, BINS = 96;
 
 T.views.push({
   id: 'sub', title: 'Sub-GHz', subs: ['Spectrum', 'Monitor'], sub: 0,
