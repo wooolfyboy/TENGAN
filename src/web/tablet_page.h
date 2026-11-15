@@ -1,5 +1,6 @@
 // АВТОМАТИЧЕСКИ СГЕНЕРИРОВАНО tools/webapp/build.py из tools/webapp/src — не править руками.
 // Приложение для планшета (один HTML, gzip). Отдаётся по /tablet.
+// html-sha256: ec003d546d53ab8d99998645c8fec1ecd8d83e3068c2f43720735da6df1f8597
 #pragma once
 #include <Arduino.h>
 

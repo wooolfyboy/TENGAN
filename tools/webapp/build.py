@@ -9,7 +9,7 @@
     python3 tools/webapp/build.py --html out.html   # ещё и сохранить несжатый HTML (для проверки)
     python3 tools/webapp/build.py --html out.html --only-html   # только HTML, прошивку не трогать
 """
-import gzip, json, os, re, sys
+import gzip, hashlib, json, os, re, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, "src")
@@ -75,8 +75,10 @@ def main():
         if "--only-html" in sys.argv:                  # для разработки: прошивку не трогать
             print("tablet: %d КБ HTML" % (len(html) // 1024)); return
     gz = gzip.compress(html.encode("utf-8"), compresslevel=9, mtime=0)   # mtime=0 — одинаковый результат при пересборке
+    digest = hashlib.sha256(html.encode("utf-8")).hexdigest()
     lines = ["// АВТОМАТИЧЕСКИ СГЕНЕРИРОВАНО tools/webapp/build.py из tools/webapp/src — не править руками.",
              "// Приложение для планшета (один HTML, gzip). Отдаётся по /tablet.",
+             "// html-sha256: " + digest,
              "#pragma once", "#include <Arduino.h>", "",
              "static const uint8_t TABLET_GZ[] PROGMEM = {"]
     for i in range(0, len(gz), 20):
@@ -84,8 +86,10 @@ def main():
     lines += ["};", "static const size_t TABLET_GZ_LEN = %d;" % len(gz), ""]
     data = "\n".join(lines)
     if "--check" in sys.argv:                          # для CI: исходники и прошивка не разъехались
+        # сравниваем сам HTML (по хэшу), а не сжатые байты: zlib разных версий жмёт чуть по-разному
         cur = open(OUT, encoding="utf-8").read() if os.path.exists(OUT) else ""
-        if cur != data:
+        m = re.search(r"html-sha256: ([0-9a-f]{64})", cur)
+        if not m or m.group(1) != digest:
             sys.exit("src/web/tablet_page.h устарел: запусти python3 tools/webapp/build.py")
         print("tablet_page.h актуален"); return
     open(OUT, "w", encoding="utf-8").write(data)
