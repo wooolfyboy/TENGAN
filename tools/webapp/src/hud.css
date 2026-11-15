@@ -39,6 +39,6 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--hot);font:16px/1
 #modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:9}
 #modal .card{width:min(640px,92vw);max-height:84vh;overflow:auto;background:rgba(10,20,28,.95);border:1px solid var(--acc);padding:18px;clip-path:polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,14px 100%,0 calc(100% - 14px))}
 .hide{display:none!important}
-@media (max-width:1400px){#fps,#radios{display:none}#nav button{padding:8px 10px 7px;font-size:17px}}
+@media (max-width:1400px){#radios{display:none}#nav button{padding:8px 10px 7px;font-size:17px}}
 @media (max-width:760px){.logo .nm{font-size:20px}#nav button{padding:7px 9px 6px;font-size:15px}#clock{display:none}}
 @media (prefers-reduced-motion:reduce){#wipe.go{animation:none}}

@@ -41,18 +41,29 @@ document.getElementById('fs').onclick = () => {
   const d = document.documentElement;
   if (document.fullscreenElement) document.exitFullscreen(); else (d.requestFullscreen || d.webkitRequestFullscreen).call(d);
 };
-// цикл кадров: рисует планшет, данные «перетекают» между пакетами
-let last = performance.now(), fpsN = 0, fpsT = 0;
+// ---- стабильный режим планшета: не больше 60 кадров, картинка ~1920 по длинной стороне ----
+// Свечение — единственный тяжёлый эффект: если 3 с подряд меньше 45 кадров, оно гаснет
+// (страховка; на нормальном планшете не срабатывает).
+const FPS_CAP = 60, STEP = 1000 / FPS_CAP;
+let last = performance.now(), next = last, fpsN = 0, fpsT = 0, slow = 0;
 const loop = now => {
+  requestAnimationFrame(loop);
+  if (now < next - 1) return;                          // экран 120/144 Гц: лишние кадры пропускаем
+  next = Math.max(next + STEP, now - STEP);            // отстали — не догоняем пачкой
   const dt = Math.min(0.1, (now - last) / 1000); last = now;
   S.tick(dt);
-  if (App.cur) App.cur.frame(dt, now / 1000);
+  if (App.cur && !App.hold) App.cur.frame(dt, now / 1000);   // во время заставки сцена ждёт (данные идут)
   fpsN++; fpsT += dt;
-  if (fpsT >= 1) { document.getElementById('fps').textContent = fpsN + ' FPS'; T.fps = fpsN; fpsN = 0; fpsT = 0; }
+  if (fpsT >= 1) {
+    const fps = Math.round(fpsN / fpsT); T.fps = fps;
+    if (!document.hidden) { slow = fps < 45 ? slow + 1 : 0; if (slow >= 3 && T.Q.bloom) { T.Q.bloom = 0; T.Q.scan = 0; } }
+    document.getElementById('fps').textContent = fps + ' FPS' + (T.Q.bloom ? '' : ' · LITE');
+    fpsN = 0; fpsT = 0;
+  }
   if (T.Stream.mode === 'live' && now - T.Stream.lastMsg > 6000) T.Stream.setLink('off');
-  requestAnimationFrame(loop);
 };
-let first = 'ov'; try { first = localStorage.getItem('view') || 'ov'; } catch (e) {}
-App.go(first);
-T.boot && T.boot();
+// старт (boot.js): сначала «запуск» со шкалой — связь, радио раздела (по умолчанию Bluetooth),
+// данные, сцена; потом красивая заставка; потом раздел
+let first = 'ble'; try { first = localStorage.getItem('view') || 'ble'; } catch (e) {}
+if (T.boot) T.boot(first); else App.go(first);
 requestAnimationFrame(loop);

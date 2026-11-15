@@ -4,7 +4,7 @@
 (() => {
 const BANDS = ['315', '433.92', '868', '915'];
 const lvl = v => T.clamp((v + 120 - 10) / 70);          // как wfColor на палке
-const ROWS = 48, BINS = 96;
+const ROWS = 36, BINS = 96;
 
 T.views.push({
   id: 'sub', title: 'Sub-GHz', subs: ['Spectrum', 'Monitor'], sub: 0,
@@ -71,7 +71,6 @@ T.views.push({
   spectrum(g, w, h, u, m, y0, dt, d, title) {
     const cam = this.cam, portrait = h > w * 1.05, cur = d.cur || [], n = cur.length || BINS;
     this.drag.tick(dt);
-    if (this.drag.idle()) cam.yaw = T.lerp(cam.yaw, 0.18 * Math.sin(this.t * 0.07), T.ease(dt, 2));
     cam.yaw = T.clamp(cam.yaw, -0.8, 0.8);
     cam.frame(w / 2, portrait ? h * 0.42 : h * 0.5, portrait ? w * 1.05 : Math.min(w * 0.7, h * 1.2));
     const X = i => (i / (n - 1) - 0.5) * 3.0, Z = r => -1.0 + r * (2.4 / ROWS), HY = 0.75;
@@ -80,9 +79,18 @@ T.views.push({
     for (let i = 0; i < n; i++) { this.peak[i] = Math.max(cur[i] ?? -120, this.peak[i] - dt * 6); if (cur[i] > cur[mi]) mi = i; }
     const pk = cur[mi] ?? -120, burst = pk > -70;
     this.flash = Math.max(burst ? 1 : 0, this.flash - dt * 1.5);
-    T.floorGrid(g, cam, 1.8, 0.2);
-    // рельеф: дальние строки первыми
-    const rows = S.subWf, R = Math.min(ROWS, rows.length);
+    // «фейк»: рельеф меняется только с новой строкой данных (~7 раз в с) или при повороте камеры —
+    // рисуем его в отдельный слой и в остальные кадры просто кладём готовую картинку
+    const rows = S.subWf, R = Math.min(ROWS, rows.length), cv = this.cv.cv;
+    const key = `${S.subT}|${cam.yaw.toFixed(3)}|${cam.pitch.toFixed(3)}|${cv.width}x${cv.height}`;
+    if (!this.layer) { this.layer = document.createElement('canvas'); this.lg = this.layer.getContext('2d'); }
+    const fresh = key !== this.layerKey;
+    if (fresh) {
+      this.layerKey = key;
+      if (this.layer.width !== cv.width || this.layer.height !== cv.height) { this.layer.width = cv.width; this.layer.height = cv.height; }
+      const keep = g; g = this.lg;
+      g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cv.width, cv.height); g.setTransform(this.cv.dpr, 0, 0, this.cv.dpr, 0, 0);
+      T.floorGrid(g, cam, 1.8, 0.2);
     for (let r = R - 1; r >= 0; r--) {
       const row = rows[r], z = Z(r), fog = T.clamp(1 - r / ROWS * 0.85, 0.12, 1);
       const pts = new Array(n);
@@ -98,6 +106,9 @@ T.views.push({
       g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]));
       g.strokeStyle = stroke; g.lineWidth = r === 0 ? 2.2 : 1.1; g.stroke();
     }
+      g = keep;
+    }
+    g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(this.layer, 0, 0); g.restore();
     // передняя линия + пики
     if (cur.length) {
       const z = Z(0) - 0.02;

@@ -48,7 +48,8 @@ static int        s_qrN = 0;
 static int        s_netCount = 0;
 static uint32_t   s_subMs = 0, s_sndMs = 0;     // когда вкладки Sub-GHz / Sound последний раз спрашивали
 static bool       s_subOn = false, s_sndOn = false;
-static const char* s_tab = "";                  // что сейчас смотрят на телефоне (для экрана палки)
+static const char* s_tab = "";
+static int8_t      s_bleWanted = -1;            // что webTick последний раз решил про Bluetooth (-1 — пересчитать)
 
 // ---------- обновление прошивки по Wi-Fi (OTA) ----------
 // Принимаем и обычный firmware.bin, и «общий» файл для прошивки на 0x0
@@ -93,29 +94,58 @@ static const char* encStr(wifi_auth_mode_t e) {
   }
 }
 
-static void scanCollect() {
-  int n = WiFi.scanComplete();
-  if (n < 0) return;                              // ещё идёт (или не запускали)
-  String o; o.reserve(64 + n * 90);
+// Скан сетей «по одному каналу»: раньше палка уходила с канала точки на все 13 каналов
+// разом (~1.2 с) — планшет/телефон терял связь и мог отвалиться от Wi-Fi. Теперь раз в
+// SCAN_STEP_MS слушаем один канал ~90 мс и сразу возвращаемся; полный круг — ~20 с,
+// результаты копятся в таблице и устаревают через NET_FORGET_MS.
+#define NET_MAX 64
+static const uint32_t SCAN_STEP_MS = 1500, NET_FORGET_MS = 60000;
+struct NetRec { uint8_t b[6]; char ssid[33]; int8_t r; uint8_t ch, enc; uint32_t t; };
+static NetRec   s_nets[NET_MAX];
+static int      s_nNets = 0;
+static uint8_t  s_scanCh = 1;
+
+static void netsJson() {
+  uint32_t now = millis();
+  int w = 0;                                       // выбросить давно не слышанные
+  for (int i = 0; i < s_nNets; i++) if (now - s_nets[i].t < NET_FORGET_MS) s_nets[w++] = s_nets[i];
+  s_nNets = w;
+  String o; o.reserve(64 + s_nNets * 90);
   o += "{\"scanned\":true,\"nets\":[";
-  for (int i = 0; i < n; i++) {
+  for (int i = 0; i < s_nNets; i++) {
+    const NetRec& n = s_nets[i];
     if (i) o += ',';
-    uint8_t* b = WiFi.BSSID(i);
-    char mac[18]; snprintf(mac, sizeof(mac), "%02X:%02X:%02X:%02X:%02X:%02X", b[0], b[1], b[2], b[3], b[4], b[5]);
-    const char* v = ouiName(b);                   // производитель по первым байтам адреса
-    o += "{\"s\":"; jsonStr(o, WiFi.SSID(i));
+    char mac[18]; snprintf(mac, sizeof(mac), "%02X:%02X:%02X:%02X:%02X:%02X", n.b[0], n.b[1], n.b[2], n.b[3], n.b[4], n.b[5]);
+    const char* v = ouiName(n.b);                  // производитель по первым байтам адреса
+    o += "{\"s\":"; jsonStr(o, n.ssid);
     o += ",\"b\":\""; o += mac; o += '"';
     o += ",\"v\":"; jsonStr(o, v ? v : "");
-    o += ",\"r\":"; o += WiFi.RSSI(i);
-    o += ",\"c\":"; o += WiFi.channel(i);
-    o += ",\"e\":\""; o += encStr(WiFi.encryptionType(i)); o += "\"}";
+    o += ",\"r\":"; o += n.r;
+    o += ",\"c\":"; o += n.ch;
+    o += ",\"e\":\""; o += encStr((wifi_auth_mode_t)n.enc); o += "\"}";
   }
   o += "]}";
   s_wifiJson = o;
-  s_netCount = n;
+  s_netCount = s_nNets;
   s_wifiGen++;
   s_scanned = true;
+}
+
+static void scanCollect() {
+  int n = WiFi.scanComplete();
+  if (n < 0) return;                              // ещё идёт (или не запускали)
+  uint32_t now = millis();
+  for (int i = 0; i < n; i++) {
+    uint8_t* b = WiFi.BSSID(i);
+    int k = 0;
+    while (k < s_nNets && memcmp(s_nets[k].b, b, 6)) k++;
+    if (k == s_nNets) { if (s_nNets >= NET_MAX) continue; s_nNets++; memcpy(s_nets[k].b, b, 6); }
+    NetRec& r = s_nets[k];
+    strlcpy(r.ssid, WiFi.SSID(i).c_str(), sizeof(r.ssid));
+    r.r = WiFi.RSSI(i); r.ch = WiFi.channel(i); r.enc = (uint8_t)WiFi.encryptionType(i); r.t = now;
+  }
   WiFi.scanDelete();
+  netsJson();
 }
 
 // какая вкладка открыта на телефоне: страница присылает её в каждом запросе (?tab=)
@@ -213,7 +243,7 @@ static void otaDone() {
     ESP.restart();
   }
   s_otaPct = -1;
-  bleRadioOn();
+  s_bleWanted = -1;                                // радио вернёт webTick — по тому, что смотрят
 }
 
 // ============================================================
@@ -337,7 +367,7 @@ static void webStart() {
   if (s_on) return;
   wifiRadioOff();                                  // раздел Wi-Fi мог оставить радио в своём режиме
   bleLowDuty(true);
-  bleRadioOn();                                    // Bluetooth слушает (реже — делит эфир с точкой)
+  s_bleWanted = -1;                                // Bluetooth включит webTick, только если его смотрят (реже — делит эфир с точкой)
   WiFi.mode(WIFI_AP_STA);
   makeNames();                                     // MAC известен после включения Wi-Fi
   s_ok = WiFi.softAP(s_ssid, s_pass, 6, 0, 4);
@@ -346,13 +376,21 @@ static void webStart() {
   s_dns.setErrorReplyCode(DNSReplyCode::NoError);
   s_dns.start(53, "*", ip);                        // любые адреса -> на палку (страница откроется сама)
   s_srv = new WebServer(80);
-  s_srv->on("/", [] { s_reqs++; s_srv->send_P(200, "text/html", WEB_PAGE); });
-  s_srv->on("/tablet", [] {                        // приложение для планшета: один файл, сжатый gzip
+  // вход: «/» — запуск, заставка и выбор LITE / FULL (то же приложение, что /full);
+  // «/lite» — лёгкая телефонная страница; «/full» — сразу полная сцена, без выбора.
+  // Старые адреса /phone и /tablet оставлены и ведут туда же.
+  static auto sendApp = [] {                       // приложение для планшета: один файл, сжатый gzip
     s_reqs++;
     s_srv->sendHeader("Content-Encoding", "gzip");
     s_srv->sendHeader("Cache-Control", "no-cache");
     s_srv->send_P(200, "text/html", (const char*)TABLET_GZ, TABLET_GZ_LEN);
-  });
+  };
+  s_srv->on("/", [] { sendApp(); });
+  s_srv->on("/full", [] { sendApp(); });
+  s_srv->on("/tablet", [] { sendApp(); });
+  static auto sendLite = [] { s_reqs++; s_srv->send_P(200, "text/html", WEB_PAGE); };
+  s_srv->on("/lite", [] { sendLite(); });
+  s_srv->on("/phone", [] { sendLite(); });
   s_srv->on("/api/ble", [] { String o; bleJson(o); sendJson(o); });
   s_srv->on("/api/bledev", [] { String o; bleDevJson((uint32_t)strtoul(s_srv->arg("id").c_str(), nullptr, 10), o); sendJson(o); });
   s_srv->on("/api/wifi", [] { sendJson(s_wifiJson); });
@@ -397,7 +435,7 @@ static void webStart() {
   s_sseSrv = new NetworkServer(81);                  // «вторая дверь» — поток для планшета
   s_sseSrv->begin();
   s_sseSrv->setNoDelay(true);
-  s_scanMs = millis() - 15000;                     // первый скан — через пару секунд
+  s_scanMs = millis();                             // первый канал — через пару секунд
   s_on = true;
 }
 
@@ -431,11 +469,11 @@ static void webTick(uint32_t now) {
   // работает только то, что нужно открытой вкладке, остальное молчит:
   //  Bluetooth — на «Обзоре» и «Bluetooth»; скан сетей — на «Обзоре» и «Wi-Fi»;
   //  CC1101 и микрофон — только на своих вкладках (ниже)
-  static bool bleWanted = true;
-  bool wantBle = s_tab[0] == 0 || tabIs("overview") || tabIs("bluetooth");
+  // пока никто ничего не смотрит — радио молчит (железное правило: что работает, то и читается)
+  bool wantBle = tabIs("overview") || tabIs("bluetooth");
   if (nSse) wantBle = sBle;                          // планшет подключён — решают его подписки
-  if (wantBle != bleWanted) { bleWanted = wantBle; if (wantBle) bleRadioOn(); else bleRadioOff(); }
-  bool wantScan = s_tab[0] == 0 || tabIs("overview") || tabIs("wi-fi");
+  if ((int8_t)wantBle != s_bleWanted) { s_bleWanted = wantBle; if (wantBle) bleRadioOn(); else bleRadioOff(); }
+  bool wantScan = tabIs("overview") || tabIs("wi-fi");
   if (nSse) wantScan = sWifi;
   // CC1101 и микрофон работают, только пока их вкладку смотрят на телефоне
   // время берём заново: запрос мог прийти уже после того, как посчитали now,
@@ -443,9 +481,10 @@ static void webTick(uint32_t now) {
   uint32_t t = millis();
   if (s_subOn) { if ((int32_t)(t - s_subMs) > 4000) { subWebStop(); s_subOn = false; } else subWebTick(t); }
   if (s_sndOn) { if ((int32_t)(t - s_sndMs) > 4000) { audioWebStop(); s_sndOn = false; } else audioWebTick(t); }
-  if (wantScan && now - s_scanMs > 20000 && WiFi.scanComplete() != WIFI_SCAN_RUNNING) {   // скан «глушит» точку на ~1 с
+  if (wantScan && now - s_scanMs > SCAN_STEP_MS && WiFi.scanComplete() != WIFI_SCAN_RUNNING) {   // один канал за раз — точка не пропадает
     s_scanMs = now;
-    WiFi.scanNetworks(true, true, false, 90);       // асинхронно, 90 мс на канал
+    WiFi.scanNetworks(true, true, false, 90, s_scanCh);   // асинхронно, 90 мс на один канал
+    s_scanCh = s_scanCh >= 13 ? 1 : s_scanCh + 1;
   }
 }
 

@@ -114,8 +114,10 @@ class Api(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         u = urlparse(self.path)
         q = parse_qs(u.query)
-        if u.path == "/tablet":
+        if u.path in ("/", "/full", "/tablet"):     # «/» — с выбором LITE / FULL, «/full» — сразу полная сцена
             body, ct = HTML, "text/html"
+        elif u.path in ("/lite", "/phone"):
+            body, ct = "<h1>phone page (на палке — web_page.h)</h1>".encode(), "text/html"
         elif u.path == "/api/bledev":
             body, ct = json.dumps({"addr": [{"mac": "4A:11:22:33:44:55", "kind": "rotating (private)", "r": -52, "ago": 1}], "n": "AirPods Pro", "t": "audio", "v": "Apple",
                                    "r": -52, "rmin": -71, "rmax": -44, "pk": 812, "age": 720, "cid": "0x004C", "uu": [{"u": "FD6F", "o": "Exposure"}], "mfr": "4C0012"}).encode(), "application/json"

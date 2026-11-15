@@ -39,6 +39,10 @@ T.hex8 = (h, signed) => {
 };
 T.el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
 T.reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+// ---- качество: фиксированное (стабильный режим). Холст ~1920 px по длинной стороне,
+// свечение, пыль и сканлайны включены; app.js гасит свечение, только если совсем не тянет.
+T.RES = 1920;
+T.Q = { bloom: 1, dust: 1, scan: 1 };
 
 // ---- «спокойное» значение: дрожь меньше порога не показываем, большие изменения перетекают ----
 // const s = T.steady(4, 0.7); s.set(v); каждый кадр s.tick(dt); s.v — что рисовать
@@ -184,23 +188,35 @@ T.drag = (cv, cam, opt = {}) => {
 };
 
 // ---- атмосфера: свечение, пыль, сканлайны, виньетка ----
-// свечение (bloom): копия кадра в ¼ разрешения, размытая, ложится поверх «светом»
+// свечение (bloom): кадр уменьшается цепочкой ½ → ¼ → ⅛ (каждый шаг честно усредняет,
+// поэтому тонкие линии не мерцают) и ложится поверх «светом». Только drawImage — дёшево на GPU,
+// без ctx.filter (на Android он считается процессором и роняет кадры).
 T.bloom = (o, strength = 0.85) => {
+  if (!T.Q.bloom) return;
   const cv = o.cv, g = o.g;
-  if (!o.glow) { o.glow = document.createElement('canvas'); o.gx = o.glow.getContext('2d'); }
-  const gw = Math.max(1, cv.width >> 2), gh = Math.max(1, cv.height >> 2);
-  if (o.glow.width !== gw || o.glow.height !== gh) { o.glow.width = gw; o.glow.height = gh; }
-  const gx = o.gx;
-  gx.setTransform(1, 0, 0, 1, 0, 0); gx.globalCompositeOperation = 'copy';
-  gx.filter = `blur(${Math.max(2, gw / 160)}px)`; gx.drawImage(cv, 0, 0, gw, gh); gx.filter = 'none'; gx.globalCompositeOperation = 'source-over';
-  g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'lighter'; g.globalAlpha = strength;
-  g.drawImage(o.glow, 0, 0, cv.width, cv.height); g.restore();
+  if (!o.bl) o.bl = [0, 1, 2].map(() => { const c = document.createElement('canvas'); return { c, g: c.getContext('2d') }; });
+  // «фейк»: само размытие пересчитываем через кадр, накладываем каждый кадр — глазу не видно, нагрузка вдвое меньше
+  o.blN = (o.blN || 0) + 1;
+  const redo = (o.blN & 1) || o.bl[0].c.width !== Math.max(1, cv.width >> 1);
+  let src = cv;
+  for (let i = 0; redo && i < 3; i++) {
+    const b = o.bl[i], w = Math.max(1, cv.width >> (i + 1)), h = Math.max(1, cv.height >> (i + 1));
+    if (b.c.width !== w || b.c.height !== h) { b.c.width = w; b.c.height = h; }
+    b.g.globalCompositeOperation = 'copy'; b.g.imageSmoothingEnabled = true; b.g.imageSmoothingQuality = 'low';
+    b.g.drawImage(src, 0, 0, w, h);
+    src = b.c;
+  }
+  g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'lighter'; g.imageSmoothingEnabled = true;
+  g.globalAlpha = strength * 0.45; g.drawImage(o.bl[1].c, 0, 0, cv.width, cv.height);
+  g.globalAlpha = strength * 0.6; g.drawImage(o.bl[2].c, 0, 0, cv.width, cv.height);
+  g.restore();
 };
 T.backdrop = (g, W, H, fx = 0.45, fy = 0.55) => {
   const r = g.createRadialGradient(W * fx, H * fy, 0, W * fx, H * fy, Math.max(W, H) * 0.75);
   r.addColorStop(0, '#0a1722'); r.addColorStop(1, T.C.bg); g.fillStyle = r; g.fillRect(0, 0, W, H);
 };
 T.finish = (g, W, H) => {                               // сканлайны + виньетка: последним слоем
+  if (!T.Q.scan) return;
   if (!T._scan) { const c = document.createElement('canvas'); c.width = 4; c.height = 4; const x = c.getContext('2d'); x.fillStyle = 'rgba(0,0,0,.16)'; x.fillRect(0, 0, 4, 1); T._scanC = c; }
   if (!T._scan || T._scanG !== g) { T._scan = g.createPattern(T._scanC, 'repeat'); T._scanG = g; }
   g.fillStyle = T._scan; g.fillRect(0, 0, W, H);
@@ -215,6 +231,7 @@ T.dust = (n = 220, ext = 1.7, top = 1.1) => {
   return {
     tick(dt) { for (let i = 0; i < n; i++) { P[i * 3 + 1] += dt * 0.035; if (P[i * 3 + 1] > top) P[i * 3 + 1] = 0; } },
     draw(g, cam) {
+      if (!T.Q.dust) return;
       const b = [[], [], []];
       for (let i = 0; i < n; i++) { const p = cam.p(P[i * 3], P[i * 3 + 1], P[i * 3 + 2]); if (cam.D + p[3] < 0.3) continue; b[p[3] < -0.4 ? 2 : p[3] < 0.6 ? 1 : 0].push(p); }
       [0.18, 0.32, 0.55].forEach((a, k) => { g.fillStyle = `rgba(62,230,255,${a})`; g.beginPath(); for (const p of b[k]) { const s = Math.max(0.8, p[2] * 0.0045); g.rect(p[0] - s / 2, p[1] - s / 2, s, s); } g.fill(); });
