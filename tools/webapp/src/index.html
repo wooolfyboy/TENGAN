@@ -1,19 +1,22 @@
 <!doctype html>
 <html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#02090b">
+<meta name="theme-color" content="#05080d">
 <meta name="mobile-web-app-capable" content="yes">
 <title>TENGAN 天眼</title>
+<style>/*@INLINE fonts.css*/</style>
 <style>/*@INLINE hud.css*/</style>
 </head><body>
 <header id="bar">
-  <div class="logo">// TENGAN <span>天眼</span></div>
+  <div class="logo"><span class="nm">TENGAN</span><canvas id="seal" width="16" height="30" aria-hidden="true"></canvas></div>
   <nav id="nav"></nav>
-  <div class="stat"><span id="link" class="dot"></span><span id="linkTxt">…</span><span id="bat"></span><span id="fps"></span>
-    <button id="fs" title="на весь экран">⛶</button></div>
+  <div class="stat"><span id="radios"></span><span id="link" class="dot"></span><span id="linkTxt">…</span><span id="bat"></span><span id="clock"></span><span id="fps"></span>
+    <button id="fs" title="на весь экран" aria-label="на весь экран">⛶</button></div>
 </header>
 <div id="subs"></div>
 <main id="main"></main>
+<div id="wipe"></div>
+<div id="boot"><canvas id="bootCv"></canvas></div>
 <div id="modal" class="hide"><div class="card" id="modalCard"></div></div>
 <script>/*@INLINE core/util.js*/</script>
 <script>/*@INLINE core/canvas.js*/</script>
@@ -22,7 +25,11 @@
 <script>/*@INLINE views/overview.js*/</script>
 <script>/*@INLINE views/ble.js*/</script>
 <script>/*@INLINE views/wifi.js*/</script>
+<script>/*@INLINE views/sub.js*/</script>
 <script>/*@INLINE views/sound.js*/</script>
+<script>/*@INLINE views/pc.js*/</script>
+<script>/*@INLINE views/astro.js*/</script>
 <script>/*@INLINE views/gallery.js*/</script>
+<script>/*@INLINE core/boot.js*/</script>
 <script>/*@INLINE core/app.js*/</script>
 </body></html>

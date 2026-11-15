@@ -7,12 +7,45 @@
 
     python3 tools/webapp/build.py            # собрать
     python3 tools/webapp/build.py --html out.html   # ещё и сохранить несжатый HTML (для проверки)
+    python3 tools/webapp/build.py --html out.html --only-html   # только HTML, прошивку не трогать
 """
-import gzip, os, re, sys
+import gzip, json, os, re, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, "src")
 OUT = os.path.join(HERE, "..", "..", "src", "web", "tablet_page.h")
+FW = os.path.join(HERE, "..", "..", "src")
+
+
+def c_array(text, name):
+    """Числа из static const ... NAME[] = { ... }; в плоский список."""
+    m = re.search(r"\b%s\b[^=]*=\s*\{(.*?)\};" % re.escape(name), text, re.S)
+    assert m, name
+    return [int(x) for x in re.findall(r"-?\d+", re.sub(r'"[^"]*"', "", m.group(1)))]
+
+
+def data_js():
+    """Данные с палки для планшета — берутся прямо из заголовков прошивки, чтобы не разъезжались:
+    звёзды, линии созвездий, контуры суши (gallery/astrodata.h) и печать 天眼 (core/seal.h)."""
+    a = open(os.path.join(FW, "gallery", "astrodata.h"), encoding="utf-8").read()
+    seal = open(os.path.join(FW, "core", "seal.h"), encoding="utf-8").read()
+    con = re.search(r"CON_NAMES\[\]\s*=\s*\{(.*?)\};", a, re.S).group(1)
+    cons = [[int(r), int(d), ab, ru] for r, d, ab, ru in re.findall(r'\{\s*(-?\d+),\s*(-?\d+),\s*"([^"]*)",\s*"([^"]*)"\s*\}', con)]
+    names = re.search(r"STAR_NAMES\[\]\s*=\s*\{(.*?)\};", a, re.S).group(1)
+    snames = [[int(i), n] for i, n in re.findall(r'\{\s*(\d+),\s*"([^"]*)"\s*\}', names)]
+    w = int(re.search(r"SEAL_W\s*=\s*(\d+)", seal).group(1)); h = int(re.search(r"SEAL_H\s*=\s*(\d+)", seal).group(1))
+    bits = "".join("%02x" % v for v in c_array(seal, "SEAL_BITS"))
+    d = {
+        "stars": c_array(a, "STARS"),            # тройки: ra*100, dec*100, (mag+2)*10
+        "starNames": snames,
+        "cl": c_array(a, "CL_PTS"),              # пары ra*100, dec*100 (uint16 -> знак восстановить)
+        "clStart": c_array(a, "CL_START"),
+        "con": cons,                             # [ra*100, dec*100, "Ori", "Орион"]
+        "land": c_array(a, "LAND_PTS"),          # пары (как в gallery_sky.cpp)
+        "landStart": c_array(a, "LAND_START"),
+        "seal": {"w": w, "h": h, "bits": bits},
+    }
+    return "T.DATA=" + json.dumps(d, ensure_ascii=False, separators=(",", ":")) + ";"
 
 
 def slim(code, kind):
@@ -33,6 +66,7 @@ def build():
         code = open(os.path.join(SRC, path), encoding="utf-8").read()
         return slim(code, "css" if path.endswith(".css") else "js")
     html = re.sub(r"/\*@INLINE ([^*]+?)\*/", inline, html)
+    html = html.replace("/*@DATA*/", data_js())
     assert "@INLINE" not in html
     assert not re.search(r'(src|href)="https?://', html), "внешние ссылки запрещены: страница должна работать без интернета"
     return html
@@ -42,6 +76,8 @@ def main():
     html = build()
     if "--html" in sys.argv:
         open(sys.argv[sys.argv.index("--html") + 1], "w", encoding="utf-8").write(html)
+        if "--only-html" in sys.argv:                  # для разработки: прошивку не трогать
+            print("tablet: %d КБ HTML" % (len(html) // 1024)); return
     gz = gzip.compress(html.encode("utf-8"), compresslevel=9, mtime=0)   # mtime=0 — одинаковый результат при пересборке
     lines = ["// АВТОМАТИЧЕСКИ СГЕНЕРИРОВАНО tools/webapp/build.py из tools/webapp/src — не править руками.",
              "// Приложение для планшета (один HTML, gzip). Отдаётся по /tablet.",

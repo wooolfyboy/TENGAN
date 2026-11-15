@@ -19,8 +19,8 @@ Stream.connect = (want) => {
   Stream.es = es;
   const on = (ev, fn) => es.addEventListener(ev, e => { Stream.lastMsg = performance.now(); try { fn(JSON.parse(e.data)); } catch (x) {} });
   es.onopen = () => { opened = true; Stream.setLink('live'); };
-  on('st', d => { S.st = d; T.app && T.app.status(); });
-  on('ble', S.onBle); on('wifi', S.onWifi); on('snd', S.onSnd);
+  on('st', d => { S.onSt(d); T.app && T.app.status(); });
+  on('ble', S.onBle); on('wifi', S.onWifi); on('snd', S.onSnd); on('sub', S.onSub); on('pc', S.onPc); on('sat', S.onSat);
   es.onerror = () => { if (Stream.mode === 'live') Stream.setLink('off'); };
   setTimeout(() => { if (!opened && Stream.es === es) { es.close(); Stream.es = null; Stream.poll(want); } }, 3500);
 };
@@ -43,7 +43,11 @@ Stream.poll = (want) => {
         S.onBle({ on: j.on ? 1 : 0, n: j.count, m: j.macs, d: j.dev.map(d => [d.id, d.r, d.t, d.v, d.n, d.age, d.m]) });
       }
       if (want.includes('wifi') && n % 40 === 1) S.onWifi(await J('/api/wifi'));
-      if (n % 16 === 1) { const i = await J('/api/info'); S.st = { name: 'TENGAN', up: i.up, bat: i.bat.ok ? i.bat.soc : -1, usb: i.bat.usb ? 1 : 0, cli: i.cli }; T.app.status(); }
+      if (want.includes('sub') && n % 2 === 1) {
+        const m = /sm=(\d+)/.exec(want), b = /sb=(\d+)/.exec(want);
+        S.onSub(await J('/api/sub?m=' + (m ? m[1] : 0) + '&b=' + (b ? b[1] : 1)));
+      }
+      if (n % 16 === 1) { const i = await J('/api/info'); S.onSt({ name: 'TENGAN', up: i.up, bat: i.bat.ok ? i.bat.soc : -1, usb: i.bat.usb ? 1 : 0, cli: i.cli }); T.app.status(); }
       Stream.lastMsg = performance.now();
     } catch (e) { Stream.setLink('off'); }
   };
