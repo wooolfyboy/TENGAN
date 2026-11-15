@@ -2,6 +2,7 @@
 //  power.cpp — выключение / включение боковой кнопкой
 // ============================================================
 #include <esp_sleep.h>
+#include "core/timeutil.h"
 #include <driver/gpio.h>
 #include <driver/rtc_io.h>
 #include "core/power.h"
@@ -24,7 +25,7 @@ bool powerIdle() { return s_dimmed; }
 void powerIdleTick(uint32_t now) {
   uint32_t limit = DIM_SECS[g_dimIdx] * 1000UL;
   if (!limit) { if (s_dimmed) powerTouch(); return; }  // выключено в настройках
-  if (!s_dimmed && now - s_lastTouch > limit) {
+  if (!s_dimmed && msSince(now, s_lastTouch) > limit) {
     s_dimmed = true;
     analogWrite(TFT_BL, g_scrBright * 255 / 100 / 4);   // четверть яркости
   }

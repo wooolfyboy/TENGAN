@@ -29,7 +29,6 @@ T.cool = (v, a = 1) => T.rgb(T.ramp(T.COOL, v), a);
 T.ALERT = [255, 122, 26];
 T.rgba = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; };
 T.hash = s => { let h = 2166136261; s = String(s); for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); return h >>> 0; };
-T.esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 T.ago = s => s < 60 ? (s | 0) + 's' : s < 3600 ? Math.floor(s / 60) + 'm' : Math.floor(s / 3600) + 'h ' + Math.floor(s / 60) % 60 + 'm';
 T.pct = r => T.clamp((r + 95) / 50, 0, 1);            // сила сигнала 0..1 (-95 .. -45 dBm), как на палке
 T.hex8 = (h, signed) => {
@@ -54,14 +53,11 @@ T.steady = (db = 4, tau = 0.7) => ({
 
 // ---- текст ----
 T.txt = (g, s, x, y, px, col, f = 'm', al = 'left', bl = 'alphabetic') => {
-  g.font = f === 't' ? `600 ${px}px ${T.FT}` : f === 'c' ? `500 ${px}px ${T.FC}` : `${px}px ${T.FM}`;
+  g.font = f === 't' ? `600 ${px}px ${T.FT}` : f === 'c' ? `500 ${px}px ${T.FC}` : f === 'k' ? `${px}px ${T.SEAL_FONT}` : `${px}px ${T.FM}`;
   g.fillStyle = col; g.textAlign = al; g.textBaseline = bl; g.fillText(s, x, y);
 };
-T.tw = (g, s, px, f = 'm') => { g.font = f === 't' ? `600 ${px}px ${T.FT}` : f === 'c' ? `500 ${px}px ${T.FC}` : `${px}px ${T.FM}`; return g.measureText(s).width; };
+T.tw = (g, s, px, f = 'm') => { g.font = f === 't' ? `600 ${px}px ${T.FT}` : f === 'c' ? `500 ${px}px ${T.FC}` : f === 'k' ? `${px}px ${T.SEAL_FONT}` : `${px}px ${T.FM}`; return g.measureText(s).width; };
 T.fit = (g, s, max) => { s = String(s); if (g.measureText(s).width <= max) return s; while (s.length > 1 && g.measureText(s + '…').width > max) s = s.slice(0, -1); return s + '…'; };
-// совместимость со старыми видами
-T.font = (px, bold) => `${bold ? '600 ' : ''}${px}px ${bold ? T.FT : T.FM}`;
-T.text = (g, s, x, y, px, col, align = 'left', base = 'alphabetic', bold) => T.txt(g, s, x, y, px, col, bold ? 't' : 'm', align, base);
 
 // ---- единица разметки: 16 px на планшете 1280×800, пропорционально на других ----
 T.unit = (W, H) => Math.min(W / 80, H / 50);
@@ -94,7 +90,6 @@ T.brackets = (g, x, y, w, h, L, col = T.C.acc, lw = 1.5) => {
   g.moveTo(x + L, y + h); g.lineTo(x, y + h); g.lineTo(x, y + h - L);
   g.stroke();
 };
-T.corners = (g, x, y, w, h, L = 16, col = T.C.acc) => T.brackets(g, x, y, w, h, L, col, 2);
 T.cutPath = (g, x, y, w, h, c) => { g.beginPath(); g.moveTo(x + c, y); g.lineTo(x + w, y); g.lineTo(x + w, y + h - c); g.lineTo(x + w - c, y + h); g.lineTo(x, y + h); g.lineTo(x, y + c); g.closePath(); };
 // панель со срезанными углами; по умолчанию «стекло» поверх 3D-сцены
 T.panel = (g, x, y, w, h, u, fill = 'rgba(14,42,52,.28)', stroke = 'rgba(62,230,255,.22)') => {
@@ -135,7 +130,7 @@ T.bigNum = (g, v, x, y, px, col, unit, al = 'left') => {
 // печать 天眼 векторная: заливка цветом, знаки «вырезаны» цветом фона (шрифт Tengan Seal —
 // два знака IPAGothic в fonts.css). Чёткая при любом размере. Возвращает ширину.
 T.SEAL_FONT = "'Tengan Seal','Noto Sans CJK JP','Noto Sans JP',sans-serif";
-T.drawSeal = (g, x, y, h, col = T.C.acc, bg = T.C.bg) => {
+T.drawSeal = (g, x, y, h, col = T.C.seal || T.C.acc, bg = T.C.bg) => {
   const w = h * 0.56, c = h * 0.1;
   T.cutPath(g, x, y, w, h, c); g.fillStyle = col; g.fill();
   g.strokeStyle = bg; g.lineWidth = Math.max(1, h * 0.03);
@@ -146,7 +141,7 @@ T.drawSeal = (g, x, y, h, col = T.C.acc, bg = T.C.bg) => {
   return w;
 };
 // печать на один знак (квадратная): filled — залитая с вырезанным знаком, иначе контур
-T.drawSealChar = (g, x, y, sz, ch, col = T.C.acc, filled = true, bg = T.C.bg) => {
+T.drawSealChar = (g, x, y, sz, ch, col = T.C.seal || T.C.acc, filled = true, bg = T.C.bg) => {
   const c = sz * 0.14;
   T.cutPath(g, x, y, sz, sz, c);
   if (filled) { g.fillStyle = col; g.fill(); g.strokeStyle = bg; g.lineWidth = Math.max(1, sz * 0.035); T.cutPath(g, x + sz * 0.08, y + sz * 0.08, sz * 0.84, sz * 0.84, c * 0.6); g.stroke(); }
@@ -156,25 +151,6 @@ T.drawSealChar = (g, x, y, sz, ch, col = T.C.acc, filled = true, bg = T.C.bg) =>
   g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = `${sz * 0.62}px ${T.SEAL_FONT}`;
   g.fillText(ch, x + sz / 2, y + sz * 0.53); g.strokeText(ch, x + sz / 2, y + sz * 0.53);
 };
-// (старое) печать 天眼 из прошивки (core/seal.h) — пиксельная, для экрана палки — кэшируется по размеру и цвету
-T.sealImg = (() => {
-  const cache = {};
-  return (h, col = T.C.acc) => {
-    const k = (h | 0) + col; if (cache[k]) return cache[k];
-    const D = T.DATA && T.DATA.seal; if (!D) return null;
-    const src = document.createElement('canvas'); src.width = D.w; src.height = D.h;
-    const sx = src.getContext('2d'), im = sx.createImageData(D.w, D.h), n = parseInt(col.slice(1), 16);
-    for (let y = 0; y < D.h; y++) for (let x = 0; x < D.w; x++) {
-      const byte = parseInt(D.bits.substr((y * (D.w >> 3) + (x >> 3)) * 2, 2), 16);
-      if ((byte >> (7 - (x & 7))) & 1) { const o = (y * D.w + x) * 4; im.data[o] = n >> 16; im.data[o + 1] = (n >> 8) & 255; im.data[o + 2] = n & 255; im.data[o + 3] = 255; }
-    }
-    sx.putImageData(im, 0, 0);
-    const c = document.createElement('canvas'), s = Math.max(1, Math.round(h / D.h));
-    c.width = D.w * s; c.height = D.h * s;
-    const cx = c.getContext('2d'); cx.imageSmoothingEnabled = false; cx.drawImage(src, 0, 0, c.width, c.height);
-    return (cache[k] = c);
-  };
-})();
 
 // ---- 3D: камера на орбите ----
 // const cam = T.orbit(); cam.frame(cx, cy, F); const p = cam.p(x, y, z) -> [sx, sy, scale, depth]
@@ -183,12 +159,10 @@ T.orbit = (yaw = 0.6, pitch = 0.95, D = 3.2) => ({
   frame(cx, cy, F) { this.cx = cx; this.cy = cy; this.F = F; this.cs = Math.cos(this.yaw); this.sn = Math.sin(this.yaw); this.cp = Math.cos(this.pitch); this.sp = Math.sin(this.pitch); },
   p(x, y, z) {
     const x1 = x * this.cs - z * this.sn, z1 = x * this.sn + z * this.cs;
-    const y2 = y * this.cp + z1 * this.sp, z2 = -y * this.sp + z1 * this.cp, s = this.F / (this.D + z2);
+    const y2 = y * this.cp + z1 * this.sp, z2 = -y * this.sp + z1 * this.cp, s = this.F / Math.max(0.05, this.D + z2);   // точка за камерой не даёт отрицательный/бесконечный масштаб
     return [this.cx + x1 * s, this.cy - y2 * s, s, z2];
   },
 });
-// старая форма (совместимость)
-T.cam = (yaw, pitch, dist, F, cx, cy) => { const o = T.orbit(yaw, pitch, dist); o.frame(cx, cy, F); return (x, y, z) => { const p = o.p(x, y, z); return [p[0], p[1], dist + p[3]]; }; };
 // пальцем: тянуть — облёт, отпустить — инерция. Возвращает {down, tap(cb)}
 T.drag = (cv, cam, opt = {}) => {
   const st = { down: null, vy: 0, last: 0, onTap: null, moved: false };

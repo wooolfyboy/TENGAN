@@ -4,8 +4,10 @@
 //  BARS (спектр) · REACTOR (анимация) · LEVEL (шумомер) · SCOPE (волна)
 // ============================================================
 #include "audio/audio_model.h"
+#include "core/timeutil.h"
 #include "core/display.h"
 #include "core/theme.h"
+#include "core/settings.h"
 #include "core/ui.h"
 #include "core/psram.h"
 
@@ -171,7 +173,7 @@ void drawLevel(uint32_t now) {
 // ============================================================
 void drawWave(uint32_t now) {
   int W = spr.width();
-  char buf[24];
+  char buf[40];                                  // «AUTO GAIN X16000  RAW 32767  L» — 30 символов
   spr.fillSprite(C_BG());
   hzStr(g_au.domHz, buf, sizeof(buf));
   uiHeader("Waveform", src(g_au.energy > 0.15f ? buf : "listening"));
@@ -206,7 +208,6 @@ void drawWave(uint32_t now) {
 }
 
 void drawMicMissing() {
-  int W = spr.width();
   char buf[48];
   spr.fillSprite(C_BG());
   if (g_micDiag.disabled) {
@@ -293,7 +294,7 @@ void drawTerrain(uint32_t now) {
   if (!s_trH) return;
   const int W = spr.width();
   g_fastFrame = true;
-  if (now - s_trLast >= 45) { s_trLast = now; terrainPush(); }
+  if (msSince(now, s_trLast) >= 45) { s_trLast = now; terrainPush(); }
   char buf[40], hz[16];
   spr.fillSprite(C_BG());
   hzStr(g_au.domHz, hz, sizeof(hz));
@@ -307,7 +308,9 @@ void drawTerrain(uint32_t now) {
   };
   // небо: «солнце» на горизонте светится от громкости
   int sunR = 12 + (int)(g_au.energy * 8);
-  spr.fillCircle(cx + 60, (int)hy - 2, sunR, scale565(C_ACC(), 20 + (int)(g_au.energy * 35)));
+  // в DENKO — светящийся диск цветом акцента; в SUMI — красное солнце киноварью, как на картинах тушью
+  uint16_t sunC = g_theme == THEME_SUMI ? scale565(C_SEAL(), 70 + (int)(g_au.energy * 30)) : scale565(C_ACC(), 20 + (int)(g_au.energy * 35));
+  spr.fillCircle(cx + 60, (int)hy - 2, sunR, sunC);
   spr.drawFastHLine(0, (int)hy, W, UI_LINE());
 
   // от дальнего хребта к ближнему: каждый — залитый силуэт со светлым гребнем

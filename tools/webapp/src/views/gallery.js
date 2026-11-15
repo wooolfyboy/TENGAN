@@ -204,9 +204,10 @@ T.views.push({
     if (Lf.t > 4) Lf.t = 0;
     const D = Lf.img.data, fade = Math.pow(0.05, dt);
     for (let i = 0; i < W * H; i++) {
-      const a = Lf.a[i]; let r = 5, gg = 8, bb = 13;
-      if (a) { const c = a === 1 ? [235, 250, 255] : T.heatRGB(Math.max(0.42, 0.95 - a * 0.025)); r = c[0]; gg = c[1]; bb = c[2]; }
-      else if (Lf.glow[i] > 0.01) { const k = Lf.glow[i] * 0.5; r = 5 + 35 * k; gg = 8 + 87 * k; bb = 13 + 117 * k; Lf.glow[i] *= fade; }
+      const a = Lf.a[i], ink = T.theme === 'sumi';          // тушь: бумага, живые клетки — тушь, «призраки» — размывка
+      let r = ink ? 236 : 5, gg = ink ? 228 : 8, bb = ink ? 212 : 13;
+      if (a) { const c = a === 1 ? (ink ? [27, 24, 20] : [235, 250, 255]) : T.heatRGB(Math.max(0.42, 0.95 - a * 0.025)); r = c[0]; gg = c[1]; bb = c[2]; }
+      else if (Lf.glow[i] > 0.01) { const k = Lf.glow[i] * 0.5; if (ink) { r = 236 - 70 * k; gg = 228 - 70 * k; bb = 212 - 66 * k; } else { r = 5 + 35 * k; gg = 8 + 87 * k; bb = 13 + 117 * k; } Lf.glow[i] *= fade; }
       D[i * 4] = r; D[i * 4 + 1] = gg; D[i * 4 + 2] = bb; D[i * 4 + 3] = 255;
     }
     Lf.off.getContext('2d').putImageData(Lf.img, 0, 0);
@@ -485,7 +486,10 @@ T.views.push({
         const nz = Math.sqrt(1 - rr), lit = nx * sv[0] + ny * sv[1] + nz * sv[2];
         const k = T.clamp((lit + 0.08) / 0.2), limb = 0.55 + 0.45 * nz;
         const tw = Math.max(0, 1 - Math.abs(lit) / 0.025) * 0.55;                    // полоса терминатора
-        Dd[q] = (6 + 14 * k) * limb + 40 * tw; Dd[q + 1] = (12 + 46 * k) * limb + 120 * tw; Dd[q + 2] = (18 + 58 * k) * limb + 140 * tw; Dd[q + 3] = 255;
+        if (T.theme === 'sumi') {                          // тушь: день — бумага, ночь — размывка тушью, терминатор — мазок
+          const v = 1 - (0.55 * (1 - k) + 0.12 * (1 - limb)) - 0.5 * tw;
+          Dd[q] = 27 + 209 * v; Dd[q + 1] = 24 + 204 * v; Dd[q + 2] = 20 + 192 * v; Dd[q + 3] = 255;
+        } else { Dd[q] = (6 + 14 * k) * limb + 40 * tw; Dd[q + 1] = (12 + 46 * k) * limb + 120 * tw; Dd[q + 2] = (18 + 58 * k) * limb + 140 * tw; Dd[q + 3] = 255; }
       }
     }
     this.gOff.getContext('2d').putImageData(this.gImg, 0, 0);

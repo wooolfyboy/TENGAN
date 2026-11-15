@@ -12,6 +12,7 @@
 //  Колесо — скорость, нажатие — назад в подменю.
 // ============================================================
 #include <algorithm>
+#include "core/timeutil.h"
 #include "gallery/gallery.h"
 #include "core/display.h"
 #include "core/theme.h"
@@ -236,7 +237,7 @@ void drawLife(uint32_t now) {
   g_fastFrame = true;
   if (s_lfGen == 0 && s_lfPop == 0) lfSeed();
   uint32_t every = s_speed > 0 ? (uint32_t)(110 / s_speed) : 0;
-  if (every && now - s_lfLast >= every) { s_lfLast = now; lfStep(); }
+  if (every && msSince(now, s_lfLast) >= every) { s_lfLast = now; lfStep(); }
   spr.fillSprite(C_BG());
   const int x0 = (spr.width() - LF_W * LF_CELL) / 2, y0 = UI_TOP + 1;
   for (int y = 0; y < LF_H; y++)
@@ -278,9 +279,12 @@ static void pdDeriv(const float* y, float* d) {          // y = th1, th2, w1, w2
 static void pdStep(float h) {
   float y[4] = { s_th1, s_th2, s_w1, s_w2 }, k1[4], k2[4], k3[4], k4[4], t[4];
   pdDeriv(y, k1);
-  for (int i = 0; i < 4; i++) t[i] = y[i] + k1[i] * h / 2; pdDeriv(t, k2);
-  for (int i = 0; i < 4; i++) t[i] = y[i] + k2[i] * h / 2; pdDeriv(t, k3);
-  for (int i = 0; i < 4; i++) t[i] = y[i] + k3[i] * h;     pdDeriv(t, k4);
+  for (int i = 0; i < 4; i++) t[i] = y[i] + k1[i] * h / 2;
+  pdDeriv(t, k2);
+  for (int i = 0; i < 4; i++) t[i] = y[i] + k2[i] * h / 2;
+  pdDeriv(t, k3);
+  for (int i = 0; i < 4; i++) t[i] = y[i] + k3[i] * h;
+  pdDeriv(t, k4);
   for (int i = 0; i < 4; i++) y[i] += h / 6 * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]);
   s_th1 = y[0]; s_th2 = y[1]; s_w1 = y[2]; s_w2 = y[3];
 }

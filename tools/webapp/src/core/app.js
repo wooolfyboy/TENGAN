@@ -18,15 +18,26 @@ App.renderSubs = () => {
     subs.appendChild(b);
   });
 };
+// разделы живут в памяти планшета: при уходе сцена прячется, а не уничтожается — при возврате
+// город (и любой раздел) показывается сразу, со всем, что уже вырос/накопил. Держим KEEP последних,
+// самый старый освобождаем, чтобы не забивать память.
+const KEEP = 3, alive = [];
 App.go = id => {
   const v = T.views.find(x => x.id === id) || T.views[0];
-  if (App.cur) App.cur.unmount();
+  if (App.cur === v) return;
+  if (App.cur && App.cur.root) App.cur.root.hidden = true;
   App.cur = v;
-  try { const s = localStorage.getItem('sub_' + v.id); if (s != null && v.subs) v.sub = Math.min(+s, v.subs.length - 1); localStorage.setItem('view', id); } catch (e) {}
+  const i = alive.indexOf(v); if (i >= 0) alive.splice(i, 1);
+  alive.push(v);
+  while (alive.length > KEEP) { const old = alive.shift(); old.unmount(); old.root = null; }
+  if (i < 0) {                                         // новый (или выгруженный) — подставить сохранённую вкладку
+    try { const s = localStorage.getItem('sub_' + v.id); if (s != null && v.subs) v.sub = Math.min(+s, v.subs.length - 1); } catch (e) {}
+  }
+  try { localStorage.setItem('view', id); } catch (e) {}
   [...nav.children].forEach(b => b.classList.toggle('on', b.dataset.id === v.id));
   const w = document.getElementById('wipe'); w.classList.remove('go'); void w.offsetWidth; w.classList.add('go');
   App.renderSubs();
-  v.mount(main);
+  if (v.root) { v.root.hidden = false; v.cv && v.cv.fit(); } else v.mount(main);
   App.rewant();
 };
 // подписка на потоки: вид может менять её на лету (want — строка или функция)

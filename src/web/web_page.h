@@ -12,7 +12,9 @@ static const char WEB_PAGE[] PROGMEM = R"HTML(<!doctype html>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>TENGAN</title>
 <style>
-:root{--bg:#02090b;--panel:#071419;--line:#12303a;--acc:#3fd9ff;--hot:#eafcff;--steel:#7f97a3;--dim:#46606b;--alert:#ff8a3d}
+:root{--bg:#02090b;--panel:#071419;--line:#12303a;--acc:#3fd9ff;--hot:#eafcff;--steel:#7f97a3;--dim:#46606b;--alert:#ff8a3d;--row:#0b1f26;--hov:#0a1d24;--track:#0b2630;--accA8:rgba(63,217,255,.8);--accA2:rgba(63,217,255,.25);--onacc:#02090b;--fh:inherit}
+body.sumi{--bg:#ece4d4;--panel:#e2d8c6;--line:#c9bfae;--acc:#1b1814;--hot:#1b1814;--steel:#4a433b;--dim:#8a8174;--alert:#c23a2b;--row:#d9cfbd;--hov:#e4dac8;--track:#d4c9b6;--accA8:rgba(27,24,20,.8);--accA2:rgba(27,24,20,.18);--onacc:#ece4d4;--fh:'Noto Serif JP','Hiragino Mincho ProN','Yu Mincho',serif}
+body.sumi h1{font-family:var(--fh);letter-spacing:.04em}body.sumi nav button.on{background:var(--alert);border-color:var(--alert);color:var(--onacc)}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--hot);font:14px/1.35 ui-monospace,Menlo,Consolas,monospace}
 header{position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--line);z-index:3}
 .top{padding:10px 16px;display:flex;align-items:center;gap:12px}
@@ -29,9 +31,9 @@ main{padding:12px 16px 40px;max-width:960px;margin:0 auto}
 canvas{width:100%;display:block}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.chip{border:1px solid var(--line);padding:3px 8px;font-size:12px;color:var(--steel)}.chip b{color:var(--hot);font-weight:600}
 table{width:100%;border-collapse:collapse}th{font-size:11px;color:var(--steel);text-align:left;font-weight:400;letter-spacing:.08em;padding:6px 4px;border-bottom:1px solid var(--line);cursor:pointer;white-space:nowrap}
-td{padding:7px 4px;border-bottom:1px solid #0b1f26;vertical-align:middle}td.n{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-tr.cl{cursor:pointer}tr.cl:hover td{background:#0a1d24}
-.bar{height:6px;background:#0b2630;width:64px;position:relative}.bar i{position:absolute;left:0;top:0;bottom:0;background:var(--acc)}
+td{padding:7px 4px;border-bottom:1px solid var(--row);vertical-align:middle}td.n{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+tr.cl{cursor:pointer}tr.cl:hover td{background:var(--hov)}
+.bar{height:6px;background:var(--track);width:64px;position:relative}.bar i{position:absolute;left:0;top:0;bottom:0;background:var(--acc)}
 .alert{color:var(--alert)}.hide{display:none!important}
 .seg{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}.seg button{background:transparent;color:var(--steel);border:1px solid var(--line);padding:6px 10px;font:inherit;font-size:12px;cursor:pointer}.seg button.on{color:var(--hot);border-color:var(--acc)}
 .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px}.kv span:nth-child(odd){color:var(--steel)}
@@ -124,7 +126,10 @@ function go(t){cur=t;TABS.forEach(([k])=>{$('n-'+k).className=k==t?'on':'';$('p-
  (async function loop(){while(my==gen){const t0=Date.now();await f();const w=ms-(Date.now()-t0);await new Promise(r=>setTimeout(r,Math.max(w,10)))}})()}
 
 // ---------- шапка ----------
-async function info(){try{const j=await J('/api/info');const b=j.bat;$('bat').textContent=b.ok?'PWR '+b.soc+'%':'';
+// тема палки: TENGAN (по умолчанию) или SUMI — тушь на бумаге; цвета холстов берутся из CSS-переменных
+const CV=n=>getComputedStyle(document.body).getPropertyValue('--'+n).trim();
+function theme(t){document.body.classList.toggle('sumi',t==='sumi')}
+async function info(){try{const j=await J('/api/info');theme(j.theme);const b=j.bat;$('bat').textContent=b.ok?'PWR '+b.soc+'%':'';
  const s=j.up;$('up').textContent='T+'+[s/3600|0,(s/60|0)%60,s%60].map(v=>String(v).padStart(2,'0')).join(':');return j}catch(e){}}
 
 // ---------- обзор ----------
@@ -139,17 +144,17 @@ function sorter(st){return(a,b)=>{let x=a[st.k],y=b[st.k];return(typeof x=='stri
 function heads(sec,st,fn){document.querySelectorAll('#'+sec+' th[data-k]').forEach(th=>th.onclick=()=>{const k=th.dataset.k;st.d=st.k==k?-st.d:-1;st.k=k;fn()})}
 function line(c,a,h,col,min,max){const[g,W,H]=sizeC(c,h);if(a.length<2)return;min=min??Math.min(...a);max=max??Math.max(...a);if(max==min)max=min+1;
  g.strokeStyle=col;g.lineWidth=2*dp();g.beginPath();a.forEach((v,i)=>{const x=i/(a.length-1)*W,y=H-4*dp()-(v-min)/(max-min)*(H-12*dp());i?g.lineTo(x,y):g.moveTo(x,y)});g.stroke();
- g.fillStyle='#7f97a3';g.font=10*dp()+'px monospace';g.fillText(Math.round(max),3,11*dp());g.fillText(Math.round(min),3,H-3)}
+ g.fillStyle=CV('steel');g.font=10*dp()+'px monospace';g.fillText(Math.round(max),3,11*dp());g.fillText(Math.round(min),3,H-3)}
 function drawB(){$('bl').innerHTML=[...bd].sort(sorter(bs)).map(d=>{const al=d.t=='tracker';
- return`<tr class="cl" onclick="openDev(${d.id})"><td><div class="bar"><i style="width:${pct(d.r)}%;${al?'background:#ff8a3d':''}"></i></div><span class="dim">${d.r}</span></td><td class="n${al?' alert':''}">${esc(d.n||'(no name)')}<br><span class="dim">${esc(d.v)}${d.m>1?' · '+d.m+' addr':''}</span></td><td class="${al?'alert':'mut'}">${esc(d.t)}</td><td class="dim">${ago(d.age)}</td></tr>`}).join('')}
+ return`<tr class="cl" onclick="openDev(${d.id})"><td><div class="bar"><i style="width:${pct(d.r)}%;${al?'background:var(--alert)':''}"></i></div><span class="dim">${d.r}</span></td><td class="n${al?' alert':''}">${esc(d.n||'(no name)')}<br><span class="dim">${esc(d.v)}${d.m>1?' · '+d.m+' addr':''}</span></td><td class="${al?'alert':'mut'}">${esc(d.t)}</td><td class="dim">${ago(d.age)}</td></tr>`}).join('')}
 async function ble(){try{const j=await J('/api/ble');bd=j.dev;sens=j.sens;info();
- $('bc').textContent=j.on?j.count:'off';$('bm').textContent=j.macs+' addresses';bhist.push(j.count);if(bhist.length>150)bhist.shift();line($('bh'),bhist,70,'#3fd9ff',0);
+ $('bc').textContent=j.on?j.count:'off';$('bm').textContent=j.macs+' addresses';bhist.push(j.count);if(bhist.length>150)bhist.shift();line($('bh'),bhist,70,CV('acc'),0);
  bd.forEach(d=>{(rhist[d.id]=rhist[d.id]||[]).push(d.r);if(rhist[d.id].length>90)rhist[d.id].shift()});
  const t={};bd.forEach(d=>t[d.t]=(t[d.t]||0)+1);$('bt').innerHTML=Object.entries(t).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<span class="chip ${k=='tracker'?'alert':''}">${esc(k)} <b>${v}</b></span>`).join('');
  const tr=bd.filter(d=>d.t=='tracker');$('trk').classList.toggle('hide',!tr.length);
  $('trk').innerHTML=tr.length?`⚠ ${tr.length} tracker tag(s) nearby — `+tr.map(d=>`${esc(d.v)} ${d.r} dBm, near ${ago(d.age)}`).join('; '):'';
  $('sens').classList.toggle('hide',!sens.length);
- $('sl').innerHTML=sens.map(z=>`<div style="padding:8px 0;border-bottom:1px solid #0b1f26"><b>${esc(z.n)}</b> <span class="dim">${esc(z.mo)} · ${z.r} dBm · ${ago(z.ago)} ago</span><br><span class="mid">${z.t!=null?z.t+'°C':''}</span> <span class="mut">${z.h!=null?z.h+'% ':''}${z.p!=null?z.p+' hPa ':''}${z.co2!=null?z.co2+' ppm ':''}${z.b!=null?'· battery '+z.b+'%':''}</span></div>`).join('');
+ $('sl').innerHTML=sens.map(z=>`<div style="padding:8px 0;border-bottom:1px solid var(--row)"><b>${esc(z.n)}</b> <span class="dim">${esc(z.mo)} · ${z.r} dBm · ${ago(z.ago)} ago</span><br><span class="mid">${z.t!=null?z.t+'°C':''}</span> <span class="mut">${z.h!=null?z.h+'% ':''}${z.p!=null?z.p+' hPa ':''}${z.co2!=null?z.co2+' ppm ':''}${z.b!=null?'· battery '+z.b+'%':''}</span></div>`).join('');
  drawB();if(detId!=null)openDev(detId,true)}catch(e){}}
 async function openDev(id,refresh){detId=id;try{const d=await J('/api/bledev?id='+id);if(detId!=id)return;
  const kv=[['type',d.t],['vendor',d.v],['signal',d.r+' dBm (min '+d.rmin+', max '+d.rmax+')'],['near',ago(d.age||0)],['packets',d.pk],d.cid?['company id',d.cid]:null,d.app?['appearance',d.app]:null,d.mfr?['mfr data',d.mfr]:null].filter(Boolean);
@@ -157,13 +162,13 @@ async function openDev(id,refresh){detId=id;try{const d=await J('/api/bledev?id=
  <canvas id="dsp" height="70" style="margin:10px 0"></canvas><div class="kv">${kv.map(([k,v])=>`<span>${k}</span><span>${esc(v)}</span>`).join('')}</div>
  ${d.uu&&d.uu.length?`<div class="lab" style="margin-top:12px">services</div>`+d.uu.map(u=>`<div>${u.u} <span class="dim">${esc(u.o)}</span></div>`).join(''):''}
  <div class="lab" style="margin-top:12px">addresses (phones change them)</div>${(d.addr||[]).map(a=>`<div>${a.mac} <span class="dim">${a.kind} · ${a.r} dBm · ${ago(a.ago)} ago</span></div>`).join('')}`;
- $('modal').classList.remove('hide');line($('dsp'),rhist[id]||[],70,'#3fd9ff',-100,-30)}catch(e){}}
+ $('modal').classList.remove('hide');line($('dsp'),rhist[id]||[],70,CV('acc'),-100,-30)}catch(e){}}
 function closeM(){detId=null;$('modal').classList.add('hide')}
 
 // ---------- wi-fi ----------
 function drawW(){$('wl').innerHTML=[...wd].sort(sorter(ws)).map(n=>`<tr><td><div class="bar"><i style="width:${pct(n.r)}%"></i></div><span class="dim">${n.r}</span></td><td class="n">${esc(n.s||'(hidden)')} <span class="${n.e=='open'?'alert':'dim'}">${esc(n.e)}</span><br><span class="dim">${n.v?esc(n.v)+' · ':''}${esc(n.b)}</span></td><td>${n.c}</td></tr>`).join('');
- const[g,W,H]=sizeC($('wch'),120),d=dp(),cw=W/15;g.fillStyle='#46606b';g.font=10*d+'px monospace';for(let ch=1;ch<=13;ch++)g.fillText(ch,(ch+.5)*cw-3*d,H-2*d);
- wd.forEach(n=>{if(n.c>13)return;const x=(n.c+.5)*cw,h=pct(n.r)/100*(H-24*d),w=2*cw;g.strokeStyle=n.e=='open'?'#ff8a3d':'rgba(63,217,255,.8)';g.lineWidth=1.5*d;g.beginPath();g.moveTo(x-w,H-14*d);g.quadraticCurveTo(x,H-14*d-h*2,x+w,H-14*d);g.stroke()});
+ const[g,W,H]=sizeC($('wch'),120),d=dp(),cw=W/15;g.fillStyle=CV('dim');g.font=10*d+'px monospace';for(let ch=1;ch<=13;ch++)g.fillText(ch,(ch+.5)*cw-3*d,H-2*d);
+ wd.forEach(n=>{if(n.c>13)return;const x=(n.c+.5)*cw,h=pct(n.r)/100*(H-24*d),w=2*cw;g.strokeStyle=n.e=='open'?CV('alert'):CV('accA8');g.lineWidth=1.5*d;g.beginPath();g.moveTo(x-w,H-14*d);g.quadraticCurveTo(x,H-14*d-h*2,x+w,H-14*d);g.stroke()});
  const cnt=Array(14).fill(0);wd.forEach(n=>{for(let k=n.c-2;k<=n.c+2;k++)if(k>0&&k<14)cnt[k]++});const best=[1,6,11].sort((a,b)=>cnt[a]-cnt[b])[0];$('wb').textContent=wd.length?'best channel: '+best:''}
 async function wifi(){try{const j=await J('/api/wifi');wd=j.nets;$('wc').textContent=j.scanned?wd.length:'scanning…';drawW();info()}catch(e){}}
 
@@ -175,17 +180,17 @@ function subUI(){$('sm').innerHTML=['SPECTRUM','MONITOR'].map((n,i)=>`<button cl
 async function subP(){try{const j=await J(`/api/sub?m=${sub.m}&b=${sub.b}`);if(cur!='sub')return;$('s-none').classList.toggle('hide',j.ok);if(!j.ok)return;
  if(j.mode!=lastMode||j.band!=lastBand){wfImg=null;lastMode=j.mode;lastBand=j.band}
  if(j.mode==0&&j.cur){$('s-rng').textContent=j.lo+' – '+j.hi+' MHz';const[g,W,H]=sizeC($('spc'),140),d=dp(),n=j.cur.length,y=v=>H-((v+120)/90)*(H-8*d);
-  g.strokeStyle='#12303a';for(let v=-110;v<=-40;v+=10){g.beginPath();g.moveTo(0,y(v));g.lineTo(W,y(v));g.stroke()}
-  g.fillStyle='rgba(63,217,255,.25)';g.beginPath();g.moveTo(0,H);j.cur.forEach((v,i)=>g.lineTo(i/(n-1)*W,y(v)));g.lineTo(W,H);g.fill();
-  g.strokeStyle='#3fd9ff';g.lineWidth=1.5*d;g.beginPath();j.cur.forEach((v,i)=>{const x=i/(n-1)*W;i?g.lineTo(x,y(v)):g.moveTo(x,y(v))});g.stroke();
-  g.strokeStyle='#eafcff';g.lineWidth=1*d;g.setLineDash([3*d,3*d]);g.beginPath();j.peak.forEach((v,i)=>{const x=i/(n-1)*W;i?g.lineTo(x,y(v)):g.moveTo(x,y(v))});g.stroke();g.setLineDash([]);
-  g.fillStyle='#7f97a3';g.font=10*d+'px monospace';g.fillText('-40',3,y(-40)+10*d);g.fillText('-110',3,y(-110)-3*d);
-  const c=$('wf'),wg=c.getContext('2d');if(!wfImg){c.width=n;c.height=80;wfImg=true;wg.fillStyle='#02090b';wg.fillRect(0,0,n,80)}
+  g.strokeStyle=CV('line');for(let v=-110;v<=-40;v+=10){g.beginPath();g.moveTo(0,y(v));g.lineTo(W,y(v));g.stroke()}
+  g.fillStyle=CV('accA2');g.beginPath();g.moveTo(0,H);j.cur.forEach((v,i)=>g.lineTo(i/(n-1)*W,y(v)));g.lineTo(W,H);g.fill();
+  g.strokeStyle=CV('acc');g.lineWidth=1.5*d;g.beginPath();j.cur.forEach((v,i)=>{const x=i/(n-1)*W;i?g.lineTo(x,y(v)):g.moveTo(x,y(v))});g.stroke();
+  g.strokeStyle=CV('hot');g.lineWidth=1*d;g.setLineDash([3*d,3*d]);g.beginPath();j.peak.forEach((v,i)=>{const x=i/(n-1)*W;i?g.lineTo(x,y(v)):g.moveTo(x,y(v))});g.stroke();g.setLineDash([]);
+  g.fillStyle=CV('steel');g.font=10*d+'px monospace';g.fillText('-40',3,y(-40)+10*d);g.fillText('-110',3,y(-110)-3*d);
+  const c=$('wf'),wg=c.getContext('2d');if(!wfImg){c.width=n;c.height=80;wfImg=true;wg.fillStyle=CV('bg');wg.fillRect(0,0,n,80)}
   wg.drawImage(c,0,0,n,79,0,1,n,79);const row=wg.createImageData(n,1);j.cur.forEach((v,i)=>{const x=Math.max(0,Math.min(1,(v+105)/55));const m=heat(x).match(/\d+/g);const k=x<.08?.15:1;row.data.set([m[0]*k,m[1]*k,m[2]*k,255],i*4)});wg.putImageData(row,0,0);
   c.style.height='160px';c.style.imageRendering='pixelated'}
  if(j.mode==1&&j.rssi){$('s-ev').textContent=j.events;$('s-st').innerHTML=j.burst?'<span class="alert">SIGNAL!</span>':'quiet';$('s-fl').textContent='noise floor '+j.floor+' dBm · '+j.mon+' MHz';
-  const[g,W,H]=sizeC($('mon'),120),d=dp(),n=j.rssi.length,y=v=>H-((v+120)/90)*(H-6*d);g.strokeStyle='#46606b';g.setLineDash([4*d,4*d]);g.beginPath();g.moveTo(0,y(j.floor+12));g.lineTo(W,y(j.floor+12));g.stroke();g.setLineDash([]);
-  g.strokeStyle='#3fd9ff';g.lineWidth=1.5*d;g.beginPath();j.rssi.forEach((v,i)=>{const x=i/(Math.max(n,120)-1)*W;i?g.lineTo(x,y(v)):g.moveTo(x,y(v))});g.stroke();
+  const[g,W,H]=sizeC($('mon'),120),d=dp(),n=j.rssi.length,y=v=>H-((v+120)/90)*(H-6*d);g.strokeStyle=CV('dim');g.setLineDash([4*d,4*d]);g.beginPath();g.moveTo(0,y(j.floor+12));g.lineTo(W,y(j.floor+12));g.stroke();g.setLineDash([]);
+  g.strokeStyle=CV('acc');g.lineWidth=1.5*d;g.beginPath();j.rssi.forEach((v,i)=>{const x=i/(Math.max(n,120)-1)*W;i?g.lineTo(x,y(v)):g.moveTo(x,y(v))});g.stroke();
   $('s-tb').innerHTML=j.ev.map(e=>`<tr><td>${ago(e.ago)} ago</td><td>${e.ms} ms</td><td>${e.pk} dBm</td></tr>`).join('')||'<tr><td colspan="3" class="dim">press a car key, doorbell or gate remote nearby</td></tr>'}
 }catch(e){}}
 
@@ -196,7 +201,7 @@ async function snd(){try{const j=await J('/api/snd');if(cur!='snd')return;$('a-o
  $('a-lv').textContent=Math.round(j.lv)+' dBFS';$('a-w').innerHTML=j.lv>=-25?`<span class="alert">${j.w}</span>`:j.w;$('a-hz').textContent=j.e>.15?'loudest '+(j.hz>=1000?(j.hz/1000).toFixed(1)+' kHz':j.hz+' Hz'):'';
  $('a-pk').textContent=Math.round(j.pk);$('a-mx').textContent=Math.round(j.mx);$('a-avg').textContent=Math.round(j.avg);
  const[g,W,H]=sizeC($('a-bars'),150),d=dp(),n=j.b.length,bw=W/n;j.b.forEach((v,i)=>{const h=v/100*(H-4*d);g.fillStyle=heat(.2+v/120);g.fillRect(i*bw+1*d,H-h,bw-2*d,h)});
- ahist.push(j.lv);if(ahist.length>1200)ahist.shift();line($('a-h'),ahist,90,'#3fd9ff',-90,0)}catch(e){}}
+ ahist.push(j.lv);if(ahist.length>1200)ahist.shift();line($('a-h'),ahist,90,CV('acc'),-90,0)}catch(e){}}
 
 // ---------- system ----------
 async function sys(){const j=await info();if(!j)return;const b=j.bat;$('y-soc').textContent=b.ok?b.soc+'%':'n/a';
@@ -217,4 +222,5 @@ function upload(){const f=$('u-f').files[0];if(!f){$('u-st').textContent='choose
  x.onerror=()=>{$('u-st').innerHTML='<span class="alert">connection lost</span> — if the device restarted, reconnect and check the version';$('u-go').disabled=false};
  $('u-st').textContent='uploading…';x.send(fd)}
 heads('p-ble',bs,drawB);heads('p-wifi',ws,drawW);subUI();go('ov');
+info();setInterval(info,8000);   // тема и батарея — на всех вкладках
 </script></body></html>)HTML";

@@ -2,6 +2,7 @@
 //  settings.cpp — настройки и их экран
 // ============================================================
 #include <Preferences.h>
+#include "core/timeutil.h"
 #include "core/settings.h"
 #include "core/display.h"
 #include "core/theme.h"
@@ -19,6 +20,7 @@ int g_scrBright = 100;
 int g_dimIdx = 0;                        // по умолчанию экран не гаснет
 int g_sndIdx = 1;                        // тихие звуки интерфейса
 int g_clickEn = 1;
+int g_theme = THEME_DENKO;                // оформление: DENKO 電光 (свет, HUD) / SUMI 墨 (тушь)
 int g_micEn = 1;
 int g_auSrc = 0;
 int g_city = 0;
@@ -35,7 +37,7 @@ static uint32_t g_setChangedMs = 0;
 static Preferences g_prefs;
 
 // все пункты настроек; page — на какой странице показывать
-enum { S_SCREEN, S_DIM, S_LEDBR, S_VOLUME, S_CLICKS, S_CITY, S_BATTERY,
+enum { S_THEME, S_SCREEN, S_DIM, S_LEDBR, S_VOLUME, S_CLICKS, S_CITY, S_BATTERY,
        S_RANGE, S_LEDEV, S_BLETICK,
        S_WRANGE, S_WTICK,
        S_BAND,
@@ -43,6 +45,7 @@ enum { S_SCREEN, S_DIM, S_LEDBR, S_VOLUME, S_CLICKS, S_CITY, S_BATTERY,
 enum { P_GENERAL, P_BLE, P_WIFI, P_SUBGHZ, P_SOUND, P_NUM };
 struct SetDef { const char* name; const char* hint; uint8_t page; };
 static const SetDef DEFS[S_NUM] = {
+  { "Theme",          "look: denko light / sumi ink", P_GENERAL },
   { "Screen",         "screen backlight",            P_GENERAL },
   { "Auto dim",       "dim screen when idle",        P_GENERAL },
   { "LED brightness", "led strip brightness",        P_GENERAL },
@@ -61,7 +64,7 @@ static const SetDef DEFS[S_NUM] = {
   { "Source",         "auto / mic / laptop audio",   P_SOUND },
 };
 static const char* const PAGE_NAMES[P_NUM] = { "General", "Bluetooth", "Wi-Fi", "Sub-GHz", "Sound" };
-static const char* const PAGE_DESCS[P_NUM] = { "screen, leds, sound, city", "range, leds, ticks",
+static const char* const PAGE_DESCS[P_NUM] = { "theme, screen, leds, city", "range, leds, ticks",
                                                "range, ticks", "radio band", "source, mic, leds" };
 static const int SET_ROWS = 7;           // строк на экране (список прокручивается)
 
@@ -88,6 +91,7 @@ void loadSettings() {
   g_sndIdx    = g_prefs.getInt("snd", 1);
   g_micEn     = g_prefs.getInt("mic", 1) ? 1 : 0;
   g_clickEn   = g_prefs.getInt("click", 1) ? 1 : 0;
+  g_theme     = g_prefs.getInt("theme", THEME_DENKO) == THEME_SUMI ? THEME_SUMI : THEME_DENKO;
   g_auLeds    = g_prefs.getInt("auled", 0) ? 1 : 0;
   g_auSrc     = constrain(g_prefs.getInt("ausrc", 0), 0, 2);
   g_city      = constrain(g_prefs.getInt("city", 0), 0, N_CITIES - 1);
@@ -117,6 +121,7 @@ void saveSettings() {
   g_prefs.putInt("snd", g_sndIdx);
   g_prefs.putInt("mic", g_micEn);
   g_prefs.putInt("click", g_clickEn);
+  g_prefs.putInt("theme", g_theme);
   g_prefs.putInt("auled", g_auLeds);
   g_prefs.putInt("ausrc", g_auSrc);
   g_prefs.putInt("city", g_city);
@@ -130,7 +135,7 @@ void saveSettings() {
 }
 
 void settingsSaveNow() { if (g_setDirty) saveSettings(); }
-void settingsAutosave(uint32_t now) { if (g_setDirty && now - g_setChangedMs > 3000) saveSettings(); }
+void settingsAutosave(uint32_t now) { if (g_setDirty && msSince(now, g_setChangedMs) > 3000) saveSettings(); }
 void settingsBegin() { loadSettings(); applyBrightness(); }
 
 static int curItem() {
@@ -148,6 +153,7 @@ void settingsAdjust(int dir) {
     case S_DIM:     g_dimIdx = constrain(g_dimIdx + dir, 0, N_DIMS - 1); break;
     case S_VOLUME:  g_sndIdx = constrain(g_sndIdx + dir, 0, 2); audioBeep(1400, 60); break;
     case S_CLICKS:  g_clickEn = dir > 0; break;
+    case S_THEME:   g_theme = dir > 0 ? THEME_SUMI : THEME_DENKO; break;
     case S_BLETICK: g_bleTicks = dir > 0; break;
     case S_WTICK:   g_wifiTicks = dir > 0; break;
     case S_WRANGE:  g_wRange = constrain(g_wRange + dir, 0, N_RANGES - 1); break;
@@ -202,6 +208,7 @@ void drawSettings() {
         break;
       case S_VOLUME:  sprintf(val, "%s", g_sndIdx == 0 ? "off" : g_sndIdx == 1 ? "quiet" : "loud"); break;
       case S_CLICKS:  strcpy(val, onOff(g_clickEn)); break;
+      case S_THEME:   strcpy(val, g_theme == THEME_SUMI ? "sumi" : "denko"); break;
       case S_BLETICK: strcpy(val, onOff(g_bleTicks)); break;
       case S_WTICK:   strcpy(val, onOff(g_wifiTicks)); break;
       case S_BAND:    strcpy(val, BANDS[g_band].name); break;

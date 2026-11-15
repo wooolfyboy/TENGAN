@@ -92,7 +92,8 @@ void drawCity(const std::vector<Blip>& bl, uint32_t now) {
       if (c.pct == 0) c.pct = c.target;                  // новая башня встаёт на место и растёт
     }
   }
-  std::vector<Tower> tw;
+  static std::vector<Tower> tw;                        // static: память не выделяется заново каждый кадр
+  tw.clear();
   for (auto it = s_city.begin(); it != s_city.end();) {
     CityT& c = it->second;
     if (c.alive) c.pct += (c.target - c.pct) * 0.06f;
@@ -138,7 +139,8 @@ void drawCity(const std::vector<Blip>& bl, uint32_t now) {
   }
   // подписи трёх ближайших: тип и сигнал над крышей
   spr.setTextDatum(BC_DATUM);
-  std::vector<const Tower*> top;
+  static std::vector<const Tower*> top;
+  top.clear();
   for (const Tower& t : tw) top.push_back(&t);
   std::sort(top.begin(), top.end(), [](const Tower* a, const Tower* b) { return a->rssi > b->rssi; });
   int lx[3], ly[3], lw[3];

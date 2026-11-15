@@ -260,11 +260,13 @@ static void fillSub() {
   g_evN = 3;
 }
 
+extern int g_theme;
 int main(int argc, char** argv) {
   if (argc > 1) s_outDir = argv[1];
   spr.setColorDepth(16);
   spr.createSprite(320, 170);
   settingsBegin();
+  if (getenv("SIM_THEME")) g_theme = atoi(getenv("SIM_THEME"));   // 0 — DENKO, 1 — SUMI (тушь)
   g_bat.ok = true; g_bat.soc = 87; g_bat.mv = 3980; g_bat.ma = -132; g_bat.tte = 250; g_bat.chgOk = true;
   fillBle(); fillWifi(); fillSub();
 
@@ -272,8 +274,8 @@ int main(int argc, char** argv) {
     for (int i = 0; i < 7; i++) { char nm[32]; snprintf(nm, sizeof nm, "00_boot_%04u", (unsigned)ts[i]); bootFrame(ts[i]); snap(nm); } }
   navBegin(); navDraw(s_now);                    snap("01_menu");
   g_powerHold = 1500; drawPowerHold();           snap("08_power_hold"); g_powerHold = 0;
-  { const uint32_t ts[] = { 300, 760, 1000, 1250 };
-    for (int i = 0; i < 4; i++) { char nm[32]; snprintf(nm, sizeof nm, "09_power_off_%04u", (unsigned)ts[i]); shutFrame(ts[i]); spr.pushSprite(0, 0); snap(nm); } }
+  { const uint32_t ts[] = { 300, 760, 1000, 1250, 1400 };
+    for (int i = 0; i < 5; i++) { char nm[32]; snprintf(nm, sizeof nm, "09_power_off_%04u", (unsigned)ts[i]); shutFrame(ts[i]); spr.pushSprite(0, 0); snap(nm); } }
   navClick(); navDraw(s_now);                    snap("02_ble_sub");
   navBack();
   navRotate(+1); navClick(); navDraw(s_now);     snap("03_wifi_sub");

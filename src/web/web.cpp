@@ -342,6 +342,7 @@ static void sseTick(uint32_t now) {
       o += ",\"bat\":"; o += g_bat.ok ? g_bat.soc : -1; o += ",\"mv\":"; o += g_bat.mv;
       o += ",\"usb\":"; o += g_bat.bus ? 1 : 0; o += ",\"chg\":"; o += g_bat.chg;
       o += ",\"cli\":"; o += WiFi.softAPgetStationNum(); o += ",\"heap\":"; o += ESP.getFreeHeap() / 1024;
+      o += ",\"theme\":\""; o += g_theme == THEME_SUMI ? "sumi" : "denko"; o += '"';
       o += ",\"radio\":\""; o += bleRadioActive() ? "b" : ""; o += s_scanMs && now - s_scanMs < 25000 ? "w" : "";
       o += s_subOn ? "s" : ""; o += s_sndOn ? "m" : ""; o += pcLive(now) ? "p" : ""; o += '"';
       o += '}';
@@ -417,6 +418,7 @@ static void webStart() {
     o += ",\"cli\":"; o += WiFi.softAPgetStationNum();
     o += ",\"nets\":"; o += s_netCount;
     o += ",\"build\":\"" __DATE__ " " __TIME__ "\"";
+    o += ",\"theme\":\""; o += g_theme == THEME_SUMI ? "sumi" : "denko"; o += '"';
     o += ",\"ssid\":\""; o += s_ssid; o += "\"}";
     sendJson(o);
   });

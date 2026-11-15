@@ -66,7 +66,7 @@ BU.scene = (g, cam, sw, opt) => {
     const col = BU.rgb(e, 0.35 + 0.65 * sg);
     const gr = g.createLinearGradient(p0[0], p0[1], p1[0], p1[1]); gr.addColorStop(0, T.rgb(col, 0.05 * fog)); gr.addColorStop(1, T.rgb(col, (0.5 + 0.5 * ph) * fog));
     g.strokeStyle = gr; g.lineWidth = Math.max(1.5, p0[2] * 0.016); g.lineCap = 'round'; g.beginPath(); g.moveTo(p0[0], p0[1]); g.lineTo(p1[0], p1[1]); g.stroke(); g.lineCap = 'butt';
-    const rr = p1[2] * (0.014 + 0.02 * sg) * (1 + 0.6 * Math.max(0, 1 - pa * 2));
+    const rr = Math.max(0.5, p1[2] * (0.014 + 0.02 * sg) * (1 + 0.6 * Math.max(0, 1 - pa * 2)) || 0);
     g.fillStyle = T.rgb(BU.tr(e) ? col : T.heatRGB(0.55 + 0.45 * ph), fog); g.beginPath(); g.arc(p1[0], p1[1], rr, 0, T.TAU); g.fill();
     g.fillStyle = T.rgb(col, 0.5 * fog); g.beginPath(); g.ellipse(p0[0], p0[1], p0[2] * 0.02, p0[2] * 0.02 * Math.sin(cam.pitch), 0, 0, T.TAU); g.fill();
     if (opt.hits) { T.hits.circle(p1[0], p1[1], Math.max(u * 1.6, rr * 2.5), { k: 'dev', id: e.id }); T.hits.circle((p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2, u * 1.2, { k: 'dev', id: e.id }); }
@@ -75,6 +75,46 @@ BU.scene = (g, cam, sw, opt) => {
   }
   return selTop;
 };
+
+// ---- SUMI: тот же радар тушью — энсо, размывка луча, капли туши на полу ----
+BU.sceneInk = (g, cam, sw, opt) => {
+  const { u, t } = opt, I = T.ink, s = sw.a;
+  const ell = (r, N = 72) => { const p = []; for (let k = 0; k <= N; k++) { const a = k / N * T.TAU, q = cam.p(Math.cos(a) * r, 0, Math.sin(a) * r); p.push([q[0], q[1]]); } return p; };
+  for (let i = 1; i <= 3; i++) I.pen(g, ell(i / 4), 1, I.ink(0.16));
+  // крестовина — две сухие черты
+  { const a = cam.p(-1, 0, 0), b = cam.p(1, 0, 0), c = cam.p(0, 0, -1), d = cam.p(0, 0, 1);
+    I.stroke(g, [[a[0], a[1]], [b[0], b[1]]], u * 0.22, { seed: 13, taper: [0.2, 0.2], dry: 0.9, alpha: 0.28 });
+    I.stroke(g, [[c[0], c[1]], [d[0], d[1]]], u * 0.22, { seed: 14, taper: [0.2, 0.2], dry: 0.9, alpha: 0.28 }); }
+  // размывка луча: клин тушью, растекается назад
+  const tail = 1.5, N = 30, o = cam.p(0, 0, 0);
+  for (let i = 0; i < N; i++) {
+    const a0 = s - tail * (1 - i / N), a1 = s - tail * (1 - (i + 1) / N), v = (i + 1) / N, p = cam.p(Math.cos(a0), 0, Math.sin(a0)), q = cam.p(Math.cos(a1), 0, Math.sin(a1));
+    I.raw(g, 'fillStyle', I.ink(0.16 * v * v)); g.beginPath(); g.moveTo(o[0], o[1]); g.lineTo(p[0], p[1]); g.lineTo(q[0], q[1]); g.closePath(); g.fill();
+  }
+  { const b = cam.p(Math.cos(s), 0, Math.sin(s)), m = cam.p(Math.cos(s) * 0.5, 0, Math.sin(s) * 0.5);
+    I.stroke(g, [[o[0], o[1]], [m[0], m[1]], [b[0], b[1]]], u * 0.35, { seed: 77, taper: [0.02, 0.5], dry: 0.4, alpha: 0.8 }); }
+  // энсо — внешнее кольцо одним мазком (точки в перспективе)
+  { const pts = []; for (let k = 0; k <= 110; k++) { const a = -2.2 + T.TAU * 0.94 * k / 110, rr = 1.04 * (1 + 0.012 * Math.sin(k * 0.5)), q = cam.p(Math.cos(a) * rr, 0, Math.sin(a) * rr); pts.push([q[0], q[1]]); }
+    I.stroke(g, pts, u * 0.75, { seed: 8, taper: [0.08, 0.3], dry: 0.9, alpha: 0.9 }); }
+  for (let a = 0; a < 360; a += 30) { const r = a * Math.PI / 180, p = cam.p(Math.cos(r) * 1.1, 0, Math.sin(r) * 1.1), q = cam.p(Math.cos(r) * 1.16, 0, Math.sin(r) * 1.16); I.stroke(g, [[p[0], p[1]], [q[0], q[1]]], u * 0.25, { seed: a, taper: [0.3, 0.5], dry: 0, alpha: 0.6 }); }
+  // капли: дальние раньше
+  const list = BU.list(), rank = [...list].sort((a, b) => b.rs - a.rs);
+  const items = list.map(e => { const r = BU.rad(e.rs), a = BU.ang(e.id), x = Math.cos(a) * r, z = Math.sin(a) * r; return { e, x, z, p: cam.p(x, 0, z) }; }).sort((a, b) => b.p[3] - a.p[3]);
+  let selTop = null;
+  for (const it of items) {
+    const e = it.e, sg = T.pct(e.rs), p = it.p, tr = BU.tr(e), col = tr ? [194, 58, 43] : [27, 24, 20];
+    const since = (((s - BU.ang(e.id)) % T.TAU) + T.TAU) % T.TAU / T.TAU, fresh = 1 - since, pa = sw.ping(e.id, t);
+    const rad = p[2] * (0.012 + 0.02 * sg);
+    if (pa < 1.3) { I.raw(g, 'strokeStyle', `rgba(${col},${0.4 * (1 - pa / 1.3) * e.h})`); g.lineWidth = 1.2; g.beginPath(); g.ellipse(p[0], p[1], rad + p[2] * pa * 0.12, (rad + p[2] * pa * 0.12) * Math.sin(cam.pitch), 0, 0, T.TAU); g.stroke(); }
+    const a = (0.45 + 0.5 * Math.max(sg * 0.6, fresh)) * e.h;
+    g.save(); g.translate(p[0], p[1]); g.scale(1, 0.55 + 0.45 * Math.sin(cam.pitch)); I.blot(g, 0, 0, rad, a, (e.id % 997) + 3, col); g.restore();
+    if (opt.hits) T.hits.circle(p[0], p[1], Math.max(u * 1.6, rad * 2.5), { k: 'dev', id: e.id });
+    if (e.id === opt.sel) { selTop = { p: [p[0], p[1] - rad, p[2]], e }; I.hanko(g, p[0] - u * 1.2, p[1] - u * 1.2, u * 2.4, [''], { filled: false, seed: 5 }); }
+    else if (opt.labels && rank.indexOf(e) < opt.labels && opt.sel == null) { g.font = `500 ${u * 0.72}px ${T.FC}`; T.txt(g, T.fit(g, BU.label(e), u * 9), p[0] + rad + u * 0.6, p[1] - u * 0.4, u * 0.75, tr ? T.C.alert : T.C.label, 'c'); }
+  }
+  return selTop;
+};
+BU.sceneAny = (g, cam, sw, opt) => (T.theme === 'sumi' ? BU.sceneInk : BU.scene)(g, cam, sw, opt);
 
 // выноска-карточка у цели (Scope и City)
 BU.card = (g, p, e, u, W, H, top) => {
@@ -150,7 +190,7 @@ T.views.push({
     this.cam = T.orbit(0.5, 0.98, 3.2); this.camT = { yaw: 0.5, D: 3.2 };
     this.drag = T.drag(this.cv.cv, this.cam, { minPitch: 0.5, maxPitch: 1.35 });
     this.drag.onTap = (x, y) => this.tap(x, y);
-    this.sw = BU.sweeper(); this.dust = T.dust(220); this.sel = null; this.sticky = BU.sticky(); this.slots = new Map(); this.info = null; this.infoT = 0;
+    this.sw = BU.sweeper(); this.dust = T.dust(220); this.sel = null; this.sticky = BU.sticky(); this.info = null; this.infoT = 0;
     this.onSub(this.sub);
   },
   unmount() { this.cv.dispose(); this.root.remove(); },
@@ -202,7 +242,7 @@ T.views.push({
     this.camStep(dt);
     const c = this.cam;
     c.frame(portrait ? w * 0.5 : w * 0.37, portrait ? y0 + (h - y0) * 0.27 : y0 + (h - y0) * 0.55, portrait ? w * 0.9 : Math.min((h - y0) * 1.42, w * 0.95));
-    const selTop = BU.scene(g, c, this.sw, { u, t, sel: this.sel, labels: 3, hits: true });
+    const selTop = BU.sceneAny(g, c, this.sw, { u, t, sel: this.sel, labels: 3, hits: true });
     this.dust.draw(g, c);
     T.bloom(this.cv);
     const list = BU.list(), trk = list.some(BU.tr);
@@ -220,16 +260,30 @@ T.views.push({
     if (selTop) BU.card(g, selTop.p, selTop.e, u, portrait ? w : w * 0.7, h, y0 + u * 4);
     T.footer(g, m, h - u * 2.4, w - 2 * m, u, 'drag: orbit  ·  tap pillar: focus', 'height = signal · ring = sweep hit');
   },
-  // ---------- CITY ----------
-  slot(id) {
-    let s = this.slots.get(id); if (s != null) return s;
-    const used = new Set(this.slots.values()), N = 9;
-    // спираль от центра; место выбирается по хэшу, чтобы город был «тот же» после переподключения
-    const sp = []; for (let r = 0; r <= 4; r++) for (let x = -r; x <= r; x++) for (let z = -r; z <= r; z++) if (Math.max(Math.abs(x), Math.abs(z)) === r) sp.push([x, z]);
-    const start = T.hash(id) % 9;
-    for (let k = 0; k < sp.length; k++) { const i = (k < 9 ? (start + k) % 9 : k); const key = sp[i][0] + ',' + sp[i][1]; if (!used.has(key)) { this.slots.set(id, key); return key; } }
-    this.slots.set(id, '0,0'); return '0,0';
+  // бамбук тушью (SUMI): стебель из колен — чем сильнее сигнал, тем выше и больше колен; у сильных — листья.
+  // Дёшево: несколько fillRect и пара треугольников на устройство, без мазков с кистью.
+  bamboo(g, c, x, z, hh, sg, fog, tr, id, u) {
+    const b = c.p(x, 0, z), t = c.p(x, Math.max(hh, 0.04), z), sc = b[2] / 260, al = 0.35 + 0.6 * fog;
+    const col = tr ? '194,58,43' : '27,24,20', H = Math.max(u * 1.2, b[1] - t[1]), segs = 2 + Math.round(sg * 4);
+    const w = Math.max(1.5, u * (0.32 + 0.3 * sg) * sc * 1.4), lean = ((T.hash(id) % 5) - 2) * u * 0.12 * sc, sh = H / segs;
+    g.fillStyle = `rgba(${col},${al * 0.85})`;
+    for (let k = 0; k < segs; k++) {                       // колено: стебель чуть сужается кверху, между коленами — просвет
+      const y1 = b[1] - k * sh, x1 = b[0] + lean * k / segs, ww = w * (1 - k * 0.06);
+      g.fillRect(x1 - ww / 2, y1 - sh + sh * 0.08, ww, sh * 0.84);
+      g.fillRect(x1 - ww * 0.75, y1 - sh + sh * 0.02, ww * 1.5, Math.max(1, sh * 0.05));   // узел
+    }
+    const tx = b[0] + lean, ty = b[1] - H;
+    if (sg > 0.45) {                                      // листья: узкие треугольники от верхнего узла
+      g.fillStyle = `rgba(${col},${al * 0.7})`;
+      for (const [ang, len] of [[-2.4, 1.0], [-0.6, 0.85], [-2.0, 0.7]]) {
+        const L = u * 2.2 * sc * 1.3 * len, ex = tx + Math.cos(ang) * L, ey = ty + sh * 0.3 + Math.sin(ang) * L * 0.6, nx = -Math.sin(ang) * w * 0.55, ny = Math.cos(ang) * w * 0.55;
+        g.beginPath(); g.moveTo(tx + nx, ty + sh * 0.3 + ny); g.lineTo(ex, ey); g.lineTo(tx - nx, ty + sh * 0.3 - ny); g.closePath(); g.fill();
+      }
+    }
+    g.fillStyle = `rgba(${col},${al * 0.25})`; g.fillRect(b[0] - w * 1.6, b[1] - 1, w * 3.2, 2);   // тень у основания
+    return [tx, ty, t[2]];
   },
+  // ---------- CITY ----------
   city(g, w, h, u, m, y0, portrait, dt, t) {
     this.camStep(dt);
     const c = this.cam;
@@ -269,8 +323,21 @@ T.views.push({
       return { e, x, z, s: SZ[e.type] || 0.055, hh: e._ch, sg, d: c.p(x, 0, z)[3] };
     }).sort((a, b) => b.d - a.d);
     let selP = null; const labels = [];
+    const ink = T.theme === 'sumi';
+    if (ink) {                                             // тушь: далёкие горы в тумане за городом
+      const far = c.p(Math.sin(c.yaw) * 1.7, 0, Math.cos(c.yaw) * 1.7);     // за дальним краем колец
+      T.ink.mountains(g, w, Math.max(y0 + u * 8, far[1] - u * 0.5), u);
+    }
     for (const tw of towers) {
       const { e, x, z, s, hh, sg } = tw, tr = BU.tr(e), fog = T.clamp(1.2 - (tw.d + 1) * 0.3, 0.3, 1) * T.clamp(e.h);
+      if (ink) {                                           // бамбук: выше и больше колен — сильнее сигнал
+        const bot = c.p(x, 0, z), top = this.bamboo(g, c, x, z, hh, sg, fog, tr, e.id, u);
+        T.hits.circle(top[0], top[1], Math.max(u * 1.6, top[2] * 0.06), { k: 'dev', id: e.id });
+        T.hits.rect(bot[0] - bot[2] * 0.05, top[1], bot[2] * 0.1, Math.max(4, bot[1] - top[1]), { k: 'dev', id: e.id });
+        if (e.id === this.sel) selP = { p: top, e };
+        else if (this.sel == null && rank.indexOf(e) < 5) labels.push([top, e]);
+        continue;
+      }
       const col = BU.rgb(e, 0.35 + 0.65 * sg);
       const P = [[-s, -s], [s, -s], [s, s], [-s, s]].map(([a, b]) => [c.p(x + a, 0, z + b), c.p(x + a, hh, z + b)]);
       // боковые грани: видимые (обход по часовой на экране), дальние раньше
@@ -301,7 +368,7 @@ T.views.push({
     T.bloom(this.cv);
     this.hud(g, w, h, u, m, y0, 'City', `${list.length} towers · height = signal`);
     if (selP) BU.card(g, selP.p, selP.e, u, w, h, y0 + u * 4);
-    T.footer(g, m, h - u * 2.4, w - 2 * m, u, 'drag: orbit  ·  tap tower: focus', 'roof orange = tracker');
+    T.footer(g, m, h - u * 2.4, w - 2 * m, u, 'drag: orbit  ·  tap tower: focus', (T.theme === 'sumi' ? 'red = tracker' : 'roof orange = tracker'));
   },
   // ---------- DEVICES ----------
   devices(g, w, h, u, m, y0, portrait, dt, t) {

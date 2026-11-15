@@ -55,7 +55,7 @@ void drawPc(uint32_t now) {
     for (int i = 0; i < p.histN; i++) {
       int x = gx + gw - 2 - (p.histN - 1 - i) * (gw - 3) / (PC_HIST - 1);
       int y = gy + gh - 2 - (int)((gh - 4) * constrain(h[i], 0.0f, 100.0f) / 100.0f);
-      if (fill) spr.drawFastVLine(x, y, gy + gh - 1 - y, tft.color565(10, 45, 56));
+      if (fill) spr.drawFastVLine(x, y, gy + gh - 1 - y, TC(10, 45, 56));
       if (px >= 0) spr.drawLine(px, py, x, y, col);
       px = x; py = y;
     }
@@ -218,9 +218,9 @@ void drawPcMedia(uint32_t now) {
     lastMs = now;
     rot += dt * (turning ? 7.0f : 1.8f);                   // крутишь колесо — пластинка разгоняется
     const int cx = tx + 66, cy = UI_TOP + 64, R = 58;
-    spr.fillCircle(cx, cy, R, tft.color565(6, 18, 22));
+    spr.fillCircle(cx, cy, R, TC(6, 18, 22));
     spr.drawCircle(cx, cy, R, UI_LINE());
-    for (int r = 24; r < R - 2; r += 4) spr.drawCircle(cx, cy, r, tft.color565(12, 34, 41));   // бороздки
+    for (int r = 24; r < R - 2; r += 4) spr.drawCircle(cx, cy, r, TC(12, 34, 41));   // бороздки
     // блики: два светлых сектора на бороздках, крутятся вместе с пластинкой
     for (int side = 0; side < 2; side++) {
       float base = rot + side * PI;
@@ -228,11 +228,11 @@ void drawPcMedia(uint32_t now) {
         for (int k = -6; k <= 6; k++) {
           float ang = base + k * 0.035f;
           int br = 110 - abs(k) * 15;
-          spr.drawPixel(cx + (int)(cosf(ang) * r), cy + (int)(sinf(ang) * r), tft.color565(br / 3, br, br + 20 > 255 ? 255 : br + 20));
+          spr.drawPixel(cx + (int)(cosf(ang) * r), cy + (int)(sinf(ang) * r), TC(br / 3, br, br + 20 > 255 ? 255 : br + 20));
         }
     }
     // яблоко пластинки с меткой, крутится
-    spr.fillCircle(cx, cy, 19, tft.color565(10, 60, 74));
+    spr.fillCircle(cx, cy, 19, TC(10, 60, 74));
     spr.drawCircle(cx, cy, 19, C_ACC());
     float la = rot * 1.0f;
     spr.drawLine(cx + (int)(cosf(la) * 8), cy + (int)(sinf(la) * 8), cx + (int)(cosf(la) * 16), cy + (int)(sinf(la) * 16), C_HOT());

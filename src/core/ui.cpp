@@ -4,11 +4,13 @@
 #include "core/ui.h"
 #include "core/display.h"
 #include "core/theme.h"
+#include "core/settings.h"
 
-uint16_t UI_LABEL() { return tft.color565(150, 175, 192); }
-uint16_t UI_DIM()   { return tft.color565(90, 112, 128); }
-uint16_t UI_LINE()  { return tft.color565(32, 50, 64); }
-uint16_t UI_PANEL() { return tft.color565(14, 42, 52); }
+static bool sumi() { return g_theme == THEME_SUMI; }
+uint16_t UI_LABEL() { return sumi() ? tft.color565(74, 67, 59)    : tft.color565(150, 175, 192); }
+uint16_t UI_DIM()   { return sumi() ? tft.color565(138, 129, 116) : tft.color565(90, 112, 128); }
+uint16_t UI_LINE()  { return sumi() ? tft.color565(201, 191, 174) : tft.color565(32, 50, 64); }
+uint16_t UI_PANEL() { return sumi() ? tft.color565(222, 212, 194) : tft.color565(14, 42, 52); }
 
 static void upper(const char* s, char* out, size_t n) {
   size_t i = 0;
@@ -34,10 +36,9 @@ void uiHeader(const char* title, const char* right, bool rightAlert) {
   }
   // линия под шапкой, угасающая вправо
   uint16_t a = C_ACC();
-  uint8_t r = ((a >> 11) & 0x1F) << 3, g = ((a >> 5) & 0x3F) << 2, b = (a & 0x1F) << 3;
   for (int x = UI_M; x < W - UI_M; x++) {
     float k = 1.0f - 0.85f * (x - UI_M) / (float)(W - 2 * UI_M);
-    spr.drawPixel(x, 19, tft.color565(r * k, g * k, b * k));
+    spr.drawPixel(x, 19, scale565(a, (int)(k * 100)));
   }
 }
 
