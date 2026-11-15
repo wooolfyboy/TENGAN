@@ -94,7 +94,7 @@ T.boot = (first) => {
     g.fillStyle = T.C.bg; g.fillRect(0, 0, W, H);
     const bw = Math.min(W * 0.6, u * 40), x = cx - bw / 2;
     T.header(g, x, cy - u * 9, bw, u, 'Starting', view.title, false);
-    const seal = T.sealImg(u * 3, T.C.acc); if (seal) g.drawImage(seal, x + bw - seal.width * u * 3 / seal.height, cy - u * 6, seal.width * u * 3 / seal.height, u * 3);
+    T.drawSeal(g, x + bw - u * 3 * 0.56, cy - u * 6.2, u * 3);
     T.segBar(g, x, cy - u * 1.5, bw, u * 1.1, L.bar, 32, true);
     T.txt(g, Math.round(L.bar * 100) + '%', x + bw, cy - u * 2.4, u * 1.6, T.C.hot, 't', 'right');
     L.steps.forEach((s, i) => {
@@ -152,7 +152,7 @@ T.boot = (first) => {
     // плашка, название, печать
     const bar = eo(seg(t, 1000, 1280)), bw = W * 0.6 * bar, bh = u * 9;
     if (bar > 0) { g.fillStyle = T.C.bg; g.fillRect(cx - bw / 2, cy - bh / 2, bw, bh); g.fillStyle = T.C.acc; g.fillRect(cx - bw / 2, cy - bh / 2, bw, 1.5); g.fillRect(cx - bw / 2, cy + bh / 2, bw, 1.5); }
-    const px = u * 4.6, tw = T.tw(g, TITLE, px, 't'), sealH = px * 1.15, seal = T.sealImg(sealH, t < 1700 ? T.C.hot : T.C.acc), sw2 = seal ? seal.width * sealH / seal.height : 0;
+    const px = u * 4.6, tw = T.tw(g, TITLE, px, 't'), sealH = px * 1.15, sealCol = t < 1700 ? T.C.hot : T.C.acc, seal = true, sw2 = sealH * 0.56;
     const bx = cx - (tw + u * 2 + sw2) / 2;
     if (t >= 1120) {
       let x = bx;
@@ -164,7 +164,7 @@ T.boot = (first) => {
     }
     if (t >= 1640 && seal) {
       const k = seg(t, 1640, 1820), sx = bx + tw + u * 2, sy = cy - sealH / 2 - px * 0.06;
-      g.drawImage(seal, sx, sy, sw2, sealH);
+      T.drawSeal(g, sx, sy, sealH, sealCol);
       if (k < 1) { const gg = u * (0.3 + k * 2); g.strokeStyle = `rgba(235,250,255,${0.6 * (1 - k)})`; g.strokeRect(sx - gg, sy - gg, sw2 + 2 * gg, sealH + 2 * gg); }
     }
     if (t >= 1700) { const k = Math.min(SUB.length, (t - 1700) / 14 | 0); T.txt(g, SUB.slice(0, k) + ((t / 120 | 0) & 1 && k < SUB.length ? '_' : ''), cx, cy + bh / 2 - u * 1.2, u * 1.05, T.C.label, 'm', 'center'); }

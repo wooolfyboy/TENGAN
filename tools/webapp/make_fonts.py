@@ -4,6 +4,8 @@
   Rajdhani SemiBold  — заголовки и крупные числа (как на экране палки)
   Share Tech Mono    — текст HUD
   JetBrains Mono     — кириллица (названия треков, сети с русскими именами)
+  IPAGothic          — только два знака печати 天眼 (IPA Font License; системный шрифт
+                       fonts-ipafont-gothic, в репозиторий не кладём — нужен лишь при пересборке)
 
 Результат: tools/webapp/src/fonts.css (@font-face с WOFF2 в base64 — без интернета).
 Нужен pip install fonttools brotli. Запускать только при смене набора символов:
@@ -16,6 +18,7 @@ from fontTools.ttLib import TTFont
 HERE = os.path.dirname(os.path.abspath(__file__))
 FONTS = os.path.join(HERE, "..", "..", "fonts")
 OUT = os.path.join(HERE, "src", "fonts.css")
+IPA = "/usr/share/fonts/opentype/ipafont-gothic/ipag.ttf"
 
 ASCII = "".join(chr(c) for c in range(0x20, 0x7F))
 EXTRA = "°·—–…‹›«»×←→↑↓▲▼◆◇●○■□♪⚡±≈≤≥µ№™✓✕▸◂"
@@ -49,7 +52,11 @@ def main():
         face("Share Tech Mono", 400, woff2(os.path.join(FONTS, "ShareTechMono-Regular.ttf"), ASCII + EXTRA)),
         face("JetBrains Mono", 500, woff2(os.path.join(FONTS, "JetBrainsMono-Medium.ttf"), ASCII + EXTRA + CYR)),
     ]
-    css = "/* АВТОМАТИЧЕСКИ СГЕНЕРИРОВАНО tools/webapp/make_fonts.py — шрифты OFL, см. fonts/ */\n" + "\n".join(parts) + "\n"
+    if os.path.exists(IPA):
+        parts.append(face("Tengan Seal", 400, woff2(IPA, "天眼")))
+    else:
+        print("нет %s — печать 天眼 останется системным шрифтом" % IPA)
+    css = "/* АВТОМАТИЧЕСКИ СГЕНЕРИРОВАНО tools/webapp/make_fonts.py — шрифты OFL; печать 天眼 — IPAGothic (IPA Font License), см. fonts/ */\n" + "\n".join(parts) + "\n"
     open(OUT, "w", encoding="utf-8").write(css)
     print("fonts.css: %d КБ" % (len(css) // 1024))
 
