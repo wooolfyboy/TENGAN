@@ -32,6 +32,7 @@
 #include "gallery/sat.h"
 #include "gallery/weather.h"
 #include "core/settings.h"
+#include "core/version.h"
 #include "core/battery.h"
 #include "core/display.h"
 #include "core/leds.h"
@@ -345,6 +346,8 @@ static void sseTick(uint32_t now) {
       o += ",\"usb\":"; o += g_bat.bus ? 1 : 0; o += ",\"chg\":"; o += g_bat.chg;
       o += ",\"cli\":"; o += WiFi.softAPgetStationNum(); o += ",\"heap\":"; o += ESP.getFreeHeap() / 1024;
       o += ",\"theme\":\""; o += g_theme == THEME_SUMI ? "sumi" : "denko"; o += '"';
+    o += ",\"ver\":\"" FW_VERSION "\"";
+      o += ",\"ver\":\"" FW_VERSION "\"";
       o += ",\"radio\":\""; o += bleRadioActive() ? "b" : ""; o += s_scanMs && now - s_scanMs < 25000 ? "w" : "";
       o += s_subOn ? "s" : ""; o += s_sndOn ? "m" : ""; o += pcLive(now) ? "p" : ""; o += '"';
       o += '}';
@@ -434,6 +437,7 @@ static void webStart() {
     o += ",\"nets\":"; o += s_netCount;
     o += ",\"build\":\"" __DATE__ " " __TIME__ "\"";
     o += ",\"theme\":\""; o += g_theme == THEME_SUMI ? "sumi" : "denko"; o += '"';
+    o += ",\"ver\":\"" FW_VERSION "\"";
     o += ",\"ssid\":\""; o += s_ssid; o += "\"}";
     sendJson(o);
   });

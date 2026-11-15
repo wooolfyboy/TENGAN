@@ -63,6 +63,8 @@ def build():
         return slim(code, "css" if path.endswith(".css") else "js")
     html = re.sub(r"/\*@INLINE ([^*]+?)\*/", inline, html)
     html = html.replace("/*@DATA*/", data_js())
+    ver = open(os.path.join(HERE, "..", "..", "VERSION")).read().strip()
+    html = html.replace("@@VERSION@@", ver)                      # версия TENGAN (файл VERSION)
     assert "@INLINE" not in html
     assert not re.search(r'(src|href)="https?://', html), "внешние ссылки запрещены: страница должна работать без интернета"
     return html

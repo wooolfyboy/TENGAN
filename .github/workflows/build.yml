@@ -114,7 +114,6 @@ jobs:
         working-directory: app/android
         env:
           APP_VERSION_CODE: ${{ github.run_number }}
-          APP_VERSION_NAME: ${{ inputs.release_tag || github.ref_name }}
         run: |
           chmod +x gradlew
           ./gradlew --no-daemon assembleRelease

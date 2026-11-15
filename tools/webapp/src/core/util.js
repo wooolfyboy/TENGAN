@@ -38,7 +38,7 @@ T.hex8 = (h, signed) => {
 };
 T.el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
 // внутри приложения для планшета (Capacitor): страница своя, палка — по её адресу в сети TENGAN
-T.PAGE_REV = 2;                                         // номер ревизии страницы (видно в углу экрана запуска)
+T.VERSION = '@@VERSION@@';                               // версия TENGAN (build.py подставляет из файла VERSION)
 T.native = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 T.STICK = '192.168.4.1';
 T.stickHost = () => new URLSearchParams(location.search).get('host') || (T.native ? T.STICK : location.hostname || T.STICK);

@@ -4,6 +4,7 @@
 #include <Preferences.h>
 #include "core/timeutil.h"
 #include "core/settings.h"
+#include "core/version.h"
 #include "core/display.h"
 #include "core/theme.h"
 #include "core/leds.h"
@@ -37,7 +38,7 @@ static uint32_t g_setChangedMs = 0;
 static Preferences g_prefs;
 
 // все пункты настроек; page — на какой странице показывать
-enum { S_THEME, S_SCREEN, S_DIM, S_LEDBR, S_VOLUME, S_CLICKS, S_CITY, S_BATTERY,
+enum { S_THEME, S_SCREEN, S_DIM, S_LEDBR, S_VOLUME, S_CLICKS, S_CITY, S_BATTERY, S_VERSION,
        S_RANGE, S_LEDEV, S_BLETICK,
        S_WRANGE, S_WTICK,
        S_BAND,
@@ -53,6 +54,7 @@ static const SetDef DEFS[S_NUM] = {
   { "Wheel clicks",   "click on every wheel step",   P_GENERAL },
   { "City",           "for sky map and satellites",  P_GENERAL },
   { "Battery",        "",                            P_GENERAL },
+  { "Version",        "TENGAN firmware",             P_GENERAL },
   { "Range",          "ignore weaker devices",       P_BLE },
   { "LED events",     "leds flash on count jump",    P_BLE },
   { "Find ticks",     "ticks on nearest screen",     P_BLE },
@@ -219,6 +221,7 @@ void drawSettings() {
       case S_AULED:   strcpy(val, onOff(g_auLeds)); break;
       case S_AUSRC:   strcpy(val, g_auSrc == 0 ? "auto" : g_auSrc == 1 ? "mic" : "laptop"); break;
       case S_CITY:    snprintf(val, sizeof(val), "%s", curCity().name); break;
+      case S_VERSION: snprintf(val, sizeof(val), "v%s", FW_VERSION); break;
       default:
         if (g_bat.ok) { sprintf(val, "%d%%  %.2f V", g_bat.soc, g_bat.mv / 1000.0f); alert = g_bat.soc <= 20; }
         else          sprintf(val, "n/a");
@@ -230,7 +233,7 @@ void drawSettings() {
     spr.setTextDatum(MR_DATUM);
     spr.setTextColor(alert ? C_ALERT() : (sel ? C_ACC() : C_HOT()));
     txt(val, W - UI_M - 8, cy, 2);
-    if (sel && id != S_BATTERY) {                 // стрелка «крути колесо»
+    if (sel && id != S_BATTERY && id != S_VERSION) {                 // стрелка «крути колесо»
       int vw = txtW(val, 2);
       spr.setTextColor(UI_DIM());
       txt("<", W - UI_M - 16 - vw, cy, 2);
