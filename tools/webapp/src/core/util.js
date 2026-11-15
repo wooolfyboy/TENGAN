@@ -39,26 +39,10 @@ T.hex8 = (h, signed) => {
 };
 T.el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
 T.reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-// ---- уровень качества: подбирается сам по реальным кадрам (app.js) ----
-// 0 — родное разрешение; дальше по шагу дешевле. Красота важнее точности, но плавность важнее красоты.
-T.QL = [
-  { dpr: 3, bloom: 1, dust: 1, scan: 1 },
-  { dpr: 2, bloom: 1, dust: 1, scan: 1 },
-  { dpr: 1.5, bloom: 1, dust: 1, scan: 1 },
-  { dpr: 1.5, bloom: 0, dust: 1, scan: 0 },
-  { dpr: 1.25, bloom: 0, dust: 0, scan: 0 },
-  { dpr: 1, bloom: 0, dust: 0, scan: 0 },
-];
-T.qLevel = 2;                                           // старт: 1.5× + свечение; дальше app.js подстроит
-try { const v = localStorage.getItem('qLevel'); if (v != null && +v >= 0 && +v < T.QL.length) T.qLevel = +v; } catch (e) {}
-T.Q = Object.assign({}, T.QL[T.qLevel]);
-T.setQuality = lv => {
-  lv = T.clamp(lv, 0, T.QL.length - 1) | 0;
-  if (lv === T.qLevel) return;
-  T.qLevel = lv; Object.assign(T.Q, T.QL[lv]);
-  try { localStorage.setItem('qLevel', lv); } catch (e) {}
-  for (const o of T._cvs || []) o.fit();
-};
+// ---- качество: фиксированное (стабильный режим). Холст ~1920 px по длинной стороне,
+// свечение, пыль и сканлайны включены; app.js гасит свечение, только если совсем не тянет.
+T.RES = 1920;
+T.Q = { bloom: 1, dust: 1, scan: 1 };
 
 // ---- «спокойное» значение: дрожь меньше порога не показываем, большие изменения перетекают ----
 // const s = T.steady(4, 0.7); s.set(v); каждый кадр s.tick(dt); s.v — что рисовать
@@ -211,8 +195,11 @@ T.bloom = (o, strength = 0.85) => {
   if (!T.Q.bloom) return;
   const cv = o.cv, g = o.g;
   if (!o.bl) o.bl = [0, 1, 2].map(() => { const c = document.createElement('canvas'); return { c, g: c.getContext('2d') }; });
+  // «фейк»: само размытие пересчитываем через кадр, накладываем каждый кадр — глазу не видно, нагрузка вдвое меньше
+  o.blN = (o.blN || 0) + 1;
+  const redo = (o.blN & 1) || o.bl[0].c.width !== Math.max(1, cv.width >> 1);
   let src = cv;
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; redo && i < 3; i++) {
     const b = o.bl[i], w = Math.max(1, cv.width >> (i + 1)), h = Math.max(1, cv.height >> (i + 1));
     if (b.c.width !== w || b.c.height !== h) { b.c.width = w; b.c.height = h; }
     b.g.globalCompositeOperation = 'copy'; b.g.imageSmoothingEnabled = true; b.g.imageSmoothingQuality = 'low';

@@ -1,5 +1,5 @@
 // ---- холст в полном разрешении планшета: учитывает devicePixelRatio и поворот ----
-// Разрешение ограничено уровнем качества T.Q (его подбирает app.js по реальным кадрам).
+// Разрешение: не больше T.RES (1920) по длинной стороне — стабильно на планшете 2.8K.
 T._cvs = new Set();
 T.canvas = (parent, maxDpr = 3) => {
   const cv = document.createElement('canvas');
@@ -7,7 +7,7 @@ T.canvas = (parent, maxDpr = 3) => {
   const g = cv.getContext('2d');
   const o = { cv, g, w: 0, h: 0, dpr: 1 };
   const fit = () => {
-    const r = parent.getBoundingClientRect(), d = Math.min(window.devicePixelRatio || 1, maxDpr, T.Q.dpr);
+    const r = parent.getBoundingClientRect(), d = Math.min(window.devicePixelRatio || 1, maxDpr, T.RES / Math.max(1, r.width, r.height));
     const W = Math.max(1, Math.round(r.width * d)), H = Math.max(1, Math.round(r.height * d));
     if (W !== cv.width || H !== cv.height) { cv.width = W; cv.height = H; }
     o.w = r.width; o.h = r.height; o.dpr = d;
