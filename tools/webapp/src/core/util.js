@@ -132,7 +132,31 @@ T.bigNum = (g, v, x, y, px, col, unit, al = 'left') => {
   T.txt(g, s, x0, y, px, col, 't');
   if (unit) T.txt(g, unit, x0 + w + px * 0.1, y - px * 0.04, px * 0.22, T.C.dim);
 };
-// печать 天眼 из прошивки (core/seal.h) — кэшируется по размеру и цвету
+// печать 天眼 векторная: заливка цветом, знаки «вырезаны» цветом фона (шрифт Tengan Seal —
+// два знака IPAGothic в fonts.css). Чёткая при любом размере. Возвращает ширину.
+T.SEAL_FONT = "'Tengan Seal','Noto Sans CJK JP','Noto Sans JP',sans-serif";
+T.drawSeal = (g, x, y, h, col = T.C.acc, bg = T.C.bg) => {
+  const w = h * 0.56, c = h * 0.1;
+  T.cutPath(g, x, y, w, h, c); g.fillStyle = col; g.fill();
+  g.strokeStyle = bg; g.lineWidth = Math.max(1, h * 0.03);
+  T.cutPath(g, x + h * 0.06, y + h * 0.06, w - h * 0.12, h - h * 0.12, c * 0.6); g.stroke();
+  g.fillStyle = bg; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = `${h * 0.38}px ${T.SEAL_FONT}`;
+  g.lineWidth = h * 0.018; g.lineJoin = 'round';                      // чуть толще штрих — печать, а не тонкий шрифт
+  for (const [ch, k] of [['天', 0.29], ['眼', 0.71]]) { g.fillText(ch, x + w / 2, y + h * k); g.strokeText(ch, x + w / 2, y + h * k); }
+  return w;
+};
+// печать на один знак (квадратная): filled — залитая с вырезанным знаком, иначе контур
+T.drawSealChar = (g, x, y, sz, ch, col = T.C.acc, filled = true, bg = T.C.bg) => {
+  const c = sz * 0.14;
+  T.cutPath(g, x, y, sz, sz, c);
+  if (filled) { g.fillStyle = col; g.fill(); g.strokeStyle = bg; g.lineWidth = Math.max(1, sz * 0.035); T.cutPath(g, x + sz * 0.08, y + sz * 0.08, sz * 0.84, sz * 0.84, c * 0.6); g.stroke(); }
+  else { g.strokeStyle = col; g.lineWidth = Math.max(1, sz * 0.04); g.stroke(); }
+  const ink = filled ? bg : col;
+  g.fillStyle = ink; g.strokeStyle = ink; g.lineWidth = sz * 0.02; g.lineJoin = 'round';
+  g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = `${sz * 0.62}px ${T.SEAL_FONT}`;
+  g.fillText(ch, x + sz / 2, y + sz * 0.53); g.strokeText(ch, x + sz / 2, y + sz * 0.53);
+};
+// (старое) печать 天眼 из прошивки (core/seal.h) — пиксельная, для экрана палки — кэшируется по размеру и цвету
 T.sealImg = (() => {
   const cache = {};
   return (h, col = T.C.acc) => {

@@ -7,8 +7,7 @@ App.status = () => {
   const r = s.radio || '', names = [['b', 'BLE'], ['w', 'WIFI'], ['s', 'SUB'], ['m', 'MIC'], ['p', 'PC']];
   document.getElementById('radios').innerHTML = names.map(([k, n]) => `<i class="${r.includes(k) ? 'on' : ''}">${n}</i>`).join('');
 };
-// печать 天眼 в шапке — из прошивки
-(() => { const c = document.getElementById('seal'), im = T.sealImg(60, T.C.acc); if (im) { c.width = im.width; c.height = im.height; c.getContext('2d').drawImage(im, 0, 0); } })();
+
 setInterval(() => { const d = new Date(); document.getElementById('clock').textContent = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }, 1000);
 App.renderSubs = () => {
   const v = App.cur; subs.innerHTML = '';
