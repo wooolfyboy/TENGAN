@@ -19,7 +19,7 @@ FW = os.path.join(HERE, "..", "..", "src")
 
 def c_array(text, name):
     """Числа из static const ... NAME[] = { ... }; в плоский список."""
-    m = re.search(r"\b%s\b[^=]*=\s*\{(.*?)\};" % re.escape(name), text, re.S)
+    m = re.search(r"static const [^=;]*\b%s\b[^=;]*=\s*\{(.*?)\};" % re.escape(name), text, re.S)
     assert m, name
     return [int(x) for x in re.findall(r"-?\d+", re.sub(r'"[^"]*"', "", m.group(1)))]
 
