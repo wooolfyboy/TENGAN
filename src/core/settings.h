@@ -20,7 +20,9 @@ extern int g_thresh;                       // порог событий для �
 extern int g_ledBright;                    // % яркости ленты
 extern int g_scrBright;                    // % яркости экрана
 extern int g_micEn;                        // микрофон разрешён (1) / выключен (0)
-extern int g_auSrc;                        // звук для раздела Sound: 0 авто, 1 микрофон, 2 ноутбук
+extern int g_auSrc;
+extern int g_city;                         // город для Sky / Globe (индекс в CITIES, gallery/astro.h)
+extern int g_tzOff;                        // смещение местного времени, с (приходит с ноутбука)                        // звук для раздела Sound: 0 авто, 1 микрофон, 2 ноутбук
 extern int g_auLeds;                       // Sound: светодиоды показывают громкость (по умолчанию выкл)
 extern int g_clickEn;                      // щелчки колеса
 extern int g_bleTicks;                     // щелчки «ближе-дальше» в Bluetooth

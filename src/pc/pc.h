@@ -36,8 +36,8 @@ struct PcStat {
   int      histN = 0;
 };
 extern PcStat g_pc;
-extern int    g_pcPage;               // 0 — обзор, 1 — ядра, 2 — музыка (колесо = громкость)
-#define PC_PAGES 3
+extern int    g_pcPage;               // 0 — обзор, 1 — ядра, 2 — город процессов, 3 — музыка (колесо = громкость)
+#define PC_PAGES 4
 // пульт: что и когда палка последний раз отправила ноуту (для анимации экрана)
 extern int      g_pcLastCmd;          // +1 громче, -1 тише, 2 пауза/играть, 3 без звука
 extern uint32_t g_pcLastCmdMs;
@@ -50,5 +50,8 @@ void drawPc(uint32_t now);
 void drawPcCores(uint32_t now);
 void drawPcWaiting(uint32_t now);
 void drawPcMedia(uint32_t now);
+void drawPcCity(uint32_t now);       // город процессов (pc_city.cpp)
+void pcCityLine(char* s);            // строка «PP ...» с ноутбука
+void pcCityNext();                   // нажатие: прожектор на следующую башню
 
 extern const Section pcSection;

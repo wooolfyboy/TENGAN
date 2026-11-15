@@ -24,6 +24,7 @@
 #include "ble/ble.h"
 #include "core/boot.h"
 #include "pc/pc.h"
+#include "gallery/sat.h"
 #include <driver/gpio.h>
 #include <esp_ota_ops.h>
 #include "audio/audio.h"
@@ -71,6 +72,7 @@ void setup() {
   bootScreen();          // анимация включения
   bleBegin();
   audioBegin();          // динамик: звуки интерфейса
+  satBegin();            // сохранённые орбиты спутников (Gallery › Globe)
   navBegin();
   navDraw(millis());
 }

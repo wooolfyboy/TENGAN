@@ -13,6 +13,8 @@
 #include "core/battery.h"
 #include "core/settings.h"
 #include "gallery/gallery.h"
+#include "gallery/astro.h"
+#include "gallery/sat.h"
 #include "web/web.h"
 #include "pc/pc.h"
 #include "core/power.h"
@@ -372,6 +374,13 @@ int main(int argc, char** argv) {
   for (int f = 0; f < 10; f++) drawTorus(s_now + 1500 + f * 33); snap("51_gallery_torus");
   for (int f = 0; f < 60; f++) drawLife(s_now + 2000 + f * 120); snap("52_gallery_life");
   for (int f = 0; f < 160; f++) drawPendulum(s_now + 9000 + f * 33); snap("53_gallery_pendulum");
+  { char l1[] = "TLE\tISS\t1 25544U 98067A   26318.50000000  .00016717  00000+0  30472-3 0  9990\t2 25544  51.6400 120.0000 0003000  90.0000 270.0000 15.50000000400000";
+    char l2[] = "TLE\tTiangong\t1 48274U 21035A   26318.40000000  .00020000  00000+0  25000-3 0  9990\t2 48274  41.4700 210.0000 0005000  30.0000 330.0000 15.60000000300000";
+    satFromLine(l1); satFromLine(l2);
+    astroSetTime((uint32_t)astroUnixNow(), 10800);
+    for (int f = 0; f < 3; f++) drawSky(s_now + f * 40);   snap("54_gallery_sky");
+    skyClick(); drawSky(s_now);                           snap("54b_gallery_sky_stars"); skyClick(); skyClick();
+    for (int f = 0; f < 60; f++) drawGlobe(s_now + f * 40); snap("55_gallery_globe"); }
   { uint8_t qr[29 * 29]; for (int i = 0; i < 29 * 29; i++) qr[i] = (noise(i) > 0.5f) || ((i % 29 < 7 || i % 29 > 21) && (i / 29 < 7) && !((i % 29 == 1 || i % 29 == 5 || i % 29 == 23 || i % 29 == 27) && i / 29 > 0 && i / 29 < 6));
     WebView v = { "TENGAN-3F2A", "48213907", "192.168.4.1", 1, 214, true, "sub-ghz" };
     drawWebScreen(v, qr, 29); snap("60_web"); }
@@ -386,6 +395,12 @@ int main(int argc, char** argv) {
   g_pc.t = s_now;
   drawPc(s_now);             snap("71_pc_overview");
   drawPcCores(s_now);        snap("72_pc_cores");
+  Serial.feed("PP\tchrome,384,2840,1\tCode,121,1240,0\tTelegram,45,410,0\tsvchost,38,620,0\tDiscord,72,780,0\tYandexMusic,64,520,0\t"
+              "explorer,12,210,0\tMsMpEng,95,380,0\tdwm,52,160,0\tpython,31,120,0\tSteam,8,340,0\tSearchHost,4,180,0\tOneDrive,6,90,0\t"
+              "audiodg,18,40,0\tTeams,22,690,0\tNVIDIA,9,150,0\tgame,612,3100,0\n");
+  for (int f = 0; f < 50; f++) { pcPoll(0); drawPcCity(s_now + f * 33); }
+  snap("72b_pc_city");
+  pcCityNext(); drawPcCity(s_now + 2000); snap("72c_pc_city_spot");
   Serial.feed("PV vol=42 mute=0\n"); pcPoll(0); g_pc.volT = s_now;
   g_pcLastCmd = 1; g_pcLastCmdMs = s_now - 120;
   Serial.feed("PM\t1\t63\t215\tSpotify\tГруппа крови (Remastered 2024 Edition)\tКино\n"); pcPoll(0); g_pc.trkT = s_now;

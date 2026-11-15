@@ -7,6 +7,7 @@
 //  TORUS     — бублик из ~1000 точек; яркость — освещение и глубина.
 //  LIFE      — игра «Жизнь» Конвея с послесвечением.
 //  PENDULUM  — двойной маятник: хаос и светящийся след.
+//  SKY/GLOBE — планетарий и спутники (gallery_sky.cpp).
 //
 //  Колесо — скорость, нажатие — назад в подменю.
 // ============================================================
@@ -17,8 +18,11 @@
 #include "core/ui.h"
 #include "core/menu.h"
 #include "core/psram.h"
+#include "core/settings.h"
+#include "gallery/astro.h"
+#include "gallery/sat.h"
 
-enum { G_TESS = 0, G_TORUS, G_LIFE, G_PEND, G_NUM };
+enum { G_TESS = 0, G_TORUS, G_LIFE, G_PEND, G_SKY, G_GLOBE, G_NUM };
 static int   g_gal = 0;
 static float s_speed = 1.0f;                // множитель скорости (колесо)
 static float s_phase = 0;                   // «время» анимации с учётом скорости
@@ -337,23 +341,31 @@ static void galSubtitle(char* out, size_t n) { snprintf(out, n, "%d demos", G_NU
 static void galEnter() { s_lastMs = 0; }
 static void galLeave() {}
 static void galInfo(int i, SubItem& it) {
-  static const char* const names[G_NUM] = { "Tesseract", "Torus", "Life", "Pendulum" };
-  static const char* const descs[G_NUM] = { "4D hypercube", "donut of points", "game of life", "double pendulum chaos" };
+  static const char* const names[G_NUM] = { "Tesseract", "Torus", "Life", "Pendulum", "Sky", "Globe" };
+  static const char* const descs[G_NUM] = { "4D hypercube", "donut of points", "game of life", "double pendulum chaos", "stars over you now", "ISS and satellites" };
   it.name = names[i]; it.desc = descs[i]; it.value[0] = 0;
   if (i == G_TESS)       strcpy(it.value, "4D");
   else if (i == G_TORUS) strcpy(it.value, "3D");
-  else if (s_lfGen)      snprintf(it.value, sizeof(it.value), "gen %lu", (unsigned long)s_lfGen);
+  else if (s_lfGen && i == G_LIFE) snprintf(it.value, sizeof(it.value), "gen %lu", (unsigned long)s_lfGen);
+  else if (i == G_SKY)   snprintf(it.value, sizeof(it.value), "%s", CITIES[g_city].name);
+  else if (i == G_GLOBE) snprintf(it.value, sizeof(it.value), "%d sats", g_nSats);
 }
 static int  galNow() { return g_gal; }
 static void galOpen(int m) { g_gal = m; s_lastMs = 0; s_trailN = 0; }
 static void galClose() {}
 static void galClick() {                                // в «Жизни» — новый мир, в маятнике — новый запуск
   if (g_gal == G_LIFE) lfSeed(); else if (g_gal == G_PEND) pdReset();   // у фигур нажатия нет
+  else if (g_gal == G_SKY) skyClick(); else if (g_gal == G_GLOBE) globeClick();
 }
-static void galRotate(int dir) { s_speed = constrain(s_speed + dir * 0.25f, 0.0f, 4.0f); }
+static void galRotate(int dir) {
+  if (g_gal == G_SKY) { skyTurn(dir); return; }              // небо и Земля — колесо крутит вид
+  if (g_gal == G_GLOBE) { globeTurn(dir); return; }
+  s_speed = constrain(s_speed + dir * 0.25f, 0.0f, 4.0f);
+}
 static void galDraw(uint32_t now) {
   if (g_gal == G_TESS) drawTesseract(now); else if (g_gal == G_TORUS) drawTorus(now);
-  else if (g_gal == G_LIFE) drawLife(now); else drawPendulum(now);
+  else if (g_gal == G_LIFE) drawLife(now); else if (g_gal == G_PEND) drawPendulum(now);
+  else if (g_gal == G_SKY) drawSky(now); else drawGlobe(now);
 }
 
 const Section gallerySection = {
