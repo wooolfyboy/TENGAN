@@ -52,7 +52,7 @@ const loop = now => {
   next = Math.max(next + STEP, now - STEP);            // отстали — не догоняем пачкой
   const dt = Math.min(0.1, (now - last) / 1000); last = now;
   S.tick(dt);
-  if (App.cur) App.cur.frame(dt, now / 1000);
+  if (App.cur && !App.hold) App.cur.frame(dt, now / 1000);   // во время заставки сцена ждёт (данные идут)
   fpsN++; fpsT += dt;
   if (fpsT >= 1) {
     const fps = Math.round(fpsN / fpsT); T.fps = fps;
@@ -62,7 +62,8 @@ const loop = now => {
   }
   if (T.Stream.mode === 'live' && now - T.Stream.lastMsg > 6000) T.Stream.setLink('off');
 };
-let first = 'ov'; try { first = localStorage.getItem('view') || 'ov'; } catch (e) {}
-App.go(first);
-T.boot && T.boot();
+// старт (boot.js): сначала «запуск» со шкалой — связь, радио раздела (по умолчанию Bluetooth),
+// данные, сцена; потом красивая заставка; потом раздел
+let first = 'ble'; try { first = localStorage.getItem('view') || 'ble'; } catch (e) {}
+if (T.boot) T.boot(first); else App.go(first);
 requestAnimationFrame(loop);

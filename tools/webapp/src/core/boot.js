@@ -1,23 +1,75 @@
-// ---- заставка при открытии: та же, что на палке (core/boot.cpp), но в 2.8K ----
-// прицел и уголки разлетаются, кольца расходятся, луч с хвостом засекает цели,
-// название «расшифровывается», ставится печать 天眼, строка развёртки стирает экран.
-T.boot = () => {
+// ---- старт: сначала «запуск» со шкалой, потом красивая заставка ----
+// 1) ЗАПУСК: по шагам поднимаем связь с палкой, радио открываемого раздела (по умолчанию
+//    Bluetooth), первые данные и сцену (несколько кадров под шторкой) — пока идёт шкала.
+// 2) ЗАСТАВКА (как core/boot.cpp на палке): всё уже поднято, сцена на паузе — анимация идёт
+//    одна и не лагает. Прицел, кольца, луч, «расшифровка» названия, печать 天眼, развёртка.
+// 3) Шторка уходит — раздел уже живой.
+T.boot = (first) => {
   const box = document.getElementById('boot'), cv = document.getElementById('bootCv');
   let skip = false;
   try { skip = sessionStorage.getItem('booted') === '1'; sessionStorage.setItem('booted', '1'); } catch (e) {}
-  if (skip || T.reduce) { box.remove(); return; }
-  const g = cv.getContext('2d'), t0 = performance.now(), MS = 2700;
+  const view = T.views.find(v => v.id === first) || T.views[0];
+  if (skip || T.reduce) { box.remove(); T.app.go(view.id); return; }
+  const g = cv.getContext('2d'), MS = 2700;
+  let t0 = 0;
   const seg = (t, a, b) => t <= a ? 0 : t >= b ? 1 : (t - a) / (b - a), eo = x => 1 - Math.pow(1 - T.clamp(x), 3);
   const BL = [[35, 72], [80, 38], [140, 88], [200, 55], [250, 80], [310, 30], [335, 64]];
   const POOL = 'ABCDEFGHKLMNPRSTVXZ0123456789', TITLE = 'TENGAN', SUB = '// ENVIRONMENT ANALYZER';
   const hash = x => { x ^= x >>> 16; x = Math.imul(x, 0x7feb352d); x ^= x >>> 15; x = Math.imul(x, 0x846ca68b); x ^= x >>> 16; return x >>> 0; };
-  const end = () => { box.classList.add('done'); setTimeout(() => box.remove(), 400); };
-  box.addEventListener('pointerdown', end);
+  const end = () => { phase = 'done'; T.app.hold = false; box.classList.add('done'); setTimeout(() => box.remove(), 400); };
+  let phase = 'launch', L = null;
+  box.addEventListener('pointerdown', () => { if (phase === 'anim') end(); });   // тап — пропустить заставку
+  const want = (typeof view.want === 'function' ? view.want() : view.want) || 'st';
+  const needBle = want.split(/[,&]/).includes('ble');
+  const startLaunch = now => {
+    phase = 'launch';
+    L = { t0: now, bar: 0, step: 0, mounted: 0, warm: 0, stepT: now,
+      steps: [
+        ['LINK', 'связь с палкой', () => T.Stream.mode === 'live' || T.Stream.mode === 'poll'],
+        ['STICK', 'состояние палки', () => !!T.S.st],
+        ['RADIO', needBle ? 'Bluetooth' : 'радио по разделу', () => !needBle || (T.S.ble && T.S.ble.on)],
+        ['DATA', 'первые данные', () => !needBle || T.S.dev.size > 0],
+        ['RENDER', 'сцена', () => L.warm >= 3],
+      ] };
+    T.Stream.connect(want);
+  };
+  startLaunch(performance.now());
+  const launchFrame = (now, W, H, u) => {
+    const cx = W / 2, cy = H / 2;
+    // шаг выполнен или ждём слишком долго (6 с) — дальше; без связи сцена всё равно откроется
+    const st = L.steps[L.step];
+    if (st && (st[2]() || now - L.stepT > 6000)) { st.ok = st[2](); L.step++; L.stepT = now; }
+    if (L.step >= 4 && !L.mounted) { L.mounted = 1; T.app.go(view.id); }   // сцена рисуется под шторкой
+    if (L.mounted) L.warm++;
+    const target = Math.min(1, (L.step + (L.step < 5 ? 0.6 * Math.min(1, (now - L.stepT) / 1500) : 0)) / 5);
+    L.bar += (target - L.bar) * 0.12;
+    g.fillStyle = T.C.bg; g.fillRect(0, 0, W, H);
+    const bw = Math.min(W * 0.6, u * 40), x = cx - bw / 2;
+    T.header(g, x, cy - u * 9, bw, u, 'Starting', view.title, false);
+    const seal = T.sealImg(u * 3, T.C.acc); if (seal) g.drawImage(seal, x + bw - seal.width * u * 3 / seal.height, cy - u * 6, seal.width * u * 3 / seal.height, u * 3);
+    T.segBar(g, x, cy - u * 1.5, bw, u * 1.1, L.bar, 32, true);
+    T.txt(g, Math.round(L.bar * 100) + '%', x + bw, cy - u * 2.4, u * 1.6, T.C.hot, 't', 'right');
+    L.steps.forEach((s, i) => {
+      const y = cy + u * 2.2 + i * u * 1.5, done = i < L.step, cur = i === L.step;
+      T.diamond(g, x + u * 0.4, y - u * 0.3, u * 0.32, done ? (s.ok === false ? T.C.alert : T.C.acc) : cur ? T.C.hot : T.C.line, done || cur);
+      T.txt(g, s[0], x + u * 1.4, y, u * 0.9, done ? T.C.label : cur ? T.C.hot : T.C.dim);
+      T.txt(g, s[1] + (done ? (s.ok === false ? ' · skipped' : ' · ok') : cur ? ((now / 300 | 0) % 2 ? ' …' : '') : ''), x + u * 6.5, y, u * 0.9, done && s.ok === false ? T.C.alert : done ? T.C.label : cur ? T.C.hot : T.C.dim, 'c');
+    });
+    if (L.step >= 5 && L.bar > 0.985) { phase = 'anim'; t0 = now; T.app.hold = true; return false; }   // всё поднято — сцену на паузу, заставка
+    return true;
+  };
+  let lastDraw = 0;
   const frame = now => {
-    if (!box.isConnected) return;
-    const t = now - t0, d = Math.min(devicePixelRatio || 1, 3), W = innerWidth, H = innerHeight;
+    if (!box.isConnected || phase === 'done') return;
+    requestAnimationFrame(frame);
+    if (now - lastDraw < 15) return;                   // не больше ~60 кадров
+    lastDraw = now;
+    const W = innerWidth, H = innerHeight, d = Math.min(devicePixelRatio || 1, T.RES / Math.max(W, H));
     if (cv.width !== Math.round(W * d)) { cv.width = Math.round(W * d); cv.height = Math.round(H * d); }
     g.setTransform(d, 0, 0, d, 0, 0);
+    if (phase === 'launch') { launchFrame(now, W, H, T.unit(W, H)); return; }
+    if (now - t0 > MS) { end(); return; }
+    const t = now - t0;
     const cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.36, u = T.unit(W, H);
     g.fillStyle = T.C.bg; g.fillRect(0, 0, W, H);
     // прицел
@@ -70,8 +122,6 @@ T.boot = () => {
     // развёртка стирает
     const wp = seg(t, 2350, MS);
     if (wp > 0) { const y = eo(wp) * (H + 6); g.fillStyle = T.C.bg; g.fillRect(0, 0, W, Math.min(y, H)); g.fillStyle = T.C.hot; g.fillRect(0, y, W, 2); g.fillStyle = T.C.acc; g.fillRect(0, y - 2, W, 1); g.fillRect(0, y + 3, W, 1); }
-    if (t > MS) { end(); return; }
-    requestAnimationFrame(frame);
   };
   (document.fonts ? document.fonts.ready : Promise.resolve()).then(() => requestAnimationFrame(frame));
 };
