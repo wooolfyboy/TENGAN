@@ -6626,3 +6626,5 @@ static const uint8_t TABLET_GZ[] PROGMEM = {
   0x35,0x0f,0xe3,0x04,0x00,
 };
 static const size_t TABLET_GZ_LEN = 132365;
+// версия страницы (sha256 несжатого HTML): по ней приложение планшета понимает, что пора обновиться
+static const char TABLET_HTML_SHA[] = "20b2defdd105c1bd3561718269a40d438e82424dbdc22c60d029946b5e5fc265";
