@@ -81,6 +81,7 @@ jobs:
             **tengan_firmware_ota.bin** — upload over Wi-Fi: Web section → page → Update tab.
             **pc_monitor_windows.zip** — laptop monitor for the PC section: unzip, double-click start_pc_monitor.bat.
             **tengan_tablet.apk** — Android app for the tablet (same page as /full plus GPS): copy to the tablet, open, allow install.
+            **tengan_desktop.exe** — Windows app: the same HQ page in a window + the PC monitor, over the USB cable or the stick's Wi-Fi. Open Web on the stick, run the exe, pick USB.
 
 
   # Приложение для планшета (Android, app/): та же страница, что /full на палке, плюс GPS.
@@ -131,3 +132,38 @@ jobs:
         with:
           tag_name: ${{ inputs.release_tag || github.ref_name }}
           files: dist/tengan_tablet.apk
+
+  # Приложение для компьютера (Windows, tools/desktop): та же страница FULL + монитор ПК,
+  # связь по USB-кабелю или по Wi-Fi палки. Один файл tengan_desktop.exe.
+  desktop:
+    runs-on: windows-latest
+    needs: firmware                  # релиз создаёт firmware — сюда только докладываем exe
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Libraries
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r tools/desktop/requirements.txt pyinstaller
+
+      - name: Check it imports
+        run: python -c "import sys; sys.path.insert(0,'tools/pc_monitor'); sys.path.insert(0,'tools/desktop'); import webview, serial, psutil, tengan_desktop; print('ok')"
+
+      - name: Build exe
+        run: python tools/desktop/build_exe.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-exe-${{ github.sha }}
+          path: dist/tengan_desktop.exe
+
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.release_tag || github.ref_name }}
+          files: dist/tengan_desktop.exe

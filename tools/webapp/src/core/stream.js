@@ -85,7 +85,7 @@ Stream.poll = (want) => {
 // ---- USB (приложение для компьютера): подписка + длинный опрос моста ----
 // Мост раз в ≤0.25 с отдаёт пачку «[[событие, данные], …]»; «_x» — служебное от приложения/палки.
 Stream.usb = (want) => {
-  USB.want(want).catch(() => {});
+  USB.want('want=' + want).catch(() => {});
   if (Stream.usbLoop) return;
   Stream.usbLoop = true;
   if (Stream.mode !== 'usb') Stream.setLink('usbwait');
