@@ -19,13 +19,14 @@ static bool     s_dimmed = false;
 
 void powerTouch() {
   s_lastTouch = millis();
+  if (g_screenOff) { g_screenOff = false; applyBrightness(); }   // экран гасили с планшета — касание палки будит
   if (s_dimmed) { s_dimmed = false; applyBrightness(); }
 }
 bool powerIdle() { return s_dimmed; }
 void powerIdleTick(uint32_t now) {
   uint32_t limit = DIM_SECS[g_dimIdx] * 1000UL;
   if (!limit) { if (s_dimmed) powerTouch(); return; }  // выключено в настройках
-  if (!s_dimmed && msSince(now, s_lastTouch) > limit) {
+  if (!s_dimmed && !g_screenOff && msSince(now, s_lastTouch) > limit) {
     s_dimmed = true;
     analogWrite(TFT_BL, g_scrBright * 255 / 100 / 4);   // четверть яркости
   }

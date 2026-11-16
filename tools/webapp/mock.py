@@ -21,6 +21,44 @@ VEND = ["Apple", "Apple", "Samsung", "Apple", "Lenovo", "private", "Samsung", "X
 BASE = [-44 - i * 2.6 for i in range(22)]
 
 
+# пульт управления (как в прошивке: /api/settings, /api/set, /api/label, /api/act) — состояние в памяти
+SETTINGS = json.loads('{"pages":[{"id":"general","name":"General","items":[{"k":"theme","name":"Theme","hint":"look: denko light / sumi ink","type":"enum","v":"denko","opts":["denko","sumi"]},{"k":"screen","name":"Screen","hint":"screen backlight","type":"range","v":100,"min":20,"max":100,"step":10,"unit":"%"},{"k":"dim","name":"Auto dim","hint":"dim screen when idle","type":"enum","v":"off","opts":["off","30 s","1 min","5 min"]},{"k":"ledbr","name":"LED brightness","hint":"led strip brightness","type":"range","v":50,"min":10,"max":100,"step":10,"unit":"%"},{"k":"volume","name":"Volume","hint":"all sounds: off/quiet/loud","type":"enum","v":"quiet","opts":["off","quiet","loud"]},{"k":"clicks","name":"Wheel clicks","hint":"click on every wheel step","type":"bool","v":1},{"k":"city","name":"City","hint":"for sky map and satellites","type":"enum","v":"Moscow","opts":["Moscow","Saint Petersburg","Novosibirsk","Yekaterinburg","Kazan","Nizhny Novgorod","Samara","Krasnodar","Rostov-on-Don","Vladivostok","Irkutsk","Minsk","Kyiv","Almaty","Tbilisi","Yerevan","Berlin","London","New York","Tokyo"]},{"k":"battery","name":"Battery","hint":"","type":"info","v":"87%  3.98 V"},{"k":"version","name":"Version","hint":"TENGAN firmware","type":"info","v":"v1.7-test3"}]},{"id":"ble","name":"Bluetooth","items":[{"k":"ble_range","name":"Range","hint":"ignore weaker devices","type":"enum","v":"all","opts":["all","far","room","near","very near"]},{"k":"ble_ledev","name":"LED events","hint":"leds flash on count jump","type":"range","v":7,"min":0,"max":30,"step":1,"unit":""},{"k":"ble_ticks","name":"Find ticks","hint":"ticks on nearest screen","type":"bool","v":1}]},{"id":"wifi","name":"Wi-Fi","items":[{"k":"wifi_range","name":"Range","hint":"hide weaker networks","type":"enum","v":"all","opts":["all","far","room","near","very near"]},{"k":"wifi_ticks","name":"Find ticks","hint":"ticks on find screen","type":"bool","v":1}]},{"id":"sub","name":"Sub-GHz","items":[{"k":"sub_band","name":"Start band","hint":"band when section opens","type":"enum","v":"433 MHz","opts":["315 MHz","433 MHz","868 MHz","915 MHz"]}]},{"id":"snd","name":"Sound","items":[{"k":"mic","name":"Microphone","hint":"mic for sound section","type":"bool","v":1},{"k":"au_leds","name":"LED meter","hint":"leds show loudness","type":"bool","v":0},{"k":"au_src","name":"Source","hint":"auto / mic / laptop audio","type":"enum","v":"auto","opts":["auto","mic","laptop"]}]}]}')
+LABELS = {}
+for _pg in SETTINGS["pages"]:                              # тема — та, с которой запущен мок
+    for _it in _pg["items"]:
+        if _it["k"] == "theme":
+            _it["v"] = THEME
+
+
+def set_item(k, v):
+    for pg in SETTINGS["pages"]:
+        for it in pg["items"]:
+            if it["k"] != k:
+                continue
+            if it["type"] == "info":
+                return {"ok": False, "err": "read-only"}
+            if it["type"] == "enum":
+                opts = it["opts"]
+                m = [o for o in opts if o.lower() == v.lower()]
+                if not m and v.isdigit() and int(v) < len(opts):
+                    m = [opts[int(v)]]
+                if not m:
+                    return {"ok": False, "err": "bad option"}
+                it["v"] = m[0]
+            elif it["type"] == "bool":
+                it["v"] = 1 if v.lower() in ("1", "true", "on") else 0
+            else:
+                try:
+                    it["v"] = max(it["min"], min(it["max"], int(v)))
+                except ValueError:
+                    return {"ok": False, "err": "bad number"}
+            if k == "theme":
+                global THEME
+                THEME = it["v"]
+            return {"ok": True, "item": it}
+    return {"ok": False, "err": "unknown key"}
+
+
 def ble():
     t = time.time()
     d = []
@@ -29,7 +67,7 @@ def ble():
             continue
         drift = 6 * math.sin(t * 0.05 + i)        # медленный уход
         r = int(BASE[i] + drift + random.uniform(-3, 3))   # сырой шум ±3 dB — пусть сглаживание работает
-        d.append([1000 + i, r, TYPES[i % 10], VEND[i % 10], NAMES[i % 10], 30 + i * 41, 1 + i % 3])
+        d.append([1000 + i, r, TYPES[i % 10], VEND[i % 10], NAMES[i % 10], 30 + i * 41, 1 + i % 3, LABELS.get(1000 + i, "")])
     return {"on": 1, "n": len(d), "m": len(d) + 7, "d": d}
 
 
@@ -108,6 +146,30 @@ def sat():
 WX = {"hist": [], "histT": 0}
 
 
+IR_FAKE = [("NEC", 0x04, 0x08, 32, "LG TV"), ("SAMSUNG", 0x07, 0x02, 32, "Samsung TV"), ("SONY12", 1, 0x15, 12, "Sony TV"),
+           ("RC5", 0, 0x0C, 13, "Philips TV"), ("NEC-EXT", 0xEF00, 0x05, 32, "RGB LED strip / lamp"), ("RAW", 0, 0x76D1A5F3, 71, "long frame: air conditioner?")]
+
+
+def ir_ev():
+    """ИК: случайный пульт (как событие "ir" палки)."""
+    p, a, c, b, br = random.choice(IR_FAKE)
+    raw = [9000, 4500] + [x for _ in range(31) for x in (560, random.choice((560, 1690)))]
+    return {"p": p, "addr": a, "cmd": c, "bits": b, "brand": br, "rep": int(random.random() < 0.3), "raw": raw[:64],
+            "t": int(time.time() * 1000) & 0x7FFFFFFF}
+
+
+NFC_FAKE = [{"fam": "MIFARE Classic 1K", "hint": "transit pass / door key - likely", "uid": "3A91\u2022\u2022", "atqa": "0004", "sak": "08", "ndef": []},
+            {"fam": "NTAG213", "hint": "sticker / tag - 144 bytes", "uid": "04A2\u2022\u2022", "atqa": "0044", "sak": "00",
+             "ndef": ["https://tengan.dev/hello", "Привет, палка"]},
+            {"fam": "Bank card (EMV)", "hint": "tap-to-pay card or phone", "uid": "084F\u2022\u2022", "atqa": "0004", "sak": "20", "ndef": []}]
+
+
+def nfc_ev():
+    """NFC: случайная карта (как событие "nfc" палки)."""
+    d = dict(random.choice(NFC_FAKE)); d["present"] = 1; d["t"] = int(time.time() * 1000) & 0x7FFFFFFF
+    return d
+
+
 def wx():
     # радиопогода: медленно плывущие значения + цикл «ясно → облака → дождь → гроза» (~2 минуты)
     t = time.time()
@@ -123,7 +185,45 @@ def wx():
         WX["histT"] = t; WX["hist"].append([round(clouds, 2), round(rain, 2)]); WX["hist"] = WX["hist"][-60:]
     return {"ok": 1, "cond": cond, "clouds": round(clouds, 3), "wind": round(wind, 3), "rain": round(rain, 3), "storm": round(storm, 3),
             "thunder": thunder, "trend": round(-math.cos(ph * math.pi * 2 - 1.2), 2), "ble": int(8 + clouds * 40), "turn": int(wind * 20),
-            "sub": int(rain * 9), "subPk": int(-70 + rain * 25), "snd": int(-50 + storm * 30), "pk": int(-40 + storm * 30), "hist": WX["hist"]}
+            "sub": int(rain * 9), "subPk": int(-70 + rain * 25), "snd": int(-50 + storm * 30), "pk": int(-40 + storm * 30), "hist": WX["hist"],
+            "temp": round(4.2 + 0.4 * math.sin(t / 300), 1), "hum": 81, "tsrc": "Nexus"}   # за окном: датчик 433 (null, если не слышно)
+
+
+SENS = {"t0": time.time(), "pk": 0, "last": 0.0, "lastKind": "sensor"}
+
+
+def sens():
+    """Датчики 433 (как событие "sens" палки): три термометра и звонок; посылки приходят раз в ~4 с."""
+    t = time.time()
+    el = t - SENS["t0"]
+    nx_t = round(4.2 + 0.4 * math.sin(t / 300), 1)
+    lc_t = round(21.4 + 0.2 * math.sin(t / 200), 1)
+    def ago(period, off): return int((el + off) % period)
+    rows = [
+        {"id": "nexus-1-0x5a", "p": "Nexus", "ch": 1, "kind": "th", "t": nx_t, "h": 81, "bat": 1, "rssi": -62, "ago": ago(57, 3), "n": 5 + int(el / 57)},
+        {"id": "lacrosse-tx141th-1-0x9b", "p": "LaCrosse-TX141TH", "ch": 1, "kind": "th", "t": lc_t, "h": 38, "bat": 1, "rssi": -78, "ago": ago(50, 20), "n": 3 + int(el / 50)},
+        {"id": "nexus-3-0x2c", "p": "Nexus", "ch": 3, "kind": "t", "t": -1.6, "h": None, "bat": 0, "rssi": -88, "ago": 700 + int(el), "n": 1},
+        {"id": "remote-7a0b", "p": "Remote", "ch": 0, "kind": "remote", "t": None, "h": None, "bat": None, "btn": 1, "rssi": -71, "ago": ago(40, 10), "n": 2 + int(el / 40)},
+    ]
+    if t - SENS["last"] > 4:                      # «пришла посылка»
+        SENS["last"] = t; SENS["pk"] += 1
+        SENS["lastKind"] = "remote" if SENS["pk"] % 4 == 0 else "sensor"
+    if SENS["lastKind"] == "sensor":             # Nexus: 36 бит PPM, рисунок — 48 пар импульс/пауза
+        raw = int(round(nx_t * 10)) & 0xFFF
+        b = [0x5A, 0x80 | (raw >> 8), raw & 0xFF, 0xF0 | (81 >> 4), (81 << 4) & 0xFF]
+        bits = [(b[i >> 3] >> (7 - (i & 7))) & 1 for i in range(36)]
+        pt = []
+        for bit in bits + bits: pt += [500, 2000 if bit else 1000]
+        pt = pt[:72]; pt[71] = 4000
+        last = {"p": "Nexus", "cls": "sensor", "pulses": 444, "bits": 36, "rows": 12, "mod": "PPM", "hex": "".join("%02x" % x for x in b),
+                "short": 500, "long": 500, "gs": 1000, "gl": 2000, "gap": 4000, "hash": "e30b", "pt": pt}
+    else:                                         # звонок: только начало посылки, без кода
+        pt = [350, 4000] + [350, 1050, 1050, 350, 350, 1050, 1050, 350, 1050, 350, 350, 1050, 1050, 350, 1050, 350, 350, 1050, 350, 1050, 1050, 350]
+        last = {"p": "Remote", "cls": "remote", "pulses": 150, "bits": 25, "rows": 6, "mod": "PWM", "hex": "",
+                "short": 350, "long": 1050, "gs": 350, "gl": 1050, "gap": 10850, "hash": "7a0b", "pt": pt}
+    last.update({"rssi": -62 if SENS["lastKind"] == "sensor" else -71, "ago": int(t - SENS["last"]), "us": 902000})
+    rows.sort(key=lambda r: (r["kind"] == "remote", r["ago"] > 600, -r["rssi"]))
+    return {"on": 1, "pk": SENS["pk"], "noise": 3, "sensors": rows, "last": last}
 
 
 def st():
@@ -146,9 +246,28 @@ class Api(http.server.BaseHTTPRequestHandler):
         elif u.path == "/api/pagever":             # версия страницы — для самообновления приложения
             import hashlib
             body, ct = json.dumps({"sha": hashlib.sha256(HTML).hexdigest(), "gz": 0}).encode(), "application/json"
+        elif u.path == "/api/settings":
+            body, ct = json.dumps(SETTINGS, ensure_ascii=False).encode(), "application/json"
+        elif u.path == "/api/set":
+            body, ct = json.dumps(set_item(q.get("k", [""])[0], q.get("v", [""])[0]), ensure_ascii=False).encode(), "application/json"
+        elif u.path == "/api/label":
+            i, n = int(q.get("id", ["0"])[0] or 0), q.get("n", [""])[0]
+            if n:
+                LABELS[i] = n[:20]
+            else:
+                LABELS.pop(i, None)
+            body, ct = json.dumps({"ok": True, "stable": i % 2 == 0}).encode(), "application/json"
+        elif u.path == "/api/act":
+            print("act", q.get("a"), q.get("v"), flush=True)
+            body, ct = b'{"ok":true}', "application/json"
+        elif u.path == "/api/pckey":               # пульт музыки
+            print("key", q.get("k"), flush=True)
+            body, ct = b'{"ok":true}', "application/json"
         elif u.path == "/api/loc":                 # GPS с приложения планшета
             print("loc", q.get("lat"), q.get("lon"), flush=True)
             body, ct = b'{"ok":true}', "application/json"
+        elif u.path == "/api/sens":
+            body, ct = json.dumps(sens()).encode(), "application/json"
         elif u.path == "/api/sub":
             body, ct = json.dumps(sub(int(q.get("m", ["0"])[0]), int(q.get("b", ["1"])[0]))).encode(), "application/json"
         else:
@@ -169,7 +288,8 @@ class Sse(http.server.BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Origin", "*"); self.end_headers()
 
         def ev(name, d): self.wfile.write(("event: %s\ndata: %s\n\n" % (name, json.dumps(d, ensure_ascii=False))).encode()); self.wfile.flush()
-        tb = tw = ts = tsub = tpc = twx = 0
+        tb = tw = ts = tsub = tpc = twx = tsens = 0
+        tir, tnfc = time.time(), time.time()
         sent_sat = False
         try:
             while True:
@@ -183,6 +303,9 @@ class Sse(http.server.BaseHTTPRequestHandler):
                 if "sub" in want and now - tsub > 0.14: tsub = now; ev("sub", sub(sm, sb))
                 if "pc" in want and now - tpc > 1: tpc = now; ev("pc", pc())
                 if "wx" in want and now - twx > 1: twx = now; ev("wx", wx())
+                if "sens" in want.split(",") and now - tsens > 1: tsens = now; ev("sens", sens())
+                if "ir" in want.split(",") and now - tir > 2.5: tir = now; ev("ir", ir_ev())
+                if "nfc" in want.split(",") and now - tnfc > 6: tnfc = now; ev("nfc", nfc_ev())
                 time.sleep(0.04)
         except Exception:
             pass

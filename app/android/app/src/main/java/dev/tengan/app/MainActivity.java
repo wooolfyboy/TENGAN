@@ -5,6 +5,11 @@ import android.content.pm.PackageInfo;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import com.getcapacitor.JSObject;
+import com.getcapacitor.Plugin;
+import com.getcapacitor.PluginCall;
+import com.getcapacitor.PluginMethod;
+import com.getcapacitor.annotation.CapacitorPlugin;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.Toast;
@@ -32,13 +37,30 @@ public class MainActivity extends BridgeActivity {
     private static final String CAP_PREFS = "CapWebViewSettings", CAP_PATH = "serverBasePath";   // так их читает сам Capacitor
     private final Handler ui = new Handler(Looper.getMainLooper());
     private volatile boolean busy = false;
+    // что происходит с обновлением — страница показывает это в шапке (window.TenganNative.status())
+    static volatile String status = "start";
+    static MainActivity self;
+    // плагин для страницы: Capacitor.Plugins.TenganUpdate.status() / .check()
+    @CapacitorPlugin(name = "TenganUpdate")
+    public static class UpdatePlugin extends Plugin {
+        @PluginMethod public void status(PluginCall call) { JSObject r = new JSObject(); r.put("status", status); call.resolve(r); }
+        @PluginMethod public void check(PluginCall call) { if (self != null) self.ui.post(self::checkStickPage); call.resolve(); }
+    }
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         forgetOldDownloadAfterApkUpdate();
+        self = this;
+        registerPlugin(UpdatePlugin.class);
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         ui.postDelayed(checker, 3000);
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        ui.postDelayed(this::checkStickPage, 1500);       // вернулись в приложение (могли перешить палку) — проверить сразу
     }
 
     @Override
@@ -88,22 +110,28 @@ public class MainActivity extends BridgeActivity {
         busy = true;
         new Thread(() -> {
             try {
+                status = "check";
                 JSONObject j = new JSONObject(new String(get(STICK + "/api/pagever", 2500), StandardCharsets.UTF_8));
-                String sha = j.getString("sha");
-                if (sha.isEmpty() || sha.equals(currentSha())) return;
-                byte[] html = get(STICK + "/full", 10000);
-                if (!sha.equals(sha256(html))) return;                 // пришло не целиком — в другой раз
+                String sha = j.getString("sha"), cur = currentSha();
+                if (sha.isEmpty()) { status = "stick: no version"; return; }
+                if (sha.equals(cur)) { status = "same " + sha.substring(0, 6); return; }
+                status = "download " + sha.substring(0, 6);
+                byte[] html = get(STICK + "/full", 15000);
+                String got = sha256(html);
+                if (!sha.equals(got)) { status = "bad hash " + got.substring(0, 6) + " (" + html.length + " B)"; return; }
                 File dir = pageDir();
                 dir.mkdirs();
                 write(new File(dir, "index.html"), html);
                 write(new File(dir, "pagever.txt"), sha.getBytes(StandardCharsets.UTF_8));
                 String path = dir.getAbsolutePath();
                 getSharedPreferences(CAP_PREFS, MODE_PRIVATE).edit().putString(CAP_PATH, path).apply();
+                status = "updated " + sha.substring(0, 6);
                 ui.post(() -> {
                     Toast.makeText(this, "TENGAN: страница обновлена с палки", Toast.LENGTH_SHORT).show();
                     getBridge().setServerBasePath(path);
                 });
-            } catch (Exception ignored) {                              // палки рядом нет — ничего страшного
+            } catch (Exception e) {
+                status = "no stick: " + e.getClass().getSimpleName() + (e.getMessage() != null ? " " + e.getMessage() : "");
             } finally { busy = false; }
         }).start();
     }

@@ -9,6 +9,7 @@
 #include "ble/ble_model.h"
 #include "subghz/subghz.h"
 #include "subghz/subghz_model.h"
+#include "subghz/sensors.h"
 #include "audio/audio.h"
 #include "audio/audio_model.h"
 #include "core/display.h"
@@ -131,6 +132,11 @@ void wxUpdate(uint32_t now) {
   float old = w.hist[0][0];
   w.trend = w.histN > 6 ? max(-1.0f, min(1.0f, (w.clouds - old) * 3)) : 0;
 
+  // за окном: уличный термодатчик 433 МГц (CC1101 в мониторе разбирает посылки)
+  { float t; int h; const char* src;
+    w.tOk = sensOutside(t, h, src, now);
+    if (w.tOk) { w.temp = t; w.hum = h; w.tsrc = src; } else { w.hum = -1; w.tsrc = ""; } }
+
   // слово погоды меняется, только если новое продержалось 5 с
   const char* c = condFor(w);
   if (c != s_condCand) { s_condCand = c; s_condMs = now; }
@@ -152,7 +158,13 @@ void wxJson(String& o) {
     snprintf(b, sizeof(b), "%s[%.2f,%.2f]", i ? "," : "", w.hist[i][0], w.hist[i][1]);
     o += b;
   }
-  o += "]}";
+  o += ']';
+  if (w.tOk) {
+    snprintf(b, sizeof(b), ",\"temp\":%.1f,\"hum\":", w.temp); o += b;
+    if (w.hum >= 0) o += w.hum; else o += "null";
+    o += ",\"tsrc\":\""; o += w.tsrc; o += '"';
+  } else o += ",\"temp\":null,\"hum\":null,\"tsrc\":\"\"";
+  o += '}';
 }
 
 // ============================================================
@@ -243,6 +255,24 @@ static void drawSkyView(uint32_t now, int x0, int y0, int w, int h) {
       spr.drawLine(lx, ly, nx, ny, C_HOT()); spr.drawLine(lx + 1, ly, nx + 1, ny, C_HOT());
       lx = nx; ly = ny;
     }
+  }
+
+  // за окном: температура с уличного датчика — крупно в левом верхнем углу неба
+  if (W.tOk) {
+    char tb[16];
+    snprintf(tb, sizeof(tb), "%+.1f", W.temp);
+    int tx = x0 + 6, ty = y0 + 5;
+    spr.setTextDatum(TL_DATUM);
+    spr.setTextColor(C_HOT());
+    txt(tb, tx, ty, 4);
+    int dx = tx + txtW(tb, 4) + 3;
+    spr.drawCircle(dx, ty + 4, 3, C_HOT()); spr.drawCircle(dx, ty + 4, 2, C_HOT());
+    char sb[28];
+    char src[16]; strncpy(src, W.tsrc, sizeof(src)); src[sizeof(src) - 1] = 0;
+    for (char* c = src; *c; c++) { if (*c == '-') { *c = 0; break; } *c = toupper((unsigned char)*c); }
+    if (W.hum >= 0) snprintf(sb, sizeof(sb), "%d%%  %s", W.hum, src); else snprintf(sb, sizeof(sb), "%s", src);
+    spr.setTextColor(UI_LABEL());
+    txt(sb, tx + 1, ty + 26, 1);
   }
 
   // земля: линия горизонта и «трава» — громкость колышет её

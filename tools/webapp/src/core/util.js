@@ -30,6 +30,7 @@ T.ALERT = [255, 122, 26];
 T.rgba = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; };
 T.hash = s => { let h = 2166136261; s = String(s); for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); return h >>> 0; };
 T.ago = s => s < 60 ? (s | 0) + 's' : s < 3600 ? Math.floor(s / 60) + 'm' : Math.floor(s / 3600) + 'h ' + Math.floor(s / 60) % 60 + 'm';
+T.hexs = (v, n = 2) => '0x' + (v >>> 0).toString(16).toUpperCase().padStart(n, '0');
 T.pct = r => T.clamp((r + 95) / 50, 0, 1);            // сила сигнала 0..1 (-95 .. -45 dBm), как на палке
 T.hex8 = (h, signed) => {
   const n = (h || '').length >> 1, a = signed ? new Int8Array(n) : new Uint8Array(n);
@@ -41,7 +42,7 @@ T.el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.c
 T.VERSION = '@@VERSION@@';                               // версия TENGAN (build.py подставляет из файла VERSION)
 T.native = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 T.STICK = '192.168.4.1';
-T.stickHost = () => new URLSearchParams(location.search).get('host') || (T.native ? T.STICK : location.hostname || T.STICK);
+T.stickHost = () => (new URLSearchParams(location.search).get('host') || (T.native ? T.STICK : location.hostname || T.STICK)).replace(/:\d+$/, '');   // имя без порта: поток SSE идёт на свой порт
 T.apiBase = () => { const h = new URLSearchParams(location.search).get('host'); return h ? `http://${h}` : T.native ? `http://${T.STICK}` : ''; };
 T.reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 // ---- качество: фиксированное (стабильный режим). Холст ~1920 px по длинной стороне,

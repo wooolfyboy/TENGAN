@@ -69,7 +69,7 @@ T.views.push({
     T.txt(g, 'CLIENTS ' + (s.cli ?? '—') + '   HEAP ' + (s.heap ?? '—') + 'K', cx + u, cy + u * 4.4, u * 0.75, T.C.label);
     const r = s.radio || '';
     let rx = cx + u;
-    for (const [k, n] of [['b', 'BLE'], ['w', 'WIFI'], ['s', 'SUB'], ['m', 'MIC'], ['p', 'PC']]) {
+    for (const [k, n] of [['b', 'BLE'], ['w', 'WIFI'], ['s', 'SUB'], ['m', 'MIC'], ['p', 'PC'], ['i', 'IR'], ['n', 'NFC']]) {
       const on = r.includes(k); T.diamond(g, rx + u * 0.3, cy + u * 5.55, u * 0.28, on ? T.C.acc : T.C.line, true);
       T.txt(g, n, rx + u * 0.8, cy + u * 5.8, u * 0.72, on ? T.C.hot : T.C.dim); rx += u * 1.2 + T.tw(g, n, u * 0.72);
     }

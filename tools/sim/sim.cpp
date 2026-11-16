@@ -1,3 +1,4 @@
+#include <string>
 // ============================================================
 //  sim.cpp — симулятор экрана палки на компьютере.
 //
@@ -27,8 +28,11 @@
 #include "wifi/wifi_model.h"
 #include "subghz/subghz.h"
 #include "subghz/subghz_model.h"
+#include "subghz/sensors.h"
 #include "audio/audio.h"
 #include "audio/audio_model.h"
+#include "probe/ir.h"
+#include "probe/nfc.h"
 #include <esp_wifi.h>
 #include <Wire.h>
 #include <SPI.h>
@@ -53,6 +57,11 @@ int      g_top = 0;
 bool     g_detail = false;
 int8_t   g_spark[SPARK_N];
 int      g_sparkN = 0;
+// «чёрный ящик» (в прошивке — core/crumb.cpp)
+void crumb(const char*) {}
+bool crumbWasCrash() { return false; }
+const char* crumbLastStep() { return ""; }
+const char* crumbLastReason() { return ""; }
 void bleRadioOff() {}
 void bleRadioOn() {}
 bool bleRadioActive() { return true; }
@@ -64,6 +73,42 @@ bool audioWebUse() { return true; }
 void audioWebTick(uint32_t) {}
 void audioWebStop() {}
 void wifiRadioOff() {}
+
+// ---------- датчики 433 (в прошивке — sens_rx.cpp): посылки собираем сами и кормим настоящий разбор ----------
+void sensRxStart() {}
+void sensRxStop() {}
+void sensRxTick(uint32_t, int) {}
+bool sensRxOn() { return true; }
+static OokTrain s_tr;
+static void trAdd(int p, int g) { if (s_tr.n < OOK_MAXP) { s_tr.p[s_tr.n] = p; s_tr.g[s_tr.n] = g; s_tr.n++; } }
+static void trBits(const uint8_t* b, int nbits, int p0, int g0, int p1, int g1) {
+  for (int i = 0; i < nbits; i++) { bool one = b[i >> 3] & (0x80 >> (i & 7)); trAdd(one ? p1 : p0, one ? g1 : g0); }
+}
+static void simNexus(uint8_t id, int ch, float t, int hum) {         // 36 бит PPM, 12 повторов
+  int raw = (int)lroundf(t * 10) & 0xFFF;
+  uint8_t b[5] = { id, (uint8_t)(0x80 | ((ch - 1) << 4) | (raw >> 8)), (uint8_t)raw, (uint8_t)(0xF0 | (hum >> 4)), (uint8_t)(hum << 4) };
+  s_tr.n = 0;
+  for (int r = 0; r < 12; r++) { trBits(b, 36, 500, 1000, 500, 2000); trAdd(500, r == 11 ? 30000 : 4000); }
+}
+static uint8_t simDigest(const uint8_t* m, int bytes) {               // LaCrosse: lfsr 0x31 / 0xf4, отражённый
+  uint8_t sum = 0, key = 0xF4;
+  for (int k = bytes - 1; k >= 0; --k) for (int i = 0; i < 8; ++i) { if ((m[k] >> i) & 1) sum ^= key; key = (key & 0x80) ? (key << 1) ^ 0x31 : key << 1; }
+  return sum;
+}
+static void simTx141(uint8_t id, int ch, float t, int hum) {         // 40 бит PWM, преамбула 4×833, 12 повторов
+  int raw = (int)lroundf(t * 10) + 500;
+  uint8_t b[5] = { id, (uint8_t)(((ch - 1) << 4) | (raw >> 8)), (uint8_t)raw, (uint8_t)hum, 0 };
+  b[4] = simDigest(b, 4);
+  s_tr.n = 0;
+  for (int r = 0; r < 12; r++) { for (int k = 0; k < 4; k++) trAdd(833, 833); trBits(b, 40, 208, 417, 417, 208); }
+  s_tr.g[s_tr.n - 1] = 30000;
+}
+static void simBell() {                                               // звонок EV1527: 24 бита, 6 повторов
+  uint8_t b[3] = { 0x5C, 0x3A, 0x91 };
+  s_tr.n = 0;
+  for (int r = 0; r < 6; r++) { trAdd(350, 10850); trBits(b, 24, 350, 1050, 1050, 350); }
+  s_tr.g[s_tr.n - 1] = 30000;
+}
 
 // ---------- состояние Sub-GHz (в прошивке — subghz.cpp) ----------
 int  g_gMode = 0, g_band = 1;
@@ -131,9 +176,9 @@ static void wifiInfo(int i, SubItem& it) {
   it.name = nm[i]; it.desc = ds[i]; snprintf(it.value, sizeof(it.value), "%s", vv[i]);
 }
 static void subInfo(int i, SubItem& it) {
-  static const char* const nm[] = { "Spectrum", "Monitor" };
-  static const char* const ds[] = { "band + waterfall", "catch remotes" };
-  static const char* const vv[] = { "433 MHz", "3" };
+  static const char* const nm[] = { "Spectrum", "Monitor", "Sensors" };
+  static const char* const ds[] = { "band + waterfall", "catch remotes", "thermometers, bells" };
+  static const char* const vv[] = { "433 MHz", "3", "3" };
   it.name = nm[i]; it.desc = ds[i]; snprintf(it.value, sizeof(it.value), "%s", vv[i]);
 }
 const Section bleSection = { "Bluetooth", 80, 150, 240, iconBluetooth, bleSub, noop, noop,
@@ -154,6 +199,60 @@ const Section soundSection = { "Sound", 120, 200, 255, iconMic, sndSub, noop, no
   A_NUM, sndInfo, zero, noopI, noop, noop, noopI, noBack, noopT, noopT };
 const Section subghzSection = { "Sub-GHz", 240, 120, 90, iconAntenna, subSub, noop, noop,
   G_NUM, subInfo, zero, noopI, noop, noop, noopI, noBack, noopT, noopT };
+static void irSub(char* o, size_t n) { if (g_ir.have) snprintf(o, n, "last: %s", g_ir.last.proto); else snprintf(o, n, "38 kHz"); }
+static void nfcSub(char* o, size_t n) { snprintf(o, n, "%lu cards", (unsigned long)g_nfc.taps); }
+const Section irSection = { "IR", 230, 90, 120, iconRemote, irSub, noop, noop,
+  0, nullptr, nullptr, nullptr, nullptr, noop, noopI, noBack, noopT, drawIr };
+const Section nfcSection = { "NFC", 120, 230, 160, iconCard, nfcSub, noop, noop,
+  0, nullptr, nullptr, nullptr, nullptr, noop, noopI, noBack, noopT, drawNfc };
+
+// ---------- ИК: синтетические пачки разных пультов (проверка разбора) ----------
+static std::vector<uint16_t> irDist(uint32_t hm, uint32_t hs, const std::vector<uint8_t>& bytes, int bits, uint32_t mk, uint32_t one, uint32_t zero, bool lsb) {
+  std::vector<uint16_t> d = { (uint16_t)hm, (uint16_t)hs };
+  for (int b = 0; b < bits; b++) {
+    int bit = lsb ? (bytes[b / 8] >> (b % 8)) & 1 : (bytes[b / 8] >> (7 - b % 8)) & 1;
+    d.push_back(mk + 40); d.push_back(bit ? one - 40 : zero - 40);   // приёмник удлиняет вспышки
+  }
+  d.push_back(mk);
+  return d;
+}
+static std::vector<uint16_t> runs(const std::vector<uint8_t>& h, uint32_t unit) {   // полубиты -> длительности (с первой вспышки)
+  std::vector<uint16_t> d; int i = 0;
+  while (i < (int)h.size() && h[i] == 0) i++;
+  while (i < (int)h.size()) { int j = i; while (j < (int)h.size() && h[j] == h[i]) j++; d.push_back((j - i) * unit); i = j; }
+  if (d.size() % 2 == 0) d.pop_back();                      // хвостовая пауза не видна
+  return d;
+}
+static void irTestAll(bool verbose) {
+  std::vector<std::vector<uint16_t>> f;
+  f.push_back(irDist(9000, 4500, { 0x04, 0xFB, 0x08, 0xF7 }, 32, 560, 1690, 560, true));        // LG TV, power
+  f.push_back(irDist(4500, 4500, { 0x07, 0x07, 0x02, 0xFD }, 32, 560, 1690, 560, true));        // Samsung TV
+  { std::vector<uint16_t> d = { 2400, 600 }; uint32_t v = 0x15 | (1 << 7);                       // Sony TV 12 бит
+    for (int b = 0; b < 12; b++) { d.push_back((v >> b) & 1 ? 1200 : 600); if (b < 11) d.push_back(600); } f.push_back(d); }
+  { std::vector<uint8_t> h; uint16_t v = 0x3000 | (0 << 6) | 0x0C;                              // RC5 Philips TV, cmd 12
+    for (int b = 13; b >= 0; b--) { int bit = (v >> b) & 1; h.push_back(bit ? 0 : 1); h.push_back(bit ? 1 : 0); }
+    f.push_back(runs(h, 889)); }
+  { std::vector<uint8_t> h = { 1, 1, 1, 1, 1, 1, 0, 0 };                                         // RC6: лидер 6+2 полубитов по 444
+    h.push_back(1); h.push_back(0);                                                               // старт 1
+    for (int b = 0; b < 3; b++) { h.push_back(0); h.push_back(1); }                               // режим 0
+    h.push_back(0); h.push_back(0); h.push_back(1); h.push_back(1);                               // прицеп (toggle 0)
+    uint16_t v = 0x000C;
+    for (int b = 15; b >= 0; b--) { int bit = (v >> b) & 1; h.push_back(bit); h.push_back(!bit); }
+    auto d = runs(h, 444); d[0] = 2666; d[1] = 889; f.push_back(d); }
+  f.push_back(irDist(3456, 1728, { 0x02, 0x20, 0xE0, 0x04, 0x3D, 0xBD }, 48, 432, 1296, 432, true));   // Panasonic
+  f.push_back(irDist(8500, 4250, { 0x88, 0x00, 0x34, 0x70 }, 28, 550, 1600, 550, false));          // LG кондиционер
+  { std::vector<uint16_t> d = { 3100, 1600 }; for (int i = 0; i < 139; i++) d.push_back(i % 2 ? (i % 7 < 3 ? 1150 : 400) : 450); f.push_back(d); }   // «кондиционер»
+  f.push_back(irDist(9000, 4500, { 0xEE, 0x87, 0x0C, 0x5A }, 32, 560, 1690, 560, true));          // Apple
+  for (auto& d : f) {
+    IrCode c;
+    bool ok = irDecode(d.data(), (int)d.size(), c);
+    if (verbose) printf("ir: n=%3d -> %s %-9s addr=%lX cmd=%lX bits=%d brand=%s\n", (int)d.size(), ok ? "ok" : "--", c.proto,
+                        (unsigned long)c.addr, (unsigned long)c.cmd, c.bits, ok ? irBrand(c) : "");
+  }
+  for (size_t i = 0; i < f.size(); i++) { s_now += 1500; irFeed(f[i].data(), (int)f[i].size(), s_now); }
+  s_now += 1500; irFeed(f[0].data(), (int)f[0].size(), s_now);                                   // снова LG — последняя
+  { uint16_t r[] = { 9000, 2250, 560 }; s_now += 110; irFeed(r, 3, s_now); }                     // держат кнопку
+}
 
 // ---------- вывод ----------
 static const char* s_outDir = "out";
@@ -278,6 +377,12 @@ int main(int argc, char** argv) {
   if (getenv("SIM_THEME")) g_theme = atoi(getenv("SIM_THEME"));   // 0 — DENKO, 1 — SUMI (тушь)
   g_bat.ok = true; g_bat.soc = 87; g_bat.mv = 3980; g_bat.ma = -132; g_bat.tte = 250; g_bat.chgOk = true;
   fillBle(); fillWifi(); fillSub();
+  { String j; settingsJson(j);                            // то же, что палка отдаёт планшету по /api/settings
+    FILE* f = fopen((std::string(getenv("SIM_OUT") ? getenv("SIM_OUT") : "tools/sim/out") + "/settings.json").c_str(), "w");
+    if (f) { fputs(j.c_str(), f); fclose(f); }
+    String r; settingsSetKey("ledbr", "70", r); printf("set ledbr: %s\n", r.c_str());
+    settingsSetKey("theme", "sumi", r); printf("set theme: %s\n", r.c_str()); settingsSetKey("theme", "denko", r);
+    settingsSetKey("nope", "1", r); printf("set nope: %s\n", r.c_str()); }
 
   { const uint32_t ts[] = { 250, 600, 1000, 1300, 1680, 1950, 2200 };
     for (int i = 0; i < 7; i++) { char nm[32]; snprintf(nm, sizeof nm, "00_boot_%04u", (unsigned)ts[i]); bootFrame(ts[i]); snap(nm); } }
@@ -405,6 +510,51 @@ int main(int argc, char** argv) {
   { uint8_t qr[29 * 29]; for (int i = 0; i < 29 * 29; i++) qr[i] = (noise(i) > 0.5f) || ((i % 29 < 7 || i % 29 > 21) && (i / 29 < 7) && !((i % 29 == 1 || i % 29 == 5 || i % 29 == 23 || i % 29 == 27) && i / 29 > 0 && i / 29 < 6));
     WebView v = { "TENGAN-3F2A", "48213907", "192.168.4.1", 1, 214, true, "sub-ghz" };
     drawWebScreen(v, qr, 29); snap("60_web"); }
+  { WebLink l = { 1, "BLE  WX  ", 3400, 0 };              // планшет подключён: живая картинка по теме
+    char nm[32];
+    for (int f = 0; f < 48; f++) { drawWebLink(l, 2000 + f * 70); snprintf(nm, sizeof nm, "anim_link_%03d", f); snap(nm); } }
+  { // тема с планшета: SUMI -> DENKO посреди анимации связи (воспроизведение падения)
+    WebLink l = { 1, "BLE  ", 3000, 0 }; String o;
+    settingsSetKey("theme", "sumi", o); printf("set sumi: %s\n", o.c_str());
+    for (int f = 0; f < 5; f++) drawWebLink(l, 9000 + f * 70);
+    settingsSetKey("theme", "denko", o); printf("set denko: %s\n", o.c_str());
+    for (int f = 0; f < 5; f++) drawWebLink(l, 9500 + f * 70);
+    snap("zz_theme_flip"); printf("theme flip ok\n"); }
+  { // IR и NFC (разбор — настоящий код, данные синтетические)
+    g_ir.on = g_ir.ok = true;
+    drawIr(s_now);                                       snap("80_ir_idle");
+    uint32_t keep = s_now;
+    irTestAll(true);
+    drawIr(s_now + 120);                                 snap("81_ir_lg");
+    drawIr(s_now + 2000);                                snap("81b_ir_settled");
+    s_now = keep;
+    g_nfc.state = NFC_SCAN;
+    drawNfc(s_now + 900);                                snap("82_nfc_idle");
+    NfcCard c; memset(&c, 0, sizeof c);
+    uint8_t u1[4] = { 0x3A, 0x91, 0x0C, 0x55 }; memcpy(c.uid, u1, 4); c.uidLen = 4; c.atqa = 0x0004; c.sak = 0x08;
+    nfcClassify(c, -1); nfcCommit(c, s_now - 60000);
+    NfcCard t; memset(&t, 0, sizeof t);
+    uint8_t u2[7] = { 0x04, 0xA2, 0x5B, 0x1A, 0x9C, 0x70, 0x80 }; memcpy(t.uid, u2, 7); t.uidLen = 7; t.atqa = 0x0044; t.sak = 0x00;
+    const char url[] = "tengan.dev/hello";
+    uint8_t mem[64] = { 0x03, 0, 0xD1, 0x01, (uint8_t)(sizeof(url)), 'U', 0x04 };
+    memcpy(mem + 7, url, sizeof(url) - 1);
+    int p = 7 + sizeof(url) - 1;
+    const char txtr[] = "\x02" "ruПривет, палка";
+    mem[p++] = 0x51; mem[p++] = 0x01; mem[p++] = (uint8_t)(sizeof(txtr) - 1); mem[p++] = 'T';
+    memcpy(mem + p, txtr, sizeof(txtr) - 1); p += sizeof(txtr) - 1;
+    mem[1] = (uint8_t)(p - 2); mem[p++] = 0xFE;
+    mem[2] = 0x91;                                           // первая запись: MB, SR, TNF=1 (не последняя)
+    nfcParseNdef(mem, p, t); nfcClassify(t, 0x0F); nfcCommit(t, s_now - 200);
+    printf("nfc: %s / %s / ndef=%d [%s] [%s]\n", t.fam, t.hint, t.nNdef, t.ndef[0], t.nNdef > 1 ? t.ndef[1] : "");
+    g_nfc.lastSeen = s_now;
+    drawNfc(s_now);                                      snap("83_nfc_tag");
+    NfcCard b; memset(&b, 0, sizeof b);
+    uint8_t u3[4] = { 0x08, 0x4F, 0x21, 0x9E }; memcpy(b.uid, u3, 4); b.uidLen = 4; b.atqa = 0x0004; b.sak = 0x20; b.isoDep = true; b.bank = true;
+    nfcClassify(b, -1); nfcCommit(b, s_now - 300); g_nfc.lastSeen = s_now;
+    drawNfc(s_now);                                      snap("84_nfc_bank");
+    g_nfc.present = false; drawNfc(s_now + 14000);       snap("84b_nfc_bank_gone");
+    { String j; char u[24]; nfcUidMasked(b, u, sizeof u, true); printf("nfc uid: %s\n", u); }
+    g_nfc.state = NFC_NOREADER; drawNfc(s_now);          snap("85_nfc_noreader"); g_nfc.state = NFC_SCAN; }
   drawPcWaiting(s_now);      snap("70_pc_waiting");
   for (int i = 0; i < 60; i++) {                        // минута «настоящих» строк с ноутбука
     char ln[300];
@@ -432,6 +582,21 @@ int main(int argc, char** argv) {
   drawSpectrum();            snap("30_subghz_spectrum");
   g_uiPages = 0;
   drawMonitor(s_now);        snap("31_subghz_monitor");
+  drawSensors(s_now);        snap("32a_subghz_sensors_empty");
+  simBell();                 sensFeed(s_tr, -71, s_now - 95000);
+  simTx141(0x9b, 1, 21.4f, 38); sensFeed(s_tr, -78, s_now - 41000);
+  simNexus(0x5a, 1, 4.2f, 81);  sensFeed(s_tr, -62, s_now - 12000);
+  simNexus(0x2c, 3, -1.6f, 0);  sensFeed(s_tr, -88, s_now - 700000);
+  printf("sensors: %d decoded\n", g_sensN);
+  { String o; sensJson(o, s_now); printf("sens json: %s\n", o.c_str()); }
+  drawSensors(s_now - 11000);  snap("32b_subghz_sensors");
+  simBell();                 sensFeed(s_tr, -66, s_now - 400);
+  drawSensors(s_now);        snap("32c_subghz_sensors_bell");
+  { WxState& w = g_wx; w.thunder = false; w.thunderMs = 0; w.cond = "cloudy"; w.clouds = 0.45f; w.rain = 0.1f; w.storm = 0.1f;
+    float t; int h; const char* src;
+    w.tOk = sensOutside(t, h, src, s_now); if (w.tOk) { w.temp = t; w.hum = h; w.tsrc = src; }
+    drawWeather(s_now);      snap("56e_gallery_weather_temp");
+    String o; wxJson(o); printf("wx json tail: %s\n", o.c_str() + (o.length() > 60 ? o.length() - 60 : 0)); }
   if (getenv("SIM_ANIM")) {                              // кадры для гифок README (tools/make_docs.py)
     char nm[48];
     for (int f = 0; f * 40 <= 2700; f++) { bootFrame(f * 40); snprintf(nm, sizeof nm, "anim_boot_%03d", f); snap(nm); }

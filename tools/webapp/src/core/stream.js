@@ -21,6 +21,7 @@ Stream.connect = (want) => {
   es.onopen = () => { opened = true; Stream.setLink('live'); };
   on('st', d => { S.onSt(d); T.app && T.app.status(); });
   on('ble', S.onBle); on('wifi', S.onWifi); on('snd', S.onSnd); on('sub', S.onSub); on('pc', S.onPc); on('sat', S.onSat); on('wx', S.onWx);
+  on('ir', S.onIr); on('nfc', S.onNfc); on('sens', S.onSens);
   es.onerror = () => { if (Stream.mode === 'live') Stream.setLink('off'); };
   setTimeout(() => { if (!opened && Stream.es === es) { es.close(); Stream.es = null; Stream.poll(want); } }, 5000);
 };

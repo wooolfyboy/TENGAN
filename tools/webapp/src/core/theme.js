@@ -20,7 +20,7 @@
   };
   T.THEMES = { denko: DENKO, sumi: SUMI };
   T.theme = 'denko';
-  T.KANJI = { ov: '観', ble: '藍', wifi: '網', sub: '波', snd: '音', pc: '機', gal: '画' };
+  T.KANJI = { ov: '観', ble: '藍', wifi: '網', sub: '波', snd: '音', pc: '機', gal: '画', probe: '解', hq: '令' };
 
   // ---- перекраска палитры DENKO -> SUMI ----
   const INK = [27, 24, 20], PAPER = [236, 228, 212];

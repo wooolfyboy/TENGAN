@@ -4,7 +4,7 @@ const nav = document.getElementById('nav'), subs = document.getElementById('subs
 App.status = () => {
   const s = S.st; if (!s) return;
   document.getElementById('bat').textContent = s.bat >= 0 ? 'BAT ' + s.bat + '%' + (s.usb ? ' ⚡' : '') : '';
-  const r = s.radio || '', names = [['b', 'BLE'], ['w', 'WIFI'], ['s', 'SUB'], ['m', 'MIC'], ['p', 'PC']];
+  const r = s.radio || '', names = [['b', 'BLE'], ['w', 'WIFI'], ['s', 'SUB'], ['m', 'MIC'], ['p', 'PC'], ['i', 'IR'], ['n', 'NFC']];
   document.getElementById('radios').innerHTML = names.map(([k, n]) => `<i class="${r.includes(k) ? 'on' : ''}">${n}</i>`).join('');
 };
 
@@ -47,6 +47,7 @@ App.rewant = () => {
   if (want !== T.Stream.want) T.Stream.connect(want);
 };
 T.views.forEach(v => { const b = T.el('button', '', v.title); b.dataset.id = v.id; b.onclick = () => App.go(v.id); nav.appendChild(b); });
+document.getElementById('upd').onclick = () => { const UP = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.TenganUpdate; if (UP) UP.check().catch(() => {}); };
 document.getElementById('fs').onclick = () => {
   const d = document.documentElement;
   if (document.fullscreenElement) document.exitFullscreen(); else (d.requestFullscreen || d.webkitRequestFullscreen).call(d);
@@ -70,6 +71,9 @@ const loop = now => {
     const fps = Math.round(fpsN / fpsT); T.fps = fps;
     if (!document.hidden && !SHOT) { slow = fps < 45 ? slow + 1 : 0; if (slow >= 3 && T.Q.bloom) { T.Q.bloom = 0; T.Q.scan = 0; } }
     document.getElementById('fps').textContent = fps + ' FPS' + (T.Q.bloom ? '' : ' · LITE');
+    // приложение: состояние обновления страницы от палки (диагностика) — тап по нему = проверить сейчас
+    const UP = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.TenganUpdate;
+    if (UP) UP.status().then(r => { const el = document.getElementById('upd'); if (el) el.textContent = 'UPD ' + r.status; }).catch(() => {});
     fpsN = 0; fpsT = 0;
   }
   if (T.Stream.mode === 'live' && now - T.Stream.lastMsg > 6000) T.Stream.setLink('off');

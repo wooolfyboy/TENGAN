@@ -17,6 +17,7 @@
 #include <Update.h>
 #include <esp_ota_ops.h>
 #include "core/jsonutil.h"
+#include "core/timeutil.h"
 #include "web/web.h"
 #include "core/board.h"
 #include "web/web_page.h"
@@ -26,6 +27,8 @@
 #include "wifi/wifi.h"
 #include "wifi/wifi_model.h"
 #include "subghz/subghz.h"
+#include "subghz/subghz_model.h"
+#include "subghz/sensors.h"
 #include "audio/audio.h"
 #include "pc/pc.h"
 #include "gallery/astro.h"
@@ -33,9 +36,12 @@
 #include "gallery/weather.h"
 #include "core/settings.h"
 #include "core/version.h"
+#include "core/crumb.h"
 #include "core/battery.h"
 #include "core/display.h"
 #include "core/leds.h"
+#include "probe/ir.h"
+#include "probe/nfc.h"
 
 static WebServer* s_srv = nullptr;
 static DNSServer  s_dns;
@@ -50,6 +56,8 @@ static int        s_qrN = 0;
 static int        s_netCount = 0;
 static uint32_t   s_subMs = 0, s_sndMs = 0;     // когда вкладки Sub-GHz / Sound последний раз спрашивали
 static bool       s_subOn = false, s_sndOn = false;
+static uint32_t   s_irMs = 0, s_nfcMs = 0;      // ИК-приёмник и NFC для планшета (пока подписан)
+static bool       s_irOn = false, s_nfcOn = false;
 static const char* s_tab = "";
 static int8_t      s_bleWanted = -1;            // что webTick последний раз решил про Bluetooth (-1 — пересчитать)
 
@@ -188,6 +196,7 @@ static bool otaWrite(uint8_t* d, size_t n) {
     if (!Update.begin(UPDATE_SIZE_UNKNOWN)) { s_otaErr = Update.errorString(); return false; }
     s_otaStarted = true;
   }
+  crumbFeed();                                     // запись прошивки долгая — сторож знает, что мы живы
   if (Update.write(d, n) != n) { s_otaErr = Update.errorString(); return false; }
   return true;
 }
@@ -259,17 +268,23 @@ static void otaDone() {
 //    event: snd   ~25 раз в с  (полосы, уровень, волна) — только если просили
 //    event: sub   ~7 раз в с   (спектр CC1101; режим и полоса — &sm= &sb=)
 //    event: pc    раз в 1 с    (ноутбук: нагрузка, трек, город процессов)
+//    event: sens  на каждую новую посылку 433 МГц и раз в 1 с (датчики, анализатор; want=sens)
 //    event: sat   при подключении (орбиты спутников и город — небо считает планшет)
+//    event: ir    на каждую ИК-пачку (протокол, адрес, команда, импульсы)
+//    event: nfc   на каждое прикладывание карты (тип, начало UID, записи метки)
 //  Отправка без ожидания: если планшет не успевает принимать, кадр звука
 //  пропускается, а палка не «зависает» на записи.
 // ============================================================
 #define SSE_MAX 2
+static uint32_t s_sseBytes = 0;                  // всего отправлено планшетам (для экрана связи)
 struct SseCli {
   NetworkClient c;
-  bool on = false, ble = false, wifi = false, snd = false, sub = false, pc = false, wx = false, satSent = false;
+  bool on = false, ble = false, wifi = false, snd = false, sub = false, pc = false, wx = false, ir = false, nfc = false, satSent = false;
   int8_t sm = 0, sb = 1;                         // режим и полоса Sub-GHz
+  bool sens = false;                             // датчики 433 МГц (sensors.h)
+  uint32_t tSens = 0, sensSeen = 0;
   String pend;                                   // не отправленный хвост (докидываем без ожидания)
-  uint32_t tSt = 0, tBle = 0, tSnd = 0, tSub = 0, tPc = 0, tWx = 0, wifiSeen = 0;
+  uint32_t tSt = 0, tBle = 0, tSnd = 0, tSub = 0, tPc = 0, tWx = 0, wifiSeen = 0, irSeen = 0, nfcSeen = 0;
 };
 static NetworkServer* s_sseSrv = nullptr;
 static SseCli s_sse[SSE_MAX];
@@ -277,7 +292,7 @@ static SseCli s_sse[SSE_MAX];
 static bool sseFlush(SseCli& k) {                // true — всё ушло
   while (k.pend.length()) {
     int n = send(k.c.fd(), k.pend.c_str(), k.pend.length(), MSG_DONTWAIT);
-    if (n > 0) { k.pend.remove(0, n); continue; }
+    if (n > 0) { k.pend.remove(0, n); s_sseBytes += n; continue; }
     if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) return false;   // буфер полон — позже
     k.on = false; k.c.stop(); return false;      // соединение умерло
   }
@@ -316,7 +331,10 @@ static void sseAccept() {
   int q = req.indexOf("want="); String want = q >= 0 ? req.substring(q + 5, req.indexOf(' ', q)) : String("ble,wifi");
   k.ble = want.indexOf("ble") >= 0; k.wifi = want.indexOf("wifi") >= 0; k.snd = want.indexOf("snd") >= 0;
   k.sub = want.indexOf("sub") >= 0; k.pc = want.indexOf("pc") >= 0; k.wx = want.indexOf("wx") >= 0;
+  k.ir = want.indexOf("ir") >= 0; k.nfc = want.indexOf("nfc") >= 0;
+  k.irSeen = g_ir.gen; k.nfcSeen = g_nfc.gen;     // старое не повторяем — только новые нажатия и карты
   auto qInt = [&](const char* key, int def) { int p = req.indexOf(key); return p >= 0 ? req.substring(p + strlen(key)).toInt() : def; };
+  k.sens = want.indexOf("sens") >= 0;
   k.sm = (int8_t)qInt("sm=", 0); k.sb = (int8_t)qInt("sb=", 1);
   k.pend = "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\n"
            "Connection: keep-alive\r\nAccess-Control-Allow-Origin: *\r\n\r\nretry: 1500\n\n";
@@ -346,10 +364,10 @@ static void sseTick(uint32_t now) {
       o += ",\"usb\":"; o += g_bat.bus ? 1 : 0; o += ",\"chg\":"; o += g_bat.chg;
       o += ",\"cli\":"; o += WiFi.softAPgetStationNum(); o += ",\"heap\":"; o += ESP.getFreeHeap() / 1024;
       o += ",\"theme\":\""; o += g_theme == THEME_SUMI ? "sumi" : "denko"; o += '"';
-    o += ",\"ver\":\"" FW_VERSION "\"";
       o += ",\"ver\":\"" FW_VERSION "\"";
+      o += ",\"rst\":"; jsonStr(o, crumbLastReason()); o += ",\"rstStep\":"; jsonStr(o, crumbLastStep());
       o += ",\"radio\":\""; o += bleRadioActive() ? "b" : ""; o += s_scanMs && now - s_scanMs < 25000 ? "w" : "";
-      o += s_subOn ? "s" : ""; o += s_sndOn ? "m" : ""; o += pcLive(now) ? "p" : ""; o += '"';
+      o += s_subOn ? "s" : ""; o += s_sndOn ? "m" : ""; o += pcLive(now) ? "p" : ""; o += s_irOn ? "i" : ""; o += s_nfcOn ? "n" : ""; o += '"';
       o += '}';
       sseEvent(k, "st", o, false);
       if (!k.satSent) {                          // один раз: город и орбиты — небо и глобус считает планшет
@@ -367,6 +385,11 @@ static void sseTick(uint32_t now) {
     if (k.sub && s_subOn && now - k.tSub >= 140) { k.tSub = now; String o; subJson(o); sseEvent(k, "sub", o, true); }
     if (k.pc && now - k.tPc >= 1000) { k.tPc = now; String o; pcStreamJson(o); sseEvent(k, "pc", o, false); }
     if (k.wx && now - k.tWx >= 1000) { k.tWx = now; String o; wxJson(o); sseEvent(k, "wx", o, false); }
+    if (k.sens && now - k.tSens >= 150 && (k.sensSeen != g_sensGen || now - k.tSens >= 1000)) {
+      k.tSens = now; k.sensSeen = g_sensGen; String o; sensJson(o, now); sseEvent(k, "sens", o, false);
+    }
+    if (k.ir && k.irSeen != g_ir.gen) { k.irSeen = g_ir.gen; String o; irJson(o); sseEvent(k, "ir", o, false); }
+    if (k.nfc && k.nfcSeen != g_nfc.gen) { k.nfcSeen = g_nfc.gen; String o; nfcJson(o); sseEvent(k, "nfc", o, false); }
   }
 }
 
@@ -406,6 +429,11 @@ static void webStart() {
     s_subOn = subWebUse(s_srv->arg("m").toInt(), s_srv->hasArg("b") ? s_srv->arg("b").toInt() : 1);
     String o; subJson(o); sendJson(o);
   });
+  s_srv->on("/api/sens", [] {                      // датчики 433 (опрос): включает разбор посылок, как /api/sub?m=2
+    s_subMs = millis();
+    s_subOn = subWebUse(G_SENSORS, s_srv->hasArg("b") ? s_srv->arg("b").toInt() : 1);
+    String o; sensJson(o, millis()); sendJson(o);
+  });
   s_srv->on("/api/snd", [] {
     s_sndMs = millis();
     s_sndOn = audioWebUse();
@@ -416,6 +444,29 @@ static void webStart() {
   s_srv->on("/api/pagever", [] {
     String o = "{\"sha\":\""; o += TABLET_HTML_SHA; o += "\",\"gz\":"; o += TABLET_GZ_LEN; o += '}';
     sendJson(o);
+  });
+  // планшет как пульт управления: настройки палки, подписи устройств, действия
+  s_srv->on("/api/settings", [] { String o; settingsJson(o); sendJson(o); });
+  s_srv->on("/api/set", [] {
+    { char c[48]; snprintf(c, sizeof c, "api set %s=%s", s_srv->arg("k").c_str(), s_srv->arg("v").c_str()); crumb(c); }
+    String o; settingsSetKey(s_srv->arg("k").c_str(), s_srv->arg("v").c_str(), o); sendJson(o);
+  });
+  s_srv->on("/api/label", [] {
+    bool stable = false;
+    bool ok = bleLabelSet((uint32_t)strtoul(s_srv->arg("id").c_str(), nullptr, 10), s_srv->arg("n").c_str(), stable);
+    sendJson(ok ? (stable ? "{\"ok\":true,\"stable\":true}" : "{\"ok\":true,\"stable\":false}") : "{\"ok\":false,\"err\":\"device not found\"}");
+  });
+  s_srv->on("/api/act", [] {
+    String a = s_srv->arg("a"); int v = s_srv->arg("v").toInt(); bool ok = true;
+    if (a == "screen") { g_screenOff = !v; applyBrightness(); }   // экран палки погасить / включить (работа идёт дальше)
+    else if (a == "leds" && !v) ledsOff();
+    else ok = false;
+    sendJson(ok ? "{\"ok\":true}" : "{\"ok\":false,\"err\":\"unknown action\"}");
+  });
+  // пульт музыки с планшета: палка передаёт медиа-клавишу ноутбуку по USB
+  s_srv->on("/api/pckey", [] {
+    bool ok = pcKey(s_srv->arg("k").c_str());
+    sendJson(ok ? "{\"ok\":true}" : "{\"ok\":false}");
   });
   s_srv->on("/api/loc", [] {
     float lat = s_srv->arg("lat").toFloat(), lon = s_srv->arg("lon").toFloat();
@@ -438,6 +489,7 @@ static void webStart() {
     o += ",\"build\":\"" __DATE__ " " __TIME__ "\"";
     o += ",\"theme\":\""; o += g_theme == THEME_SUMI ? "sumi" : "denko"; o += '"';
     o += ",\"ver\":\"" FW_VERSION "\"";
+    o += ",\"rst\":"; jsonStr(o, crumbLastReason()); o += ",\"rstStep\":"; jsonStr(o, crumbLastStep());
     o += ",\"ssid\":\""; o += s_ssid; o += "\"}";
     sendJson(o);
   });
@@ -473,16 +525,19 @@ static void webStop() {
   bleLowDuty(false);
   if (s_subOn) { subWebStop(); s_subOn = false; }
   if (s_sndOn) { audioWebStop(); s_sndOn = false; }
+  if (s_irOn) { irStop(); s_irOn = false; }
+  if (s_nfcOn) { nfcStop(); s_nfcOn = false; }
   s_on = false;
   s_tab = "";
 }
 
 static void webTick(uint32_t now) {
+  crumb("web tick");
   if (!s_on || !s_ok) return;
   s_dns.processNextRequest();
-  s_srv->handleClient();
+  crumb("web http"); s_srv->handleClient();
   scanCollect();
-  sseTick(millis());
+  crumb("web sse"); sseTick(millis());
   bool sBle, sWifi, sSnd, sWx; int subM, subB;
   int nSse = sseClients(sBle, sWifi, sSnd, subM, subB, sWx);
   // радиопогода на планшете: Bluetooth + CC1101 монитор 433.92 + микрофон (Wi-Fi не трогаем — мешал бы)
@@ -490,6 +545,10 @@ static void webTick(uint32_t now) {
     sBle = true; sSnd = true;
     if (subM < 0) { subM = 1; subB = 1; }             // Sub-GHz никто не смотрит отдельно — монитор (режим 1) на 433.92 (полоса 1)
   }
+  // датчики 433: CC1101 в режиме разбора посылок (монитор тоже разбирает — его не трогаем)
+  bool sSens = false;
+  for (auto& k : s_sse) if (k.on) sSens |= k.sens;
+  if (nSse && sSens && subM != G_MONITOR && subM != G_SENSORS) { if (subM < 0) subB = 1; subM = G_SENSORS; }
   if (nSse && sSnd) { s_sndMs = millis(); if (!s_sndOn) s_sndOn = audioWebUse(); }   // планшет смотрит звук
   if (nSse && subM >= 0) { s_subMs = millis(); s_subOn = subWebUse(subM, subB); }    // планшет смотрит Sub-GHz
   // работает только то, что нужно открытой вкладке, остальное молчит:
@@ -508,6 +567,13 @@ static void webTick(uint32_t now) {
   uint32_t t = millis();
   if (s_subOn) { if ((int32_t)(t - s_subMs) > 4000) { subWebStop(); s_subOn = false; } else subWebTick(t); }
   if (s_sndOn) { if ((int32_t)(t - s_sndMs) > 4000) { audioWebStop(); s_sndOn = false; } else audioWebTick(t); }
+  // ИК и NFC: работают, пока планшет на них подписан (+4 с), потом спят
+  bool sIr = false, sNfc = false;
+  for (auto& k : s_sse) if (k.on) { sIr |= k.ir; sNfc |= k.nfc; }
+  if (sIr)  { s_irMs = t;  if (!s_irOn)  { irStart();  s_irOn = true; } }
+  if (sNfc) { s_nfcMs = t; if (!s_nfcOn) { nfcStart(); s_nfcOn = true; } }
+  if (s_irOn)  { if ((int32_t)(t - s_irMs) > 4000)  { irStop();  s_irOn = false; }  else { crumb("web ir");  irTick(t); } }
+  if (s_nfcOn) { if ((int32_t)(t - s_nfcMs) > 4000) { nfcStop(); s_nfcOn = false; } else { crumb("web nfc"); nfcTick(t); } }
   if (wantScan && now - s_scanMs > SCAN_STEP_MS && WiFi.scanComplete() != WIFI_SCAN_RUNNING) {   // один канал за раз — точка не пропадает
     s_scanMs = now;
     WiFi.scanNetworks(true, true, false, 90, s_scanCh);   // асинхронно, 90 мс на один канал
@@ -515,9 +581,26 @@ static void webTick(uint32_t now) {
   }
 }
 
-static void webDraw(uint32_t) {
+// экран: пока подключён планшет — анимация связи; колесо или нажатие показывают QR и пароль
+// (чтобы подключить ещё кого-то или вспомнить пароль), через 30 с без касаний — снова анимация
+static bool     s_showInfo = false;
+static uint32_t s_infoMs = 0;
+static void webDraw(uint32_t now) {
   WebView v = { s_ssid, s_pass, "192.168.4.1", s_ok ? (int)WiFi.softAPgetStationNum() : 0, s_reqs, s_ok, s_tab };
-  drawWebScreen(v, s_qr, s_qrN);
+  int tablets = 0; bool b = false, w = false, sn = false, su = false, pc = false, wx = false, ir = false, nf = false;
+  for (auto& k : s_sse) if (k.on) { tablets++; b |= k.ble; w |= k.wifi; sn |= k.snd; su |= k.sub; pc |= k.pc; wx |= k.wx; ir |= k.ir; nf |= k.nfc; }
+  if (s_showInfo && msSince(now, s_infoMs) > 30000) s_showInfo = false;
+  if (!s_ok || !tablets || s_showInfo) { drawWebScreen(v, s_qr, s_qrN); return; }
+  // скорость: байт за последнюю секунду (плавно)
+  static uint32_t lastBytes = 0, lastMs = 0; static float bps = 0;
+  if (!lastMs) { lastMs = now; lastBytes = s_sseBytes; }
+  uint32_t dt = msSince(now, lastMs);
+  if (dt >= 250) { bps = bps * 0.6f + 0.4f * (s_sseBytes - lastBytes) * 1000.0f / dt; lastBytes = s_sseBytes; lastMs = now; }
+  char st[64] = "";
+  if (b) strcat(st, "BLE  "); if (w) strcat(st, "WIFI  "); if (su) strcat(st, "SUB  "); if (sn) strcat(st, "SND  "); if (pc) strcat(st, "PC  "); if (wx) strcat(st, "WX  "); if (ir) strcat(st, "IR  "); if (nf) strcat(st, "NFC  ");
+  if (!st[0]) strcpy(st, "STATUS");
+  WebLink l = { tablets, st, (uint32_t)bps, s_sseBytes };
+  drawWebLink(l, now);
 }
 
 static void webSubtitle(char* out, size_t n) {
@@ -526,8 +609,8 @@ static void webSubtitle(char* out, size_t n) {
 }
 static void webEnter() { webStart(); }
 static void webLeave() { webStop(); ledsOff(); }
-static void webClick() {}
-static void webRotate(int) {}
+static void webClick() { s_showInfo = !s_showInfo; s_infoMs = millis(); }
+static void webRotate(int) { s_showInfo = !s_showInfo; s_infoMs = millis(); }
 
 const Section webSection = {
   "Web", 90, 200, 230, iconPhone, webSubtitle,

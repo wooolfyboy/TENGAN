@@ -5,6 +5,8 @@
 #include "core/timeutil.h"
 #include "core/settings.h"
 #include "core/version.h"
+#include "core/crumb.h"
+#include "core/jsonutil.h"
 #include "core/display.h"
 #include "core/theme.h"
 #include "core/leds.h"
@@ -37,35 +39,39 @@ static bool     g_setDirty = false;
 static uint32_t g_setChangedMs = 0;
 static Preferences g_prefs;
 
-// все пункты настроек; page — на какой странице показывать
+// все пункты настроек; page — на какой странице показывать.
+// Одна таблица на всё: экран палки (колесо) и планшет (/api/settings, /api/set) читают и меняют
+// настройки через одни и те же getVal / setVal — логика не дублируется.
 enum { S_THEME, S_SCREEN, S_DIM, S_LEDBR, S_VOLUME, S_CLICKS, S_CITY, S_BATTERY, S_VERSION,
        S_RANGE, S_LEDEV, S_BLETICK,
        S_WRANGE, S_WTICK,
        S_BAND,
        S_MIC, S_AULED, S_AUSRC, S_NUM };
 enum { P_GENERAL, P_BLE, P_WIFI, P_SUBGHZ, P_SOUND, P_NUM };
-struct SetDef { const char* name; const char* hint; uint8_t page; };
+enum { K_ENUM, K_RANGE, K_BOOL, K_INFO };                 // вид пункта (для планшета)
+struct SetDef { const char* name; const char* hint; uint8_t page; const char* key; uint8_t kind; int16_t mn, mx, step; const char* unit; };
 static const SetDef DEFS[S_NUM] = {
-  { "Theme",          "look: denko light / sumi ink", P_GENERAL },
-  { "Screen",         "screen backlight",            P_GENERAL },
-  { "Auto dim",       "dim screen when idle",        P_GENERAL },
-  { "LED brightness", "led strip brightness",        P_GENERAL },
-  { "Volume",         "all sounds: off/quiet/loud",  P_GENERAL },
-  { "Wheel clicks",   "click on every wheel step",   P_GENERAL },
-  { "City",           "for sky map and satellites",  P_GENERAL },
-  { "Battery",        "",                            P_GENERAL },
-  { "Version",        "TENGAN firmware",             P_GENERAL },
-  { "Range",          "ignore weaker devices",       P_BLE },
-  { "LED events",     "leds flash on count jump",    P_BLE },
-  { "Find ticks",     "ticks on nearest screen",     P_BLE },
-  { "Range",          "hide weaker networks",        P_WIFI },
-  { "Find ticks",     "ticks on find screen",        P_WIFI },
-  { "Start band",     "band when section opens",     P_SUBGHZ },
-  { "Microphone",     "mic for sound section",       P_SOUND },
-  { "LED meter",      "leds show loudness",          P_SOUND },
-  { "Source",         "auto / mic / laptop audio",   P_SOUND },
+  { "Theme",          "look: denko light / sumi ink", P_GENERAL, "theme",      K_ENUM },
+  { "Screen",         "screen backlight",            P_GENERAL, "screen",     K_RANGE, 20, 100, 10, "%" },
+  { "Auto dim",       "dim screen when idle",        P_GENERAL, "dim",        K_ENUM },
+  { "LED brightness", "led strip brightness",        P_GENERAL, "ledbr",      K_RANGE, 10, 100, 10, "%" },
+  { "Volume",         "all sounds: off/quiet/loud",  P_GENERAL, "volume",     K_ENUM },
+  { "Wheel clicks",   "click on every wheel step",   P_GENERAL, "clicks",     K_BOOL },
+  { "City",           "for sky map and satellites",  P_GENERAL, "city",       K_ENUM },
+  { "Battery",        "",                            P_GENERAL, "battery",    K_INFO },
+  { "Version",        "TENGAN firmware",             P_GENERAL, "version",    K_INFO },
+  { "Range",          "ignore weaker devices",       P_BLE,     "ble_range",  K_ENUM },
+  { "LED events",     "leds flash on count jump",    P_BLE,     "ble_ledev",  K_RANGE, 0, 30, 1, "" },
+  { "Find ticks",     "ticks on nearest screen",     P_BLE,     "ble_ticks",  K_BOOL },
+  { "Range",          "hide weaker networks",        P_WIFI,    "wifi_range", K_ENUM },
+  { "Find ticks",     "ticks on find screen",        P_WIFI,    "wifi_ticks", K_BOOL },
+  { "Start band",     "band when section opens",     P_SUBGHZ,  "sub_band",   K_ENUM },
+  { "Microphone",     "mic for sound section",       P_SOUND,   "mic",        K_BOOL },
+  { "LED meter",      "leds show loudness",          P_SOUND,   "au_leds",    K_BOOL },
+  { "Source",         "auto / mic / laptop audio",   P_SOUND,   "au_src",     K_ENUM },
 };
 static const char* const PAGE_NAMES[P_NUM] = { "General", "Bluetooth", "Wi-Fi", "Sub-GHz", "Sound" };
+static const char* const PAGE_IDS[P_NUM]   = { "general", "ble", "wifi", "sub", "snd" };
 static const char* const PAGE_DESCS[P_NUM] = { "theme, screen, leds, city", "range, leds, ticks",
                                                "range, ticks", "radio band", "source, mic, leds" };
 static const int SET_ROWS = 7;           // строк на экране (список прокручивается)
@@ -78,9 +84,10 @@ static int pageItems(int page, int* out) {
 }
 
 // ---------- настройки ----------
+bool g_screenOff = false;
 void applyBrightness() {
   strip.setBrightness(g_ledBright * 255 / 100);
-  analogWrite(TFT_BL, g_scrBright * 255 / 100);
+  analogWrite(TFT_BL, g_screenOff ? 0 : g_scrBright * 255 / 100);
 }
 
 void loadSettings() {
@@ -148,30 +155,161 @@ static int curItem() {
   return n ? ids[constrain(g_setItem, 0, n - 1)] : -1;
 }
 
-void settingsAdjust(int dir) {
-  int id = curItem();
+// ---------- значения пунктов: одна логика для колеса и для планшета ----------
+static const char* const VOL_NAMES[3] = { "off", "quiet", "loud" };
+static const char* const SRC_NAMES[3] = { "auto", "mic", "laptop" };
+
+static int optCount(int id) {                             // сколько вариантов у пункта-списка
   switch (id) {
-    case S_RANGE:   g_range = constrain(g_range + dir, 0, N_RANGES - 1); break;
-    case S_LEDEV:   g_thresh = constrain(g_thresh + dir, 0, 30); break;
-    case S_LEDBR:   g_ledBright = constrain(g_ledBright + dir * 10, 10, 100); break;
-    case S_SCREEN:  g_scrBright = constrain(g_scrBright + dir * 10, 20, 100); break;
-    case S_DIM:     g_dimIdx = constrain(g_dimIdx + dir, 0, N_DIMS - 1); break;
-    case S_VOLUME:  g_sndIdx = constrain(g_sndIdx + dir, 0, 2); audioBeep(1400, 60); break;
-    case S_CLICKS:  g_clickEn = dir > 0; break;
-    case S_THEME:   g_theme = dir > 0 ? THEME_SUMI : THEME_DENKO; break;
-    case S_BLETICK: g_bleTicks = dir > 0; break;
-    case S_WTICK:   g_wifiTicks = dir > 0; break;
-    case S_WRANGE:  g_wRange = constrain(g_wRange + dir, 0, N_RANGES - 1); break;
-    case S_BAND:    g_band = constrain(g_band + dir, 0, N_BANDS - 1); break;
-    case S_MIC:     g_micEn = dir > 0; break;
-    case S_AULED:   g_auLeds = dir > 0; if (!g_auLeds) ledsOff(); break;
-    case S_AUSRC:   g_auSrc = constrain(g_auSrc + dir, 0, 2); break;
-    case S_CITY:    g_city = (g_city + dir + cityCount()) % cityCount(); break;
-    default: return;                       // батарея — только показывает
+    case S_THEME: return 2;
+    case S_DIM: return N_DIMS;
+    case S_VOLUME: return 3;
+    case S_CITY: return cityCount();
+    case S_RANGE: case S_WRANGE: return N_RANGES;
+    case S_BAND: return N_BANDS;
+    case S_AUSRC: return 3;
+  }
+  return 0;
+}
+static void optName(int id, int i, char* out, size_t n) {   // имя варианта (как на планшете)
+  switch (id) {
+    case S_THEME:  snprintf(out, n, "%s", i == THEME_SUMI ? "sumi" : "denko"); break;
+    case S_DIM:    if (DIM_SECS[i] == 0) snprintf(out, n, "off"); else if (DIM_SECS[i] < 60) snprintf(out, n, "%d s", DIM_SECS[i]); else snprintf(out, n, "%d min", DIM_SECS[i] / 60); break;
+    case S_VOLUME: snprintf(out, n, "%s", VOL_NAMES[i]); break;
+    case S_CITY:   snprintf(out, n, "%s", i == N_CITIES ? g_gpsCity.name : CITIES[i].name); break;
+    case S_RANGE: case S_WRANGE: snprintf(out, n, "%s", RANGES[i].name); break;
+    case S_BAND:   snprintf(out, n, "%s", BANDS[i].name); break;
+    case S_AUSRC:  snprintf(out, n, "%s", SRC_NAMES[i]); break;
+    default: out[0] = 0;
+  }
+}
+static int getVal(int id) {                               // индекс варианта / число / 0-1
+  switch (id) {
+    case S_THEME: return g_theme;          case S_SCREEN: return g_scrBright;   case S_DIM: return g_dimIdx;
+    case S_LEDBR: return g_ledBright;      case S_VOLUME: return g_sndIdx;      case S_CLICKS: return g_clickEn;
+    case S_CITY: return g_city;            case S_RANGE: return g_range;        case S_LEDEV: return g_thresh;
+    case S_BLETICK: return g_bleTicks;     case S_WRANGE: return g_wRange;      case S_WTICK: return g_wifiTicks;
+    case S_BAND: return g_band;            case S_MIC: return g_micEn;          case S_AULED: return g_auLeds;
+    case S_AUSRC: return g_auSrc;
+  }
+  return 0;
+}
+// поставить значение: проверка границ и те же побочные действия, что при повороте колеса
+static bool setVal(int id, int v) {
+  const SetDef& d = DEFS[id];
+  if (d.kind == K_INFO) return false;
+  if (d.kind == K_ENUM)  v = constrain(v, 0, optCount(id) - 1);
+  if (d.kind == K_BOOL)  v = v ? 1 : 0;
+  if (d.kind == K_RANGE) v = constrain(v, d.mn, d.mx);
+  switch (id) {
+    case S_THEME:   g_theme = v ? THEME_SUMI : THEME_DENKO; break;
+    case S_SCREEN:  g_scrBright = v; break;
+    case S_DIM:     g_dimIdx = v; break;
+    case S_LEDBR:   g_ledBright = v; break;
+    case S_VOLUME:  g_sndIdx = v; audioBeep(1400, 60); break;
+    case S_CLICKS:  g_clickEn = v; break;
+    case S_CITY:    g_city = v; break;
+    case S_RANGE:   g_range = v; break;
+    case S_LEDEV:   g_thresh = v; break;
+    case S_BLETICK: g_bleTicks = v; break;
+    case S_WRANGE:  g_wRange = v; break;
+    case S_WTICK:   g_wifiTicks = v; break;
+    case S_BAND:    g_band = v; break;
+    case S_MIC:     g_micEn = v; break;
+    case S_AULED:   g_auLeds = v; if (!g_auLeds) ledsOff(); break;
+    case S_AUSRC:   g_auSrc = v; break;
+    default: return false;
   }
   applyBrightness();
   if (id == S_LEDBR) ledsEvent(+1);        // показать яркость ленты
   settingsTouch();
+  return true;
+}
+
+void settingsAdjust(int dir) {
+  int id = curItem();
+  if (id < 0) return;
+  const SetDef& d = DEFS[id];
+  switch (d.kind) {
+    case K_ENUM:
+      if (id == S_CITY) setVal(id, (getVal(id) + dir + optCount(id)) % optCount(id));   // города — по кругу
+      else setVal(id, getVal(id) + dir);
+      break;
+    case K_BOOL:  setVal(id, dir > 0); break;
+    case K_RANGE: setVal(id, getVal(id) + dir * d.step); break;
+    default: break;                        // батарея и версия — только показывают
+  }
+}
+
+// ---------- для планшета: все пункты в JSON и смена по ключу ----------
+static void itemJson(int id, String& o) {
+  const SetDef& d = DEFS[id];
+  char b[48];
+  o += "{\"k\":\""; o += d.key; o += "\",\"name\":"; jsonStr(o, d.name); o += ",\"hint\":";
+  // тема с планшета не меняется (смена из веба роняла палку) — только показываем, менять колесом на палке
+  if (id == S_THEME) { jsonStr(o, "change on the stick: Settings > Theme"); o += ",\"type\":\"info\",\"v\":"; optName(id, getVal(id), b, sizeof(b)); jsonStr(o, b); o += '}'; return; }
+  jsonStr(o, d.hint);
+  switch (d.kind) {
+    case K_ENUM:
+      o += ",\"type\":\"enum\",\"v\":"; optName(id, getVal(id), b, sizeof(b)); jsonStr(o, b);
+      o += ",\"opts\":[";
+      for (int i = 0; i < optCount(id); i++) { if (i) o += ','; optName(id, i, b, sizeof(b)); jsonStr(o, b); }
+      o += ']';
+      break;
+    case K_RANGE:
+      o += ",\"type\":\"range\",\"v\":"; o += getVal(id);
+      o += ",\"min\":"; o += d.mn; o += ",\"max\":"; o += d.mx; o += ",\"step\":"; o += d.step; o += ",\"unit\":"; jsonStr(o, d.unit);
+      break;
+    case K_BOOL:
+      o += ",\"type\":\"bool\",\"v\":"; o += getVal(id) ? 1 : 0;
+      break;
+    default:
+      if (id == S_VERSION) { if (crumbWasCrash()) snprintf(b, sizeof(b), "v%s · last reset: %s @ %s", FW_VERSION, crumbLastReason(), crumbLastStep()); else snprintf(b, sizeof(b), "v%s", FW_VERSION); }
+      else if (g_bat.ok) snprintf(b, sizeof(b), "%d%%  %.2f V", g_bat.soc, g_bat.mv / 1000.0f);
+      else snprintf(b, sizeof(b), "n/a");
+      o += ",\"type\":\"info\",\"v\":"; jsonStr(o, b);
+  }
+  o += '}';
+}
+
+void settingsJson(String& o) {
+  o.reserve(2600);
+  o = "{\"pages\":[";
+  for (int p = 0; p < P_NUM; p++) {
+    if (p) o += ',';
+    o += "{\"id\":\""; o += PAGE_IDS[p]; o += "\",\"name\":"; jsonStr(o, PAGE_NAMES[p]); o += ",\"items\":[";
+    bool first = true;
+    for (int i = 0; i < S_NUM; i++) if (DEFS[i].page == p) { if (!first) o += ','; first = false; itemJson(i, o); }
+    o += "]}";
+  }
+  o += "]}";
+}
+
+bool settingsSetKey(const char* key, const char* val, String& o) {
+  int id = -1;
+  for (int i = 0; i < S_NUM; i++) if (!strcmp(DEFS[i].key, key)) id = i;
+  const char* err = nullptr;
+  if (id < 0) err = "unknown key";
+  else if (DEFS[id].kind == K_INFO || id == S_THEME) err = "change it on the stick";
+  else {
+    int v = 0;
+    if (DEFS[id].kind == K_ENUM) {                        // имя варианта (без учёта регистра) или его номер
+      v = -1;
+      char b[48];
+      for (int i = 0; i < optCount(id); i++) { optName(id, i, b, sizeof(b)); if (!strcasecmp(b, val)) v = i; }
+      if (v < 0 && isdigit((unsigned char)val[0])) v = atoi(val);
+      if (v < 0 || v >= optCount(id)) err = "bad option";
+    } else if (DEFS[id].kind == K_BOOL) {
+      v = (!strcasecmp(val, "1") || !strcasecmp(val, "true") || !strcasecmp(val, "on")) ? 1 : 0;
+    } else {
+      if (!val[0] || !(isdigit((unsigned char)val[0]) || val[0] == '-')) err = "bad number";
+      else v = atoi(val);
+    }
+    if (!err && !setVal(id, v)) err = "not applied";
+  }
+  if (err) { o = "{\"ok\":false,\"err\":"; jsonStr(o, err); o += '}'; return false; }
+  o = "{\"ok\":true,\"item\":"; itemJson(id, o); o += '}';
+  return true;
 }
 
 void settingsTouch() { g_setDirty = true; g_setChangedMs = millis(); }
@@ -189,7 +327,9 @@ void drawSettings() {
   g_setItem = constrain(g_setItem, 0, n - 1);
   int cur = ids[g_setItem];
   char batLine[64]; batSummary(batLine, sizeof(batLine));
-  uiHeader(PAGE_NAMES[g_setPage], cur == S_BATTERY ? batLine : DEFS[cur].hint);
+  char rst[72] = "";
+  if (cur == S_VERSION && crumbWasCrash()) snprintf(rst, sizeof(rst), "last reset: %s @ %s", crumbLastReason(), crumbLastStep());
+  uiHeader(PAGE_NAMES[g_setPage], cur == S_BATTERY ? batLine : rst[0] ? rst : DEFS[cur].hint, rst[0] != 0);
   const int rh = 18;
   int rows = min(n, SET_ROWS);
   int first = constrain(g_setItem - (rows - 1), 0, n - rows);

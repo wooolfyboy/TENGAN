@@ -19,7 +19,7 @@
 //  площадку, колесо крутит её; новые башни «вырастают».
 // ============================================================
 static float s_yaw = 0.6f, s_yawTarget = 0.6f;
-struct CityT { float rssiAvg = 0, target = 0, pct = 0, h = 0; uint8_t type = 0; bool alive = false; };
+struct CityT { float rssiAvg = 0, target = 0, pct = 0, h = 0; uint8_t type = 0; bool alive = false; char label[21] = ""; };
 static std::map<uint32_t, CityT> s_city;             // башни: сглаженные значения и анимация
 
 void cityTurn(int dir) { s_yawTarget += dir * 0.26f; }
@@ -73,7 +73,7 @@ void drawCity(const std::vector<Blip>& bl, uint32_t now) {
 
   // башни: данные берём раз в 1.5 с (сигнал BLE сильно «шумит»), а между
   // обновлениями высота и место плавно перетекают к новым значениям
-  struct Tower { float x, z, h, depth; uint16_t col; bool alert; int rssi; uint8_t type; };
+  struct Tower { float x, z, h, depth; uint16_t col; bool alert; int rssi; uint8_t type; const char* label; };
   static uint32_t lastPick = 0;
   if (now - lastPick >= 1500 || s_city.empty()) {
     lastPick = now;
@@ -88,7 +88,7 @@ void drawCity(const std::vector<Blip>& bl, uint32_t now) {
       if (c.rssiAvg == 0) { c.rssiAvg = b.rssi; c.pct = c.h = 0; }
       c.rssiAvg = c.rssiAvg * 0.5f + b.rssi * 0.5f;      // ещё и усреднение между выборками
       c.target = constrain((c.rssiAvg + 95) / 50.0f, 0.0f, 1.0f);
-      c.type = b.type; c.alive = true;
+      c.type = b.type; c.alive = true; strlcpy(c.label, b.label, sizeof(c.label));
       if (c.pct == 0) c.pct = c.target;                  // новая башня встаёт на место и растёт
     }
   }
@@ -106,7 +106,7 @@ void drawCity(const std::vector<Blip>& bl, uint32_t now) {
     float sx, sy; proj(t.x, 0, t.z, sx, sy, t.depth);
     t.alert = (c.type == T_TRACKER);
     t.col = t.alert ? C_ALERT() : heatV(0.2f + 0.8f * c.pct);
-    t.rssi = (int)lroundf(c.rssiAvg); t.type = c.type;
+    t.rssi = (int)lroundf(c.rssiAvg); t.type = c.type; t.label = c.label;
     tw.push_back(t);
     ++it;
   }
@@ -146,8 +146,11 @@ void drawCity(const std::vector<Blip>& bl, uint32_t now) {
   int lx[3], ly[3], lw[3];
   for (size_t n = 0; n < top.size() && n < 3; n++) {
     float sx, sy, d; proj(top[n]->x, top[n]->h, top[n]->z, sx, sy, d);
-    snprintf(buf, sizeof(buf), "%s %d", typeName(top[n]->type), top[n]->rssi);
-    int x = (int)sx, y = (int)sy - 3, w = txtW(buf, 1);
+    bool lab = top[n]->label[0];                        // подпись пользователя — вместо типа (кириллица — своим шрифтом)
+    snprintf(buf, sizeof(buf), "%s %d", lab ? top[n]->label : typeName(top[n]->type), top[n]->rssi);
+    int lf = 1;
+    for (const char* q = buf; *q; q++) if ((uint8_t)*q >= 0x80) { lf = 3; break; }
+    int x = (int)sx, y = (int)sy - 3, w = txtW(buf, lf);
     for (int pass = 0; pass < 3; pass++)                  // подписи не налезают друг на друга
       for (size_t m = 0; m < n; m++)
         if (abs(y - ly[m]) < 10 && abs(x - lx[m]) < (w + lw[m]) / 2 + 4) y = ly[m] - 10;
@@ -155,7 +158,7 @@ void drawCity(const std::vector<Blip>& bl, uint32_t now) {
     lx[n] = x; ly[n] = y; lw[n] = w;
     spr.drawLine(x, y + 1, (int)sx, (int)sy - 1, UI_DIM());   // «ножка» к крыше
     spr.setTextColor(top[n]->alert ? C_ALERT() : C_HOT());
-    txt(buf, x, y, 1);
+    txt(buf, x, y, lf);
   }
 
   snprintf(buf, sizeof(buf), "%d devices", (int)bl.size());

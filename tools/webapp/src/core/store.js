@@ -15,23 +15,33 @@ const S = T.S = {
 };
 S.event = (tag, text, alert) => { S.events.unshift({ t: Date.now(), tag, text, alert: !!alert }); if (S.events.length > 40) S.events.pop(); };
 
+// подписи устройств («мои AirPods»): палка хранит их и шлёт 8-м полем; планшет держит свою копию,
+// чтобы новое имя было видно сразу, ещё до ответа палки
+S.labels = new Map();                                  // id -> {n, t}
+S.setLabel = (id, n) => { S.labels.set(id, { n, t: performance.now() }); const e = S.dev.get(id); if (e) e.label = n; };
+const pickLabel = (id, fromStick) => {
+  const loc = S.labels.get(id);
+  if (loc && (fromStick === undefined || performance.now() - loc.t < 6000)) return loc.n;   // своё свежее — главнее
+  return fromStick || '';
+};
 S.onBle = d => {
   S.ble = d; S.bleT = performance.now();
   S.bleHist.push(d.n); if (S.bleHist.length > 180) S.bleHist.shift();
   const seen = new Set(), now = performance.now();
   for (const a of d.d) {
     const [id, r, type, vend, name, age, macs] = a; seen.add(id);
+    const label = pickLabel(id, a.length > 7 ? a[7] : undefined);
     let e = S.dev.get(id);
     if (!e) {
       e = { id, st: T.steady(4, 0.8), h: 0, born: now, hist: [], first: !S.devInit };
       S.dev.set(id, e);
-      if (S.devInit) S.event('BLE', '+ ' + (name || type || 'device') + '  ' + r + ' dBm', type === 'tracker');
+      if (S.devInit) S.event('BLE', '+ ' + (label || name || type || 'device') + '  ' + r + ' dBm', type === 'tracker');
     }
     e.st.set(r);
-    Object.assign(e, { r, type, vend, name, age, macs, alive: true, seen: now });
+    Object.assign(e, { r, type, vend, name, label, age, macs, alive: true, seen: now });
     e.hist.push(r); if (e.hist.length > 120) e.hist.shift();
   }
-  for (const [id, e] of S.dev) if (!seen.has(id) && e.alive) { e.alive = false; if (now - e.born > 5000) S.event('BLE', '- ' + (e.name || e.type || 'device') + '  lost'); }
+  for (const [id, e] of S.dev) if (!seen.has(id) && e.alive) { e.alive = false; if (now - e.born > 5000) S.event('BLE', '- ' + (e.label || e.name || e.type || 'device') + '  lost'); }
   S.devInit = true;
 };
 S.onWifi = d => {
@@ -71,6 +81,40 @@ S.onPc = d => {
   if (was !== undefined && was !== !!d.live) S.event('PC', d.live ? 'laptop online' : 'laptop stopped', !d.live);
 };
 S.onSat = d => { S.sky = d; };
+// ИК-пульты (событие ir — на каждое нажатие): последнее + история; удержание кнопки (rep) не плодит строк
+S.ir = { last: null, t: 0, hist: [], n: 0 };
+S.onIr = d => {
+  const I = S.ir, now = performance.now(), prev = I.hist[0];
+  I.n++;
+  if (d.rep && prev && prev.p === d.p && prev.addr === d.addr && prev.cmd === d.cmd) { prev.x++; prev.at = now; }
+  else {
+    I.hist.unshift(Object.assign({ at: now, x: 1 }, d)); if (I.hist.length > 12) I.hist.pop();
+    S.event('IR', (d.brand ? d.brand + ' · ' : '') + d.p + ' ' + T.hexs(d.cmd));
+  }
+  I.last = d; I.t = now;
+};
+// NFC (событие nfc — на каждое касание): карта, история; err — нет считывателя
+S.nfc = { last: null, t: 0, hist: [], err: '' };
+S.onNfc = d => {
+  const N = S.nfc, now = performance.now();
+  if (d.err) { N.err = d.err; return; }
+  N.err = ''; N.last = d; N.t = now;
+  const prev = N.hist[0];
+  if (!(prev && prev.uid === d.uid && now - prev.at < 3000)) {
+    N.hist.unshift(Object.assign({ at: now }, d)); if (N.hist.length > 8) N.hist.pop();
+    S.event('NFC', d.fam || 'card');
+  } else prev.at = now;
+};
+// датчики 433 (событие sens): таблица и последняя посылка; новая посылка = pk вырос
+S.sens = null; S.sensPkT = 0;
+S.onSens = d => {
+  const prev = S.sens; S.sens = d; S.sensT = performance.now();
+  if (!prev || d.pk !== prev.pk) S.sensPkT = S.sensT;
+  if (prev) {
+    const known = new Set((prev.sensors || []).map(x => x.id));
+    for (const x of d.sensors || []) if (!known.has(x.id)) S.event('433', x.kind === 'remote' ? 'remote / bell #' + String(x.id).split('-').pop() : x.p + ' ch' + x.ch + (x.t != null ? '  ' + x.t + '°' : ''));
+  }
+};
 // радиопогода (событие wx, раз в секунду): rx — что пришло, wxs — плавные значения для сцены
 S.wxs = { clouds: 0, wind: 0, rain: 0, storm: 0, trend: 0 }; S.wxBolt = 0;
 S.onWx = d => {

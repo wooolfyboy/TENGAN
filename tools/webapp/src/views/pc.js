@@ -32,7 +32,7 @@
       main.appendChild(this.root);
       this.cam = T.orbit(0.7, 0.72, 3.4);
       this.drag = T.drag(this.cv.cv, this.cam, { minPitch: 0.25, maxPitch: 1.35 });
-      this.drag.onTap = (x, y) => { const hit = T.hits.at(x, y); this.sel = hit && hit.app ? (this.sel === hit.app ? null : hit.app) : null; };
+      this.drag.onTap = (x, y) => { const hit = T.hits.at(x, y); if (hit && hit.key) { this.mediaKey(hit.key); return; } this.sel = hit && hit.app ? (this.sel === hit.app ? null : hit.app) : null; };
       this.dust = T.dust(160, 1.6, 1.4);
       this.cpu = T.steady(2, 0.6); this.ram = T.steady(1, 0.8);
       this.tw = new Map(); this.coreH = []; this.angle = 0; this.pos = -1; this.posT = 0; this.lastT = 0; this.wasLive = false;
@@ -256,7 +256,7 @@
       // текст
       const tx = port ? a.x : cx + R * 1.45, tw = port ? a.w : a.x + a.w - tx;
       let ty = port ? cy + R * 1.35 + u * 2 : a.y + a.h * 0.3;
-      if (!trk) { T.txt(g, 'NOTHING PLAYING', tx, ty + u * 2, u * 2, T.C.label, 't'); T.txt(g, 'START A TRACK ON THE LAPTOP', tx, ty + u * 3.5, u * 0.85, T.C.dim); return; }
+      if (!trk) { T.txt(g, 'NOTHING PLAYING', tx, ty + u * 2, u * 2, T.C.label, 't'); T.txt(g, 'START A TRACK ON THE LAPTOP', tx, ty + u * 3.5, u * 0.85, T.C.dim); this.controls(g, tx, ty + u * 6, tw, u, t, false); return; }
       T.txt(g, (trk.app || 'MEDIA').toUpperCase() + (play ? '  ▸ PLAYING' : '  ▮▮ PAUSED'), tx, ty, u * 0.85, play ? T.C.acc : T.C.label);
       ty += u * 3;
       g.font = `500 ${u * 2.4}px ${T.FC}`; T.txt(g, T.fit(g, trk.t || '—', tw), tx, ty, u * 2.4, T.C.hot, 'c');
@@ -274,6 +274,36 @@
         T.txt(g, p.mute ? 'VOLUME · MUTE' : 'VOLUME · ' + p.vol + '%', tx, ty, u * 0.8, p.mute ? T.C.alert : T.C.label);
         T.segBar(g, tx, ty + u * 0.6, Math.min(tw, u * 18), u * 0.5, p.mute ? 0 : p.vol / 100, 20, true);
       }
+      this.controls(g, tx, ty + u * 2.6, tw, u, t, play);
+    },
+    // пульт: ⏮ ⏯ ⏭ · − MUTE + — палка передаёт клавишу ноутбуку (pc_monitor нажимает медиа-клавишу)
+    controls(g, x, y, w, u, t, play) {
+      const keys = [['PREV', 'prev'], ['PLAY', play ? 'pause' : 'play'], ['NEXT', 'next'], null, ['VOLDN', 'minus'], ['MUTE', 'mute'], ['VOLUP', 'plus']];
+      const bs = Math.min(u * 4.2, (w - u * 2) / 7.2), gap = bs * 0.18;
+      let bx = x;
+      for (const k of keys) {
+        if (!k) { bx += bs * 0.5; continue; }
+        const [key, ic] = k, hot = this.pressK === key && t - this.pressT < 0.25, big = key === 'PLAY';
+        T.panel(g, bx, y, bs, bs, u * 0.5, hot ? 'rgba(62,230,255,.35)' : big ? 'rgba(62,230,255,.12)' : 'rgba(14,42,52,.35)', hot || big ? T.C.acc : 'rgba(62,230,255,.3)');
+        const cx = bx + bs / 2, cy = y + bs / 2, s = bs * 0.2, col = hot ? T.C.hot : big ? T.C.hot : T.C.acc;
+        g.fillStyle = col; g.strokeStyle = col; g.lineWidth = Math.max(1.5, bs * 0.06);
+        const tri = (x0, dir) => { g.beginPath(); g.moveTo(x0, cy - s); g.lineTo(x0 + dir * s * 1.3, cy); g.lineTo(x0, cy + s); g.closePath(); g.fill(); };
+        if (ic === 'play') tri(cx - s * 0.6, 1);
+        else if (ic === 'pause') { g.fillRect(cx - s * 0.8, cy - s, s * 0.55, s * 2); g.fillRect(cx + s * 0.25, cy - s, s * 0.55, s * 2); }
+        else if (ic === 'next') { tri(cx - s * 1.1, 1); g.fillRect(cx + s * 0.35, cy - s, s * 0.35, s * 2); }
+        else if (ic === 'prev') { tri(cx + s * 1.1, -1); g.fillRect(cx - s * 0.7, cy - s, s * 0.35, s * 2); }
+        else if (ic === 'minus') g.fillRect(cx - s, cy - s * 0.15, s * 2, s * 0.3);
+        else if (ic === 'plus') { g.fillRect(cx - s, cy - s * 0.15, s * 2, s * 0.3); g.fillRect(cx - s * 0.15, cy - s, s * 0.3, s * 2); }
+        else if (ic === 'mute') { g.fillRect(cx - s * 1.1, cy - s * 0.4, s * 0.5, s * 0.8); g.beginPath(); g.moveTo(cx - s * 0.6, cy - s * 0.4); g.lineTo(cx, cy - s); g.lineTo(cx, cy + s); g.lineTo(cx - s * 0.6, cy + s * 0.4); g.closePath(); g.fill();
+          g.beginPath(); g.moveTo(cx + s * 0.4, cy - s * 0.45); g.lineTo(cx + s * 1.2, cy + s * 0.45); g.moveTo(cx + s * 1.2, cy - s * 0.45); g.lineTo(cx + s * 0.4, cy + s * 0.45); g.stroke(); }
+        T.hits.rect(bx, y, bs, bs, { key });
+        bx += bs + gap;
+      }
+    },
+    mediaKey(key) {
+      this.pressK = key; this.pressT = performance.now() / 1000;
+      const p = S.pc; if (key === 'PLAY' && p && p.trk) p.trk.play = p.trk.play ? 0 : 1;   // сразу показать, не ждать ноутбук
+      fetch(`${T.apiBase()}/api/pckey?k=${key}`, { cache: 'no-store' }).catch(() => {});
     },
     curPos(t, trk) {
       if (this.pos < 0) return -1;

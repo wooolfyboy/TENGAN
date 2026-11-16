@@ -67,6 +67,7 @@ struct Ent {
   uint16_t vcode;
   uint64_t key;      // ключ самого свежего адреса
   char     name[20];
+  char     label[21]; // подпись, которую дал пользователь с планшета (UTF-8, может быть пустой)
 };
 // датчик погоды
 struct Sensor {
@@ -76,7 +77,7 @@ struct Sensor {
   uint8_t  mac[6];
   char     name[20];
 };
-struct Blip { int rssi; uint32_t h; uint8_t cat; uint8_t type; };   // точка на SCOPE
+struct Blip { int rssi; uint32_t h; uint8_t cat; uint8_t type; char label[21]; };   // точка на SCOPE / CITY (label — подпись пользователя)
 
 // --- история для TIMELINE ---
 #define HIST_N 150

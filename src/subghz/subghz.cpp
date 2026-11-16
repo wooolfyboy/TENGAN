@@ -7,11 +7,15 @@
 //  Экраны:
 //    SPECTRUM — развёртка по полосе ±2 МГц + «водопад»
 //    MONITOR  — слушаем одну частоту и ловим всплески (брелоки, звонки, датчики)
+//    SENSORS  — то же + разбор посылок: уличные термометры, звонки (sensors.h)
+//  В MONITOR и SENSORS CC1101 отдаёт демодулированный OOK на GDO0 — датчики
+//  разбираются в обоих (Радиопогода берёт отсюда температуру за окном).
 // ============================================================
 #include "core/settings.h"
 #include "subghz/subghz.h"
 #include "subghz/cc1101.h"
 #include "subghz/subghz_model.h"
+#include "subghz/sensors.h"
 #include "core/timeutil.h"
 #include "core/board.h"
 #include "core/display.h"
@@ -77,7 +81,7 @@ int      g_evN = 0;
 
 static void monStart() {
   ccStrobe(0x36);
-  ccSetBw(0xA5);                               // пошире (~270 кГц) — брелоки «гуляют» по частоте
+  ccSetBw(0x65);                               // пошире (~270 кГц) — брелоки и датчики «гуляют» по частоте
   ccSetFreq(BANDS[g_band].mon);
   ccStrobe(0x34);                              // SRX
   g_monN = 0; g_burst = false;
@@ -123,17 +127,24 @@ static void subEnter() {
   ccStrobe(0x36);
   g_ccOn = true;
 }
-static void subLeave() { if (g_ccOk) ccSleep(); g_ccOn = false; ledsOff(); }
+static void subLeave() { if (g_ccOk) { sensRxStop(); ccSleep(); } g_ccOn = false; ledsOff(); }
+
+// пик уровня за последние ~10 замеров монитора — «сила» только что закончившейся посылки
+static int monRecentPeak() {
+  int mx = -120;
+  for (int i = max(0, g_monN - 10); i < g_monN; i++) if (g_mon[i] > mx) mx = g_mon[i];
+  return mx;
+}
 
 static void subStartMode() {
   if (!g_ccOk) return;
   ccAntenna(BANDS[g_band].mon);
-  if (g_gMode == G_SPECTRUM) { ccSetBw(0xF5); spReset(); }
-  else monStart();
+  if (g_gMode == G_SPECTRUM) { sensRxStop(); ccSetBw(0xF5); spReset(); }
+  else { sensRxStop(); monStart(); sensRxStart(); }
   strip.clear(); strip.show();
 }
 static void subOpenScreen(int m) { g_gMode = m; subStartMode(); }
-static void subCloseScreen() { if (g_ccOk) ccStrobe(0x36); strip.clear(); strip.show(); }
+static void subCloseScreen() { if (g_ccOk) { sensRxStop(); ccStrobe(0x36); } strip.clear(); strip.show(); }
 static int  subScreenNow() { return g_gMode; }
 static void subRotate(int dir) {
   static uint32_t last = 0;
@@ -147,21 +158,25 @@ static void subClick() { g_band = (g_band + 1) % N_BANDS; settingsTouch(); subSt
 // вызывается на каждом проходе loop(), пока открыт экран раздела
 static void subTick(uint32_t now) {
   if (!g_ccOk || !g_ccOn) return;
-  if (g_gMode == G_SPECTRUM) spTick(); else monTick(now);
+  if (g_gMode == G_SPECTRUM) spTick();
+  else { monTick(now); sensRxTick(now, monRecentPeak()); }
 }
 
 
 static void subFrame(uint32_t now) {
   if (!g_ccOk) { drawCcMissing(); return; }
-  if (g_gMode == G_SPECTRUM) drawSpectrum(); else drawMonitor(now);
+  if (g_gMode == G_SPECTRUM) drawSpectrum();
+  else if (g_gMode == G_SENSORS) drawSensors(now);
+  else drawMonitor(now);
 }
 
 static void subScreenInfo(int i, SubItem& it) {
-  static const char* const names[G_NUM] = { "Spectrum", "Monitor" };
-  static const char* const descs[G_NUM] = { "band + waterfall", "catch remotes" };
+  static const char* const names[G_NUM] = { "Spectrum", "Monitor", "Sensors" };
+  static const char* const descs[G_NUM] = { "band + waterfall", "catch remotes", "thermometers, bells" };
   it.name = names[i]; it.desc = descs[i];
   if (!g_ccOk && g_ccTried) { strcpy(it.value, "no chip"); return; }
   if (i == G_SPECTRUM) strcpy(it.value, BANDS[g_band].name);
+  else if (i == G_SENSORS) { if (g_sensN) sprintf(it.value, "%d", g_sensN); else strcpy(it.value, "-"); }
   else if (g_events)   sprintf(it.value, "%lu", (unsigned long)g_events);
   else                 strcpy(it.value, "-");
 }
