@@ -81,6 +81,40 @@ S.onPc = d => {
   if (was !== undefined && was !== !!d.live) S.event('PC', d.live ? 'laptop online' : 'laptop stopped', !d.live);
 };
 S.onSat = d => { S.sky = d; };
+// ИК-пульты (событие ir — на каждое нажатие): последнее + история; удержание кнопки (rep) не плодит строк
+S.ir = { last: null, t: 0, hist: [], n: 0 };
+S.onIr = d => {
+  const I = S.ir, now = performance.now(), prev = I.hist[0];
+  I.n++;
+  if (d.rep && prev && prev.p === d.p && prev.addr === d.addr && prev.cmd === d.cmd) { prev.x++; prev.at = now; }
+  else {
+    I.hist.unshift(Object.assign({ at: now, x: 1 }, d)); if (I.hist.length > 12) I.hist.pop();
+    S.event('IR', (d.brand ? d.brand + ' · ' : '') + d.p + ' ' + T.hexs(d.cmd));
+  }
+  I.last = d; I.t = now;
+};
+// NFC (событие nfc — на каждое касание): карта, история; err — нет считывателя
+S.nfc = { last: null, t: 0, hist: [], err: '' };
+S.onNfc = d => {
+  const N = S.nfc, now = performance.now();
+  if (d.err) { N.err = d.err; return; }
+  N.err = ''; N.last = d; N.t = now;
+  const prev = N.hist[0];
+  if (!(prev && prev.uid === d.uid && now - prev.at < 3000)) {
+    N.hist.unshift(Object.assign({ at: now }, d)); if (N.hist.length > 8) N.hist.pop();
+    S.event('NFC', d.fam || 'card');
+  } else prev.at = now;
+};
+// датчики 433 (событие sens): таблица и последняя посылка; новая посылка = pk вырос
+S.sens = null; S.sensPkT = 0;
+S.onSens = d => {
+  const prev = S.sens; S.sens = d; S.sensT = performance.now();
+  if (!prev || d.pk !== prev.pk) S.sensPkT = S.sensT;
+  if (prev) {
+    const known = new Set((prev.sensors || []).map(x => x.id));
+    for (const x of d.sensors || []) if (!known.has(x.id)) S.event('433', x.kind === 'remote' ? 'remote / bell #' + String(x.id).split('-').pop() : x.p + ' ch' + x.ch + (x.t != null ? '  ' + x.t + '°' : ''));
+  }
+};
 // радиопогода (событие wx, раз в секунду): rx — что пришло, wxs — плавные значения для сцены
 S.wxs = { clouds: 0, wind: 0, rain: 0, storm: 0, trend: 0 }; S.wxBolt = 0;
 S.onWx = d => {

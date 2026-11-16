@@ -190,6 +190,15 @@
       // подложка, чтобы показания читались поверх облаков и дождя; цифры крупно, как на метеостанции
       T.panel(g, x0 - u * 0.8, ry - u * 1.5, u * 22, u * 9.8, u * 0.6, ink ? 'rgba(236,228,212,.82)' : 'rgba(5,8,13,.62)', ink ? 'rgba(27,24,20,.25)' : 'rgba(62,230,255,.25)');
       rows.forEach(([k, v], i) => { T.txt(g, k, x0, ry + i * u * 2.3, u * 0.95, T.C.label); T.txt(g, v, x0 + u * 8, ry + i * u * 2.3 + u * 0.15, u * 1.55, T.C.hot, 't'); });
+      // за окном: настоящая температура с датчика 433 (если слышно за 10 мин)
+      if (d.temp != null) {
+        const oy = ry + u * 9.3;
+        T.panel(g, x0 - u * 0.8, oy, u * 22, u * 6.4, u * 0.6, ink ? 'rgba(236,228,212,.82)' : 'rgba(5,8,13,.62)', ink ? 'rgba(27,24,20,.25)' : 'rgba(62,230,255,.25)');
+        T.txt(g, 'OUTSIDE · 433', x0, oy + u * 1.7, u * 0.95, T.C.label);
+        T.bigNum(g, (d.temp > 0 ? '+' : '') + Number(d.temp).toFixed(1), x0, oy + u * 5.3, u * 3.6, T.C.hot, '°C');
+        T.txt(g, (d.hum != null ? d.hum + '%' : ''), x0 + u * 13, oy + u * 3.6, u * 1.55, T.C.hot, 't');
+        T.txt(g, String(d.tsrc || '').toUpperCase(), x0 + u * 13, oy + u * 5.1, u * 0.8, T.C.dim);
+      }
       // барометр: давление «падает» к буре
       const bx = w - m - u * 5.5, by = y1 + u * 5, br = u * 4.2, p = T.clamp(1 - (s.clouds * 0.45 + s.rain * 0.3 + s.storm * 0.35));
       if (ink) { T.ink.enso(g, bx, by, br, u * 0.5, -1.4, T.TAU * 0.92, 21, 0.85); }

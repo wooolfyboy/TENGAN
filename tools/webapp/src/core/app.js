@@ -4,7 +4,7 @@ const nav = document.getElementById('nav'), subs = document.getElementById('subs
 App.status = () => {
   const s = S.st; if (!s) return;
   document.getElementById('bat').textContent = s.bat >= 0 ? 'BAT ' + s.bat + '%' + (s.usb ? ' ⚡' : '') : '';
-  const r = s.radio || '', names = [['b', 'BLE'], ['w', 'WIFI'], ['s', 'SUB'], ['m', 'MIC'], ['p', 'PC']];
+  const r = s.radio || '', names = [['b', 'BLE'], ['w', 'WIFI'], ['s', 'SUB'], ['m', 'MIC'], ['p', 'PC'], ['i', 'IR'], ['n', 'NFC']];
   document.getElementById('radios').innerHTML = names.map(([k, n]) => `<i class="${r.includes(k) ? 'on' : ''}">${n}</i>`).join('');
 };
 

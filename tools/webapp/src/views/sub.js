@@ -7,8 +7,8 @@ const lvl = v => T.clamp((v + 120 - 10) / 70);          // как wfColor на �
 const ROWS = 36, BINS = 96;
 
 T.views.push({
-  id: 'sub', title: 'Sub-GHz', subs: ['Spectrum', 'Monitor'], sub: 0,
-  want() { return `sub&sm=${this.sub}&sb=${this.band}`; },
+  id: 'sub', title: 'Sub-GHz', subs: ['Spectrum', 'Monitor', 'Sensors'], sub: 0,
+  want() { return this.sub === 2 ? 'sens' : `sub&sm=${this.sub}&sb=${this.band}`; },
   mount(main) {
     try { const b = localStorage.getItem('sub_band'); this.band = b != null ? +b : 1; } catch (e) { this.band = this.band ?? 1; }
     if (!(this.band >= 0 && this.band < 4)) this.band = 1;
@@ -49,6 +49,7 @@ T.views.push({
     T.hits.clear();
     T.backdrop(g, w, h, 0.5, 0.62);
     const u = T.unit(w, h), m = u * 1.6, y0 = 50;
+    if (this.sub === 2) { this.sensors(g, w, h, u, m, y0, dt); T.finish(g, w, h); return; }
     const d = S.sub;
     const title = (this.sub ? 'Monitor ' : 'Spectrum ') + BANDS[this.band];
     if (!d || d.mode !== this.sub) {
@@ -210,6 +211,92 @@ T.views.push({
       yy += u * 2.6;
     }
     T.footer(g, m, h - u * 2.2, w - 2 * m, u, 'level at band frequency · tap band to switch', 'receive only');
+  },
+  // ---------- SENSORS: датчики 433 (термометры, звонки, пульты) + анализатор посылки ----------
+  sensors(g, w, h, u, m, y0, dt) {
+    const d = S.sens, now = performance.now(), portrait = h > w * 1.05;
+    if (!d) {
+      T.header(g, m, y0, w - 2 * m, u, 'Sensors 433.92', 'waiting');
+      T.emptyState(g, w, h, u, 'WAITING', 'starting the 433 MHz decoder');
+      return;
+    }
+    const fresh = T.clamp(1 - (now - S.sensPkT) / 700);
+    if (S.sensPkT !== this.pkSeen) { this.pkSeen = S.sensPkT; this.rev = 0; }
+    this.rev = Math.min(1, (this.rev ?? 1) + dt / 0.6);
+    T.header(g, m, y0, w - 2 * m, u, 'Sensors 433.92', `${d.pk || 0} packets · noise ${d.noise || 0}`, false);
+    const top = y0 + u * 3.6, bot = h - u * 3;
+    const list = d.sensors || [];
+    // таблица
+    const tw = w - 2 * m, rowH = u * 3.1, th = portrait ? Math.min((bot - top) * 0.55, u * 4 + rowH * Math.max(3, list.length)) : Math.min((bot - top) * 0.52, u * 4 + rowH * Math.max(3, list.length));
+    T.panel(g, m, top, tw, th, u);
+    const cols = [0.02, 0.32, 0.5, 0.63, 0.73, 0.9];                 // имя, темп, влажн, батарея, сигнал, когда
+    const X = k => m + tw * cols[k];
+    T.txt(g, '// SENSORS', X(0), top + u * 1.8, u * 1.0, T.C.acc, 't');
+    ['TEMP', 'HUM', 'BAT', 'SIGNAL', 'SEEN'].forEach((s, i) => T.txt(g, s, X(i + 1), top + u * 1.8, u * 0.75, T.C.dim));
+    let y = top + u * 3.2;
+    if (!list.length) {
+      T.txt(g, 'NOTHING HEARD YET', X(0), y + u * 1.4, u * 1.1, T.C.label, 't');
+      T.txt(g, 'OUTDOOR THERMOMETERS (NEXUS, LACROSSE, ACURITE, BRESSER...), DOORBELLS, REMOTES', X(0), y + u * 2.8, u * 0.75, T.C.dim);
+    }
+    for (const r of list) {
+      if (y + rowH > top + th) break;
+      const stale = r.ago > 600, rem = r.kind === 'remote' || r.kind === 'rolling';
+      g.globalAlpha = stale ? 0.45 : 1;
+      if (r.ago < 2) { g.fillStyle = 'rgba(62,230,255,.10)'; g.fillRect(m + u * 0.5, y, tw - u, rowH - u * 0.3); }
+      const nm = rem ? (r.kind === 'rolling' ? 'CAR KEY' : 'REMOTE / BELL') : String(r.p).toUpperCase();
+      g.font = `600 ${u * 1.2}px ${T.FT}`; T.txt(g, T.fit(g, nm, tw * 0.28), X(0), y + u * 1.35, u * 1.2, T.C.hot, 't');
+      T.txt(g, rem ? '#' + String(r.id).split('-').pop() + (r.btn != null ? '  BTN ' + r.btn : '') : 'CH ' + r.ch + '  ·  ' + r.n + '×', X(0), y + u * 2.5, u * 0.7, T.C.label);
+      if (r.t != null) { const ts = (r.t > 0 ? '+' : '') + r.t.toFixed(1); T.txt(g, ts, X(1), y + u * 2.3, u * 2.1, T.C.hot, 't'); T.txt(g, '°C', X(1) + T.tw(g, ts, u * 2.1, 't') + u * 0.3, y + u * 2.2, u * 0.8, T.C.label); }
+      else T.txt(g, '—', X(1), y + u * 2, u * 1.2, T.C.dim, 't');
+      T.txt(g, r.h != null ? r.h + '%' : '—', X(2), y + u * 2, u * 1.4, r.h != null ? T.C.hot : T.C.dim, 't');
+      T.txt(g, r.bat == null ? '—' : r.bat ? 'OK' : 'LOW', X(3), y + u * 2, u * 1.1, r.bat === 0 ? T.C.alert : r.bat ? T.C.label : T.C.dim, 't');
+      T.segBar(g, X(4), y + u * 1.1, tw * 0.1, u * 0.55, T.pct(r.rssi), 8, false);
+      T.txt(g, r.rssi + ' DBM', X(4), y + u * 2.6, u * 0.65, T.C.dim);
+      T.txt(g, T.ago(r.ago), X(5), y + u * 2, u * 1.1, r.ago < 60 ? T.C.hot : T.C.label, 't');
+      g.globalAlpha = 1;
+      g.fillStyle = T.C.line; g.fillRect(m + u, y + rowH - u * 0.2, tw - 2 * u, 1);
+      y += rowH;
+    }
+    // анализатор последней посылки
+    const ay = top + th + u, ah = bot - ay, L = d.last;
+    T.panel(g, m, ay, tw, ah, u);
+    if (fresh > 0) { T.cutPath(g, m, ay, tw, ah, u * 0.8); g.strokeStyle = `rgba(62,230,255,${0.6 * fresh})`; g.lineWidth = 2; g.stroke(); }
+    T.txt(g, '// LAST PACKET', m + u * 1.4, ay + u * 1.8, u * 1.0, T.C.acc, 't');
+    if (!L) { T.txt(g, 'NO PACKETS YET', m + u * 1.4, ay + u * 4, u * 0.9, T.C.dim); }
+    else {
+      const cls = { sensor: 'SENSOR', remote: 'REMOTE / BELL', rolling: 'ROLLING CODE', unknown: 'UNKNOWN', noise: 'NOISE' }[L.cls] || String(L.cls || '?').toUpperCase();
+      T.txt(g, `${L.p && L.p !== '?' && L.cls === 'sensor' ? L.p + ' · ' : ''}${cls}  ·  ${T.ago(L.ago ?? 0)} AGO  ·  ${L.rssi} DBM`, m + tw - u * 1.4, ay + u * 1.8, u * 0.85, L.cls === 'sensor' ? T.C.hot : T.C.label, 'm', 'right');
+      const fx = m + u * 1.4, fw = portrait ? tw - u * 2.8 : tw * 0.3, fy = ay + u * 3.6;
+      const rows = [['MOD', L.mod], ['BITS', L.bits + (L.rows > 1 ? '  ×' + L.rows : '')], ['PULSES', L.pulses], ['PULSE', L.short === L.long ? L.short + ' µS' : L.short + ' / ' + L.long + ' µS'], ['GAP', L.gs + ' / ' + L.gl + ' µS'], ['SYNC', L.gap + ' µS']];
+      if (L.hex) rows.push(['HEX', L.hex.toUpperCase()]); else if (L.hash) rows.push(['ID', '#' + L.hash + '  (code not shown)']);
+      const per = portrait ? 2 : 1, rh = u * 1.55;
+      rows.forEach(([k, v], i) => {
+        const cx = fx + (i % per) * (fw / per), cy = fy + Math.floor(i / per) * rh;
+        if (cy > ay + ah - u * 0.8) return;
+        T.txt(g, k, cx, cy, u * 0.72, T.C.dim);
+        g.font = `600 ${u * 1.05}px ${T.FT}`; T.txt(g, T.fit(g, String(v), fw / per - u * 4.5), cx + u * 4.2, cy + u * 0.05, u * 1.05, T.C.hot, 't');
+      });
+      const wx = portrait ? fx : fx + fw + u, wy = portrait ? fy + Math.ceil(rows.length / per) * rh : fy - u * 1.2, ww = portrait ? tw - u * 2.8 : m + tw - u * 1.4 - wx, wh = ay + ah - wy - u * 1.2;
+      if (wh > u * 2) this.pulses(g, L.pt || [], wx, wy, ww, wh, u, this.rev, L.cls === 'sensor');
+    }
+    T.bloom(this.cv, 0.5 + 0.5 * fresh);
+    T.footer(g, m, h - u * 2.2, w - 2 * m, u, 'outdoor sensors feed radio weather · remotes show only a fingerprint', 'receive only');
+  },
+  // посылка: [импульс, пауза, ...] мкс — меандр с подписью ширин
+  pulses(g, pt, x, y, w, h, u, rev, sensor) {
+    g.fillStyle = 'rgba(5,10,16,.5)'; g.fillRect(x, y, w, h);
+    g.strokeStyle = T.C.line; g.lineWidth = 1;
+    for (let k = 1; k < 10; k++) { g.beginPath(); g.moveTo(x + w * k / 10, y); g.lineTo(x + w * k / 10, y + h); g.stroke(); }
+    if (!pt.length) return;
+    let tot = 0; for (const v of pt) tot += v;
+    const hi = y + h * 0.2, lo = y + h * 0.8, lim = x + w * rev;
+    g.beginPath(); g.moveTo(x, lo);
+    let cx = x;
+    for (let i = 0; i < pt.length && cx < lim; i++) { const nx = Math.min(lim, cx + pt[i] / tot * w), yy = i % 2 ? lo : hi; g.lineTo(cx, yy); g.lineTo(nx, yy); cx = nx; }
+    g.lineTo(cx, lo);
+    g.strokeStyle = sensor ? T.C.acc : T.C.label; g.lineWidth = 2; g.stroke();
+    if (rev < 1) { g.fillStyle = T.C.hot; g.fillRect(lim - 1, y, 2, h); }
+    T.txt(g, (tot / 1000).toFixed(1) + ' MS SHOWN', x + w - u * 0.4, y + h - u * 0.4, u * 0.65, T.C.dim, 'm', 'right');
   },
 });
 })();
