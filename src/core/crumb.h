@@ -12,3 +12,6 @@ void crumbBoot();                          // в начале setup(): проч�
 const char* crumbLastReason();             // "power on", "panic", "watchdog", "brownout", ...
 const char* crumbLastStep();               // последний шаг перед сбросом ("" если чистый запуск)
 bool crumbWasCrash();                      // прошлый сброс — падение (panic / watchdog / brownout)
+// сторожевой таймер основного цикла: завис дольше 15 с — палка перезагрузится сама, шаг запишется
+void crumbWatchdogStart();
+void crumbFeed();                          // «я жив» — в начале каждого прохода loop() и в долгих операциях

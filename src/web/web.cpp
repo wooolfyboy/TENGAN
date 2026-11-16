@@ -190,6 +190,7 @@ static bool otaWrite(uint8_t* d, size_t n) {
     if (!Update.begin(UPDATE_SIZE_UNKNOWN)) { s_otaErr = Update.errorString(); return false; }
     s_otaStarted = true;
   }
+  crumbFeed();                                     // запись прошивки долгая — сторож знает, что мы живы
   if (Update.write(d, n) != n) { s_otaErr = Update.errorString(); return false; }
   return true;
 }

@@ -1,6 +1,7 @@
 #include "core/crumb.h"
 #include <esp_system.h>
 #include <esp_attr.h>
+#include <esp_task_wdt.h>
 
 static RTC_NOINIT_ATTR char s_crumb[48];
 static RTC_NOINIT_ATTR uint32_t s_magic;
@@ -29,6 +30,13 @@ void crumbBoot() {
   }
   crumb("boot");
 }
+
+void crumbWatchdogStart() {
+  esp_task_wdt_config_t cfg = { .timeout_ms = 15000, .idle_core_mask = 0, .trigger_panic = true };
+  if (esp_task_wdt_reconfigure(&cfg) != ESP_OK) esp_task_wdt_init(&cfg);
+  esp_task_wdt_add(NULL);                    // текущая задача — loop() Arduino
+}
+void crumbFeed() { esp_task_wdt_reset(); }
 
 const char* crumbLastReason() { return s_reason; }
 const char* crumbLastStep() { return s_lastStep; }

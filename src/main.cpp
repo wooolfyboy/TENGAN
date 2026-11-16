@@ -77,10 +77,12 @@ void setup() {
   satBegin();            // сохранённые орбиты спутников (Gallery › Globe)
   navBegin();
   navDraw(millis());
+  crumbWatchdogStart();                // с этого места зависание дольше 15 с = перезагрузка с записью шага
 }
 
 void loop() {
   static uint32_t lastDraw = 0;
+  crumbFeed();
   crumb("input");   inputPoll();
   uint32_t now = millis();
   crumb("ble sample"); bleSample(now);
