@@ -161,7 +161,7 @@ void main(){
  if(sumi>.5){                                      // тушь: силуэт размывкой, окна — бумага, у трекера — киноварь
   vec3 pap=vec3(.925,.894,.831),ink=tr>.5?vec3(.76,.23,.17):vec3(.11,.094,.078);
   float lum=dot(col,vec3(.3,.5,.2));
-  col=mix(ink,pap,clamp(lum*.9,0.,.85));a=.92;
+  col=mix(ink,pap,clamp(.3+lum*.8,0.,.9));a=.88;
  }
  float fog=smoothstep(fogA,fogB,vdep);a*=1.-fog*.8;
  if(refl>0.){a*=refl*exp(-vy*5.);col*=.9;}

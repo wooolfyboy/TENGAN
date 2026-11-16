@@ -77,8 +77,8 @@ T.galGL = (() => {
     if(r>1.){
       float d=r-1., s=dot(normalize(q),normalize(sun.xy+1e-4));
       float day=smoothstep(-.6,.6,s+sun.z*.4);
-      if(ink>.5){ float a=exp(-d*28.)*(.22+.08*noise(q*30.))*(.4+.6*day); gl_FragColor=vec4(K*a,a); return; }
-      float a=exp(-d*16.)*(.25+.75*day)+exp(-d*60.)*.5*day;
+      if(ink>.5){ float a=exp(-d*28.)*(.22+.08*noise(q*30.))*(.4+.6*day)*smoothstep(.22,.12,d); gl_FragColor=vec4(K*a,a); return; }
+      float a=(exp(-d*16.)*(.25+.75*day)+exp(-d*60.)*.5*day)*smoothstep(.22,.12,d);
       vec3 c=mix(vec3(.10,.45,.75),vec3(.25,.9,1.),day)*a; gl_FragColor=vec4(c,clamp(a,0.,1.)); return;
     }
     vec3 n=vec3(q,sqrt(1.-r*r));
@@ -168,7 +168,7 @@ T.galGL = (() => {
     float da=abs(mod(az-sunAz+PI,2.*PI)-PI);
     float tw2=clamp(1.-abs(sunAlt*57.3+5.)/13.,0.,1.);
     col+=vec3(.15,.55,.75)*tw2*exp(-da*1.4)*smoothstep(.2,1.,r)*.55;
-    col+=vec3(.35,.55,.75)*band*.22*night*ext + vec3(.6,.75,.85)*pow(band,3.)*.12*night*ext;
+    col+=vec3(.35,.55,.75)*band*.42*night*ext + vec3(.6,.75,.85)*pow(band,3.)*.25*night*ext;
     col+=vec3(.75,.92,1.)*star*night*ext;
     gl_FragColor=vec4(col,1.);
   }`;

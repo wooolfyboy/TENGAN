@@ -91,7 +91,7 @@
         col=mix(col,I,clamp(e*(.55+storm*.5),0.,.85));
       } else {
         vec3 cc=mix(vec3(.05,.09,.12)*dark,vec3(.30,.44,.52)*(.6+.4*dark),lt);
-        cc+=vec3(.55,.70,.80)*flash*(.5+lt);
+        cc+=vec3(.45,.60,.70)*flash*(.25+.45*lt);
         col=mix(col,cc,a);
       }
       cover=max(cover,a);
@@ -114,7 +114,7 @@
       }
     }
     // вспышка молнии — всё небо
-    col=K? mix(col,P,flash*.55): col+vec3(.30,.40,.48)*flash*.6;
+    col=K? mix(col,P,flash*.55): col+vec3(.20,.28,.34)*flash*.45;
     gl_FragColor=vec4(col,1.);
   }`;
   let WXP;
