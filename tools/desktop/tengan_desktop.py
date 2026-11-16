@@ -29,7 +29,7 @@ import time
 import urllib.parse
 from collections import deque
 
-APP_NAME = "TENGAN"
+APP_NAME = "TENGAN Desktop"
 PORT = 47321                       # постоянный адрес страницы — чтобы планшетные настройки (вкладки) запоминались
 STICK_URL = "http://192.168.4.1/full"
 
@@ -48,6 +48,52 @@ import pc_monitor as pm            # noqa: E402  (сбор нагрузки, м�
 
 def log(*a):
     print(time.strftime("%H:%M:%S"), *a, flush=True)
+
+
+# ---------- язык окна: последний известный язык прошивки TENGAN, иначе язык Windows ----------
+TX = {
+    "en": {
+        "sub": "desktop · HQ and PC monitor", "usb_s": "over the cable · internet stays on", "wifi_s": "via the TENGAN access point",
+        "auto": "AUTO", "auto_s": "USB if TENGAN is on the cable", "hint": "F11 — full screen · F2 — back to this screen · open Web on TENGAN",
+        "countdown": "starting {m} in {n} s · or pick another", "wait": "please wait…",
+        "wifi_open": "opening 192.168.4.1 — the computer must be on the TENGAN Wi-Fi",
+        "usb_find": "looking for TENGAN on USB…", "usb_find2": "looking for TENGAN on USB… connect it with a cable and turn it on",
+        "usb_none": "TENGAN not found on USB — check the cable (or choose Wi-Fi)",
+        "usb_load": "loading HQ from TENGAN… {p}%", "failed": "failed: {e}", "no_page": "no page",
+        "not_on_usb": "TENGAN is not on USB",
+        "no_answer": "TENGAN does not answer — is firmware v1.8-test4 or newer installed? Is the old PC monitor closed?",
+        "no_send": "TENGAN did not send the page", "partial": "the page arrived incomplete ({a} of {b})",
+    },
+    "ru": {
+        "sub": "desktop · штаб и монитор ПК", "usb_s": "по кабелю · интернет остаётся", "wifi_s": "через точку доступа TENGAN",
+        "auto": "АВТО", "auto_s": "USB, если TENGAN на кабеле", "hint": "F11 — во весь экран · F2 — снова этот выбор · на TENGAN открой раздел Web",
+        "countdown": "запуск: {m} через {n} с · или выбери другой", "wait": "подожди…",
+        "wifi_open": "открываю 192.168.4.1 — компьютер должен быть подключён к Wi-Fi TENGAN",
+        "usb_find": "ищу TENGAN на USB…", "usb_find2": "ищу TENGAN на USB… подключи кабелем и включи",
+        "usb_none": "TENGAN не найден на USB — проверь кабель (или выбери Wi-Fi)",
+        "usb_load": "загружаю штаб с TENGAN… {p}%", "failed": "не вышло: {e}", "no_page": "нет страницы",
+        "not_on_usb": "TENGAN не на USB",
+        "no_answer": "TENGAN не отвечает — на нём прошивка v1.8-test4 или новее? Старый монитор ПК закрыт?",
+        "no_send": "TENGAN не прислал страницу", "partial": "страница пришла не целиком ({a} из {b})",
+    },
+}
+
+
+def os_lang():
+    """Язык интерфейса Windows: русский → ru, остальное → en."""
+    try:
+        import ctypes
+        return "ru" if (ctypes.windll.kernel32.GetUserDefaultUILanguage() & 0x3FF) == 0x19 else "en"
+    except Exception:
+        import locale
+        return "ru" if (locale.getlocale()[0] or "").lower().startswith("ru") else "en"
+
+
+class Msg(RuntimeError):
+    """Ошибка с ключом из TX (текст подставляется на языке окна)."""
+    def __init__(self, key, **kw):
+        super().__init__(key)
+        self.key, self.kw = key, kw
 
 
 # ---------- настройки приложения ----------
@@ -91,6 +137,7 @@ class Link:
         self.pages = {}
         self.on_line = None            # монитор ПК: строки без «@» (KEY / AUD)
         self.on_port = None            # монитор ПК: порт открылся / пропал
+        self.dev_lang = None           # язык прошивки TENGAN (из события st)
         self.stop = False
         threading.Thread(target=self._keeper, daemon=True).start()
 
@@ -107,7 +154,7 @@ class Link:
                         p = self.open_port(name)
                         p.timeout = 0.2
                         self.port, self.port_name = p, name
-                        log("USB: палка на", name)
+                        log("USB: TENGAN на", name)
                         threading.Thread(target=self._reader, args=(p,), daemon=True).start()
                         if self.on_port:
                             self.on_port(p)
@@ -174,6 +221,11 @@ class Link:
     def handle(self, line):
         if line.startswith("@E "):
             ev, _, js = line[3:].partition(" ")
+            if ev == "st" and '"lang"' in js:
+                try:
+                    self.dev_lang = json.loads(js).get("lang") or self.dev_lang
+                except Exception:
+                    pass
             self._push(ev, js)
         elif line.startswith("@R "):
             rid, _, js = line[3:].partition(" ")
@@ -217,7 +269,7 @@ class Link:
         self.pending[rid] = w
         try:
             if not self.send_line("@Q %s %s" % (rid, path)):
-                return '{"ok":false,"err":"no stick on USB"}'
+                return '{"ok":false,"err":"no device on USB"}'
             if not w[0].wait(timeout):
                 return '{"ok":false,"err":"timeout"}'
             return w[1]
@@ -248,18 +300,18 @@ class Link:
         self.pages[pid] = pg
         try:
             if not self.send_line("@G " + pid):
-                raise RuntimeError("палка не на USB")
+                raise Msg("not_on_usb")
             t0 = time.time()
             while not pg["done"].wait(0.2):
                 if progress and pg["size"]:
                     progress(pg["got"], pg["size"])
                 if not pg["size"] and time.time() - t0 > 6:
-                    raise RuntimeError("палка не отвечает — на ней прошивка v1.8-test4 или новее? старый монитор ПК закрыт?")
+                    raise Msg("no_answer")
                 if time.time() - t0 > timeout:
-                    raise RuntimeError("палка не прислала страницу")
+                    raise Msg("no_send")
             data = b"".join(pg["chunks"][k] for k in sorted(pg["chunks"]))
             if pg["size"] and len(data) != pg["size"]:
-                raise RuntimeError("страница пришла не целиком (%d из %d)" % (len(data), pg["size"]))
+                raise Msg("partial", a=len(data), b=pg["size"])
             html = gzip.decompress(data).decode("utf-8")
             if pg["sha"] and hashlib.sha256(html.encode("utf-8")).hexdigest()[:len(pg["sha"])] != pg["sha"]:
                 log("страница: контрольная сумма не совпала (", pg["sha"], ") — показываю как есть")
@@ -366,9 +418,9 @@ class JsApi:
         self._app.launcher()
 
 
-LAUNCHER = """<!doctype html><html><head><meta charset="utf-8"><title>TENGAN</title>
+LAUNCHER = """<!doctype html><html lang="%LANG%"><head><meta charset="utf-8"><title>TENGAN Desktop</title>
 <style>
-:root{--bg:#000;--acc:#fff;--hot:#fff;--dim:#8a8a8a;--line:#2e2e2e}  /* строгий чёрно-белый старт: тема палки ещё не известна */
+:root{--bg:#000;--acc:#fff;--hot:#fff;--dim:#8a8a8a;--line:#2e2e2e}  /* строгий чёрно-белый старт: тема TENGAN ещё не известна */
 html,body{margin:0;height:100%;background:var(--bg);color:var(--hot);font:16px/1.4 'Segoe UI',system-ui,sans-serif}
 .w{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px}
 h1{margin:0;font-weight:600;letter-spacing:.3em;font-size:40px}h1 b{color:var(--acc)}
@@ -382,20 +434,20 @@ button:hover,button.on{border-color:var(--acc);box-shadow:0 0 18px rgba(255,255,
 .bar{width:420px;height:3px;background:var(--line)}.bar i{display:block;height:100%;width:0;background:var(--acc)}
 .hint{color:var(--dim);font-size:12px}
 </style></head><body><div class="w">
-<h1>TENGAN <b>天眼</b></h1><div class="sub">desktop · штаб и монитор ПК</div>
+<h1>TENGAN <b>天眼</b></h1><div class="sub">%SUB%</div>
 <div class="row">
-<button data-m="usb">USB<small>по кабелю · интернет остаётся</small></button>
-<button data-m="wifi">WI-FI<small>через точку палки</small></button>
-<button data-m="auto">АВТО<small>USB, если палка на кабеле</small></button>
+<button data-m="usb">USB<small>%USB_S%</small></button>
+<button data-m="wifi">WI-FI<small>%WIFI_S%</small></button>
+<button data-m="auto">%AUTO_T%<small>%AUTO_S%</small></button>
 </div>
 <div id="st"></div><div class="bar"><i id="pb"></i></div>
-<div class="hint">F11 — во весь экран · F2 — снова этот выбор · на палке открой раздел Web</div>
+<div class="hint">%HINT%</div>
 </div><script>
 var last='%LAST%',auto=%AUTO%,cd=3,timer=null;
 var st=document.getElementById('st');
 function go(m){clearInterval(timer);st.textContent='…';fetch('/__app/start?mode='+m).then(function(r){return r.text()}).then(function(t){if(t)st.textContent=t});}
 document.querySelectorAll('button').forEach(function(b){if(b.dataset.m===last)b.classList.add('on');b.onclick=function(){go(b.dataset.m)}});
-if(auto&&last){timer=setInterval(function(){if(cd<=0){go(last);return}st.textContent='запуск: '+last.toUpperCase()+' через '+cd+' с · или выбери другой';cd--},1000);}
+if(auto&&last){timer=setInterval(function(){if(cd<=0){go(last);return}st.textContent='%COUNTDOWN%'.replace('{m}',last.toUpperCase()).replace('{n}',cd);cd--},1000);}
 setInterval(function(){fetch('/__app/status').then(function(r){return r.json()}).then(function(s){if(s.msg)st.textContent=s.msg;document.getElementById('pb').style.width=(s.pct||0)+'%'}).catch(function(){})},300);
 </script></body></html>"""
 
@@ -412,6 +464,27 @@ class App:
         self.first = True
         self.port = PORT
 
+    @property
+    def lang(self):
+        d = self.link.dev_lang
+        if d in TX and self.cfg.get("lang") != d:            # запомнить язык прошивки — следующий запуск сразу на нём
+            self.cfg["lang"] = d
+            cfg_save(self.cfg)
+        return d if d in TX else self.cfg.get("lang") if self.cfg.get("lang") in TX else os_lang()
+
+    def t(self, key, **kw):
+        s = TX[self.lang][key]
+        return s.format(**kw) if kw else s
+
+    def launcher_html(self, last, auto):
+        rep = {"%LANG%": self.lang, "%SUB%": self.t("sub"), "%USB_S%": self.t("usb_s"), "%WIFI_S%": self.t("wifi_s"),
+               "%AUTO_T%": self.t("auto"), "%AUTO_S%": self.t("auto_s"), "%HINT%": self.t("hint"),
+               "%COUNTDOWN%": self.t("countdown").replace("'", "\\'"), "%LAST%": last, "%AUTO%": auto}
+        h = LAUNCHER
+        for k, v in rep.items():
+            h = h.replace(k, v)
+        return h
+
     # --- переходы окна ---
     def launcher(self, autostart=False):
         if self.window:
@@ -419,46 +492,46 @@ class App:
 
     def start(self, mode):
         if self.busy:
-            return "подожди…"
+            return self.t("wait")
         self.cfg["mode"] = mode
         cfg_save(self.cfg)
         if mode == "auto":
             mode = "usb" if (self.link.connected() or self.link.find_port()) else "wifi"
         if mode == "wifi":
-            self.msg = "открываю 192.168.4.1 — компьютер должен быть подключён к Wi-Fi палки"
+            self.msg = self.t("wifi_open")
             if self.window:
                 self.window.load_url(STICK_URL)
             return self.msg
         threading.Thread(target=self._start_usb, daemon=True).start()
-        return "ищу палку на USB…"
+        return self.t("usb_find")
 
     def _start_usb(self):
         self.busy = True
         try:
             t0 = time.time()
             while not self.link.connected():
-                self.msg = "ищу палку на USB… подключи её кабелем и включи"
+                self.msg = self.t("usb_find2")
                 if time.time() - t0 > 30:
-                    self.msg = "палка не найдена на USB — проверь кабель (или выбери Wi-Fi)"
+                    self.msg = self.t("usb_none")
                     return
                 time.sleep(0.3)
 
             def prog(got, size):
                 self.pct = int(100 * got / max(1, size))
-                self.msg = "загружаю штаб с палки… %d%%" % self.pct
+                self.msg = self.t("usb_load", p=self.pct)
             self.html = self.link.get_page(progress=prog)
             self.pct = 100
             self.msg = ""
             if self.window:
                 self.window.load_url("http://127.0.0.1:%d/full" % self.port)
         except Exception as e:
-            self.msg = "не вышло: %s" % e
+            self.msg = self.t("failed", e=self.t(e.key, **e.kw) if isinstance(e, Msg) else e)
             log("USB старт:", e)
         finally:
             self.busy = False
 
     def full_html(self):
-        h = self.html or "<html><body style='background:#000;color:#fff'>нет страницы</body></html>"
+        h = self.html or "<html><body style='background:#000;color:#fff'>%s</body></html>" % self.t("no_page")
         i = h.find("<head>")
         inj = BRIDGE + "<script>" + KEYS + "</script>"
         return h[:i + 6] + inj + h[i + 6:] if i >= 0 else inj + h
@@ -489,7 +562,7 @@ def make_handler(app):
                 last = app.cfg.get("mode", "")
                 auto = "true" if ("auto" in q or app.first) and last else "false"
                 app.first = False
-                self._send(LAUNCHER.replace("%LAST%", last).replace("%AUTO%", auto), "text/html; charset=utf-8")
+                self._send(app.launcher_html(last, auto), "text/html; charset=utf-8")
             elif p in ("/full", "/tablet"):
                 self._send(app.full_html(), "text/html; charset=utf-8")
             elif p == "/__link/want":
