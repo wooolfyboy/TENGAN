@@ -121,7 +121,11 @@ T.boot = (first) => {
         T.txt(g, s[1] + (note ? ' · ' + note : ''), x + u * 6.5, y, u * 0.9, bad ? T.C.alert : done ? T.C.label : cur ? T.C.hot : T.C.dim, 'c');
       }
     });
-    if (L.step >= 5 && L.bar > 0.985) { if (T.reduce) { afterAnim(now); return false; } phase = 'anim'; t0 = now; T.app.hold = true; return false; }   // всё поднято — сцену на паузу, заставка
+    if (L.step >= 5 && L.bar > 0.985) {
+      // запуск закончен: включаем тему палки разом (весь запуск был чёрно-белым), дальше заставка уже в теме
+      T.themeHold = false;
+      if (!new URLSearchParams(location.search).get('theme')) { if (T.S.st && T.S.st.theme) T.setTheme(T.S.st.theme); else T.themeFallback(); }
+      if (T.reduce) { afterAnim(now); return false; } phase = 'anim'; t0 = now; T.app.hold = true; return false; }   // всё поднято — сцену на паузу, заставка
     return true;
   };
   let lastDraw = 0;

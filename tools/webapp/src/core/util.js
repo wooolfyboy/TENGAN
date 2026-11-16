@@ -213,7 +213,7 @@ T.drag = (cv, cam, opt = {}) => {
 // свечение (bloom): кадр уменьшается ¼ → ⅛ (через кадр), обе копии сводятся в ОДНУ маленькую
 // «карту света», и она ложится на экран одним проходом (раньше — двумя).
 T.bloom = (o, strength = 0.85) => {
-  if (!T.Q.bloom || T.theme === 'kurenai') return;            // KURENAI плоская — свечение не считаем вовсе
+  if (!T.Q.bloom || T.FLAT) return;            // KURENAI плоская — свечение не считаем вовсе
   const cv = o.cv, g = o.g;
   if (!o.bl) o.bl = [0, 1, 2].map(() => { const c = document.createElement('canvas'); return { c, g: c.getContext('2d', { alpha: false }) }; });
   o.blN = (o.blN || 0) + 1;
@@ -235,7 +235,7 @@ T.bloom = (o, strength = 0.85) => {
 };
 // фон: градиент один раз в маленькую картинку, потом растягивается (не создаётся заново каждый кадр)
 T.backdrop = (g, W, H, fx = 0.45, fy = 0.55) => {
-  if (T.theme === 'kurenai') { g.fillStyle = T.C.bg; g.fillRect(0, 0, W, H); return; }   // KURENAI: ровный фон
+  if (T.FLAT) { g.fillStyle = T.C.bg; g.fillRect(0, 0, W, H); return; }   // KURENAI: ровный фон
   const key = W + 'x' + H + ':' + fx + ':' + fy + ':' + T.C.bg;
   let c = T._bdCache && T._bdCache.get(key);
   if (!c) {
@@ -266,7 +266,7 @@ const paintScan = (x, W, H, d) => {
   v.addColorStop(0, `rgba(${T.RGB.bg},0)`); v.addColorStop(1, `rgba(${T.RGB.bg},.7)`); x.fillStyle = v; x.fillRect(0, 0, W, H);
 };
 T.finish = (g, W, H, paint = paintScan) => {
-  if (!T.Q.scan || T.theme === 'kurenai') return;             // KURENAI: без сканлайнов и виньетки
+  if (!T.Q.scan || T.FLAT) return;             // KURENAI: без сканлайнов и виньетки
   const cv = g.canvas, c = T.finishLayer(W, H, cv.width, cv.height, paint);
   g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; g.drawImage(c, 0, 0); g.restore();
 };

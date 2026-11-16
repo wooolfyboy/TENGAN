@@ -17,7 +17,17 @@
     COOL: [[0, [11, 11, 11]], [0.25, [42, 42, 42]], [0.5, [95, 95, 95]], [0.72, [150, 150, 148]], [0.86, [229, 38, 47]], [1, [244, 241, 234]]],
     ALERT: [255, 59, 48], FT: "Anton,Rajdhani,'Arial Narrow',sans-serif", FM: "'Space Mono','JetBrains Mono',ui-monospace,monospace", GLK: 1,
   };
-  T.THEMES = { denko: DENKO, kurenai: KURENAI };
+  // MONO — строгий чёрно-белый старт: пока не знаем тему палки, экран запуска нейтральный
+  // (одинаковый в браузере, приложении планшета и программе на компе), потом сразу нужная тема
+  const MONO = {
+    C: { bg: '#000000', acc: '#ffffff', hot: '#ffffff', alert: '#d9d9d9', label: '#b4b4b4', dim: '#6c6c6c', line: '#2e2e2e',
+      panel: '#141414', steel: '#b4b4b4', seal: '#ffffff', mid: '#5a5a5a', bg2: '#080808' },
+    HEAT: [[0, [40, 40, 40]], [0.5, [130, 130, 130]], [1, [255, 255, 255]]],
+    COOL: [[0, [0, 0, 0]], [0.5, [100, 100, 100]], [1, [255, 255, 255]]],
+    ALERT: [217, 217, 217], FT: T.FT, FM: T.FM, GLK: 1,
+  };
+  DENKO.FLAT = 0; KURENAI.FLAT = 1; MONO.FLAT = 1;
+  T.THEMES = { denko: DENKO, kurenai: KURENAI, mono: MONO };
   T.theme = '';
   T.RGB = {};
   T.setTheme = name => {
@@ -25,14 +35,18 @@
     if (th === T.theme) return;
     T.theme = th;
     Object.assign(T.C, D.C); Object.assign(T.RGB, pack(D.C));
-    T.HEAT = D.HEAT; T.COOL = D.COOL; T.ALERT = D.ALERT; T.FT = D.FT; T.FM = D.FM; T.GLK = D.GLK;
-    document.documentElement.classList.toggle('kurenai', th === 'kurenai');
+    T.HEAT = D.HEAT; T.COOL = D.COOL; T.ALERT = D.ALERT; T.FT = D.FT; T.FM = D.FM; T.GLK = D.GLK; T.FLAT = D.FLAT;
+    document.documentElement.classList.toggle('kurenai', th === 'kurenai'); document.documentElement.classList.toggle('mono', th === 'mono');
     const meta = document.querySelector('meta[name=theme-color]'); if (meta) meta.content = D.C.bg;
     T._bdCache = null; T._finKey = '';
     for (const o of T._cvs || []) o.glow = null;
   };
   // тема — как на палке (st.theme); ?theme=kurenai — для проверки
   const urlTheme = new URLSearchParams(location.search).get('theme');
-  T.setTheme(urlTheme || 'denko');
-  setInterval(() => { const st = T.S && T.S.st; if (!urlTheme && st && st.theme && st.theme !== T.theme) T.setTheme(st.theme); }, 400);
+  T.setTheme(urlTheme || 'mono');                       // старт нейтральный, тема придёт с палкой (st.theme)
+  T.themeFallback = () => { if (T.theme === 'mono') T.setTheme('denko'); };   // палки нет — по умолчанию DENKO
+  setTimeout(() => { if (!T.themeHold) T.themeFallback(); }, 9000);
+  // пока идёт экран запуска (boot.js держит T.themeHold) — остаёмся чёрно-белыми, тема включается разом перед заставкой
+  T.themeHold = !new URLSearchParams(location.search).has('noboot');
+  setInterval(() => { const st = T.S && T.S.st; if (!urlTheme && !T.themeHold && st && st.theme && st.theme !== T.theme) T.setTheme(st.theme); }, 400);
 })();
