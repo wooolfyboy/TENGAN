@@ -15,6 +15,7 @@ def main():
     lat = "--latin1" in sys.argv[4:] or cyr     # из Latin-1 только нужное интерфейсу: · « » ° ×
     last = 0x45F if cyr else 0xFF if lat else 0x7E
     EXTRA = {0xB7, 0xAB, 0xBB, 0xB0, 0xD7}
+    thr = next((int(a.split('=')[1]) for a in sys.argv[4:] if a.startswith('--thr=')), 110)   # порог «пиксель есть»: ниже — жирнее
     font = ImageFont.truetype(path, size)
     ascent, descent = font.getmetrics()
     bitmap = bytearray()
@@ -25,7 +26,7 @@ def main():
             glyphs.append((len(bitmap), 0, 0, 0, 0, 0, "?"))
             continue
         adv = int(round(font.getlength(ch)))
-        if ch == ' ' and '--widespace' in sys.argv[4:]: adv = max(adv, int(round(size * 0.38)))   # у Play пробел узкий — слова слипаются на маленьком экране
+        if ch == ' ' and '--widespace' in sys.argv[4:]: adv = max(adv, int(round(size * 0.38)))   # пробел пошире — на маленьком экране слова не слипаются
         l, t, r, b = font.getbbox(ch, anchor="ls")
         w, h = max(0, r - l), max(0, b - t)
         offset = len(bitmap)
@@ -35,7 +36,7 @@ def main():
             bits, nbits, acc = [], 0, 0
             for y in range(h):
                 for x in range(w):
-                    acc = (acc << 1) | (1 if img.getpixel((x, y)) >= 110 else 0)
+                    acc = (acc << 1) | (1 if img.getpixel((x, y)) >= thr else 0)
                     nbits += 1
                     if nbits == 8:
                         bits.append(acc); acc = 0; nbits = 0

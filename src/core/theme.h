@@ -36,8 +36,8 @@ uint16_t C_SELACC();                            // акцент на выбра�
 bool themeKurenai();                            // тема KURENAI 紅 (чёрный/белый/красный)
 void themeChanged();                            // тема сменилась — пересчитать палитру
 
-// size: 1 встроенный мелкий, 2 STM14, 4 RAJ24, 6 RAJ44, 7 «семисегментный»;
-//       3 JBM14 и 5 JBM19 — с русскими буквами (UTF-8), для текстов с ноутбука/телефона
+// size: 1 JBM11 мелкий, 2 JBM12 текст, 4 заголовок (Exo 2 / Oswald), 6 крупные цифры (Exo 2 / Oswald), 7 «семисегментный»;
+//       3 JBM14, 5 JBM19. Все шрифты — латиница + кириллица (UTF-8)
 void txt(const char* s, int x, int y, int size);
 void txtNum(long n, int x, int y, int size);
 int  txtW(const char* s, int size);

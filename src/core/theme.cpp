@@ -5,16 +5,16 @@
 #include "core/perf.h"
 #include "core/ui.h"
 #include "core/display.h"
-#include "core/fonts/STM14.h"
-#include "core/lang.h"
-#include "core/fonts/PLY10.h"
-#include "core/fonts/PLY13.h"   // Play с кириллицей: для русских строк вместо STM14 / RAJ24 / RAJ44
-#include "core/fonts/PLB20.h"
-#include "core/fonts/PLB36.h"
-#include "core/fonts/RAJ24.h"
-#include "core/fonts/RAJ44.h"
-#include "core/fonts/JBM14.h"   // с кириллицей — для текстов «снаружи» (названия треков)
+// Шрифты интерфейса: одна семья рисует и латиницу, и кириллицу — при смене языка ничего не «прыгает».
+//   текст (обе темы): JetBrains Mono · заголовки и крупные цифры: DENKO — Exo 2, KURENAI — Oswald
+#include "core/fonts/JBM11.h"
+#include "core/fonts/JBM12.h"
+#include "core/fonts/JBM14.h"
 #include "core/fonts/JBM19.h"
+#include "core/fonts/EXO20.h"
+#include "core/fonts/EXO37.h"
+#include "core/fonts/OSW20.h"
+#include "core/fonts/OSW36.h"
 #include "core/settings.h"
 
 struct Stop { float x; uint8_t r, g, b; };
@@ -81,12 +81,13 @@ uint16_t heat(int rssi) { return heatV((rssi + 100) / 60.0f); }
 // ---------- текст ----------
 static const GFXfont* fontFor(int size) {
   switch (size) {
-    case 2: return &STM14;
-    case 4: return &RAJ24;
-    case 6: return &RAJ44;
-    case 3: return &JBM14;                           // кириллица, мелкий
-    case 5: return &JBM19;                           // кириллица, крупный
-    default: return nullptr;                         // 1 и 7 — встроенные
+    case 1: return &JBM11;                           // мелкий текст (был встроенный 6x8)
+    case 2: return &JBM12;                           // текст HUD
+    case 3: return &JBM14;
+    case 5: return &JBM19;
+    case 4: return themeKurenai() ? &OSW20 : &EXO20; // заголовки
+    case 6: return themeKurenai() ? &OSW36 : &EXO37; // крупные цифры
+    default: return nullptr;                         // 7 — «семисегментный» встроенный
   }
 }
 
@@ -97,19 +98,8 @@ uint16_t scale565(uint16_t c, int pct) {
   return tft.color565(r * pct / 100, g * pct / 100, b * pct / 100);
 }
 
-// если в строке есть не-ASCII (кириллица), а у шрифта её нет — берём Play того же размера.
-// Латиница и цифры остаются в фирменных шрифтах (Share Tech Mono, Rajdhani).
-static const GFXfont* fontForText(const char* s, int size) {
-  const GFXfont* f = fontFor(size);
-  bool hi = false; for (const char* p = s; *p; p++) if ((uint8_t)*p == 0xD0 || (uint8_t)*p == 0xD1) { hi = true; break; }   // кириллица
-  if (hi) {
-    if (size == 1) return &PLY10;                      // мелкий встроенный 6x8 — без кириллицы
-    if (size == 2) return &PLY13;
-    if (size == 4) return &PLB20;
-    if (size == 6) return &PLB36;
-  }
-  return f;
-}
+// у всех шрифтов интерфейса есть кириллица — шрифт зависит только от размера и темы, не от языка
+static const GFXfont* fontForText(const char*, int size) { return fontFor(size); }
 
 void utf8UpperInPlace(char* s) {
   for (uint8_t* p = (uint8_t*)s; *p; p++) {
