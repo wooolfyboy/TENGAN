@@ -24,6 +24,7 @@ const pickLabel = (id, fromStick) => {
   if (loc && (fromStick === undefined || performance.now() - loc.t < 6000)) return loc.n;   // своё свежее — главнее
   return fromStick || '';
 };
+S.ever = new Map();                                  // id -> когда видели впервые (за сеанс)
 S.onBle = d => {
   S.ble = d; S.bleT = performance.now();
   S.bleHist.push(d.n); if (S.bleHist.length > 180) S.bleHist.shift();
@@ -33,16 +34,23 @@ S.onBle = d => {
     const label = pickLabel(id, a.length > 7 ? a[7] : undefined);
     let e = S.dev.get(id);
     if (!e) {
-      e = { id, st: T.steady(4, 0.8), h: 0, born: now, hist: [], first: !S.devInit };
+      // «новое» — только то, чего за сеанс ещё не было. Устройство, которое пропало из списка и вернулось
+      // (палка шлёт не всех сразу, телефоны то слышны, то нет), новым не считается. Первые 20 с после
+      // подключения — разогрев: список палки заполняется, все считаются «уже были».
+      const seenBefore = S.ever.has(id); S.ever.set(id, now);
+      if (!S.warmT) S.warmT = now + 20000;
+      const fresh = !seenBefore && now > S.warmT;
+      e = { id, st: T.steady(4, 0.8), h: 0, born: now, hist: [], first: !fresh };
       S.dev.set(id, e);
-      if (S.devInit) S.event('BLE', '+ ' + (label || name || type || 'device') + '  ' + r + ' dBm', type === 'tracker');
+      if (fresh) S.event('BLE', '+ ' + (label || name || type || 'device') + '  ' + r + ' dBm', type === 'tracker' && r > -70);
     }
     e.st.set(r);
     Object.assign(e, { r, type, vend, name, label, age, macs, alive: true, seen: now });
     e.hist.push(r); if (e.hist.length > 120) e.hist.shift();
   }
-  for (const [id, e] of S.dev) if (!seen.has(id) && e.alive) { e.alive = false; if (now - e.born > 5000) S.event('BLE', '- ' + (e.label || e.name || e.type || 'device') + '  lost'); }
+  for (const [id, e] of S.dev) if (!seen.has(id) && e.alive) e.alive = false;      // «пропал» не пишем в ленту: слишком часто мигает
   S.devInit = true;
+  if (S.ever.size > 5000) S.ever.clear();
 };
 S.onWifi = d => {
   S.wifi = d; S.wifiT = performance.now();
@@ -78,7 +86,7 @@ S.onPc = d => {
   S.pc = d; S.pcT = performance.now();
   if (d.live && d.cpu != null) { S.pcHist.push(d.cpu); if (S.pcHist.length > 120) S.pcHist.shift(); }
   if (d.c) d.c.forEach((v, i) => { if (!S.cores[i]) S.cores[i] = T.steady(3, 0.5); S.cores[i].set(v); });
-  if (was !== undefined && was !== !!d.live) S.event('PC', d.live ? 'laptop online' : 'laptop stopped', !d.live);
+  if (was !== undefined && !!was !== !!d.live) S.event('PC', d.live ? 'laptop online' : 'laptop stopped', !d.live);
 };
 S.onSat = d => { S.sky = d; };
 // ИК-пульты (событие ir — на каждое нажатие): последнее + история; удержание кнопки (rep) не плодит строк
