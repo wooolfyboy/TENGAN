@@ -38,13 +38,13 @@ T.boot = (first) => {
   // экран выбора: две панели с силуэтами устройств
   const device = (x, y, w, h, r, col) => {
     T.cutPath(g, x, y, w, h, r); g.strokeStyle = col; g.lineWidth = 2; g.stroke();
-    g.fillStyle = 'rgba(62,230,255,.06)'; g.fill();
+    g.fillStyle = `rgba(${T.RGB.acc},.06)`; g.fill();
     g.strokeStyle = T.rgba(col, 0.5); g.lineWidth = 1; g.strokeRect(x + w * 0.08, y + h * 0.08, w * 0.84, h * 0.84);
   };
   const choiceFrame = (now, W, H, u) => {
     const k = T.clamp((now - pickT) / 450), eo = 1 - Math.pow(1 - k, 3);
     g.clearRect(0, 0, W, H);
-    g.fillStyle = `rgba(5,8,13,${0.94 - 0.12 * eo})`; g.fillRect(0, 0, W, H);  // сквозь шторку чуть видно живой город
+    g.fillStyle = `rgba(${T.RGB.bg},${0.94 - 0.12 * eo})`; g.fillRect(0, 0, W, H);  // сквозь шторку чуть видно живой город
     const cx = W / 2, cy = H / 2, portrait = H > W;
     T.txt(g, '// SELECT DEVICE', cx, cy - u * (portrait ? 17 : 11), u * 1.9, T.C.acc, 't', 'center');
     T.txt(g, 'CITY IS WARMING UP · ' + T.S.dev.size + ' DEVICES', cx, cy - u * (portrait ? 15 : 9), u * 0.9, T.C.label, 'm', 'center');
@@ -113,7 +113,7 @@ T.boot = (first) => {
         T.txt(g, s[0], sx, sy0 + u * 1.6, u * 0.85, done || cur ? T.C.hot : T.C.dim, 'm', 'center');
         T.txt(g, s[1], sx, sy0 + u * 2.7, u * 0.72, done ? T.C.label : cur ? T.C.hot : T.C.dim, 'c', 'center');
         T.txt(g, note, sx, sy0 + u * 3.7, u * 0.7, bad ? T.C.alert : T.C.dim, 'm', 'center');
-        if (i < L.steps.length - 1) { g.fillStyle = done ? 'rgba(62,230,255,.4)' : T.C.line; g.fillRect(sx + u * 0.7, sy0 - 0.5, cw - u * 1.4, 1); }
+        if (i < L.steps.length - 1) { g.fillStyle = done ? `rgba(${T.RGB.acc},.4)` : T.C.line; g.fillRect(sx + u * 0.7, sy0 - 0.5, cw - u * 1.4, 1); }
       } else {                                             // узко (телефон): списком
         const y = sy0 + i * u * 1.5;
         T.diamond(g, x + u * 0.4, y - u * 0.3, u * 0.32, col, done || cur);
@@ -150,8 +150,8 @@ T.boot = (first) => {
     // луч с хвостом и цели
     if (t > 300 && t < 2400) {
       const sw = (t - 300) * 0.48 * Math.PI / 180, fade = 1 - seg(t, 2050, 2400);
-      if (g.createConicGradient) { const c = g.createConicGradient(sw - 1.3, cx, cy), f = 1.3 / T.TAU; c.addColorStop(0, 'rgba(40,95,130,0)'); c.addColorStop(f * 0.985, `rgba(62,230,255,${0.4 * fade})`); c.addColorStop(f, 'rgba(62,230,255,0)'); c.addColorStop(1, 'rgba(62,230,255,0)'); g.fillStyle = c; g.beginPath(); g.moveTo(cx, cy); g.arc(cx, cy, R, sw - 1.3, sw); g.closePath(); g.fill(); }
-      g.strokeStyle = `rgba(235,250,255,${fade})`; g.lineWidth = 2; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + Math.cos(sw) * R, cy + Math.sin(sw) * R); g.stroke();
+      if (g.createConicGradient) { const c = g.createConicGradient(sw - 1.3, cx, cy), f = 1.3 / T.TAU; c.addColorStop(0, `rgba(${T.RGB.mid},0)`); c.addColorStop(f * 0.985, `rgba(${T.RGB.acc},${0.4 * fade})`); c.addColorStop(f, `rgba(${T.RGB.acc},0)`); c.addColorStop(1, `rgba(${T.RGB.acc},0)`); g.fillStyle = c; g.beginPath(); g.moveTo(cx, cy); g.arc(cx, cy, R, sw - 1.3, sw); g.closePath(); g.fill(); }
+      g.strokeStyle = `rgba(${T.RGB.hot},${fade})`; g.lineWidth = 2; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + Math.cos(sw) * R, cy + Math.sin(sw) * R); g.stroke();
       const swd = (t - 300) * 0.48;
       for (const [deg, rr] of BL) {
         if (swd < deg) continue;
@@ -183,7 +183,7 @@ T.boot = (first) => {
     if (t >= 1640 && seal) {
       const k = seg(t, 1640, 1820), sx = bx + tw + u * 2, sy = cy - sealH / 2 - px * 0.06;
       T.drawSeal(g, sx, sy, sealH, sealCol);
-      if (k < 1) { const gg = u * (0.3 + k * 2); g.strokeStyle = `rgba(235,250,255,${0.6 * (1 - k)})`; g.strokeRect(sx - gg, sy - gg, sw2 + 2 * gg, sealH + 2 * gg); }
+      if (k < 1) { const gg = u * (0.3 + k * 2); g.strokeStyle = `rgba(${T.RGB.hot},${0.6 * (1 - k)})`; g.strokeRect(sx - gg, sy - gg, sw2 + 2 * gg, sealH + 2 * gg); }
     }
     if (t >= 1700) { const k = Math.min(SUB.length, (t - 1700) / 14 | 0); T.txt(g, SUB.slice(0, k) + ((t / 120 | 0) & 1 && k < SUB.length ? '_' : ''), cx, cy + bh / 2 - u * 1.2, u * 1.05, T.C.label, 'm', 'center'); }
     // развёртка стирает

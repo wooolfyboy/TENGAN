@@ -20,11 +20,11 @@
     for (let i = 0; i < puffs; i++) {
       const k = i / puffs, x = W * (0.12 + 0.76 * r()), y = H * (0.42 + 0.28 * Math.sin(k * Math.PI) * (r() - 0.2)), rr = H * (0.16 + 0.24 * r()) * (0.6 + 0.4 * Math.sin(Math.PI * (x / W)));
       const gr = g.createRadialGradient(x, y - rr * 0.2, 0, x, y, rr);
-      gr.addColorStop(0, 'rgba(150,185,205,.22)'); gr.addColorStop(0.55, 'rgba(60,95,120,.12)'); gr.addColorStop(1, 'rgba(20,40,54,0)');
+      gr.addColorStop(0, `rgba(${T.RGB.steel},.22)`); gr.addColorStop(0.55, 'rgba(60,95,120,.12)'); gr.addColorStop(1, 'rgba(20,40,54,0)');
       g.fillStyle = gr; g.beginPath(); g.arc(x, y, rr, 0, T.TAU); g.fill();
     }
     {                                                         // подсвеченный край сверху
-      const gr = g.createLinearGradient(0, H * 0.2, 0, H * 0.55); gr.addColorStop(0, 'rgba(62,230,255,.10)'); gr.addColorStop(1, 'rgba(62,230,255,0)');
+      const gr = g.createLinearGradient(0, H * 0.2, 0, H * 0.55); gr.addColorStop(0, `rgba(${T.RGB.acc},.10)`); gr.addColorStop(1, `rgba(${T.RGB.acc},0)`);
       g.fillStyle = gr; g.globalCompositeOperation = 'source-atop'; g.fillRect(0, 0, W, H); g.globalCompositeOperation = 'source-over';
     }
     return c;
@@ -136,22 +136,22 @@
     {
       const sky = g.createLinearGradient(0, top, 0, hz);
       const dark = 1 - s.storm * 0.5;
-      sky.addColorStop(0, `rgba(5,8,13,1)`); sky.addColorStop(1, `rgba(${14 * dark | 0},${34 * dark | 0},${48 * dark | 0},1)`);
+      sky.addColorStop(0, `rgba(${T.RGB.bg},1)`); sky.addColorStop(1, `rgba(${14 * dark | 0},${34 * dark | 0},${48 * dark | 0},1)`);
       g.fillStyle = sky; g.fillRect(0, 0, w, hz);
       // звёзды — сквозь просветы
       const sv = T.clamp(1 - s.clouds * 1.1);
       if (sv > 0.02) {
-        g.fillStyle = `rgba(235,250,255,${0.8 * sv})`; g.beginPath();
+        g.fillStyle = `rgba(${T.RGB.hot},${0.8 * sv})`; g.beginPath();
         for (const st of stars) { const y = top + (hz - top) * st.y; if (y > hz - u) continue; const tw = 0.6 + 0.4 * Math.sin(t * 1.3 + st.tw); const r = (0.5 + st.m * 1.1) * tw; g.rect(w * st.x - r / 2, y - r / 2, r, r); }
         g.fill();
       }
       // мягкое свечение у горизонта (город)
       const glow = g.createRadialGradient(w / 2, hz, 0, w / 2, hz, w * 0.6);
-      glow.addColorStop(0, `rgba(62,230,255,${0.08 + 0.05 * (1 - s.clouds)})`); glow.addColorStop(1, 'rgba(62,230,255,0)');
+      glow.addColorStop(0, `rgba(${T.RGB.acc},${0.08 + 0.05 * (1 - s.clouds)})`); glow.addColorStop(1, `rgba(${T.RGB.acc},0)`);
       g.fillStyle = glow; g.fillRect(0, top, w, hz - top);
     }
     // вспышка подсвечивает всё небо
-    if (F > 0.01) { g.fillStyle = `rgba(150,185,205,${0.22 * F})`; g.fillRect(0, 0, w, hz); }
+    if (F > 0.01) { g.fillStyle = `rgba(${T.RGB.steel},${0.22 * F})`; g.fillRect(0, 0, w, hz); }
 
     // ---- облака: три слоя, сколько видно — по облачности ----
     const nVis = s.clouds * N_CLOUD;
@@ -172,8 +172,8 @@
     if (W8.bolt && W8.boltT < 0.45) {
       const al = 1 - W8.boltT / 0.45, path = pts => { g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.stroke(); };
       g.lineJoin = 'round'; g.lineCap = 'round';
-      g.strokeStyle = `rgba(62,230,255,${0.5 * al})`; g.lineWidth = u * 0.6; path(W8.bolt.pts);
-      g.strokeStyle = `rgba(235,250,255,${al})`; g.lineWidth = Math.max(1.5, u * 0.16); path(W8.bolt.pts);
+      g.strokeStyle = `rgba(${T.RGB.acc},${0.5 * al})`; g.lineWidth = u * 0.6; path(W8.bolt.pts);
+      g.strokeStyle = `rgba(${T.RGB.hot},${al})`; g.lineWidth = Math.max(1.5, u * 0.16); path(W8.bolt.pts);
       g.lineWidth = Math.max(1, u * 0.09); path(W8.bolt.br);
     }
 
@@ -181,7 +181,7 @@
     const nRain = GLW ? 0 : Math.round(s.rain * N_RAIN);
     if (nRain > 0) {
       const slant = 0.15 + s.wind * 0.6, len = u * (1.2 + s.rain * 1.6), vy = (bot - top) * (0.9 + s.rain * 0.8);
-      g.strokeStyle = `rgba(150,185,205,${0.35 + 0.25 * s.rain})`; g.lineWidth = 1.2; g.lineCap = 'round';
+      g.strokeStyle = `rgba(${T.RGB.steel},${0.35 + 0.25 * s.rain})`; g.lineWidth = 1.2; g.lineCap = 'round';
       g.beginPath();
       for (let i = 0; i < nRain; i++) {
         const r = rain[i]; r.y += dt * vy * r.v / (bot - top); if (r.y > 1) { r.y -= 1; r.x = Math.random(); }
@@ -193,20 +193,20 @@
 
     // ---- земля: город, рисуется в слой при смене размера ----
     {
-      const key = w + 'x' + h + ':' + Math.round(hz);
+      const key = w + 'x' + h + ':' + Math.round(hz) + T.theme;
       if (W8.cityKey !== key) {
         const c = W8.cityC || (W8.cityC = document.createElement('canvas')), d2 = this.cv.dpr; c.width = Math.round(w * d2); c.height = Math.round((h - hz + u * 8) * d2);
         const x = c.getContext('2d'); x.setTransform(d2, 0, 0, d2, 0, 0); const base = u * 8, H2 = Math.max(h - hz, (hz - top) * 0.16);   // высота домов — от неба, не от земли
-        x.fillStyle = '#060b11';
+        x.fillStyle = T.C.bg2;
         for (const b of city) x.fillRect(b.x * w, base - Math.min(base, b.h * H2 * 4), b.w * w, Math.min(base, b.h * H2 * 4) + (h - hz));
-        x.fillStyle = 'rgba(62,230,255,.55)';                  // окна — точки света
+        x.fillStyle = `rgba(${T.RGB.acc},.55)`;                  // окна — точки света
         for (const b of city) { const bh = Math.min(base, b.h * H2 * 4); for (let yy = base - bh + u * 0.5; yy < base - u * 0.3; yy += u * 0.7) for (let xx = b.x * w + u * 0.3; xx < (b.x + b.w) * w - u * 0.3; xx += u * 0.6) if (((xx * 13 + yy * 7) | 0) % 5 === 0) x.fillRect(xx, yy, 1.5, 1.5); }
-        x.fillStyle = 'rgba(62,230,255,.6)'; x.fillRect(0, base, w, 1);
+        x.fillStyle = `rgba(${T.RGB.acc},.6)`; x.fillRect(0, base, w, 1);
         W8.cityC = c; W8.cityKey = key;
       }
-      g.fillStyle = '#05080d'; g.fillRect(0, hz, w, h - hz);
+      g.fillStyle = T.C.bg; g.fillRect(0, hz, w, h - hz);
       g.drawImage(W8.cityC, 0, hz - u * 8, w, h - hz + u * 8);
-      if (F > 0.02) { g.fillStyle = `rgba(150,185,205,${0.12 * F})`; g.fillRect(0, hz, w, h - hz); }
+      if (F > 0.02) { g.fillStyle = `rgba(${T.RGB.steel},${0.12 * F})`; g.fillRect(0, hz, w, h - hz); }
     }
 
     // ---- HUD (плоский, поверх свечения) ----
@@ -219,12 +219,12 @@
       const rows = [['CLOUDS', d.ble + ' dev'], ['WIND', (d.turn | 0) + ' /min'], ['RAIN 433', (d.sub | 0) + ' /min' + (d.sub ? '  ' + Math.round(d.subPk) + ' dBm' : '')], ['THUNDER', Math.round(d.pk) + ' dBFS']];
       const ry = y1 + u * 7.6;
       // подложка, чтобы показания читались поверх облаков и дождя; цифры крупно, как на метеостанции
-      T.panel(g, x0 - u * 0.8, ry - u * 1.5, u * 22, u * 9.8, u * 0.6, 'rgba(5,8,13,.62)', 'rgba(62,230,255,.25)');
+      T.panel(g, x0 - u * 0.8, ry - u * 1.5, u * 22, u * 9.8, u * 0.6, `rgba(${T.RGB.bg},.62)`, `rgba(${T.RGB.acc},.25)`);
       rows.forEach(([k, v], i) => { T.txt(g, k, x0, ry + i * u * 2.3, u * 0.95, T.C.label); T.txt(g, v, x0 + u * 8, ry + i * u * 2.3 + u * 0.15, u * 1.55, T.C.hot, 't'); });
       // за окном: настоящая температура с датчика 433 (если слышно за 10 мин)
       if (d.temp != null) {
         const oy = ry + u * 9.3;
-        T.panel(g, x0 - u * 0.8, oy, u * 22, u * 6.4, u * 0.6, 'rgba(5,8,13,.62)', 'rgba(62,230,255,.25)');
+        T.panel(g, x0 - u * 0.8, oy, u * 22, u * 6.4, u * 0.6, `rgba(${T.RGB.bg},.62)`, `rgba(${T.RGB.acc},.25)`);
         T.txt(g, 'OUTSIDE · 433', x0, oy + u * 1.7, u * 0.95, T.C.label);
         T.bigNum(g, (d.temp > 0 ? '+' : '') + Number(d.temp).toFixed(1), x0, oy + u * 5.3, u * 3.6, T.C.hot, '°C');
         T.txt(g, (d.hum != null ? d.hum + '%' : ''), x0 + u * 13, oy + u * 3.6, u * 1.55, T.C.hot, 't');
@@ -232,8 +232,8 @@
       }
       // барометр: давление «падает» к буре
       const bx = w - m - u * 5.5, by = y1 + u * 5, br = u * 4.2, p = T.clamp(1 - (s.clouds * 0.45 + s.rain * 0.3 + s.storm * 0.35));
-      { T.panel(g, bx - br - u * 1.2, by - br - u * 1.2, (br + u * 1.2) * 2, (br + u * 1.2) * 2 + u * 2.2, u * 0.6); g.strokeStyle = 'rgba(62,230,255,.5)'; g.lineWidth = 1.5; g.beginPath(); g.arc(bx, by, br, Math.PI * 0.8, Math.PI * 2.2); g.stroke(); }
-      for (let k = 0; k <= 10; k++) { const a = Math.PI * (0.8 + 1.4 * k / 10), l = k % 5 ? 0.88 : 0.8; g.strokeStyle = 'rgba(90,112,128,.9)'; g.lineWidth = 1; g.beginPath(); g.moveTo(bx + Math.cos(a) * br * l, by + Math.sin(a) * br * l); g.lineTo(bx + Math.cos(a) * br * 0.96, by + Math.sin(a) * br * 0.96); g.stroke(); }
+      { T.panel(g, bx - br - u * 1.2, by - br - u * 1.2, (br + u * 1.2) * 2, (br + u * 1.2) * 2 + u * 2.2, u * 0.6); g.strokeStyle = `rgba(${T.RGB.acc},.5)`; g.lineWidth = 1.5; g.beginPath(); g.arc(bx, by, br, Math.PI * 0.8, Math.PI * 2.2); g.stroke(); }
+      for (let k = 0; k <= 10; k++) { const a = Math.PI * (0.8 + 1.4 * k / 10), l = k % 5 ? 0.88 : 0.8; g.strokeStyle = `rgba(${T.RGB.dim},.9)`; g.lineWidth = 1; g.beginPath(); g.moveTo(bx + Math.cos(a) * br * l, by + Math.sin(a) * br * l); g.lineTo(bx + Math.cos(a) * br * 0.96, by + Math.sin(a) * br * 0.96); g.stroke(); }
       const na = Math.PI * (0.8 + 1.4 * p);
       g.strokeStyle = T.C.hot; g.lineWidth = 2; g.beginPath(); g.moveTo(bx, by); g.lineTo(bx + Math.cos(na) * br * 0.82, by + Math.sin(na) * br * 0.82); g.stroke();
       T.txt(g, 'STORM', bx - br * 0.95, by + br * 0.75, u * 0.62, T.C.dim, 'm', 'left'); T.txt(g, 'FAIR', bx + br * 0.95, by + br * 0.75, u * 0.62, T.C.dim, 'm', 'right');
@@ -245,7 +245,7 @@
         const hw = u * 14, hh = u * 3.2, hx = w - m - hw, hy = by + br + u * 2.8;
         T.txt(g, 'LAST ' + hist.length + ' MIN', hx, hy - u * 0.4, u * 0.62, T.C.dim);
         T.spark(g, hx, hy, hw, hh, hist.map(q => q[0]), 0, 1, T.C.acc);
-        g.fillStyle = 'rgba(150,185,205,.55)';
+        g.fillStyle = `rgba(${T.RGB.steel},.55)`;
         hist.forEach((q, i) => { if (q[1] > 0.02) { const bw = hw / hist.length; g.fillRect(hx + i * bw, hy + hh - q[1] * hh, Math.max(1, bw * 0.6), q[1] * hh); } });
       }
     };

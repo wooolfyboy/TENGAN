@@ -37,7 +37,7 @@ T.views.push({
     const tiles = [['DEVICES', S.ble ? String(nd) : '—', T.C.hot, 'ble'], ['NETWORKS', S.wifi ? String(nn) : '—', T.C.hot, 'wifi'], ['NEAREST', nv != null && devs.length ? String(Math.round(nv)) : '—', nv != null ? T.heat(0.4 + 0.6 * T.pct(nv)) : T.C.dim, 'ble']];
     tiles.forEach(([k, v, col, go], i) => {
       const x = cx + i * (tw + u);
-      T.panel(g, x, cy, tw, th, u, 'rgba(14,42,52,.28)', T.C.line);
+      T.panel(g, x, cy, tw, th, u, `rgba(${T.RGB.panel},.28)`, T.C.line);
       T.txt(g, k, x + u, cy + u * 1.5, u * 0.8, T.C.dim);
       T.bigNum(g, v, x + u, cy + th - u * 1.1, u * 3.3, col, i === 2 && v !== '—' ? 'DBM' : '');
       T.hits.rect(x, cy, tw, th, { go });
@@ -45,7 +45,7 @@ T.views.push({
     cy += th + u;
     // каналы Wi-Fi: сильнейшая сеть на канале, полосы «жара»
     const chH = u * 7.2;
-    T.panel(g, cx, cy, cw, chH, u, 'rgba(14,42,52,.22)', T.C.line);
+    T.panel(g, cx, cy, cw, chH, u, `rgba(${T.RGB.panel},.22)`, T.C.line);
     T.txt(g, '// WI-FI CHANNELS  ›', cx + u, cy + u * 1.5, u * 0.95, T.C.acc, 't');
     const best2 = new Float32Array(14).fill(-100), cnt = new Uint8Array(14);
     for (const a of aps) { const c = a.c | 0; if (c >= 1 && c <= 13) { best2[c] = Math.max(best2[c], a.rs); cnt[c]++; } }
@@ -60,7 +60,7 @@ T.views.push({
     cy += chH + u;
     // состояние палки + история числа устройств
     const sH = u * 6.6, sw2 = (cw - u) / 2;
-    T.panel(g, cx, cy, sw2, sH, u, 'rgba(14,42,52,.22)', T.C.line);
+    T.panel(g, cx, cy, sw2, sH, u, `rgba(${T.RGB.panel},.22)`, T.C.line);
     T.txt(g, '// TENGAN', cx + u, cy + u * 1.5, u * 0.95, T.C.acc, 't');
     const s = S.st || {};
     T.txt(g, 'BAT', cx + u, cy + u * 3, u * 0.75, T.C.dim);
@@ -74,7 +74,7 @@ T.views.push({
       T.txt(g, n, rx + u * 0.8, cy + u * 5.8, u * 0.72, on ? T.C.hot : T.C.dim); rx += u * 1.2 + T.tw(g, n, u * 0.72);
     }
     const hx = cx + sw2 + u;
-    T.panel(g, hx, cy, sw2, sH, u, 'rgba(14,42,52,.22)', T.C.line);
+    T.panel(g, hx, cy, sw2, sH, u, `rgba(${T.RGB.panel},.22)`, T.C.line);
     T.txt(g, '// DEVICES · 3 MIN', hx + u, cy + u * 1.5, u * 0.95, T.C.acc, 't');
     const hi = Math.max(5, ...S.bleHist);
     T.spark(g, hx + u, cy + u * 2.3, sw2 - u * 2, sH - u * 3.2, S.bleHist, 0, hi * 1.15);
@@ -82,7 +82,7 @@ T.views.push({
     // лента событий
     const eh = h - cy - u * 1.2;
     if (eh > u * 3) {
-      T.panel(g, cx, cy, cw, eh, u, 'rgba(14,42,52,.22)', T.C.line);
+      T.panel(g, cx, cy, cw, eh, u, `rgba(${T.RGB.panel},.22)`, T.C.line);
       T.txt(g, '// EVENTS', cx + u, cy + u * 1.5, u * 0.95, T.C.acc, 't');
       let ey = cy + u * 2.9;
       const nowMs = Date.now();
@@ -91,7 +91,7 @@ T.views.push({
         const ev = S.events[i], d = new Date(ev.t), ts = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') + ':' + String(d.getSeconds()).padStart(2, '0');
         const fresh = T.clamp(1 - (nowMs - ev.t) / 4000);
         g.globalAlpha = Math.max(0.4, 1 - i * 0.08);
-        if (fresh > 0) { g.fillStyle = `rgba(62,230,255,${0.12 * fresh})`; g.fillRect(cx + u * 0.5, ey - u * 0.95, cw - u, u * 1.35); }
+        if (fresh > 0) { g.fillStyle = `rgba(${T.RGB.acc},${0.12 * fresh})`; g.fillRect(cx + u * 0.5, ey - u * 0.95, cw - u, u * 1.35); }
         T.txt(g, ts, cx + u, ey, u * 0.78, T.C.dim);
         T.txt(g, ev.tag, cx + u * 6.2, ey, u * 0.78, ev.alert ? T.C.alert : T.C.acc);
         g.font = `500 ${u * 0.78}px ${T.FC}`; T.txt(g, T.fit(g, String(ev.text).toUpperCase(), cw - u * 10.5), cx + u * 9.2, ey, u * 0.78, ev.alert ? T.C.alert : (i === 0 ? T.C.hot : T.C.label), 'c');

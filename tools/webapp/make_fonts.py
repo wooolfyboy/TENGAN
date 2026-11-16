@@ -23,7 +23,7 @@ IPA = "/usr/share/fonts/opentype/ipafont-gothic/ipag.ttf"
 ASCII = "".join(chr(c) for c in range(0x20, 0x7F))
 EXTRA = "°·—–…‹›«»×←→↑↓▲▼◆◇●○■□♪⚡±≈≤≥µ№™✓✕▸◂"
 # знаки, которые рисует страница: печать 天眼, штаб HQ (NERV/DOMAIN), погода (IPAGothic)
-SEAL_TEXT = "一三中二令低信力動受司告呪器地域報外天定室封展嵐平度意感態探接敵断新既星晴曇月札析棒機気波注活源滝無特状発眼知穏空窮系級索統網線自解記設警赤距近速針録開離雨雷電静音領風齢"
+SEAL_TEXT = "中令低信光動受司告器地報外天定室嵐平度意感態探接敵断新既晴曇月析棒機気波注活滝状発眼知穏系紅索統網線自解記設警赤距近速針録離雨雷電静音風齢"
 CYR = "".join(chr(c) for c in range(0x410, 0x450)) + "ЁёІіЇїЄєҐґ"
 
 
@@ -53,6 +53,10 @@ def main():
         face("Rajdhani", 600, woff2(os.path.join(FONTS, "Rajdhani-SemiBold.ttf"), ASCII + EXTRA)),
         face("Share Tech Mono", 400, woff2(os.path.join(FONTS, "ShareTechMono-Regular.ttf"), ASCII + EXTRA)),
         face("JetBrains Mono", 500, woff2(os.path.join(FONTS, "JetBrainsMono-Medium.ttf"), ASCII + EXTRA + CYR)),
+        # тема KURENAI 紅: рубленые цифры и заголовки (Anton), моноширинный текст (Space Mono)
+        face("Anton", 400, woff2(os.path.join(FONTS, "Anton-Regular.ttf"), ASCII + EXTRA)),
+        face("Space Mono", 400, woff2(os.path.join(FONTS, "SpaceMono-Regular.ttf"), ASCII + EXTRA)),
+        face("Space Mono", 700, woff2(os.path.join(FONTS, "SpaceMono-Bold.ttf"), ASCII + EXTRA)),
     ]
     if os.path.exists(IPA):
         parts.append(face("Tengan Seal", 400, woff2(IPA, SEAL_TEXT)))

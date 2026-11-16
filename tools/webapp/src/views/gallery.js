@@ -297,7 +297,7 @@ T.views.push({
     let x = w - m;
     const btn = (label, act, bw, on) => {
       x -= bw;
-      T.panel(g, x, y, bw, bh, u * 0.6, on ? 'rgba(62,230,255,.12)' : 'rgba(5,8,13,.55)', on ? T.C.acc : 'rgba(62,230,255,.35)');
+      T.panel(g, x, y, bw, bh, u * 0.6, on ? `rgba(${T.RGB.acc},.12)` : `rgba(${T.RGB.bg},.55)`, on ? T.C.acc : `rgba(${T.RGB.acc},.35)`);
       T.txt(g, label, x + bw / 2, y + bh * 0.68, u * 1.15, on ? T.C.hot : T.C.acc, 't', 'center');
       if (act) T.hits.rect(x, y, bw, bh, { act });
       x -= u * 0.5;
@@ -329,7 +329,7 @@ T.views.push({
     if (this.trailT >= 1 / 60 || !this.trail.length) { this.trailT = 0; this.trail.unshift(P); if (this.trail.length > 14) this.trail.pop(); } else this.trail[0] = P;
     g.lineCap = 'round';
     for (let f = this.trail.length - 1; f >= 1; f--) {
-      const Q = this.trail[f]; g.strokeStyle = `rgba(62,230,255,${0.16 * (1 - f / 14)})`; g.lineWidth = 1; g.beginPath();
+      const Q = this.trail[f]; g.strokeStyle = `rgba(${T.RGB.acc},${0.16 * (1 - f / 14)})`; g.lineWidth = 1; g.beginPath();
       for (let i = 0; i < 16; i++) for (let b = 0; b < 4; b++) { const j = i ^ (1 << b); if (j < i) continue; g.moveTo(Q[i][0], Q[i][1]); g.lineTo(Q[j][0], Q[j][1]); }
       g.stroke();
     }
@@ -445,7 +445,7 @@ T.views.push({
     g.imageSmoothingEnabled = false;
     g.drawImage(Lf.off, fx, fy, fw, fh);
     g.imageSmoothingEnabled = true;
-    T.brackets(g, fx - u * 0.4, fy - u * 0.4, fw + u * 0.8, fh + u * 0.8, u * 1.2, 'rgba(62,230,255,.6)', 1.5);
+    T.brackets(g, fx - u * 0.4, fy - u * 0.4, fw + u * 0.8, fh + u * 0.8, u * 1.2, `rgba(${T.RGB.acc},.6)`, 1.5);
     const pop = Lf.pop;
     return {
       status: `gen ${Lf.gen}  ·  cells ${Lf.prev < 0 ? '—' : Lf.prev}  ·  ${W}×${H}`,
@@ -455,7 +455,7 @@ T.views.push({
         const pw = Math.min(u * 16, w * 0.3), ph = u * 2.2, px = m, py = h - m * 0.6 - u * 1.6 - ph - u * 0.8;
         if (pop.length > 2) {
           const lo = Math.min(...pop), hi = Math.max(...pop) + 1;
-          T.panel(g, px, py, pw, ph, u * 0.6, 'rgba(5,8,13,.55)');
+          T.panel(g, px, py, pw, ph, u * 0.6, `rgba(${T.RGB.bg},.55)`);
           T.spark(g, px + u * 0.5, py + u * 0.35, pw - u, ph - u * 0.7, pop, lo - (hi - lo) * 0.2, hi);
         }
       },
@@ -546,15 +546,15 @@ T.views.push({
     // зарево у горизонта со стороны Солнца (сумерки) — в WebGL оно в шейдере
     if (!glSky && sunAlt > -18 && sunAlt < 8) {
       const q = (c.sun.az - rot) * D2R, gx = cx - R * Math.sin(q), gy = cy - R * Math.cos(q), k = 1 - Math.abs(sunAlt + 5) / 13;
-      const gr = g.createRadialGradient(gx, gy, 0, gx, gy, R * 0.9); gr.addColorStop(0, `rgba(62,230,255,${0.22 * T.clamp(k)})`); gr.addColorStop(1, 'rgba(62,230,255,0)');
+      const gr = g.createRadialGradient(gx, gy, 0, gx, gy, R * 0.9); gr.addColorStop(0, `rgba(${T.RGB.acc},${0.22 * T.clamp(k)})`); gr.addColorStop(1, `rgba(${T.RGB.acc},0)`);
       g.save(); g.beginPath(); g.arc(cx, cy, R, 0, T.TAU); g.clip(); g.fillStyle = gr; g.fillRect(cx - R, cy - R, 2 * R, 2 * R); g.restore();
     }
     // круги высоты 30° и 60°
-    g.strokeStyle = 'rgba(90,112,128,.35)'; g.lineWidth = 1; g.setLineDash([2, 5]);
+    g.strokeStyle = `rgba(${T.RGB.dim},.35)`; g.lineWidth = 1; g.setLineDash([2, 5]);
     for (const alt of [30, 60]) { g.beginPath(); g.arc(cx, cy, R * Math.tan((90 - alt) * D2R / 2), 0, T.TAU); g.stroke(); }
     g.setLineDash([]);
     // линии созвездий
-    g.strokeStyle = `rgba(62,230,255,${day ? 0.16 : 0.32})`; g.lineWidth = 1; g.beginPath();
+    g.strokeStyle = `rgba(${T.RGB.acc},${day ? 0.16 : 0.32})`; g.lineWidth = 1; g.beginPath();
     for (const Lp of c.lines) { let have = false; for (const a of Lp) { const p = xy(a); if (p) { have ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]); have = true; } else have = false; } }
     g.stroke();
     // звёзды: днём видны только самые яркие; яркие мерцают
@@ -565,7 +565,7 @@ T.views.push({
       if (st.mag < 2.2) {
         const tw = 0.75 + 0.25 * Math.sin(tt * (2.2 + (i % 7) * 0.4) + i * 1.7), r = s * Math.max(1.2, (2.6 - st.mag) * 1.6) * (0.85 + 0.15 * tw);
         g.fillStyle = T.heat(0.7 + 0.3 * tw * T.clamp((2.2 - st.mag) / 3)); g.beginPath(); g.arc(p[0], p[1], r, 0, T.TAU); g.fill();
-        if (st.mag < 0.8) { g.strokeStyle = `rgba(235,250,255,${0.35 * tw})`; g.lineWidth = 1; g.beginPath(); g.moveTo(p[0] - r * 3, p[1]); g.lineTo(p[0] + r * 3, p[1]); g.moveTo(p[0], p[1] - r * 3); g.lineTo(p[0], p[1] + r * 3); g.stroke(); }
+        if (st.mag < 0.8) { g.strokeStyle = `rgba(${T.RGB.hot},${0.35 * tw})`; g.lineWidth = 1; g.beginPath(); g.moveTo(p[0] - r * 3, p[1]); g.lineTo(p[0] + r * 3, p[1]); g.moveTo(p[0], p[1] - r * 3); g.lineTo(p[0], p[1] + r * 3); g.stroke(); }
         if (D.names[i]) T.hits.circle(p[0], p[1], u * 1.4, { sky: { kind: 'star', name: D.names[i], mag: st.mag, a: c.stars[i] } });
       } else buckets[Math.min(3, (st.mag - 2.2) / 0.8 | 0)].push(p);
     }
@@ -591,7 +591,7 @@ T.views.push({
     let p = xy(c.moon);
     if (p) {
       const r = u * 0.9, k = c.phase;
-      g.fillStyle = 'rgba(235,250,255,.12)'; g.beginPath(); g.arc(p[0], p[1], r, 0, T.TAU); g.fill();
+      g.fillStyle = `rgba(${T.RGB.hot},.12)`; g.beginPath(); g.arc(p[0], p[1], r, 0, T.TAU); g.fill();
       g.save(); g.translate(p[0], p[1]); if (!c.waxing) g.scale(-1, 1);
       g.fillStyle = T.C.hot; g.beginPath(); g.arc(0, 0, r, -Math.PI / 2, Math.PI / 2); g.ellipse(0, 0, r * Math.abs(1 - 2 * k), r, 0, Math.PI / 2, -Math.PI / 2, k > 0.5); g.fill();
       g.restore();
@@ -601,7 +601,7 @@ T.views.push({
     // Солнце
     p = xy(c.sun);
     if (p) {
-      const gr = g.createRadialGradient(p[0], p[1], 0, p[0], p[1], u * 3); gr.addColorStop(0, 'rgba(235,250,255,.9)'); gr.addColorStop(0.25, 'rgba(62,230,255,.35)'); gr.addColorStop(1, 'rgba(62,230,255,0)');
+      const gr = g.createRadialGradient(p[0], p[1], 0, p[0], p[1], u * 3); gr.addColorStop(0, `rgba(${T.RGB.hot},.9)`); gr.addColorStop(0.25, `rgba(${T.RGB.acc},.35)`); gr.addColorStop(1, `rgba(${T.RGB.acc},0)`);
       g.fillStyle = gr; g.beginPath(); g.arc(p[0], p[1], u * 3, 0, T.TAU); g.fill();
       g.fillStyle = T.C.hot; g.beginPath(); g.arc(p[0], p[1], u * 0.8, 0, T.TAU); g.fill();
       T.hits.circle(p[0], p[1], u * 2, { sky: { kind: 'sun', name: 'Солнце', a: c.sun } });
@@ -612,19 +612,19 @@ T.views.push({
       g.strokeStyle = 'rgba(255,255,255,.0)'; g.lineWidth = 1.2;
       let have = false; g.beginPath();
       for (const a of tr) { const q = xy({ alt: a.el, az: a.az }); if (q) { have ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); have = true; } else have = false; }
-      g.strokeStyle = 'rgba(62,230,255,.45)'; g.setLineDash([4, 4]); g.stroke(); g.setLineDash([]);
+      g.strokeStyle = `rgba(${T.RGB.acc},.45)`; g.setLineDash([4, 4]); g.stroke(); g.setLineDash([]);
       const look = A.satLook(A.satPos(sat, now), c.P.lat, c.P.lon), q = xy({ alt: look.el, az: look.az });
       if (q) {
         satsUp.push([sat.name, look.el]);
         const pulse = 0.5 + 0.5 * Math.sin(tt * 5);
         T.diamond(g, q[0], q[1], u * 0.55, T.C.hot, true);
-        g.strokeStyle = `rgba(235,250,255,${1 - pulse})`; g.lineWidth = 1.2; g.beginPath(); g.arc(q[0], q[1], u * (0.8 + pulse * 1.2), 0, T.TAU); g.stroke();
+        g.strokeStyle = `rgba(${T.RGB.hot},${1 - pulse})`; g.lineWidth = 1.2; g.beginPath(); g.arc(q[0], q[1], u * (0.8 + pulse * 1.2), 0, T.TAU); g.stroke();
         label(sat.name, q[0], q[1] - u * 1.1, u * 0.78, T.C.hot, 'm');
         T.hits.circle(q[0], q[1], u * 1.6, { sky: { kind: 'sat', name: sat.name, a: { alt: look.el, az: look.az } } });
       }
     }
     // созвездия (по-русски)
-    if (!day) D.con.forEach((k, i) => { const a = c.con[i]; if (a.alt < 12) return; const q = xy(a); if (q) label(k.ru, q[0], q[1], u * 0.7, 'rgba(62,230,255,.6)'); });
+    if (!day) D.con.forEach((k, i) => { const a = c.con[i]; if (a.alt < 12) return; const q = xy(a); if (q) label(k.ru, q[0], q[1], u * 0.7, `rgba(${T.RGB.acc},.6)`); });
     // горизонт: кольцо с рисками и стороны света
     g.strokeStyle = T.C.acc; g.lineWidth = 1.6; g.beginPath(); g.arc(cx, cy, R, 0, T.TAU); g.stroke();
     g.lineWidth = 1; g.beginPath();
@@ -662,7 +662,7 @@ T.views.push({
         }
         if (card) {
           const a = card.a, cw = u * 15, ch = u * 6.2, cxx = portrait ? m : cx - cw / 2, cyy = portrait ? py - ch - u * 0.6 : bot - ch - u * 3.6;
-          T.panel(g, cxx, cyy, cw, ch, u, 'rgba(5,8,13,.78)', T.C.acc);
+          T.panel(g, cxx, cyy, cw, ch, u, `rgba(${T.RGB.bg},.78)`, T.C.acc);
           T.txt(g, card.name, cxx + u, cyy + u * 1.9, u * 1.35, T.C.hot, card.kind === 'star' || card.kind === 'sat' ? 't' : 'c');
           const kind = { star: 'STAR', planet: 'PLANET', moon: 'MOON', sun: 'SUN', sat: 'SATELLITE' }[card.kind];
           T.txt(g, kind + (card.mag != null ? '  ·  MAG ' + card.mag.toFixed(1) : '') + (card.phase != null ? '  ·  ' + Math.round(card.phase * 100) + '%' : ''), cxx + u, cyy + u * 3.1, u * 0.75, T.C.label);
@@ -700,14 +700,14 @@ T.views.push({
     const scr = v => [cx + R * v[0], cy - R * v[1]];
     // фон: звёзды
     if (!this.bgStars) { this.bgStars = []; for (let i = 0; i < 260; i++) this.bgStars.push([Math.random(), Math.random(), Math.random()]); }
-    g.fillStyle = 'rgba(150,175,192,.5)'; g.beginPath();
+    g.fillStyle = `rgba(${T.RGB.label},.5)`; g.beginPath();
     for (const s of this.bgStars) { const r = 0.6 + s[2] * 1.2; g.rect(s[0] * w, s[1] * h, r, r); }
     g.fill();
     // WebGL: освещённая Земля (суша, океан с бликом, огни ночи, облака, атмосфера); иначе 2D-диск
     const jd0 = A.jd(now), sun0 = A.sun(jd0), sLon0 = ((sun0.ra - A.gmst(jd0)) % 360 + 540) % 360 - 180, sv0 = view(sun0.dec, sLon0);
     const glG = T.galGL.globe(g, cx, cy, R, l0, b0, sv0, tt);
     if (!glG) {
-    const at = g.createRadialGradient(cx, cy, R * 0.96, cx, cy, R * 1.14); at.addColorStop(0, 'rgba(62,230,255,.45)'); at.addColorStop(0.3, 'rgba(62,230,255,.12)'); at.addColorStop(1, 'rgba(62,230,255,0)');
+    const at = g.createRadialGradient(cx, cy, R * 0.96, cx, cy, R * 1.14); at.addColorStop(0, `rgba(${T.RGB.acc},.45)`); at.addColorStop(0.3, `rgba(${T.RGB.acc},.12)`); at.addColorStop(1, `rgba(${T.RGB.acc},0)`);
     g.fillStyle = at; g.beginPath(); g.arc(cx, cy, R * 1.14, 0, T.TAU); g.fill();
     // день и ночь: свет считается для каждой точки диска (в малом разрешении)
     const jd = A.jd(now), sun = A.sun(jd), sLon = ((sun.ra - A.gmst(jd)) % 360 + 540) % 360 - 180, sv = view(sun.dec, sLon);
@@ -729,7 +729,7 @@ T.views.push({
     g.imageSmoothingEnabled = true; g.drawImage(this.gOff, cx - R, cy - R, 2 * R, 2 * R);
     }
     // сетка 30°
-    g.lineWidth = 1; g.strokeStyle = 'rgba(62,230,255,.12)'; g.beginPath();
+    g.lineWidth = 1; g.strokeStyle = `rgba(${T.RGB.acc},.12)`; g.beginPath();
     const poly = pts => { let have = false; for (const v of pts) { if (v[2] > 0) { const p = scr(v); have ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]); have = true; } else have = false; } };
     for (let la = -60; la <= 60; la += 30) { const a = []; for (let lo = -180; lo <= 180; lo += 5) a.push(view(la, lo)); poly(a); }
     for (let lo = -180; lo < 180; lo += 30) { const a = []; for (let la = -90; la <= 90; la += 5) a.push(view(la, lo)); poly(a); }
@@ -748,15 +748,15 @@ T.views.push({
       }
     }
     if (!glG) {
-      g.lineWidth = 1.3; g.strokeStyle = 'rgba(62,230,255,.9)'; g.stroke(dayP); g.strokeStyle = 'rgba(62,230,255,.35)'; g.stroke(nightP);
-      g.strokeStyle = 'rgba(62,230,255,.7)'; g.lineWidth = 1.5; g.beginPath(); g.arc(cx, cy, R, 0, T.TAU); g.stroke();
+      g.lineWidth = 1.3; g.strokeStyle = `rgba(${T.RGB.acc},.9)`; g.stroke(dayP); g.strokeStyle = `rgba(${T.RGB.acc},.35)`; g.stroke(nightP);
+      g.strokeStyle = `rgba(${T.RGB.acc},.7)`; g.lineWidth = 1.5; g.beginPath(); g.arc(cx, cy, R, 0, T.TAU); g.stroke();
     }
     // дом
     const hv = view(P.lat, P.lon);
     if (hv[2] > 0) {
       const p = scr(hv), pulse = (tt % 2) / 2;
       T.diamond(g, p[0], p[1], u * 0.45, T.C.hot, true);
-      g.strokeStyle = `rgba(235,250,255,${1 - pulse})`; g.lineWidth = 1; g.beginPath(); g.arc(p[0], p[1], u * (0.6 + pulse * 1.6), 0, T.TAU); g.stroke();
+      g.strokeStyle = `rgba(${T.RGB.hot},${1 - pulse})`; g.lineWidth = 1; g.beginPath(); g.arc(p[0], p[1], u * (0.6 + pulse * 1.6), 0, T.TAU); g.stroke();
       T.txt(g, P.city.toUpperCase(), p[0] + u * 0.9, p[1] + u * 0.3, u * 0.75, T.C.hot);
       T.hits.circle(p[0], p[1], u * 1.6, { follow: -2 });
     }
@@ -773,16 +773,16 @@ T.views.push({
           const v = view(la, lo);
           if (v[2] > 0) { const p = scr(v); have ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]); have = true; } else have = false;
         }
-        g.strokeStyle = half === 0 ? `rgba(62,230,255,${sel ? 0.35 : 0.22})` : `rgba(235,250,255,${sel ? 0.7 : 0.45})`;
+        g.strokeStyle = half === 0 ? `rgba(${T.RGB.acc},${sel ? 0.35 : 0.22})` : `rgba(${T.RGB.hot},${sel ? 0.7 : 0.45})`;
         g.lineWidth = sel ? 1.8 : 1.2; if (half === 1) g.setLineDash([5, 5]); g.stroke(); g.setLineDash([]);
       }
       const q = pos[i], r = 1 + q.alt / A.RE * 2.2, sv2 = view(q.lat, q.lon, r), ground = view(q.lat, q.lon);
       const front = sv2[2] > 0 || sv2[0] * sv2[0] + sv2[1] * sv2[1] > 1;
       if (!front) return;
       const p = scr(sv2), gp = scr(ground), pulse = 0.5 + 0.5 * Math.sin(tt * 5 + i);
-      if (ground[2] > 0) { g.strokeStyle = 'rgba(235,250,255,.4)'; g.lineWidth = 1; g.setLineDash([2, 3]); g.beginPath(); g.moveTo(gp[0], gp[1]); g.lineTo(p[0], p[1]); g.stroke(); g.setLineDash([]); }
+      if (ground[2] > 0) { g.strokeStyle = `rgba(${T.RGB.hot},.4)`; g.lineWidth = 1; g.setLineDash([2, 3]); g.beginPath(); g.moveTo(gp[0], gp[1]); g.lineTo(p[0], p[1]); g.stroke(); g.setLineDash([]); }
       g.fillStyle = T.C.hot; g.beginPath(); g.arc(p[0], p[1], u * (0.35 + 0.15 * pulse), 0, T.TAU); g.fill();
-      g.strokeStyle = `rgba(62,230,255,${0.9 - pulse * 0.6})`; g.lineWidth = 1.2; g.beginPath(); g.arc(p[0], p[1], u * (0.8 + pulse), 0, T.TAU); g.stroke();
+      g.strokeStyle = `rgba(${T.RGB.acc},${0.9 - pulse * 0.6})`; g.lineWidth = 1.2; g.beginPath(); g.arc(p[0], p[1], u * (0.8 + pulse), 0, T.TAU); g.stroke();
       T.txt(g, s.name, p[0] + u * 1.2, p[1] - u * 0.5, u * 0.85, sel ? T.C.hot : T.C.acc, 't');
       T.txt(g, Math.round(q.alt) + ' km', p[0] + u * 1.2, p[1] + u * 0.6, u * 0.68, T.C.label);
       T.hits.circle(p[0], p[1], u * 1.8, { follow: i });

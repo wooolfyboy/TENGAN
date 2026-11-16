@@ -33,7 +33,7 @@ BU.scene = (g, cam, sw, opt) => {
   for (let i = 1; i <= 4; i++) {
     g.beginPath();
     for (let k = 0; k <= 96; k++) { const a = k / 96 * T.TAU, p = cam.p(Math.cos(a) * i / 4, 0, Math.sin(a) * i / 4); k ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]); }
-    g.strokeStyle = i === 4 ? T.C.acc : 'rgba(90,112,128,.5)'; g.lineWidth = i === 4 ? 1.6 : 1; g.stroke();
+    g.strokeStyle = i === 4 ? T.C.acc : `rgba(${T.RGB.dim},.5)`; g.lineWidth = i === 4 ? 1.6 : 1; g.stroke();
   }
   g.beginPath();
   for (let a = 0; a < 360; a += 10) { const r = a * Math.PI / 180, l = a % 30 ? 1.03 : 1.07, p = cam.p(Math.cos(r), 0, Math.sin(r)), q = cam.p(Math.cos(r) * l, 0, Math.sin(r) * l); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); }
@@ -46,7 +46,7 @@ BU.scene = (g, cam, sw, opt) => {
   }
   { // стенка луча
     const rx = Math.cos(s), rz = Math.sin(s), a = cam.p(0, 0, 0), b = cam.p(rx, 0, rz), c = cam.p(rx, 0.2, rz), d = cam.p(0, 0.2, 0);
-    const gr = g.createLinearGradient(a[0], a[1], d[0], d[1]); gr.addColorStop(0, 'rgba(62,230,255,.22)'); gr.addColorStop(1, 'rgba(62,230,255,0)');
+    const gr = g.createLinearGradient(a[0], a[1], d[0], d[1]); gr.addColorStop(0, `rgba(${T.RGB.acc},.22)`); gr.addColorStop(1, `rgba(${T.RGB.acc},0)`);
     g.fillStyle = gr; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.lineTo(c[0], c[1]); g.lineTo(d[0], d[1]); g.closePath(); g.fill();
     g.strokeStyle = T.C.hot; g.lineWidth = 2; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke();
   }
@@ -59,7 +59,7 @@ BU.scene = (g, cam, sw, opt) => {
     const since = (((s - BU.ang(e.id)) % T.TAU) + T.TAU) % T.TAU / T.TAU, ph = 1 - since, fog = T.clamp(1.15 - (p0[3] + 1) * 0.28, 0.35, 1) * e.h;
     const pa = sw.ping(e.id, t);
     if (pa < 1.1) {
-      g.strokeStyle = BU.tr(e) ? `rgba(255,122,26,${(1 - pa / 1.1) * 0.9 * e.h})` : `rgba(62,230,255,${(1 - pa / 1.1) * 0.9 * e.h})`; g.lineWidth = 1.2; g.beginPath();
+      g.strokeStyle = BU.tr(e) ? `rgba(${T.RGB.alert},${(1 - pa / 1.1) * 0.9 * e.h})` : `rgba(${T.RGB.acc},${(1 - pa / 1.1) * 0.9 * e.h})`; g.lineWidth = 1.2; g.beginPath();
       for (let i = 0; i <= 28; i++) { const a = i / 28 * T.TAU, rr = 0.03 + pa * 0.15, q = cam.p(it.x + Math.cos(a) * rr, 0, it.z + Math.sin(a) * rr); i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); }
       g.stroke();
     }
@@ -235,7 +235,7 @@ BU.card = (g, p, e, u, W, H, top) => {
   T.diamond(g, p[0], p[1], u * 0.9, T.C.hot, false);
   const ax = bx > p[0] ? bx : bx + bw;
   g.strokeStyle = T.C.hot; g.lineWidth = 1; g.beginPath(); g.moveTo(p[0] + (bx > p[0] ? 1 : -1) * u * 0.7, p[1] - u * 0.7); g.lineTo(ax + (bx > p[0] ? -1 : 1) * u * 1.2, by + bh * 0.55); g.lineTo(ax, by + bh * 0.55); g.stroke();
-  T.panel(g, bx, by, bw, bh, u, 'rgba(5,8,13,.78)', T.C.acc);
+  T.panel(g, bx, by, bw, bh, u, `rgba(${T.RGB.bg},.78)`, T.C.acc);
   g.font = `500 ${u * 1.2}px ${T.FC}`; T.txt(g, T.fit(g, BU.label(e).toUpperCase(), bw - u * 2), bx + u, by + u * 1.7, u * 1.2, T.C.hot, 'c');
   g.font = `${u * 0.75}px ${T.FM}`; T.txt(g, T.fit(g, ((e.vend || '—') + ' · ' + (e.type || '')).toUpperCase(), bw - u * 2), bx + u, by + u * 2.8, u * 0.75, BU.tr(e) ? T.C.alert : T.C.label);
   T.bigNum(g, Math.round(e.rs), bx + u, by + u * 5.6, u * 2.8, BU.tr(e) ? T.C.alert : T.heat(0.4 + 0.6 * sg), 'DBM');
@@ -276,7 +276,7 @@ BU.rows = (g, x, y, w, h, u, rowH, list, sel, dt, cols = {}) => {
     if (cy > y + h || cy + rowH < y0) return;
     const on = e.id === sel, tr = BU.tr(e), sg = T.pct(e.rs), gs = rowH * 0.62, col = tr ? T.C.alert : (on ? T.C.hot : T.C.acc);
     g.globalAlpha = T.clamp(e.h);
-    if (on) { g.fillStyle = 'rgba(62,230,255,.08)'; g.fillRect(x, cy, w, rowH); T.brackets(g, x, cy, w, rowH, u * 0.45, T.C.acc, 1); }
+    if (on) { g.fillStyle = `rgba(${T.RGB.acc},.08)`; g.fillRect(x, cy, w, rowH); T.brackets(g, x, cy, w, rowH, u * 0.45, T.C.acc, 1); }
     T.glyph(g, x + u * 0.3, cy + (rowH - gs) / 2, gs, BU.glyph(e), col);
     const nameW = (cols.more ? w * 0.5 : w * 0.62) - rowH * 1.05 - u * 0.3;
     g.font = `500 ${fs}px ${T.FC}`;
@@ -361,11 +361,11 @@ T.views.push({
     const lst = this.sticky.get(list, performance.now(), false);
     if (!portrait) {
       const lw = w * 0.27, lx = w - m - lw, ly = y0 + u * 4.2, lh = Math.min(h - ly - u * 4, u * 2.25 * 12 + u * 2);
-      T.panel(g, lx, ly, lw, lh, u, 'rgba(14,42,52,.25)', 'rgba(62,230,255,.25)');
+      T.panel(g, lx, ly, lw, lh, u, `rgba(${T.RGB.panel},.25)`, `rgba(${T.RGB.acc},.25)`);
       BU.rows(g, lx + u * 0.5, ly + u * 0.6, lw - u, lh - u * 1.2, u, u * 2.25, lst, this.sel, dt);
     } else {
       const ly = y0 + (h - y0) * 0.6, lh = h - ly - u * 3;
-      T.panel(g, m, ly, w - 2 * m, lh, u, 'rgba(14,42,52,.25)', 'rgba(62,230,255,.25)');
+      T.panel(g, m, ly, w - 2 * m, lh, u, `rgba(${T.RGB.panel},.25)`, `rgba(${T.RGB.acc},.25)`);
       BU.rows(g, m + u * 0.5, ly + u * 0.6, w - 2 * m - u, lh - u * 1.2, u, u * 2.4, lst, this.sel, dt, { more: true });
     }
     if (selTop) BU.card(g, selTop.p, selTop.e, u, portrait ? w : w * 0.7, h, y0 + u * 4);
@@ -383,11 +383,11 @@ T.views.push({
     const ring = (r, col, lw) => { g.beginPath(); for (let i = 0; i <= 96; i++) { const a = i / 96 * T.TAU, q = c.p(Math.cos(a) * r, 0, Math.sin(a) * r); i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); } g.strokeStyle = col; g.lineWidth = lw; g.stroke(); };
     const useGL = BU.glCity.ok();                         // видеокарта: земля и башни шейдером; 2D — запасной путь
     if (!useGL) {
-      g.lineWidth = 1; g.strokeStyle = 'rgba(32,50,64,.55)'; g.beginPath();
+      g.lineWidth = 1; g.strokeStyle = `rgba(${T.RGB.line},.55)`; g.beginPath();
       for (let a = 0; a < 360; a += 30) { const r = a * Math.PI / 180, p0 = c.p(Math.cos(r) * 0.1, 0, Math.sin(r) * 0.1), p1 = c.p(Math.cos(r) * RMAX, 0, Math.sin(r) * RMAX); g.moveTo(p0[0], p0[1]); g.lineTo(p1[0], p1[1]); }
       g.stroke();
-      RINGS.forEach(([db], i) => ring(ringR(db), i === 3 ? 'rgba(62,230,255,.35)' : 'rgba(90,112,128,.4)', 1));
-      ring(RMAX, 'rgba(62,230,255,.5)', 1.4);
+      RINGS.forEach(([db], i) => ring(ringR(db), i === 3 ? `rgba(${T.RGB.acc},.35)` : `rgba(${T.RGB.dim},.4)`, 1));
+      ring(RMAX, `rgba(${T.RGB.acc},.5)`, 1.4);
     }
     const list = BU.list(), rank = [...list].sort((a, b) => b.rs - a.rs);
     const SZ = { computer: 0.09, TV: 0.1, tv: 0.1, phone: 0.065, audio: 0.06, watch: 0.05, band: 0.045, tracker: 0.045, sensor: 0.05 };
@@ -454,7 +454,7 @@ T.views.push({
       if (e.id === this.sel) selP = { p: top, e };
       else if (this.sel == null && rank.indexOf(e) < 5) labels.push([top, e]);
     }
-    for (const [top, e] of labels) { const tr = BU.tr(e); g.strokeStyle = 'rgba(235,250,255,.35)'; g.lineWidth = 1; g.beginPath(); g.moveTo(top[0], top[1] - u * 0.2); g.lineTo(top[0], top[1] - u * 1.4); g.stroke(); g.font = `500 ${u * 0.72}px ${T.FC}`; const s = T.fit(g, BU.label(e).toUpperCase() + '  ' + Math.round(e.rs), u * 11), tw = T.tw(g, s, u * 0.72, 'c'); g.fillStyle = 'rgba(5,8,13,.7)'; g.fillRect(top[0] - tw / 2 - u * 0.3, top[1] - u * 2.4, tw + u * 0.6, u * 1.1); T.txt(g, s, top[0], top[1] - u * 1.55, u * 0.72, tr ? T.C.alert : T.C.hot, 'c', 'center'); }
+    for (const [top, e] of labels) { const tr = BU.tr(e); g.strokeStyle = `rgba(${T.RGB.hot},.35)`; g.lineWidth = 1; g.beginPath(); g.moveTo(top[0], top[1] - u * 0.2); g.lineTo(top[0], top[1] - u * 1.4); g.stroke(); g.font = `500 ${u * 0.72}px ${T.FC}`; const s = T.fit(g, BU.label(e).toUpperCase() + '  ' + Math.round(e.rs), u * 11), tw = T.tw(g, s, u * 0.72, 'c'); g.fillStyle = `rgba(${T.RGB.bg},.7)`; g.fillRect(top[0] - tw / 2 - u * 0.3, top[1] - u * 2.4, tw + u * 0.6, u * 1.1); T.txt(g, s, top[0], top[1] - u * 1.55, u * 0.72, tr ? T.C.alert : T.C.hot, 'c', 'center'); }
     this.dust.draw(g, c);
     T.bloom(this.cv);
     this.hud(g, w, h, u, m, y0, 'City', `${list.length} towers · height = signal`);
@@ -467,10 +467,10 @@ T.views.push({
     this.hud(g, w, h, u, m, y0, 'Devices', `${S.ble ? S.ble.n : 0} devices · ${S.ble ? S.ble.m : 0} addresses`);
     const top = y0 + u * 4.2, bot = h - u * 3;
     let tx = m, tw = portrait ? w - 2 * m : w * 0.58 - m, th = portrait ? (bot - top) * 0.55 : bot - top;
-    T.panel(g, tx, top, tw, th, u, 'rgba(14,42,52,.22)', T.C.line);
+    T.panel(g, tx, top, tw, th, u, `rgba(${T.RGB.panel},.22)`, T.C.line);
     BU.rows(g, tx + u * 0.6, top + u * 0.8, tw - u * 1.2, th - u * 1.6, u, u * 2.5, lst, this.sel, dt, { more: tw > u * 34 });
     const dx = portrait ? m : w * 0.58 + u, dy = portrait ? top + th + u : top, dw = portrait ? w - 2 * m : w - m - dx, dh = portrait ? bot - dy : bot - top;
-    T.panel(g, dx, dy, dw, dh, u, 'rgba(14,42,52,.22)', T.C.line);
+    T.panel(g, dx, dy, dw, dh, u, `rgba(${T.RGB.panel},.22)`, T.C.line);
     const e = this.sel != null && S.dev.get(this.sel);
     if (e) { this.fetchInfo(now); this.detail(g, dx, dy, dw, dh, u, e); }
     else this.summary(g, dx, dy, dw, dh, u, list);
@@ -503,7 +503,7 @@ T.views.push({
     T.hits.rect(x + w - p - u * 4.5, cy - u * 0.4, u * 5, u * 2, { k: 'back' });
     // кнопка «назвать»: своя подпись для устройства (хранится на палке)
     { const bw = u * 5.4, bx = x + w - p - u * 5 - bw - u * 0.8, by = cy - u * 0.35;
-      T.panel(g, bx, by, bw, u * 1.7, u * 0.4, 'rgba(62,230,255,.1)', T.C.acc);
+      T.panel(g, bx, by, bw, u * 1.7, u * 0.4, `rgba(${T.RGB.acc},.1)`, T.C.acc);
       T.txt(g, e.label ? 'RENAME' : 'NAME', bx + bw / 2, by + u * 1.15, u * 0.8, T.C.hot, 'm', 'center');
       T.hits.rect(bx - u * 0.3, by - u * 0.3, bw + u * 0.6, u * 2.3, { k: 'name' }); }
     cy += u * 2.6;

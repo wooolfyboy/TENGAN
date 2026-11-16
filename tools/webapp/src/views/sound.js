@@ -91,9 +91,9 @@
       const n = 32, L = a.x + u * 1.6, bw = (a.w - u * 1.6) / n, base = a.y + a.h * 0.7, H = base - a.y - u, seg = Math.max(4, u * 0.55);
       // пол
       const fl = g.createLinearGradient(0, base, 0, a.y + a.h);
-      fl.addColorStop(0, 'rgba(62,230,255,.10)'); fl.addColorStop(1, 'rgba(62,230,255,0)');
+      fl.addColorStop(0, `rgba(${T.RGB.acc},.10)`); fl.addColorStop(1, `rgba(${T.RGB.acc},0)`);
       g.fillStyle = fl; g.fillRect(L, base, bw * n, a.y + a.h - base);
-      g.strokeStyle = 'rgba(32,50,64,.5)'; g.lineWidth = 1;
+      g.strokeStyle = `rgba(${T.RGB.line},.5)`; g.lineWidth = 1;
       for (let k = 1; k <= 4; k++) { const y = base - H * k / 4; g.beginPath(); g.moveTo(L, y); g.lineTo(L + bw * n, y); g.stroke(); }
       for (let i = 0; i < n; i++) {
         const v = S.bands[i], x = L + i * bw, segs = Math.floor(v * H / seg);
@@ -136,9 +136,9 @@
       // солнце-резонатор на горизонте
       const sx = w * 0.68, sunR = u * (1.8 + S.energy * 2.2);
       const sg = g.createRadialGradient(sx, hy, 0, sx, hy, sunR * 2.4);
-      sg.addColorStop(0, 'rgba(235,250,255,.75)'); sg.addColorStop(0.25, 'rgba(62,230,255,.45)'); sg.addColorStop(1, 'rgba(62,230,255,0)');
+      sg.addColorStop(0, `rgba(${T.RGB.hot},.75)`); sg.addColorStop(0.25, `rgba(${T.RGB.acc},.45)`); sg.addColorStop(1, `rgba(${T.RGB.acc},0)`);
       g.fillStyle = sg; g.beginPath(); g.arc(sx, hy, sunR * 2.4, 0, T.TAU); g.fill();
-      for (let k = 1; k < 6; k++) { g.fillStyle = 'rgba(5,8,13,.85)'; g.fillRect(sx - sunR * 2.4, hy - k * sunR * 0.28, sunR * 4.8, Math.max(1, k * 0.6)); }
+      for (let k = 1; k < 6; k++) { g.fillStyle = `rgba(${T.RGB.bg},.85)`; g.fillRect(sx - sunR * 2.4, hy - k * sunR * 0.28, sunR * 4.8, Math.max(1, k * 0.6)); }
       g.fillStyle = T.C.line; g.fillRect(0, hy, w, 1);
       const sh = T.heatRGB(0.4);
       for (let r = this.rows.length - 1; r >= 0; r--) {
@@ -244,7 +244,7 @@ void main(){
       for (let k = 0; k < 3; k++) {
         const rr = Rm * (0.55 + k * 0.17), tilt = 0.32 + k * 0.12, rot = this.spin * (k % 2 ? -0.4 : 0.3) + k;
         g.save(); g.translate(cx, cy); g.rotate(rot); g.scale(1, tilt);
-        g.strokeStyle = k === 2 ? 'rgba(62,230,255,.55)' : 'rgba(90,112,128,.45)'; g.lineWidth = 1.2 / Math.sqrt(tilt);
+        g.strokeStyle = k === 2 ? `rgba(${T.RGB.acc},.55)` : `rgba(${T.RGB.dim},.45)`; g.lineWidth = 1.2 / Math.sqrt(tilt);
         g.beginPath(); g.arc(0, 0, rr, 0, T.TAU); g.stroke();
         g.restore();
         const pa = t * (0.6 + k * 0.3) * (k % 2 ? -1 : 1), ex = Math.cos(pa) * rr, ey = Math.sin(pa) * rr * tilt;   // «спутник» — без растяжения
@@ -260,7 +260,7 @@ void main(){
       }
       // ядро
       const cg = g.createRadialGradient(cx, cy, 0, cx, cy, R0 * 1.25);
-      cg.addColorStop(0, 'rgba(235,250,255,1)'); cg.addColorStop(0.45, this.lvS >= -15 ? 'rgba(255,122,26,.9)' : 'rgba(62,230,255,.9)'); cg.addColorStop(1, 'rgba(62,230,255,0)');
+      cg.addColorStop(0, `rgba(${T.RGB.hot},1)`); cg.addColorStop(0.45, this.lvS >= -15 ? `rgba(${T.RGB.alert},.9)` : `rgba(${T.RGB.acc},.9)`); cg.addColorStop(1, `rgba(${T.RGB.acc},0)`);
       g.fillStyle = cg; g.beginPath(); g.arc(cx, cy, R0 * 1.25, 0, T.TAU); g.fill();
       g.strokeStyle = T.C.acc; g.lineWidth = 2; g.beginPath(); g.arc(cx, cy, R0 * 1.25, this.spin, this.spin + Math.PI * 1.4); g.stroke();
       // частицы
@@ -279,19 +279,19 @@ void main(){
       const tr = this.trW; tr.fit(); tr.fade(Math.min(1, dt * 11));
       const x = tr.x, mid = a.y + a.h / 2, amp = a.h * 0.42, gain = 1 / Math.max(0.15, Math.min(1, Math.max(...this.wave.map(Math.abs)) * 1.1));
       // сетка (на основном холсте — не размазывается)
-      g.strokeStyle = 'rgba(32,50,64,.6)'; g.lineWidth = 1;
+      g.strokeStyle = `rgba(${T.RGB.line},.6)`; g.lineWidth = 1;
       for (let k = 0; k <= 10; k++) { const gx = a.x + a.w * k / 10; g.beginPath(); g.moveTo(gx, a.y); g.lineTo(gx, a.y + a.h); g.stroke(); }
       for (let k = 0; k <= 8; k++) { const gy = a.y + a.h * k / 8; g.beginPath(); g.moveTo(a.x, gy); g.lineTo(a.x + a.w, gy); g.stroke(); }
-      g.strokeStyle = 'rgba(90,112,128,.6)'; g.beginPath(); g.moveTo(a.x, mid); g.lineTo(a.x + a.w, mid); g.stroke();
+      g.strokeStyle = `rgba(${T.RGB.dim},.6)`; g.beginPath(); g.moveTo(a.x, mid); g.lineTo(a.x + a.w, mid); g.stroke();
       x.beginPath();
       const P = i => [a.x + i / 63 * a.w, mid - T.clamp(this.wave[i] * gain, -1, 1) * amp];
       let p0 = P(0); x.moveTo(p0[0], p0[1]);
       for (let i = 1; i < 64; i++) { const p = P(i), mx = (p0[0] + p[0]) / 2, my = (p0[1] + p[1]) / 2; x.quadraticCurveTo(p0[0], p0[1], mx, my); p0 = p; }
       x.lineTo(p0[0], p0[1]);
-      x.strokeStyle = 'rgba(62,230,255,.9)'; x.lineWidth = Math.max(2, u * 0.16); x.stroke();
-      x.strokeStyle = 'rgba(235,250,255,.9)'; x.lineWidth = Math.max(1, u * 0.06); x.stroke();
+      x.strokeStyle = `rgba(${T.RGB.acc},.9)`; x.lineWidth = Math.max(2, u * 0.16); x.stroke();
+      x.strokeStyle = `rgba(${T.RGB.hot},.9)`; x.lineWidth = Math.max(1, u * 0.06); x.stroke();
       tr.draw(g);
-      T.brackets(g, a.x, a.y, a.w, a.h, u * 1.2, 'rgba(62,230,255,.6)');
+      T.brackets(g, a.x, a.y, a.w, a.h, u * 1.2, `rgba(${T.RGB.acc},.6)`);
       T.txt(g, `×${gain.toFixed(1)}`, a.x + u * 0.6, a.y + u * 1.4, u * 0.8, T.C.label);
     },
     // XY: фигура из волны и её сдвинутой копии, с послесвечением
@@ -299,7 +299,7 @@ void main(){
       const tr = this.trX; tr.fit(); tr.fade(Math.min(1, dt * 4));
       const x = tr.x, s = Math.min(a.w, a.h) * 0.46, cx = a.x + a.w / 2, cy = a.y + a.h / 2, k = 16;
       const mx = Math.max(0.15, Math.max(...this.wave.map(Math.abs)));
-      g.strokeStyle = 'rgba(32,50,64,.6)'; g.lineWidth = 1;
+      g.strokeStyle = `rgba(${T.RGB.line},.6)`; g.lineWidth = 1;
       g.strokeRect(cx - s, cy - s, s * 2, s * 2);
       g.beginPath(); g.moveTo(cx - s, cy); g.lineTo(cx + s, cy); g.moveTo(cx, cy - s); g.lineTo(cx, cy + s); g.stroke();
       g.beginPath(); g.arc(cx, cy, s, 0, T.TAU); g.stroke();
@@ -308,10 +308,10 @@ void main(){
         const j = i % 64, px = cx + this.wave[j] / mx * s * 0.92, py = cy - this.wave[(j + k) % 64] / mx * s * 0.92;
         i ? x.lineTo(px, py) : x.moveTo(px, py);
       }
-      x.strokeStyle = 'rgba(62,230,255,.85)'; x.lineWidth = Math.max(1.5, u * 0.13); x.lineJoin = 'round'; x.stroke();
-      x.strokeStyle = 'rgba(235,250,255,.8)'; x.lineWidth = Math.max(0.8, u * 0.05); x.stroke();
+      x.strokeStyle = `rgba(${T.RGB.acc},.85)`; x.lineWidth = Math.max(1.5, u * 0.13); x.lineJoin = 'round'; x.stroke();
+      x.strokeStyle = `rgba(${T.RGB.hot},.8)`; x.lineWidth = Math.max(0.8, u * 0.05); x.stroke();
       tr.draw(g);
-      T.brackets(g, cx - s, cy - s, s * 2, s * 2, u * 1.2, 'rgba(62,230,255,.6)');
+      T.brackets(g, cx - s, cy - s, s * 2, s * 2, u * 1.2, `rgba(${T.RGB.acc},.6)`);
       T.txt(g, 'X: t   Y: t + 90°', cx - s + u * 0.6, cy - s + u * 1.4, u * 0.8, T.C.label);
     },
   });

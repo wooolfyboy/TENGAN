@@ -90,7 +90,7 @@ T.views.push({
     BANDS.forEach((b, i) => {
       const on = i === this.band;
       T.cutPath(g, x, y, cw, chh, u * 0.5);
-      g.fillStyle = on ? 'rgba(62,230,255,.14)' : 'rgba(5,8,13,.5)'; g.fill();
+      g.fillStyle = on ? `rgba(${T.RGB.acc},.14)` : `rgba(${T.RGB.bg},.5)`; g.fill();
       g.strokeStyle = on ? T.C.acc : T.C.line; g.lineWidth = 1; g.stroke();
       T.txt(g, b, x + cw / 2, y + chh * 0.7, u * 1.0, on ? T.C.hot : T.C.label, 't', 'center');
       T.hits.rect(x, y - u * 0.3, cw, chh + u * 0.6, { k: 'band', i });
@@ -221,7 +221,7 @@ void main(){
       g.beginPath();
       for (let i = 0; i < n; i++) { const p = cam.p(X(i), HY * Math.pow(lvl(cur[i]), 1.2), z); i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]); }
       g.strokeStyle = T.C.hot; g.lineWidth = 2; g.stroke();
-      g.fillStyle = 'rgba(235,250,255,.75)';
+      g.fillStyle = `rgba(${T.RGB.hot},.75)`;
       for (let i = 0; i < n; i += 2) { const p = cam.p(X(i), HY * Math.pow(lvl(this.peak[i]), 1.2), z); g.fillRect(p[0] - 1, p[1] - 1, 2, 2); }
     }
     // ось частот
@@ -238,7 +238,7 @@ void main(){
       const p = cam.p(X(mi), HY * Math.pow(lvl(pk), 1.2), Z(0));
       const lx = T.clamp(p[0] + u * 3, u * 2, w - u * 15), ly = Math.max(y0 + u * 6, p[1] - u * 5);
       T.diamond(g, p[0], p[1], u * 0.6, burst ? T.C.alert : T.C.hot, false);
-      g.strokeStyle = burst ? T.C.alert : 'rgba(235,250,255,.7)'; g.lineWidth = 1;
+      g.strokeStyle = burst ? T.C.alert : `rgba(${T.RGB.hot},.7)`; g.lineWidth = 1;
       g.beginPath(); g.moveTo(p[0] + u * 0.5, p[1] - u * 0.5); g.lineTo(lx, ly); g.lineTo(lx + u * 10, ly); g.stroke();
       T.txt(g, fpk.toFixed(3) + ' MHZ', lx, ly - u * 0.5, u * 1.25, burst ? T.C.alert : T.C.hot, 't');
       T.txt(g, pk + ' DBM' + (burst ? '  · BURST' : ''), lx, ly + u * 1.1, u * 0.75, burst ? T.C.alert : T.C.label);
@@ -265,10 +265,10 @@ void main(){
     const L = cx + u * 3.4, Rr = cx + cw - u * 1.2, Tp = top + u * 4.2, B = top + ch - u * 1.6;
     const Y = v => B - T.clamp((v + 110) / 80) * (B - Tp);
     g.lineWidth = 1;
-    for (let v = -110; v <= -30; v += 10) { g.strokeStyle = v % 20 ? 'rgba(32,50,64,.5)' : T.C.line; g.beginPath(); g.moveTo(L, Y(v)); g.lineTo(Rr, Y(v)); g.stroke(); if (v % 20 === 0) T.txt(g, v, L - u * 0.5, Y(v) + u * 0.3, u * 0.65, T.C.dim, 'm', 'right'); }
+    for (let v = -110; v <= -30; v += 10) { g.strokeStyle = v % 20 ? `rgba(${T.RGB.line},.5)` : T.C.line; g.beginPath(); g.moveTo(L, Y(v)); g.lineTo(Rr, Y(v)); g.stroke(); if (v % 20 === 0) T.txt(g, v, L - u * 0.5, Y(v) + u * 0.3, u * 0.65, T.C.dim, 'm', 'right'); }
     // порог (пол + запас) пунктиром
     if (d.floor != null) {
-      g.setLineDash([u * 0.5, u * 0.4]); g.strokeStyle = 'rgba(150,175,192,.6)';
+      g.setLineDash([u * 0.5, u * 0.4]); g.strokeStyle = `rgba(${T.RGB.label},.6)`;
       g.beginPath(); g.moveTo(L, Y(d.floor)); g.lineTo(Rr, Y(d.floor)); g.stroke(); g.setLineDash([]);
       T.txt(g, 'FLOOR', Rr, Y(d.floor) - u * 0.35, u * 0.6, T.C.label, 'm', 'right');
     }
@@ -280,7 +280,7 @@ void main(){
       g.beginPath(); for (let i = 0; i < N; i++) { const yy = Y(this.chart[i]); i ? g.lineTo(px(i), yy) : g.moveTo(px(i), yy); }
       g.strokeStyle = burst ? T.C.alert : T.C.acc; g.lineWidth = 2; g.stroke();
       g.lineTo(Rr, B); g.lineTo(L, B); g.closePath();
-      const gr = g.createLinearGradient(0, Tp, 0, B); gr.addColorStop(0, burst ? 'rgba(255,122,26,.3)' : 'rgba(62,230,255,.28)'); gr.addColorStop(1, 'rgba(62,230,255,0)');
+      const gr = g.createLinearGradient(0, Tp, 0, B); gr.addColorStop(0, burst ? `rgba(${T.RGB.alert},.3)` : `rgba(${T.RGB.acc},.28)`); gr.addColorStop(1, `rgba(${T.RGB.acc},0)`);
       g.fillStyle = gr; g.fill();
       const last = this.chart[N - 1];
       T.diamond(g, Rr, Y(last), u * 0.45, burst ? T.C.alert : T.C.hot, true);
@@ -293,7 +293,7 @@ void main(){
     {
       const bw = u * 13, bh = u * 2.4, bx = cx + cw - bw - u, by = top + u * 0.9, pulse = burst ? 0.6 + 0.4 * Math.sin(this.t * 10) : 1;
       T.cutPath(g, bx, by, bw, bh, u * 0.6);
-      g.fillStyle = burst ? `rgba(255,122,26,${0.22 * pulse})` : 'rgba(62,230,255,.06)'; g.fill();
+      g.fillStyle = burst ? `rgba(${T.RGB.alert},${0.22 * pulse})` : `rgba(${T.RGB.acc},.06)`; g.fill();
       g.strokeStyle = burst ? T.C.alert : T.C.line; g.lineWidth = 1.2; g.stroke();
       T.txt(g, burst ? '// BURST' : '// LISTENING', bx + bw / 2, by + bh * 0.68, u * 1.15, burst ? T.C.alert : T.C.label, 't', 'center');
     }
@@ -347,7 +347,7 @@ void main(){
       if (y + rowH > top + th) break;
       const stale = r.ago > 600, rem = r.kind === 'remote' || r.kind === 'rolling';
       g.globalAlpha = stale ? 0.45 : 1;
-      if (r.ago < 2) { g.fillStyle = 'rgba(62,230,255,.10)'; g.fillRect(m + u * 0.5, y, tw - u, rowH - u * 0.3); }
+      if (r.ago < 2) { g.fillStyle = `rgba(${T.RGB.acc},.10)`; g.fillRect(m + u * 0.5, y, tw - u, rowH - u * 0.3); }
       const nm = rem ? (r.kind === 'rolling' ? 'CAR KEY' : 'REMOTE / BELL') : String(r.p).toUpperCase();
       g.font = `600 ${u * 1.2}px ${T.FT}`; T.txt(g, T.fit(g, nm, tw * 0.28), X(0), y + u * 1.35, u * 1.2, T.C.hot, 't');
       T.txt(g, rem ? '#' + String(r.id).split('-').pop() + (r.btn != null ? '  BTN ' + r.btn : '') : 'CH ' + r.ch + '  ·  ' + r.n + '×', X(0), y + u * 2.5, u * 0.7, T.C.label);
@@ -365,7 +365,7 @@ void main(){
     // анализатор последней посылки
     const ay = top + th + u, ah = bot - ay, L = d.last;
     T.panel(g, m, ay, tw, ah, u);
-    if (fresh > 0) { T.cutPath(g, m, ay, tw, ah, u * 0.8); g.strokeStyle = `rgba(62,230,255,${0.6 * fresh})`; g.lineWidth = 2; g.stroke(); }
+    if (fresh > 0) { T.cutPath(g, m, ay, tw, ah, u * 0.8); g.strokeStyle = `rgba(${T.RGB.acc},${0.6 * fresh})`; g.lineWidth = 2; g.stroke(); }
     T.txt(g, '// LAST PACKET', m + u * 1.4, ay + u * 1.8, u * 1.0, T.C.acc, 't');
     if (!L) { T.txt(g, 'NO PACKETS YET', m + u * 1.4, ay + u * 4, u * 0.9, T.C.dim); }
     else {
@@ -389,7 +389,7 @@ void main(){
   },
   // посылка: [импульс, пауза, ...] мкс — меандр с подписью ширин
   pulses(g, pt, x, y, w, h, u, rev, sensor) {
-    g.fillStyle = 'rgba(5,10,16,.5)'; g.fillRect(x, y, w, h);
+    g.fillStyle = `rgba(${T.RGB.bg2},.5)`; g.fillRect(x, y, w, h);
     g.strokeStyle = T.C.line; g.lineWidth = 1;
     for (let k = 1; k < 10; k++) { g.beginPath(); g.moveTo(x + w * k / 10, y); g.lineTo(x + w * k / 10, y + h); g.stroke(); }
     if (!pt.length) return;

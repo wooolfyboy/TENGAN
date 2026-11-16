@@ -93,7 +93,7 @@ T.header = (g, x, y, w, u, title, status, alert) => {
     T.txt(g, T.fit(g, String(status).toUpperCase(), Math.max(u * 4, room)), x + w, y + u * 1.45, u * 0.92, alert ? T.C.alert : T.C.label, 'm', 'right');
   }
   const gr = g.createLinearGradient(x, 0, x + w, 0);
-  gr.addColorStop(0, 'rgba(62,230,255,1)'); gr.addColorStop(1, 'rgba(62,230,255,.15)');
+  gr.addColorStop(0, `rgba(${T.RGB.acc},1)`); gr.addColorStop(1, `rgba(${T.RGB.acc},.15)`);
   g.fillStyle = gr; g.fillRect(x, y + u * 2.1, w, Math.max(1, u * 0.08));
 };
 T.dots = (g, x, y, u, n, i) => { for (let k = 0; k < n; k++) { const on = k === i; g.fillStyle = on ? T.C.acc : T.C.line; g.fillRect(x + k * u * 0.85, y, on ? u * 0.55 : u * 0.3, u * 0.3); } };
@@ -112,7 +112,7 @@ T.brackets = (g, x, y, w, h, L, col = T.C.acc, lw = 1.5) => {
 };
 T.cutPath = (g, x, y, w, h, c) => { g.beginPath(); g.moveTo(x + c, y); g.lineTo(x + w, y); g.lineTo(x + w, y + h - c); g.lineTo(x + w - c, y + h); g.lineTo(x, y + h); g.lineTo(x, y + c); g.closePath(); };
 // панель со срезанными углами; по умолчанию «стекло» поверх 3D-сцены
-T.panel = (g, x, y, w, h, u, fill = 'rgba(14,42,52,.28)', stroke = 'rgba(62,230,255,.22)') => {
+T.panel = (g, x, y, w, h, u, fill = `rgba(${T.RGB.panel},.28)`, stroke = `rgba(${T.RGB.acc},.22)`) => {
   T.cutPath(g, x, y, w, h, u * 0.8); g.fillStyle = fill; g.fill(); g.strokeStyle = stroke; g.lineWidth = 1; g.stroke();
 };
 // сегментная полоса с отражением
@@ -137,7 +137,7 @@ T.spark = (g, x, y, w, h, arr, lo, hi, col = T.C.acc) => {
   arr.forEach((v, i) => { const px = x + i / (arr.length - 1) * w, py = y + h - T.clamp((v - lo) / (hi - lo)) * h; i ? g.lineTo(px, py) : g.moveTo(px, py); });
   g.strokeStyle = col; g.lineWidth = 1.5; g.stroke();
   g.lineTo(x + w, y + h); g.lineTo(x, y + h); g.closePath();
-  const gr = g.createLinearGradient(0, y, 0, y + h); gr.addColorStop(0, 'rgba(62,230,255,.22)'); gr.addColorStop(1, 'rgba(62,230,255,0)');
+  const gr = g.createLinearGradient(0, y, 0, y + h); gr.addColorStop(0, `rgba(${T.RGB.acc},.22)`); gr.addColorStop(1, `rgba(${T.RGB.acc},0)`);
   g.fillStyle = gr; g.fill();
 };
 // крупное число + подпись единиц
@@ -213,7 +213,7 @@ T.drag = (cv, cam, opt = {}) => {
 // свечение (bloom): кадр уменьшается ¼ → ⅛ (через кадр), обе копии сводятся в ОДНУ маленькую
 // «карту света», и она ложится на экран одним проходом (раньше — двумя).
 T.bloom = (o, strength = 0.85) => {
-  if (!T.Q.bloom) return;
+  if (!T.Q.bloom || T.theme === 'kurenai') return;            // KURENAI плоская — свечение не считаем вовсе
   const cv = o.cv, g = o.g;
   if (!o.bl) o.bl = [0, 1, 2].map(() => { const c = document.createElement('canvas'); return { c, g: c.getContext('2d', { alpha: false }) }; });
   o.blN = (o.blN || 0) + 1;
@@ -235,6 +235,7 @@ T.bloom = (o, strength = 0.85) => {
 };
 // фон: градиент один раз в маленькую картинку, потом растягивается (не создаётся заново каждый кадр)
 T.backdrop = (g, W, H, fx = 0.45, fy = 0.55) => {
+  if (T.theme === 'kurenai') { g.fillStyle = T.C.bg; g.fillRect(0, 0, W, H); return; }   // KURENAI: ровный фон
   const key = W + 'x' + H + ':' + fx + ':' + fy + ':' + T.C.bg;
   let c = T._bdCache && T._bdCache.get(key);
   if (!c) {
@@ -262,10 +263,10 @@ const paintScan = (x, W, H, d) => {
   for (let y = 0; y < H * d; y += 4) x.fillRect(0, y, W * d, 1);
   x.setTransform(d, 0, 0, d, 0, 0);
   const v = x.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.45, W / 2, H / 2, Math.max(W, H) * 0.75);
-  v.addColorStop(0, 'rgba(5,8,13,0)'); v.addColorStop(1, 'rgba(5,8,13,.7)'); x.fillStyle = v; x.fillRect(0, 0, W, H);
+  v.addColorStop(0, `rgba(${T.RGB.bg},0)`); v.addColorStop(1, `rgba(${T.RGB.bg},.7)`); x.fillStyle = v; x.fillRect(0, 0, W, H);
 };
 T.finish = (g, W, H, paint = paintScan) => {
-  if (!T.Q.scan) return;
+  if (!T.Q.scan || T.theme === 'kurenai') return;             // KURENAI: без сканлайнов и виньетки
   const cv = g.canvas, c = T.finishLayer(W, H, cv.width, cv.height, paint);
   g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; g.drawImage(c, 0, 0); g.restore();
 };
@@ -280,7 +281,7 @@ T.dust = (n = 220, ext = 1.7, top = 1.1) => {
       if (!T.Q.dust) return;
       const b = [[], [], []];
       for (let i = 0; i < n; i++) { const p = cam.p(P[i * 3], P[i * 3 + 1], P[i * 3 + 2]); if (cam.D + p[3] < 0.3) continue; b[p[3] < -0.4 ? 2 : p[3] < 0.6 ? 1 : 0].push(p); }
-      [0.18, 0.32, 0.55].forEach((a, k) => { g.fillStyle = `rgba(62,230,255,${a})`; g.beginPath(); for (const p of b[k]) { const s = Math.max(0.8, p[2] * 0.0045); g.rect(p[0] - s / 2, p[1] - s / 2, s, s); } g.fill(); });
+      [0.18, 0.32, 0.55].forEach((a, k) => { g.fillStyle = `rgba(${T.RGB.acc},${a})`; g.beginPath(); for (const p of b[k]) { const s = Math.max(0.8, p[2] * 0.0045); g.rect(p[0] - s / 2, p[1] - s / 2, s, s); } g.fill(); });
     },
   };
 };
@@ -290,7 +291,7 @@ T.floorGrid = (g, cam, ext = 1.7, step = 0.2, y = 0) => {
   const n = Math.round(ext / step);
   for (let k = -n; k <= n; k++) {
     const c = k * step, a = 0.48 * (1 - Math.abs(c) / (ext + 0.05));
-    g.strokeStyle = `rgba(32,50,64,${a})`;
+    g.strokeStyle = `rgba(${T.RGB.line},${a})`;
     let p = cam.p(c, y, -ext), q = cam.p(c, y, ext); g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); g.stroke();
     p = cam.p(-ext, y, c); q = cam.p(ext, y, c); g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); g.stroke();
   }
