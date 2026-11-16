@@ -172,7 +172,7 @@ void saveSettings() {
   g_prefs.putInt("mic", g_micEn);
   g_prefs.putInt("click", g_clickEn);
   g_prefs.putInt("th2", g_theme);
-  g_prefs.putInt("lang", g_lang);
+  if (!g_langAsk) g_prefs.putInt("lang", g_lang);   // пока язык не выбран — не писать: иначе автосохранение (время с ПК, GPS) съест экран выбора
   g_prefs.putInt("auled", g_auLeds);
   g_prefs.putInt("ausrc", g_auSrc);
   g_prefs.putInt("city", g_city);
