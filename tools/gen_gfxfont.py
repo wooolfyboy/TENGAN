@@ -25,6 +25,7 @@ def main():
             glyphs.append((len(bitmap), 0, 0, 0, 0, 0, "?"))
             continue
         adv = int(round(font.getlength(ch)))
+        if ch == ' ' and '--widespace' in sys.argv[4:]: adv = max(adv, int(round(size * 0.38)))   # у Play пробел узкий — слова слипаются на маленьком экране
         l, t, r, b = font.getbbox(ch, anchor="ls")
         w, h = max(0, r - l), max(0, b - t)
         offset = len(bitmap)
