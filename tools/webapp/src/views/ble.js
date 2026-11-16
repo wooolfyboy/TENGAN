@@ -80,7 +80,7 @@ BU.sceneAny = (g, cam, sw, opt) => BU.scene(g, cam, sw, opt);
 
 // ---- ГОРОД НА ВИДЕОКАРТЕ (WebGL): башни-коробки с окнами, мокрый асфальт с отражениями, туман ----
 // Проекция в шейдере повторяет T.orbit один в один — подписи и касания (cam.p) ложатся точно на башни.
-// Общий для Bluetooth › City и PC › City. SUMI: бумажная «вода» с кругами туши (бамбук рисует 2D поверх).
+// Общий для Bluetooth › City и PC › City.
 // towers: [{x, z, sx, sz, h, col:[r,g,b] 0..255, roof:[r,g,b], seed, glow 0..1, tr, sel}]
 // opt: {t, rings:[радиусы], rmax, grid:'radial'|'square', step, ext}
 BU.glCity = (() => {

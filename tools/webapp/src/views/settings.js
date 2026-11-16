@@ -4,9 +4,6 @@
 // изменения (/api/set). Значение меняется сразу (оптимистично), при ошибке — откатывается.
 // Обычный DOM, а не холст: кнопки, ползунки, переключатели — без нагрузки на кадры.
 (() => {
-  T.KANJI.set = '設';
-  const PAGE_KANJI = { general: '設', ble: '藍', bluetooth: '藍', wifi: '網', 'wi-fi': '網', sub: '波', subghz: '波', 'sub-ghz': '波', sound: '音', snd: '音', alert: '警', alerts: '警' };
-  const kanjiOf = p => PAGE_KANJI[String(p.id || p.name || '').toLowerCase()] || PAGE_KANJI[String(p.name || '').toLowerCase()] || '設';
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const api = (path) => fetch(T.apiBase() + path, { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error('http ' + r.status); return r.json(); });
 
@@ -41,7 +38,7 @@
         return;
       }
       if (this.page >= d.pages.length) this.page = 0;
-      this.tabs.innerHTML = d.pages.map((p, i) => `<button data-i="${i}" class="${i === this.page ? 'on' : ''}"><b class="kj">${kanjiOf(p)}</b>${esc(p.name)}</button>`).join('')
+      this.tabs.innerHTML = d.pages.map((p, i) => `<button data-i="${i}" class="${i === this.page ? 'on' : ''}">${esc(p.name)}</button>`).join('')
         + `<button data-i="act" class="act ${this.page === 'act' ? 'on' : ''}"><b class="kj">動</b>Actions</button>`;
       this.tabs.querySelectorAll('button').forEach(b => b.onclick = () => {
         this.page = b.dataset.i === 'act' ? 'act' : +b.dataset.i;
@@ -50,7 +47,7 @@
       });
       if (this.page === 'act') { this.renderActions(); return; }
       const p = d.pages[this.page];
-      this.body.innerHTML = `<h2 class="set-h"><span class="kj">${kanjiOf(p)}</span>// ${esc(p.name)}</h2>` +
+      this.body.innerHTML = `<h2 class="set-h">// ${esc(p.name)}</h2>` +
         p.items.map((it, j) => `<div class="set-row" data-j="${j}">${this.rowHtml(it)}</div>`).join('');
       this.body.querySelectorAll('.set-row').forEach(row => this.bind(row, p.items[+row.dataset.j]));
     },
@@ -98,11 +95,6 @@
         if (!r || !r.ok) throw new Error((r && r.err) || 'refused');
         if (r.item) Object.assign(it, r.item);
         if (String(it.k).startsWith('al_')) { S.cfgFromItem(r.item || it); if (it.k === 'al_warn' || it.k === 'al_alarm') this.load(true); }   // штаб сразу видит новые пороги
-        if (it.k === 'theme') {                              // тема — сразу и на планшете
-          const th = String(typeof it.v === 'number' ? (it.opts || [])[it.v] : it.v).toLowerCase();
-          if (S.st) S.st.theme = th;
-          T.setTheme(th);
-        }
         this.toast('saved on the stick');
       }).catch(e => { it.v = old; this.toast('not saved · ' + (e.message || 'no link'), true); })
         .finally(() => { this.busy--; if (this.page !== 'act') this.refresh(); });

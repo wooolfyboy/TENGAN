@@ -1,5 +1,5 @@
 // ---- ШТАБ 天眼司令室 (стиль «Евангелиона»): всё, что слышит палка, на одном экране ----
-// Свой фиксированный стиль (оранжевый/красный на чёрном) — не зависит от темы DENKO/SUMI.
+// Свой фиксированный стиль (оранжевый/красный на чёрном) — не зависит от темы оформления.
 // Центр — «радиогоризонт»: BLE точками, Wi-Fi ромбами, датчики 433 треугольниками;
 // ближе к центру = сильнее сигнал. По краям — счётчики, погода, звук, пульты/карты, лог.
 (() => {
@@ -7,7 +7,7 @@ const E = {
   bg: '#050302', or: '#ff8c1a', or2: '#ffb347', dim: '#5a2e08', dk: '#2a1405', red: '#ff2a1f',
   grn: '#69ff6e', cy: '#5fe3ff', txt: '#ffcf99', wht: '#fff4e6',
 };
-// шрифты фиксированные: штаб выглядит одинаково в DENKO и SUMI
+// шрифты фиксированные: штаб выглядит одинаково при любой теме
 const RAJ = "Rajdhani,'Arial Narrow',sans-serif";
 const JP = () => T.SEAL_FONT, FT = () => RAJ, FM = () => T.FM, FC = () => T.FC;
 const font = (g, px, f, w = '') => { g.font = `${w}${px}px ${f}`; };
@@ -223,12 +223,7 @@ T.views.push({
     back.onclick = e => { if (e.target === back) close(); };
   },
 
-  // свои цвета без перекраски SUMI: на время кадра тема «сырая» (см. T.hookCanvas)
   frame(dt, t) {
-    const th = T.theme; T.theme = 'raw';
-    try { this.frame2(dt, t); } finally { T.theme = th; }
-  },
-  frame2(dt, t) {
     const sk = this.sub === 1 ? 'domain' : 'nerv';
     if (this.alSkin !== sk) { this.alSkin = sk; this.root.classList.toggle('hq-domain', sk === 'domain'); }
     // полоса вкладок NERV/DOMAIN сверху: сцена сдвигается под неё (касания — тоже)

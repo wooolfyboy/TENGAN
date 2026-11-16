@@ -372,20 +372,18 @@ static void fillSub() {
   g_evN = 3;
 }
 
-extern int g_theme;
 int main(int argc, char** argv) {
   if (argc > 1) s_outDir = argv[1];
   spr.setColorDepth(16);
   spr.createSprite(320, 170);
   settingsBegin();
-  if (getenv("SIM_THEME")) g_theme = atoi(getenv("SIM_THEME"));   // 0 — DENKO, 1 — SUMI (тушь)
   g_bat.ok = true; g_bat.soc = 87; g_bat.mv = 3980; g_bat.ma = -132; g_bat.tte = 250; g_bat.chgOk = true;
   fillBle(); fillWifi(); fillSub();
   { String j; settingsJson(j);                            // то же, что палка отдаёт планшету по /api/settings
     FILE* f = fopen((std::string(getenv("SIM_OUT") ? getenv("SIM_OUT") : "tools/sim/out") + "/settings.json").c_str(), "w");
     if (f) { fputs(j.c_str(), f); fclose(f); }
     String r; settingsSetKey("ledbr", "70", r); printf("set ledbr: %s\n", r.c_str());
-    settingsSetKey("theme", "sumi", r); printf("set theme: %s\n", r.c_str()); settingsSetKey("theme", "denko", r);
+    settingsSetKey("theme", "denko", r); printf("set theme: %s\n", r.c_str());
     settingsSetKey("nope", "1", r); printf("set nope: %s\n", r.c_str()); }
 
   { const uint32_t ts[] = { 250, 600, 1000, 1300, 1680, 1950, 2200 };
@@ -521,16 +519,9 @@ int main(int argc, char** argv) {
   { uint8_t qr[29 * 29]; for (int i = 0; i < 29 * 29; i++) qr[i] = (noise(i) > 0.5f) || ((i % 29 < 7 || i % 29 > 21) && (i / 29 < 7) && !((i % 29 == 1 || i % 29 == 5 || i % 29 == 23 || i % 29 == 27) && i / 29 > 0 && i / 29 < 6));
     WebView v = { "TENGAN-3F2A", "48213907", "192.168.4.1", 1, 214, true, "sub-ghz" };
     drawWebScreen(v, qr, 29); snap("60_web"); }
-  { WebLink l = { 1, "BLE  WX  ", 3400, 0 };              // планшет подключён: живая картинка по теме
+  { WebLink l = { 1, "BLE  WX  ", 3400, 0 };              // планшет подключён: живая картинка
     char nm[32];
     for (int f = 0; f < 48; f++) { drawWebLink(l, 2000 + f * 70); snprintf(nm, sizeof nm, "anim_link_%03d", f); snap(nm); } }
-  { // тема с планшета: SUMI -> DENKO посреди анимации связи (воспроизведение падения)
-    WebLink l = { 1, "BLE  ", 3000, 0 }; String o;
-    settingsSetKey("theme", "sumi", o); printf("set sumi: %s\n", o.c_str());
-    for (int f = 0; f < 5; f++) drawWebLink(l, 9000 + f * 70);
-    settingsSetKey("theme", "denko", o); printf("set denko: %s\n", o.c_str());
-    for (int f = 0; f < 5; f++) drawWebLink(l, 9500 + f * 70);
-    snap("zz_theme_flip"); printf("theme flip ok\n"); }
   { // IR и NFC (разбор — настоящий код, данные синтетические)
     g_ir.on = g_ir.ok = true;
     drawIr(s_now);                                       snap("80_ir_idle");

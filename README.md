@@ -12,7 +12,7 @@ Bluetooth · Wi-Fi · Sub-GHz · звук · монитор ноутбука · 
 [![build](https://github.com/wolfyboy1488/lilygostuff/actions/workflows/build.yml/badge.svg)](https://github.com/wolfyboy1488/lilygostuff/actions/workflows/build.yml)
 ![ESP32-S3](https://img.shields.io/badge/ESP32--S3-T--Embed%20CC1101-3fd9ff?style=flat-square)
 ![receive only](https://img.shields.io/badge/RF-receive%20only-7f97a3?style=flat-square)
-![style](https://img.shields.io/badge/themes-DENKO%20%C2%B7%20SUMI-02090b?style=flat-square&labelColor=3fd9ff)
+![style](https://img.shields.io/badge/theme-DENKO-02090b?style=flat-square&labelColor=3fd9ff)
 
 [**Скачать**](https://github.com/wolfyboy1488/lilygostuff/releases/latest) ·
 [Быстрый старт](#-быстрый-старт) ·
@@ -46,12 +46,6 @@ Bluetooth · Wi-Fi · Sub-GHz · звук · монитор ноутбука · 
 <img src="docs/screens.png" width="100%" alt="Экраны TENGAN">
 <br><sub>Экран палки 320×170, увеличен ровно вдвое — по пикселю. Все картинки — настоящий код рисования, снятый в симуляторе.</sub>
 </div>
-
-<details>
-<summary><b>Те же экраны в теме SUMI 墨 (тушь на бумаге)</b></summary>
-<br>
-<img src="docs/screens_sumi.png" width="100%" alt="Экраны TENGAN в теме SUMI">
-</details>
 
 ## 🚀 Быстрый старт
 
@@ -234,14 +228,10 @@ Sub-GHz (спектр, водопад, журнал) · Sound · System (бат�
 считаются по твоим координатам, а палка получает их как город «GPS». Экран не гаснет, без системных панелей.
 Поставить: скопировать APK на планшет, открыть, разрешить установку; иконка — печать 天眼.
 
-## 🎨 Темы — DENKO 電光 и SUMI 墨
+## 🎨 Тема — DENKO 電光
 
-**Settings → General → Theme.** Палка, планшет и телефонная страница переключаются вместе.
-
-<img src="docs/tablet_sumi.jpg" width="100%" alt="Тема SUMI на планшете">
-
-**SUMI 墨 — «тушь»:** рисовая бумага, тушь и киноварь. Радар — энсо и капли туши, город — бамбук в тумане,
-звук — горы сансуй с красным солнцем, запуск — мазок кистью между печатями 天 и 眼.
+Сейчас тема одна: **DENKO 電光** — светящийся HUD на тёмном фоне. Тему SUMI 墨 (тушь) убрали — на планшете
+она слишком тормозила; на её место будет новая тема.
 
 ## 💻 PC — монитор ноутбука и пульт музыки
 

@@ -45,38 +45,17 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--hot);font:16px/1
 @media (max-width:1400px){#radios{display:none}#nav button{padding:8px 8px 7px;font-size:16px}}
 @media (max-width:760px){.logo .nm{font-size:20px}#nav button{padding:7px 9px 6px;font-size:15px}#clock{display:none}}
 @media (prefers-reduced-motion:reduce){#wipe.go{animation:none}}
-/* ---- тема SUMI: тушь на рисовой бумаге ---- */
-html.sumi{--bg:#ece4d4;--panel:#e2d4c2;--line:#c9bfae;--acc:#1b1814;--hot:#1b1814;--label:#4a433b;--steel:#4a433b;--dim:#8a8174;--alert:#c23a2b;
   --ft:'Noto Serif','Liberation Serif',Georgia,serif;color-scheme:light}
-html.sumi body{background:var(--bg);color:var(--acc)}
-html.sumi #bar{background:linear-gradient(180deg,rgba(236,228,212,1),rgba(236,228,212,.88))}
-html.sumi #bar::after{height:2px;background:linear-gradient(90deg,var(--acc),rgba(27,24,20,.25) 70%,transparent);border-radius:1px}
-html.sumi .logo .nm{font-family:var(--ft);font-weight:700;letter-spacing:.04em}
-html.sumi #seal{background:var(--alert);box-shadow:inset 0 0 0 1.5px var(--alert),inset 0 0 0 2.5px var(--bg);-webkit-text-stroke:.6px var(--bg)}
-html.sumi #nav button{color:var(--label);clip-path:none;border:0;border-bottom:3px solid transparent;font-family:var(--ft);font-weight:600;text-transform:none;letter-spacing:.02em}
-html.sumi #nav button .kj{font:400 1.1em/1 'Tengan Seal',sans-serif;margin-right:.3em;color:var(--dim)}
-html.sumi #nav button.on{color:var(--acc);background:transparent;border-color:var(--alert)}
-html.sumi #nav button.on::before{content:''}
-html.sumi #nav button.on .kj{color:var(--alert)}
-html.sumi #subs button{background:rgba(236,228,212,.75);color:var(--label);clip-path:none;border:1px solid transparent;font-family:var(--ft);text-transform:none}
-html.sumi #subs button.on{color:var(--acc);border-color:var(--acc)}
-html.sumi .dot.live{background:var(--acc);box-shadow:none}
-html.sumi #clock{font-family:var(--ft)}
-html.sumi #wipe{background:var(--acc);box-shadow:0 0 14px rgba(27,24,20,.4)}
-html.sumi #fs{color:var(--acc)}
-html.sumi #modal .card{background:rgba(236,228,212,.97);border-color:var(--acc)}
 /* ---- Settings: пульт управления палкой (DOM, обе темы — через токены) ---- */
 .setv{overflow:auto;-webkit-user-select:none}
 .set-wrap{display:grid;grid-template-columns:minmax(180px,22%) 1fr;gap:18px;padding:22px max(18px,env(safe-area-inset-right)) 28px max(18px,env(safe-area-inset-left));min-height:100%;box-sizing:border-box}
 .set-tabs{display:flex;flex-direction:column;gap:6px;position:sticky;top:0;align-self:start}
 .set-tabs button{display:flex;align-items:center;gap:10px;text-align:left;background:rgba(14,42,52,.28);color:var(--label);border:1px solid rgba(62,230,255,.18);padding:12px 14px;font:600 19px/1 var(--ft);letter-spacing:.05em;text-transform:uppercase;cursor:pointer;clip-path:polygon(0 0,calc(100% - 10px) 0,100% 10px,100% 100%,0 100%)}
-.set-tabs button .kj{display:none;font:400 1.05em/1 'Tengan Seal',sans-serif;font-weight:400}
 .set-tabs button.on{color:var(--hot);border-color:var(--acc);background:rgba(62,230,255,.12)}
 .set-tabs button.on::before{content:'// ';color:var(--acc)}
 .set-tabs button.act{margin-top:10px}
 .set-body{display:flex;flex-direction:column;gap:10px;min-width:0}
 .set-h{margin:2px 0 8px;font:600 28px/1 var(--ft);color:var(--acc);letter-spacing:.04em;text-transform:uppercase}
-.set-h .kj{display:none}
 .set-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 22px;padding:14px 18px;background:rgba(14,42,52,.24);border:1px solid rgba(62,230,255,.16);clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px))}
 .set-name{display:flex;flex-direction:column;gap:4px;min-width:200px;flex:1}
 .set-name b{font:600 21px/1.1 var(--ft);color:var(--hot);letter-spacing:.03em;text-transform:uppercase}
@@ -111,30 +90,6 @@ html.sumi #modal .card{background:rgba(236,228,212,.97);border-color:var(--acc)}
 .lbl-btns{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
 .lbl-btns button{padding:12px 18px;background:transparent;color:var(--label);border:1px solid rgba(62,230,255,.3);font:600 17px/1 var(--ft);letter-spacing:.08em;cursor:pointer}
 .lbl-btns button.pri{background:var(--acc);color:var(--bg);border-color:var(--acc)}
-/* SUMI: бумага, тушь, киноварь */
-html.sumi .set-tabs button{background:rgba(236,228,212,.6);color:var(--label);border:1px solid var(--line);clip-path:none;text-transform:none;font-weight:600}
-html.sumi .set-tabs button .kj,html.sumi .set-h .kj{display:inline;color:var(--dim);margin-right:.2em}
-html.sumi .set-tabs button.on{color:var(--acc);border-color:var(--acc);background:rgba(236,228,212,.95);box-shadow:inset 3px 0 0 var(--alert)}
-html.sumi .set-tabs button.on::before{content:''}
-html.sumi .set-tabs button.on .kj{color:var(--alert)}
-html.sumi .set-h{color:var(--acc);text-transform:none}
-html.sumi .set-h .kj{color:var(--alert);font:400 1em/1 'Tengan Seal',sans-serif}
-html.sumi .set-row{background:rgba(236,228,212,.7);border-color:var(--line);clip-path:none;border-radius:2px}
-html.sumi .set-name b{text-transform:none;font-weight:700}
-html.sumi .chips button{border-color:var(--line);color:var(--label)}
-html.sumi .chips button.on{background:var(--acc);color:var(--bg);border-color:var(--acc)}
-html.sumi .rng input::-webkit-slider-runnable-track{background:linear-gradient(90deg,var(--acc),rgba(27,24,20,.15))}
-html.sumi .rng input::-webkit-slider-thumb{background:var(--alert);border-color:var(--acc);transform:none;border-radius:50%}
-html.sumi .tgl i{border-color:var(--line);background:rgba(236,228,212,.8);border-radius:15px}
-html.sumi .tgl i::after{background:var(--dim);border-radius:50%;transform:none}
-html.sumi .tgl.on i{border-color:var(--acc);background:rgba(194,58,43,.12)}
-html.sumi .tgl.on i::after{background:var(--alert)}
-html.sumi .set-toast{background:rgba(236,228,212,.96);border-color:var(--acc);color:var(--acc)}
-html.sumi .set-toast.bad{border-color:var(--alert);color:var(--alert)}
-html.sumi .lbl-dlg input{background:rgba(255,255,255,.4);border-color:var(--acc);color:var(--acc)}
-html.sumi .lbl-btns button{border-color:var(--line);color:var(--label)}
-html.sumi .lbl-btns button.pri{background:var(--alert);border-color:var(--alert);color:var(--bg)}
-@media (max-width:1400px){html.sumi #nav button{padding:8px 7px 6px;font-size:16px}html.sumi #nav button .kj{margin-right:.15em}}
 #linkTxt{max-width:11em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* штаб: кнопка и панель настроек тревог (свой стиль: NERV оранжевый / DOMAIN фиолетовый) */
 .hq-gear{position:absolute;top:6px;right:16px;z-index:3;height:32px;padding:0 14px;background:#0b0603;color:#ffb347;border:1px solid #ff8c1a;font:600 15px/1 Rajdhani,sans-serif;letter-spacing:.12em;cursor:pointer}
