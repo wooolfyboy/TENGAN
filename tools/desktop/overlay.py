@@ -193,7 +193,7 @@ class Widget:
         win_style(self.win, opacity=float(p.get("opacity", 1.0)), clickthrough=bool(p.get("clickthrough")), tool=True)
         if self.ready:
             try:
-                self.win.evaluate_js("W.style(%s)" % json.dumps(self.app.style()))
+                self.win.evaluate_js("W.style(%s);W.lang(%s)" % (json.dumps(self.app.style()), json.dumps(self.app.lang)))
             except Exception:
                 pass
 

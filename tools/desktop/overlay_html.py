@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-"""Страницы всплывашек и виджета (свои маленькие окна поверх всех). Стили NERV / DOMAIN.
+"""Страницы всплывашек и виджета (свои маленькие окна поверх всех). Стили по теме TENGAN: DENKO (оранжевый штаб) / KURENAI (чёрный · белый · алый).
 
 Окна получают данные из Python (evaluate_js) и зовут обратно через window.pywebview.api:
-  всплывашки:  P.add(извещение), P.style('nerv'|'domain') → api.popup_size(h), api.popup_click()
-  виджет:      W.update(снимок), W.style(...)               → api.widget_open()
+  всплывашки:  P.add(извещение), P.style('denko'|'kurenai') → api.popup_size(h), api.popup_click()
+  виджет:      W.update(снимок), W.style(...), W.lang('en'|'ru')               → api.widget_open()
 """
 
 COMMON_CSS = """
@@ -25,32 +25,32 @@ POPUP_HTML = """<!doctype html><html><head><meta charset="utf-8"><style>%CSS%
 .tx{position:absolute;left:68px;top:66px;right:10px;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tm{position:absolute;left:0;bottom:0;height:3px;width:100%;transform-origin:left;animation:tm linear forwards}
 @keyframes tm{from{transform:scaleX(1)}to{transform:scaleX(0)}}
-/* --- NERV: чёрный, оранжевая рамка, полосы «осторожно» --- */
-body.nerv .card{background:#060302;border:2px solid #ff8c1a;color:#ffcf99}
-body.nerv .card .side{position:absolute;left:0;top:0;bottom:0;width:54px;background:repeating-linear-gradient(-45deg,#ff8c1a 0 9px,#000 9px 18px)}
-body.nerv .kj{color:#ff8c1a}body.nerv .tt{color:#ffb347}body.nerv .tm{background:#ff8c1a}
-body.nerv .card.alert{border-color:#ff2a1f;background:#1c0200}
-body.nerv .card.alert .side{background:repeating-linear-gradient(-45deg,#ff2a1f 0 9px,#000 9px 18px)}
-body.nerv .card.alert .kj,body.nerv .card.alert .tt{color:#ff2a1f}body.nerv .card.alert .tm{background:#ff2a1f}
-body.nerv .card.alert .kj{animation:bl 1s steps(1) 3}
+/* --- DENKO: штаб в стиле NERV — чёрный, оранжевая рамка, полосы «осторожно» --- */
+body.denko .card{background:#060302;border:2px solid #ff8c1a;color:#ffcf99}
+body.denko .card .side{position:absolute;left:0;top:0;bottom:0;width:54px;background:repeating-linear-gradient(-45deg,#ff8c1a 0 9px,#000 9px 18px)}
+body.denko .card .side b{display:none}
+body.denko .kj{color:#ff8c1a}body.denko .tt{color:#ffb347}body.denko .tm{background:#ff8c1a}
+body.denko .card.alert{border-color:#ff2a1f;background:#1c0200}
+body.denko .card.alert .side{background:repeating-linear-gradient(-45deg,#ff2a1f 0 9px,#000 9px 18px)}
+body.denko .card.alert .kj,body.denko .card.alert .tt{color:#ff2a1f}body.denko .card.alert .tm{background:#ff2a1f}
+body.denko .card.alert .kj{animation:bl 1s steps(1) 3}
 @keyframes bl{50%{opacity:.2}}
-/* --- DOMAIN: фиолетовая тьма, бумажная «офуда» с печатью --- */
-body.domain .card{background:radial-gradient(circle at 20% 50%,#24185a,#0b0820 70%);border:2px solid #d9d4ef;outline:1px solid #000;color:#d9d4ef;
- box-shadow:inset 0 0 22px rgba(157,107,255,.35)}
-body.domain .card .side{position:absolute;left:6px;top:6px;bottom:6px;width:42px;background:#efe6d2;border:1px solid #111;
+/* --- KURENAI: чёрный, белая рамка, белая косая плашка с алой печатью --- */
+body.kurenai .card{background:#0b0b0b;border:2px solid #f4f1ea;color:#f4f1ea}
+body.kurenai .card .side{position:absolute;left:8px;top:8px;bottom:8px;width:40px;background:#f4f1ea;transform:skewX(-8deg);
  display:flex;align-items:center;justify-content:center}
-body.domain .card .side b{display:block;color:#e3212b;border:2px solid #e3212b;font:900 14px/1.05 'Yu Gothic','Meiryo','IPAGothic',sans-serif;padding:3px 2px;transform:rotate(-6deg);text-align:center}
-body.nerv .card .side b{display:none}
-body.domain .kj{color:#efe6d2;text-shadow:0 0 10px rgba(127,178,255,.8)}body.domain .tt{color:#7fb2ff}body.domain .tm{background:#9d6bff}
-body.domain .card.alert{box-shadow:inset 0 0 26px rgba(227,33,43,.55)}body.domain .card.alert .kj{color:#ff3b45;text-shadow:0 0 12px rgba(227,33,43,.9)}
-body.domain .card.alert .tt{color:#ff6b72}body.domain .card.alert .tm{background:#e3212b}
-</style></head><body class="nerv"><div id="stack"></div><script>
+body.kurenai .card .side b{display:block;color:#e5262f;font:900 14px/1.05 'Yu Gothic','Meiryo','IPAGothic',sans-serif;transform:skewX(8deg);text-align:center}
+body.kurenai .kj{color:#f4f1ea}body.kurenai .tt{color:#e5262f;font-family:Anton,Impact,'Arial Narrow',sans-serif;font-weight:400;letter-spacing:1px;font-size:15px}
+body.kurenai .tm{background:#e5262f}
+body.kurenai .card.alert{border-color:#e5262f;background:#1a0405}body.kurenai .card.alert .side{background:#e5262f}
+body.kurenai .card.alert .side b{color:#0b0b0b}body.kurenai .card.alert .kj{color:#e5262f;animation:bl 1s steps(1) 3}
+</style></head><body class="denko"><div id="stack"></div><script>
 var MAX=3,DUR=4500,S=document.getElementById('stack');
 function api(){return window.pywebview&&window.pywebview.api}
 function report(){var a=api();var h=S.children.length?S.getBoundingClientRect().height+4:0;if(a&&a.popup_size)a.popup_size(Math.ceil(h))}
 var SEAL={new:'接近',tracker:'追跡',ir:'赤外',nfc:'近接',sensor:'感知',temp:'外気',battery:'電池',link:'通信'};
 window.P={
- style:function(s){document.body.className=s||'nerv'},
+ style:function(s){document.body.className=s||'denko'},
  dur:function(s){DUR=Math.max(1500,s*1000)},
  add:function(n){
   while(S.children.length>=MAX){S.removeChild(S.firstChild)}
@@ -78,17 +78,18 @@ body{width:100vw;height:100vh}
 .parts{display:flex;gap:6px;font-size:9px;letter-spacing:1px}.parts span{flex:1}.parts u{display:block;height:3px;margin-top:2px;text-decoration:none}
 .tp{font:700 26px 'Segoe UI',sans-serif;line-height:1}.tp small{font-size:12px;font-weight:400;margin-left:4px}
 .ln{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-/* NERV */
-body.nerv #w{background:#050302;border:2px solid #ff8c1a}
-body.nerv #hd{color:#ff8c1a}body.nerv .lv b{color:#ffb347}body.nerv .tp{color:#ffb347}body.nerv .ln{color:#ffcf99}
-body.nerv .bar i{background:#2a1405}body.nerv .bar i.on{background:#ff8c1a}body.nerv .bar i.hot{background:#ff2a1f}
-body.nerv .parts{color:#ff8c1a}body.nerv .parts u{background:#ff8c1a}body.nerv .parts span.off{opacity:.3}
-/* DOMAIN */
-body.domain #w{background:radial-gradient(circle at 25% 60%,#1d1450,#07060c 75%);border:2px solid #d9d4ef}
-body.domain #hd{color:#efe6d2}body.domain .lv b{color:#7fb2ff}body.domain .tp{color:#efe6d2}body.domain .ln{color:#d9d4ef}
-body.domain .bar i{background:#1a1730;transform:skewX(-20deg)}body.domain .bar i.on{background:#4f7bff}body.domain .bar i.hot{background:#e3212b}
-body.domain .parts{color:#9d6bff}body.domain .parts u{background:#9d6bff}body.domain .parts span.off{opacity:.3}
-</style></head><body class="nerv"><div id="w">
+/* DENKO (штаб NERV) */
+body.denko #w{background:#050302;border:2px solid #ff8c1a}
+body.denko #hd{color:#ff8c1a}body.denko .lv b{color:#ffb347}body.denko .tp{color:#ffb347}body.denko .ln{color:#ffcf99}
+body.denko .bar i{background:#2a1405}body.denko .bar i.on{background:#ff8c1a}body.denko .bar i.hot{background:#ff2a1f}
+body.denko .parts{color:#ff8c1a}body.denko .parts u{background:#ff8c1a}body.denko .parts span.off{opacity:.3}
+/* KURENAI */
+body.kurenai #w{background:#0b0b0b;border:2px solid #f4f1ea}
+body.kurenai #hd{color:#f4f1ea}body.kurenai #hd .jp{background:#e5262f;color:#f4f1ea;padding:0 3px}
+body.kurenai .lv b{color:#e5262f}body.kurenai .tp{color:#f4f1ea;font-family:Anton,Impact,'Arial Narrow',sans-serif;font-weight:400}body.kurenai .ln{color:#bdb9b0}
+body.kurenai .bar i{background:#2a2a2a;transform:skewX(-12deg)}body.kurenai .bar i.on{background:#f4f1ea}body.kurenai .bar i.hot{background:#e5262f}
+body.kurenai .parts{color:#bdb9b0}body.kurenai .parts u{background:#e5262f}body.kurenai .parts span.off{opacity:.3}
+</style></head><body class="denko"><div id="w">
 <div id="hd"><span class="jp" id="tt">天眼</span><span>TENGAN</span><span class="sp"></span><span id="bat" class="mono"></span><i class="dot" id="lk"></i></div>
 <canvas id="rd" width="236" height="236"></canvas>
 <div id="rt">
@@ -99,18 +100,20 @@ body.domain .parts{color:#9d6bff}body.domain .parts u{background:#9d6bff}body.do
  <div class="ln mono" id="ir">IR —</div>
  <div class="ln mono" id="nfc">NFC —</div>
 </div></div><script>
-var STYLE='nerv',D=null,t0=Date.now(),B=document.getElementById('bar');
+var STYLE='denko',LANG='en',D=null,t0=Date.now(),B=document.getElementById('bar');
 for(var i=0;i<20;i++)B.appendChild(document.createElement('i'));
-var NAMES=['平穏','活発','注意','警報'],EN=['QUIET','ACTIVE','ATTN','ALARM'];
-var COL={nerv:{ring:'rgba(255,140,26,.5)',sw:'rgba(255,140,26,',dot:'#ffb347',neu:'#ff2a1f',sav:'#69ff6e',bg:'#050302'},
-         domain:{ring:'rgba(217,212,239,.45)',sw:'rgba(127,178,255,',dot:'#7fb2ff',neu:'#e3212b',sav:'#efe6d2',bg:'#07060c'}};
+var NAMES=['平穏','活発','注意','警報'],LV={en:['QUIET','ACTIVE','ATTN','ALARM'],ru:['ТИХО','АКТИВНО','ВНИМАНИЕ','ТРЕВОГА']},
+    NOS={en:'no outdoor sensor',ru:'нет уличного датчика'},BATW={en:'BAT ',ru:'БАТ '};
+var COL={denko:{ring:'rgba(255,140,26,.5)',sw:'rgba(255,140,26,',dot:'#ffb347',neu:'#ff2a1f',sav:'#69ff6e',bg:'#050302'},
+         kurenai:{ring:'rgba(244,241,234,.4)',sw:'rgba(229,38,47,',dot:'#f4f1ea',neu:'#e5262f',sav:'#bdb9b0',bg:'#0b0b0b'}};
 function api(){return window.pywebview&&window.pywebview.api}
 document.getElementById('w').ondblclick=function(){var a=api();if(a&&a.widget_open)a.widget_open()};
 function ago(t){if(!t)return'';var s=Math.max(0,Math.round(Date.now()/1000-t));return s<60?s+'s':Math.round(s/60)+'m'}
 window.W={
- style:function(s){STYLE=s||'nerv';document.body.className=STYLE},
+ style:function(s){STYLE=COL[s]?s:'denko';document.body.className=STYLE},
+ lang:function(l){LANG=l==='ru'?'ru':'en';if(D)W.update(D)},
  update:function(d){D=d;var a=d.act||{v:0,state:0,parts:{},en:{}};
-  document.getElementById('st').textContent=NAMES[a.state]||'';document.getElementById('pc').textContent=Math.round(a.v*100)+'% '+EN[a.state];
+  document.getElementById('st').textContent=NAMES[a.state]||'';document.getElementById('pc').textContent=Math.round(a.v*100)+'% '+LV[LANG][a.state];
   var n=Math.round(a.v*20),w=Math.round((a.warn||.6)*20);
   for(var i=0;i<20;i++)B.children[i].className=i<n?(i>=w?'hot':'on'):'';
   var P=document.getElementById('parts');P.innerHTML='';
@@ -118,11 +121,11 @@ window.W={
    s.className=a.en&&a.en[k[0]]===false?'off':'';s.innerHTML=k[1]+'<u style="width:'+Math.round(((a.parts||{})[k[0]]||0)*100)+'%"></u>';P.appendChild(s)});
   var tp=document.getElementById('tp'),tps=document.getElementById('tps');
   if(d.temp&&d.temp.t!=null){tp.firstChild.nodeValue=(d.temp.t>0?'+':'')+d.temp.t.toFixed(1)+'°';tps.textContent=(d.temp.h!=null?d.temp.h+'% ':'')+(d.temp.src||'')}
-  else{tp.firstChild.nodeValue='—';tps.textContent='no outdoor sensor'}
+  else{tp.firstChild.nodeValue='—';tps.textContent=NOS[LANG]}
   document.getElementById('ir').textContent=d.ir?'IR  '+(d.ir.brand||d.ir.p)+'  '+ago(d.ir.t):'IR  —';
   document.getElementById('nfc').textContent=d.nfc?'NFC '+d.nfc.fam+'  '+ago(d.nfc.t):'NFC —';
-  document.getElementById('bat').textContent=d.bat!=null?'BAT '+d.bat+'%':'';
-  var lk=document.getElementById('lk');lk.style.background=d.link?(STYLE==='nerv'?'#69ff6e':'#7fb2ff'):'#ff2a1f';
+  document.getElementById('bat').textContent=d.bat!=null?BATW[LANG]+d.bat+'%':'';
+  var lk=document.getElementById('lk');lk.style.background=d.link?(STYLE==='denko'?'#69ff6e':'#f4f1ea'):'#ff2a1f';
  }};
 var cv=document.getElementById('rd'),g=cv.getContext('2d');
 function frame(){requestAnimationFrame(frame);var C=COL[STYLE],W=cv.width,H=cv.height,cx=W/2,cy=H/2,R=W/2-6,t=(Date.now()-t0)/1000;

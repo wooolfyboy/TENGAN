@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Демо-страницы всплывашек и виджета с выдуманными данными (для просмотра в браузере без палки).
+"""Демо-страницы всплывашек и виджета с выдуманными данными (для просмотра в браузере без TENGAN).
 
     python3 tools/desktop/render_preview.py <папка>
-Создаёт popup_nerv.html, popup_domain.html, widget_nerv.html, widget_domain.html.
+Создаёт popup_<тема>_<язык>.html и widget_<тема>_<язык>.html (темы denko / kurenai, языки en / ru).
 """
 import json
 import os
@@ -11,6 +11,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from overlay_html import POPUP_HTML, WIDGET_HTML  # noqa: E402
 from events import Engine  # noqa: E402
+from tengan_desktop import note_title  # noqa: E402
 
 NOTES = [dict(kind="new", kj="接近警告", title="NEW DEVICE NEARBY", text="JBL TUNE770NC · -52 dBm", sev="alert"),
          dict(kind="ir", kj="赤外線", title="REMOTE", text="Samsung TV · NEC 0x07", sev="info"),
@@ -35,12 +36,15 @@ def demo_snapshot():
 def main(out):
     os.makedirs(out, exist_ok=True)
     snap = demo_snapshot()
-    for st in ("nerv", "domain"):
-        adds = "".join("P.add(%s);" % json.dumps(n, ensure_ascii=False) for n in NOTES)
-        with open(os.path.join(out, "popup_%s.html" % st), "w", encoding="utf-8") as f:
-            f.write(POPUP_HTML.replace("</body>", '<script>P.style("%s");P.dur(60);%s</script></body>' % (st, adds)))
-        with open(os.path.join(out, "widget_%s.html" % st), "w", encoding="utf-8") as f:
-            f.write(WIDGET_HTML.replace("</body>", '<script>W.style("%s");W.update(%s)</script></body>' % (st, json.dumps(snap, ensure_ascii=False))))
+    for st in ("denko", "kurenai"):
+        for lang in ("en", "ru"):
+            notes = [dict(n, title=note_title(n["title"], lang)) for n in NOTES]
+            adds = "".join("P.add(%s);" % json.dumps(n, ensure_ascii=False) for n in notes)
+            with open(os.path.join(out, "popup_%s_%s.html" % (st, lang)), "w", encoding="utf-8") as f:
+                f.write(POPUP_HTML.replace("</body>", '<script>P.style("%s");P.dur(60);%s</script></body>' % (st, adds)))
+            with open(os.path.join(out, "widget_%s_%s.html" % (st, lang)), "w", encoding="utf-8") as f:
+                f.write(WIDGET_HTML.replace("</body>", '<script>W.style("%s");W.lang("%s");W.update(%s)</script></body>'
+                                            % (st, lang, json.dumps(snap, ensure_ascii=False))))
     print("готово:", out, "активность", snap["act"]["v"], "устройств", snap["n"])
 
 
