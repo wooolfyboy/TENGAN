@@ -136,3 +136,29 @@ html.sumi .lbl-btns button{border-color:var(--line);color:var(--label)}
 html.sumi .lbl-btns button.pri{background:var(--alert);border-color:var(--alert);color:var(--bg)}
 @media (max-width:1400px){html.sumi #nav button{padding:8px 7px 6px;font-size:16px}html.sumi #nav button .kj{margin-right:.15em}}
 #linkTxt{max-width:11em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* штаб: кнопка и панель настроек тревог (свой стиль: NERV оранжевый / DOMAIN фиолетовый) */
+.hq-gear{position:absolute;top:6px;right:16px;z-index:3;height:32px;padding:0 14px;background:#0b0603;color:#ffb347;border:1px solid #ff8c1a;font:600 15px/1 Rajdhani,sans-serif;letter-spacing:.12em;cursor:pointer}
+.hq-gear .kj,.hq-al .kj{font:400 1em/1 'Tengan Seal',sans-serif;letter-spacing:.05em}
+.hq-gear:hover{background:#ff8c1a;color:#000}
+.hq-al-back{position:absolute;inset:44px 0 0 0;z-index:4;background:rgba(0,0,0,.35)}
+.hq-al{position:absolute;top:8px;right:16px;width:min(560px,94vw);max-height:calc(100% - 24px);overflow:auto;background:#070402;border:2px solid #ff8c1a;box-shadow:0 0 24px rgba(255,140,26,.25);color:#ffcf99;font:15px/1.25 'Share Tech Mono',monospace}
+.hq-al .h{display:flex;justify-content:space-between;align-items:center;background:#ff8c1a;color:#000;padding:6px 12px;font:600 18px/1 Rajdhani,sans-serif;letter-spacing:.1em;position:sticky;top:0}
+.hq-al .x{background:none;border:0;color:#000;font-size:20px;cursor:pointer}
+.hq-al .r{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:9px 12px;border-bottom:1px dashed #5a2e08}
+.hq-al .n{display:flex;flex-direction:column;min-width:0}.hq-al .n b{color:#ffb347;font:600 16px/1.1 Rajdhani,sans-serif;letter-spacing:.06em;text-transform:uppercase}.hq-al .n i{font-style:normal;color:#b4875a;font-size:12px}
+.hq-al button{font:600 14px/1 Rajdhani,sans-serif;letter-spacing:.06em;cursor:pointer}
+.hq-al .st{display:flex;align-items:center;gap:6px;flex:none}.hq-al .st button{width:34px;height:30px;background:#140a03;color:#ffb347;border:1px solid #ff8c1a;font-size:18px}
+.hq-al .st output{min-width:78px;text-align:center;color:#fff4e6;font:600 18px/1 Rajdhani,sans-serif}
+.hq-al .ch{display:flex;gap:4px;flex:none}.hq-al .ch button,.hq-al .tg{padding:7px 10px;background:#140a03;color:#b4875a;border:1px solid #5a2e08;text-transform:uppercase}
+.hq-al .ch button.on,.hq-al .tg.on{background:#ff8c1a;color:#000;border-color:#ff8c1a}
+.hq-al .tg{min-width:64px}
+.hq-al .f{display:flex;justify-content:space-between;align-items:center;padding:10px 12px}.hq-al .msg{color:#69ff6e;font-size:12px}
+.hq-al .rst{padding:8px 12px;background:none;color:#ff2a1f;border:1px solid #ff2a1f}
+.hq-domain .hq-gear{background:#0d0b17;color:#d9d4ef;border-color:#9d6bff}.hq-domain .hq-gear:hover{background:#9d6bff;color:#000}
+.hq-domain .hq-al{background:#0a0912;border-color:#9d6bff;box-shadow:0 0 28px rgba(157,107,255,.3);color:#d9d4ef}
+.hq-domain .hq-al .h{background:#efe6d2;color:#111}.hq-domain .hq-al .x{color:#e3212b}
+.hq-domain .hq-al .r{border-bottom-color:#3a3560}.hq-domain .hq-al .n b{color:#efe6d2}.hq-domain .hq-al .n i{color:#8a85b0}
+.hq-domain .hq-al .st button{background:#14112a;color:#7fb2ff;border-color:#4f7bff}.hq-domain .hq-al .st output{color:#efe6d2}
+.hq-domain .hq-al .ch button,.hq-domain .hq-al .tg{background:#14112a;color:#8a85b0;border-color:#3a3560}
+.hq-domain .hq-al .ch button.on,.hq-domain .hq-al .tg.on{background:#9d6bff;color:#000;border-color:#9d6bff}
+.hq-domain .hq-al .msg{color:#7fb2ff}.hq-domain .hq-al .rst{color:#e3212b;border-color:#e3212b}

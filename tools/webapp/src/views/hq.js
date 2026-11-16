@@ -168,8 +168,60 @@ T.views.push({
     this.sweep = 0; this.wf = []; this.wfPk = -1; this.lvl = 0; this.alertT = -99; this.alertTxt = null;
     this.prevIr = 0; this.prevNfc = 0; this.flashIr = -99; this.flashNfc = -99; this.scan = null; this.seenAt = new Map();
     this.cv.cv.addEventListener('pointerup', e => { const h = T.hits.at(e.offsetX, e.offsetY); if (h && h.go) T.app.go(h.go); });
+    this.alUI();
   },
   unmount() { this.cv.dispose(); this.root.remove(); },
+
+  // ---- ⚙ настройки тревог прямо в штабе (те же пункты, что Settings › Alerts на палке и планшете) ----
+  alUI() {
+    const esc = x => String(x == null ? '' : x).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const btn = T.el('button', 'hq-gear', '⚙ ALERTS · <b class="kj">警報設定</b>');
+    const back = T.el('div', 'hq-al-back'); back.hidden = true;
+    const pan = T.el('div', 'hq-al'); back.appendChild(pan);
+    this.root.appendChild(btn); this.root.appendChild(back);
+    this.alBtn = btn; this.alBack = back;
+    const api = path => fetch(T.apiBase() + path, { cache: 'no-store' }).then(r => r.json());
+    const row = it => {
+      let ctl;
+      if (it.type === 'range') ctl = `<div class="st"><button data-d="-1">−</button><output>${esc(it.v)}${it.unit && it.unit !== '%' ? ' ' : ''}${esc(it.unit || '')}</output><button data-d="1">+</button></div>`;
+      else if (it.type === 'enum') ctl = `<div class="ch">${(it.opts || []).map((o, i) => `<button data-o="${i}" class="${String(o).toLowerCase() === String(it.v).toLowerCase() ? 'on' : ''}">${esc(o)}</button>`).join('')}</div>`;
+      else if (it.type === 'bool') { const on = +it.v === 1 || it.v === true; ctl = `<button class="tg ${on ? 'on' : ''}">${on ? 'ON' : 'OFF'}</button>`; }
+      else ctl = `<span>${esc(it.v)}</span>`;
+      return `<div class="r" data-k="${esc(it.k)}"><div class="n"><b>${esc(it.name)}</b><i>${esc(it.hint || '')}</i></div>${ctl}</div>`;
+    };
+    const send = (k, v) => api(`/api/set?k=${encodeURIComponent(k)}&v=${encodeURIComponent(v)}`).then(r => {
+      if (!r || !r.ok) throw new Error((r && r.err) || 'refused');
+      S.cfgFromItem(r.item);
+      if (k === 'al_warn' || k === 'al_alarm') return T.loadCfg();   // палка могла поправить парный порог
+    });
+    const render = () => {
+      const items = S.cfgItems;
+      pan.innerHTML = `<div class="h"><span>// ALERTS · <b class="kj">警報設定</b></span><button class="x" aria-label="close">✕</button></div>` +
+        (items ? items.map(row).join('') : `<div class="r"><div class="n"><b>NO ALERT SETTINGS ON THE STICK</b><i>update the stick firmware (1.8.2+) · defaults are used</i></div></div>`) +
+        `<div class="f"><span class="msg"></span><button class="rst">RESET TO DEFAULTS</button></div>`;
+      pan.querySelector('.x').onclick = close;
+      const msg = t => { const m = pan.querySelector('.msg'); if (m) m.textContent = t; };
+      pan.querySelectorAll('.r[data-k]').forEach(el => {
+        const it = items.find(x => x.k === el.dataset.k); if (!it) return;
+        const go = v => send(it.k, v).then(() => { render(); msg('saved on the stick'); }).catch(e => msg('not saved · ' + (e.message || 'no link')));
+        el.querySelectorAll('[data-d]').forEach(b => b.onclick = () => go(Math.max(it.min, Math.min(it.max, +it.v + (+b.dataset.d) * (it.step || 1)))));
+        el.querySelectorAll('[data-o]').forEach(b => b.onclick = () => go(+b.dataset.o));
+        const tg = el.querySelector('.tg'); if (tg) tg.onclick = () => go(+it.v === 1 || it.v === true ? 0 : 1);
+      });
+      pan.querySelector('.rst').onclick = () => {
+        const keys = Object.keys(S.CFG_DEF).filter(k => k !== 'al_alarm' && k !== 'al_warn');
+        // пороги — по порядку, чтобы палка не поправила их друг под друга
+        const seq = [['al_alarm', 100], ['al_warn', S.CFG_DEF.al_warn], ['al_alarm', S.CFG_DEF.al_alarm], ...keys.map(k => [k, S.CFG_DEF[k]])];
+        msg('resetting…');
+        seq.reduce((p, [k, v]) => p.then(() => send(k, v)), Promise.resolve()).then(() => T.loadCfg()).then(() => { render(); msg('defaults restored'); })
+          .catch(e => msg('reset failed · ' + (e.message || 'no link')));
+      };
+    };
+    const open = () => { back.hidden = false; render(); T.loadCfg().then(() => { if (!back.hidden) render(); }); };
+    const close = () => { back.hidden = true; };
+    btn.onclick = () => (back.hidden ? open() : close());
+    back.onclick = e => { if (e.target === back) close(); };
+  },
 
   // свои цвета без перекраски SUMI: на время кадра тема «сырая» (см. T.hookCanvas)
   frame(dt, t) {
@@ -177,6 +229,8 @@ T.views.push({
     try { this.frame2(dt, t); } finally { T.theme = th; }
   },
   frame2(dt, t) {
+    const sk = this.sub === 1 ? 'domain' : 'nerv';
+    if (this.alSkin !== sk) { this.alSkin = sk; this.root.classList.toggle('hq-domain', sk === 'domain'); }
     // полоса вкладок NERV/DOMAIN сверху: сцена сдвигается под неё (касания — тоже)
     const off = document.body.classList.contains('hassubs') ? 44 : 0, o = this.cv;
     o.g.fillStyle = this.sub === 1 ? D.bg : E.bg; o.g.fillRect(0, 0, o.w, off);

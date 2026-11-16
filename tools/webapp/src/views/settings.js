@@ -5,7 +5,7 @@
 // Обычный DOM, а не холст: кнопки, ползунки, переключатели — без нагрузки на кадры.
 (() => {
   T.KANJI.set = '設';
-  const PAGE_KANJI = { general: '設', ble: '藍', bluetooth: '藍', wifi: '網', 'wi-fi': '網', sub: '波', subghz: '波', 'sub-ghz': '波', sound: '音', snd: '音' };
+  const PAGE_KANJI = { general: '設', ble: '藍', bluetooth: '藍', wifi: '網', 'wi-fi': '網', sub: '波', subghz: '波', 'sub-ghz': '波', sound: '音', snd: '音', alert: '警', alerts: '警' };
   const kanjiOf = p => PAGE_KANJI[String(p.id || p.name || '').toLowerCase()] || PAGE_KANJI[String(p.name || '').toLowerCase()] || '設';
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const api = (path) => fetch(T.apiBase() + path, { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error('http ' + r.status); return r.json(); });
@@ -25,7 +25,7 @@
     unmount() { clearInterval(this.timer); this.root.remove(); },
     frame() {},
     load(quiet) {
-      api('/api/settings').then(d => { this.data = d; this.err = null; quiet ? this.refresh() : this.render(); })
+      api('/api/settings').then(d => { this.data = d; this.err = null; S.cfgFromSettings(d); quiet ? this.refresh() : this.render(); })
         .catch(e => { this.err = e; if (!this.data || !quiet) { this.data = null; this.render(); } });
     },
     toast(msg, bad) {
@@ -97,6 +97,7 @@
       api(`/api/set?k=${encodeURIComponent(it.k)}&v=${encodeURIComponent(v)}`).then(r => {
         if (!r || !r.ok) throw new Error((r && r.err) || 'refused');
         if (r.item) Object.assign(it, r.item);
+        if (String(it.k).startsWith('al_')) { S.cfgFromItem(r.item || it); if (it.k === 'al_warn' || it.k === 'al_alarm') this.load(true); }   // штаб сразу видит новые пороги
         if (it.k === 'theme') {                              // тема — сразу и на планшете
           const th = String(typeof it.v === 'number' ? (it.opts || [])[it.v] : it.v).toLowerCase();
           if (S.st) S.st.theme = th;
