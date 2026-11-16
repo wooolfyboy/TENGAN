@@ -257,7 +257,7 @@ void drawLife(uint32_t now) {
   char buf[40];
   snprintf(buf, sizeof(buf), L("gen %lu  ·  cells %d  ·  x%.1f", "пок. %lu  ·  клеток %d  ·  x%.1f"), (unsigned long)s_lfGen, s_lfPop, s_speed);
   uiHeader(L("Life", "Жизнь"), buf);
-  uiFooter(L("wheel: speed  ·  click: new world", "колесо: скорость  ·  нажать: новый мир"), L("side: back", "кнопка: назад"));
+  uiFooter(L("wheel: speed  ·  click: new world", "колесо: скорость · нажать: новый мир"), L("side: back", "кнопка: назад"));
   present();
 }
 
@@ -339,7 +339,7 @@ void drawPendulum(uint32_t now) {
   spr.fillCircle(x2, y2, 5, C_HOT());
   char buf[24]; speedLabel(buf, sizeof(buf));
   uiHeader(L("Pendulum", "Маятник"), buf);
-  uiFooter(L("wheel: speed  ·  click: new swing", "колесо: скорость  ·  нажать: новый"), L("side: back", "кнопка: назад"));
+  uiFooter(L("wheel: speed  ·  click: new swing", "колесо: скорость · нажать: новый"), L("side: back", "кнопка: назад"));
   present();
 }
 
@@ -349,7 +349,7 @@ static void galEnter() { s_lastMs = 0; }
 static void galLeave() { if (s_wxOpen) { wxStop(); s_wxOpen = false; } }
 static void galInfo(int i, SubItem& it) {
   static const char* const names[G_NUM] = { L("Tesseract", "Тессеракт"), L("Torus", "Тор"), L("Life", "Жизнь"), L("Pendulum", "Маятник"), L("Sky", "Небо"), L("Globe", "Глобус"), L("Weather", "Погода") };
-  static const char* const descs[G_NUM] = { L("4D hypercube", "4D-гиперкуб"), L("donut of points", "тор из точек"), L("game of life", "игра «Жизнь»"), L("double pendulum chaos", "хаос двойного маятника"), L("stars over you now", "звёзды над вами сейчас"), L("ISS and satellites", "МКС и спутники"), L("radio weather", "радиопогода") };
+  static const char* const descs[G_NUM] = { L("4D hypercube", "4D-гиперкуб"), L("donut of points", "тор из точек"), L("game of life", "игра «Жизнь»"), L("double pendulum chaos", "двойной маятник"), L("stars over you now", "звёзды сейчас"), L("ISS and satellites", "МКС и спутники"), L("radio weather", "радиопогода") };
   it.name = names[i]; it.desc = descs[i]; it.value[0] = 0;
   if (i == G_TESS)       strcpy(it.value, "4D");
   else if (i == G_TORUS) strcpy(it.value, "3D");

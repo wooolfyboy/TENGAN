@@ -202,6 +202,6 @@ void drawPcCity(uint32_t now) {
   if (!pcCityLive(now)) { spr.setTextColor(UI_DIM()); txt(L("WAITING FOR DATA", "ЖДУ ДАННЫЕ"), px, UI_TOP + 110, 1); }
   snprintf(buf, sizeof(buf), L("%d%% total", "всего %d%%"), (int)lroundf(g_pc.cpu));
   uiHeader(L("Process city", "Город процессов"), buf, g_pc.cpu >= 90);
-  uiFooter(L("wheel: screens  ·  click: spotlight", "колесо: экраны  ·  нажать: фокус"), L("side: back", "кнопка: назад"));
+  uiFooter(L("wheel: screens  ·  click: spotlight", "колесо: экраны · нажать: фокус"), L("side: back", "кнопка: назад"));
   present();
 }

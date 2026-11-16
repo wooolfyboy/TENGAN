@@ -165,7 +165,7 @@ void drawLevel(uint32_t now) {
   spr.setTextDatum(TL_DATUM);
   spr.setTextColor(UI_DIM());
   txt(L("1 MIN", "1 МИН"), gx + 5, gy + 3, 1);
-  uiFooter(L("wheel: screens  ·  click: reset max", "колесо: экраны  ·  нажать: сброс"), L("side: back", "кнопка: назад"));
+  uiFooter(L("wheel: screens  ·  click: reset max", "колесо: экраны · нажать: сброс"), L("side: back", "кнопка: назад"));
   present();
 }
 
@@ -233,7 +233,7 @@ void drawMicMissing() {
   spr.setTextDatum(TL_DATUM);
   spr.setTextColor(UI_DIM());
   txt(L("THE MICROPHONE IS NOT RESPONDING", "МИКРОФОН НЕ ОТВЕЧАЕТ"), x, y + 96, 1);
-  txt(L("RESTART THE DEVICE; IF IT REPEATS, CONTACT SUPPORT", "ПЕРЕЗАПУСТИТЕ УСТРОЙСТВО; ЕСЛИ ПОВТОРИТСЯ - В ПОДДЕРЖКУ"), x, y + 108, 1);
+  txt(L("RESTART THE DEVICE", "ПЕРЕЗАПУСТИТЕ УСТРОЙСТВО"), x, y + 108, 1);
   uiFooter("", L("side: back", "кнопка: назад"));
   present();
 }

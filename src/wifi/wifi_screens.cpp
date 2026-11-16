@@ -94,7 +94,7 @@ void drawNets(uint32_t now) {
     spr.fillRect(W - UI_M + 2, LIST_Y0, 2, trackH, UI_LINE());
     spr.fillRect(W - UI_M + 2, barY, 2, barH, C_ACC());
   }
-  uiFooter(L("wheel: pick  ·  click: details", "колесо: выбор  ·  нажать: подробно"), L("side: back", "кнопка: назад"));
+  uiFooter(L("wheel: pick  ·  click: details", "колесо: выбор · нажать: подробно"), L("side: back", "кнопка: назад"));
   present();
 }
 
@@ -107,7 +107,7 @@ void drawNetDetail(uint32_t now) {
   spr.fillSprite(C_BG());
   int pos = -1;
   for (size_t i = 0; i < g_wOrder.size(); i++) if (g_wOrder[i] == g_wSel) pos = (int)i;
-  if (pos >= 0) snprintf(buf, sizeof(buf), L("%d / %d  ·  click: list", "%d / %d  ·  нажать: список"), pos + 1, (int)g_wOrder.size());
+  if (pos >= 0) snprintf(buf, sizeof(buf), L("%d / %d  ·  click: list", "%d / %d · нажать: список"), pos + 1, (int)g_wOrder.size());
   else          snprintf(buf, sizeof(buf), "%s", L("click: list", "нажать: список"));
   uiHeader(L("Network", "Сеть"), buf);
 
@@ -142,8 +142,8 @@ void drawNetDetail(uint32_t now) {
   uiReadout(x0, y0 + 28, L("neighbours", "соседи"), tmp, sameCh + near > 3 ? C_ALERT() : C_HOT());
   int cl = clientsOf(g_wSel);
   if (cl > 0) snprintf(tmp, sizeof(tmp), "%d", cl); else snprintf(tmp, sizeof(tmp), "?");
-  uiReadout(x0 + cw, y0 + 28, L("devices", "устройства"), tmp, C_HOT());
-  uiReadout(x0 + 2 * cw, y0 + 28, L("band", "диапазон"), L("2.4G", "2,4Г"), C_HOT());
+  uiReadout(x0 + cw, y0 + 28, L("devices", "клиенты"), tmp, C_HOT());
+  uiReadout(x0 + 2 * cw, y0 + 28, L("band", "полоса"), L("2.4G", "2,4Г"), C_HOT());
 
   int gx = 206, gy = y0, gw = W - UI_M - 4 - gx, gh = 52;
   uiFrame(gx, gy, gw, gh, UI_LINE());
@@ -427,7 +427,7 @@ void drawFind(uint32_t now) {
     int tx = W - UI_M - 64;
     uiReadout(tx, UI_TOP + 4, dlt >= 3 ? L("warmer", "теплее") : dlt <= -3 ? L("colder", "холоднее") : L("trend", "тренд"), buf, dlt >= 3 ? C_ACC() : C_HOT(), 2);
   }
-  uiFooter(L("wheel: screens  ·  click: next network", "колесо: экраны  ·  нажать: след. сеть"), L("side: back", "кнопка: назад"));
+  uiFooter(L("wheel: screens  ·  click: next network", "колесо: экраны · нажать: сеть"), L("side: back", "кнопка: назад"));
   present();
   if (!lost && g_wifiTicks) audioGeiger(pct);                     // щелчки чаще — ближе
 

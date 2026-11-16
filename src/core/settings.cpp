@@ -83,10 +83,10 @@ static const SetDef DEFS[S_NUM] = {
   { L("Sensitivity", "Чувствительность"), L("activity level gain", "усиление шкалы активности"),         P_ALERT,   "al_sens",    K_RANGE, 1, 10, 1, "" },
   { L("Attention at", "Внимание с"), L("activity level for attention", "уровень активности «внимание»"),   P_ALERT,   "al_warn",    K_RANGE, 20, 95, 5, "%" },
   { L("Alarm at", "Тревога с"), L("activity level for alarm", "уровень активности «тревога»"),       P_ALERT,   "al_alarm",   K_RANGE, 30, 100, 5, "%" },
-  { L("Count Bluetooth", "Учитывать BLE"), L("new devices raise activity", "новые устройства в активность"),  P_ALERT,   "al_cble",    K_BOOL },
-  { L("Count 433 MHz", "Учитывать 433"), L("433 MHz packets raise activity", "посылки 433 МГц в активность"),  P_ALERT,   "al_crf",     K_BOOL },
-  { L("Count sound", "Учитывать звук"), L("loudness raises activity", "громкость в активность"),    P_ALERT,   "al_csnd",    K_BOOL },
-  { L("Count IR/NFC", "Учитывать ИК/NFC"), L("remotes and cards raise activity", "пульты и карты в активность"),P_ALERT,   "al_cprb",    K_BOOL },
+  { L("Count Bluetooth", "Учитывать BLE"), L("new devices raise activity", "новые устройства"),  P_ALERT,   "al_cble",    K_BOOL },
+  { L("Count 433 MHz", "Учитывать 433"), L("433 MHz packets raise activity", "посылки 433 МГц"),  P_ALERT,   "al_crf",     K_BOOL },
+  { L("Count sound", "Учитывать звук"), L("loudness raises activity", "громкость звука"),    P_ALERT,   "al_csnd",    K_BOOL },
+  { L("Count IR/NFC", "Учитывать ИК/NFC"), L("remotes and cards raise activity", "пульты и карты"),P_ALERT,   "al_cprb",    K_BOOL },
   { L("Blinking", "Мигание"), L("blink on alerts", "мигать при тревоге"),             P_ALERT,   "al_blink",   K_BOOL },
   { L("Alert banner", "Плашка тревоги"), L("show the proximity warning", "показывать плашку тревоги"),      P_ALERT,   "al_plate",   K_BOOL },
 };
@@ -466,7 +466,7 @@ void drawSettings() {
       txt("<", W - UI_M - 16 - vw, cy, 2);
     }
   }
-  uiFooter(n > 1 ? L("wheel: change  ·  click: next", "колесо: изменить  ·  нажать: далее") : L("wheel: change", "колесо: изменить"), L("side: back", "кнопка: назад"));
+  uiFooter(n > 1 ? L("wheel: change  ·  click: next", "колесо: изменить · нажать: далее") : L("wheel: change", "колесо: изменить"), L("side: back", "кнопка: назад"));
   present();
 }
 

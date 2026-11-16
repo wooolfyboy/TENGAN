@@ -302,7 +302,7 @@ void drawList(const std::map<uint32_t, Ent>& ents) {
     spr.fillRect(W - UI_M + 2, LIST_Y0, 2, trackH, UI_LINE());
     spr.fillRect(W - UI_M + 2, barY, 2, barH, C_ACC());
   }
-  uiFooter(L("wheel: pick  ·  click: details", "колесо: выбор  ·  нажать: подробно"), L("side: back", "кнопка: назад"));
+  uiFooter(L("wheel: pick  ·  click: details", "колесо: выбор · нажать: подробно"), L("side: back", "кнопка: назад"));
   present();
 }
 
@@ -312,7 +312,7 @@ void drawDetail(const Dev& d, const Ent& e, bool inMap, uint32_t now) {
   spr.fillSprite(C_BG());
   int pos = -1;
   for (size_t i = 0; i < g_order.size(); i++) if (g_order[i] == g_sel) pos = (int)i;
-  if (pos >= 0) snprintf(buf, sizeof(buf), L("%d / %d  ·  click: list", "%d / %d  ·  нажать: список"), pos + 1, (int)g_order.size());
+  if (pos >= 0) snprintf(buf, sizeof(buf), L("%d / %d  ·  click: list", "%d / %d · нажать: список"), pos + 1, (int)g_order.size());
   else          snprintf(buf, sizeof(buf), "%s", L("click: list", "нажать: список"));
   uiHeader(L("Device", "Устройство"), buf);
 
@@ -339,7 +339,7 @@ void drawDetail(const Dev& d, const Ent& e, bool inMap, uint32_t now) {
   else { snprintf(tmp, sizeof(tmp), "%d", e.rssi); uiReadout(x0, y0, ago >= 3 ? L("signal (old)", "сигнал (давно)") : L("signal", "сигнал"), tmp, heat(e.rssi)); }
   float dist = estDistance(e.rssi);
   if (dist < 10) snprintf(tmp, sizeof(tmp), L("~%.1fm", "~%.1fм"), dist); else snprintf(tmp, sizeof(tmp), L("~%.0fm", "~%.0fм"), dist);
-  uiReadout(x0 + cw, y0, L("distance", "расстояние"), tmp, C_HOT());
+  uiReadout(x0 + cw, y0, L("distance", "до него"), tmp, C_HOT());
   uint32_t secs = (now - (e.first ? e.first : now)) / 1000;
   snprintf(tmp, sizeof(tmp), "%lu:%02lu", (unsigned long)(secs / 60), (unsigned long)(secs % 60));
   uiReadout(x0 + 2 * cw, y0, L("seen", "виден"), tmp, C_HOT());

@@ -66,7 +66,7 @@ void drawSpectrum() {
   spr.setTextDatum(TC_DATUM); txt(buf, W / 2, UI_BOTTOM - 6, 1);
   snprintf(buf, sizeof(buf), "%.2f", BANDS[g_band].hi);
   spr.setTextDatum(TR_DATUM); txt(buf, pr, UI_BOTTOM - 6, 1);
-  uiFooter(L("wheel: screens  ·  click: band", "колесо: экраны  ·  нажать: диапазон"), L("side: back", "кнопка: назад"));
+  uiFooter(L("wheel: screens  ·  click: band", "колесо: экраны · нажать: полоса"), L("side: back", "кнопка: назад"));
   present();
 }
 
@@ -118,7 +118,7 @@ void drawMonitor(uint32_t now) {
     int y = ly + 11 + i * 12;
     spr.setTextColor(i == 0 ? C_HOT() : UI_LABEL());
     txt(buf, tx, y, 1);
-    snprintf(buf, sizeof(buf), "%.1f s", b.durMs / 1000.0f); txt(buf, tx + 70, y, 1);
+    snprintf(buf, sizeof(buf), L("%.1f s", "%.1f с"), b.durMs / 1000.0f); txt(buf, tx + 70, y, 1);
     snprintf(buf, sizeof(buf), "%d", b.peak); txt(buf, tx + 130, y, 1);
     int len = constrain((b.peak + 110) * 1, 2, 60);
     spr.fillRect(W - UI_M - 8 - len, y + 1, len, 5, heat(b.peak + 10));
@@ -127,7 +127,7 @@ void drawMonitor(uint32_t now) {
     spr.setTextColor(UI_DIM());
     txt(L("PRESS A CAR KEY OR GATE REMOTE NEARBY", "НАЖМИТЕ РЯДОМ БРЕЛОК ИЛИ ПУЛЬТ ВОРОТ"), tx, ly + 14, 1);
   }
-  uiFooter(L("wheel: screens  ·  click: band", "колесо: экраны  ·  нажать: диапазон"), L("side: back", "кнопка: назад"));
+  uiFooter(L("wheel: screens  ·  click: band", "колесо: экраны · нажать: полоса"), L("side: back", "кнопка: назад"));
   present();
 }
 
@@ -283,6 +283,6 @@ void drawSensors(uint32_t now) {
     txt(buf, UI_M + 4, top + shown * rowH + 4, 1);
   }
   drawPulseTrain(UI_M, 108, W - 2 * UI_M, UI_BOTTOM - 108);
-  uiFooter(L("wheel: screens  ·  click: band", "колесо: экраны  ·  нажать: диапазон"), L("side: back", "кнопка: назад"));
+  uiFooter(L("wheel: screens  ·  click: band", "колесо: экраны · нажать: полоса"), L("side: back", "кнопка: назад"));
   present();
 }

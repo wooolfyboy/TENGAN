@@ -163,7 +163,7 @@ void drawSky(uint32_t now) {
     for (int k = 0; k < 8; k++) { float a = k * 45 * D2R; spr.drawLine(x + cosf(a) * 7, y + sinf(a) * 7, x + cosf(a) * 10, y + sinf(a) * 10, C_HOT()); }
   }
   // стороны света (поворачиваются вместе с куполом)
-  static const char* const SIDES[4] = { "N", "E", "S", "W" };
+  static const char* const SIDES[4] = { L("N", "С"), L("E", "В"), L("S", "Ю"), L("W", "З") };
   spr.setTextColor(C_ACC());
   for (int k = 0; k < 4; k++) {
     float a = (k * 90 - v.rot) * D2R;
@@ -194,7 +194,7 @@ void drawSky(uint32_t now) {
   if (nVis > 3) { snprintf(buf, sizeof(buf), "+%d", nVis - 3); spr.setTextColor(UI_DIM()); spr.setTextDatum(TR_DATUM); txt(buf, spr.width() - UI_M - 4, yy, 1); spr.setTextDatum(TL_DATUM); }
   snprintf(buf, sizeof(buf), "%s", c.name);
   uiHeader(L("Sky", "Небо"), buf);
-  static const char* const LBL[3] = { L("wheel: turn  ·  click: stars", "колесо: поворот  ·  нажать: звёзды"), L("wheel: turn  ·  click: no labels", "колесо: поворот  ·  нажать: без подписей"), L("wheel: turn  ·  click: constellations", "колесо: поворот  ·  нажать: созвездия") };
+  static const char* const LBL[3] = { L("wheel: turn  ·  click: stars", "колесо: поворот · нажать: звёзды"), L("wheel: turn  ·  click: no labels", "колесо: поворот · нажать: чисто"), L("wheel: turn  ·  click: constellations", "колесо: поворот · нажать: созвездия") };
   uiFooter(LBL[s_skyLabels], L("side: back", "кнопка: назад"));
   present();
   (void)now; (void)W;
@@ -384,6 +384,6 @@ void drawGlobe(uint32_t now) {
   const char* follow = s_gFollow == 1 ? L("home", "дом") : (satIdx >= 0 && satIdx < g_nSats ? g_sats[satIdx].name : "ISS");
   snprintf(buf, sizeof(buf), L("following %s", "слежу: %s"), follow);
   uiHeader(L("Globe", "Глобус"), buf);
-  uiFooter(L("wheel: turn  ·  click: follow", "колесо: поворот  ·  нажать: следить"), L("side: back", "кнопка: назад"));
+  uiFooter(L("wheel: turn  ·  click: follow", "колесо: поворот · нажать: цель"), L("side: back", "кнопка: назад"));
   present();
 }

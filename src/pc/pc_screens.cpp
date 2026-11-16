@@ -292,6 +292,6 @@ void drawPcMedia(uint32_t now) {
     spr.setTextColor(UI_LABEL());
     txt(p.playing ? L("PLAYING", "ИГРАЕТ") : L("PAUSED", "ПАУЗА"), ix + 22, iy + 4, 1);
   }
-  uiFooter(L("wheel: volume  ·  click: play/pause", "колесо: громкость  ·  нажать: пауза"), L("side: back", "кнопка: назад"));
+  uiFooter(L("wheel: volume  ·  click: play/pause", "колесо: громкость · нажать: пауза"), L("side: back", "кнопка: назад"));
   present();
 }
