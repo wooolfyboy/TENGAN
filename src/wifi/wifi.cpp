@@ -14,6 +14,7 @@
 //    FIND      — «горячо-холодно» по выбранной сети (быстрый скан одного канала)
 // ============================================================
 #include <WiFi.h>
+#include "core/lang.h"
 #include <esp_wifi.h>
 #include <map>
 #include <vector>
@@ -382,15 +383,15 @@ static bool wifiCloseDetail() {
 
 
 static void wifiScreenInfo(int i, SubItem& it) {
-  static const char* const names[W_NUM] = { "Networks", "Channels", "Activity", "Clients", "Find" };
-  static const char* const descs[W_NUM] = { "list + details", "who uses which ch", "packets & noise",
-    "devices in networks", "best signal spot" };
+  static const char* const names[W_NUM] = { L("Networks", "Сети"), L("Channels", "Каналы"), L("Activity", "Активность"), L("Clients", "Клиенты"), L("Finder", "Поиск") };
+  static const char* const descs[W_NUM] = { L("list + details", "список и подробности"), L("who uses which channel", "кто на каком канале"), L("packets & noise", "пакеты и шум"),
+    L("devices in networks", "устройства в сетях"), L("best signal spot", "где сигнал лучше") };
   it.name = names[i]; it.desc = descs[i]; strcpy(it.value, "-");
   switch (i) {
     case W_NETS:
       if (g_wEverScanned) sprintf(it.value, "%d", (int)g_aps.size()); else strcpy(it.value, "...");
       break;
-    case W_CHANNELS: { int bc = bestChannel(); if (bc) sprintf(it.value, "best %d", bc); break; }
+    case W_CHANNELS: { int bc = bestChannel(); if (bc) sprintf(it.value, L("best %d", "лучший %d"), bc); break; }
     case W_ACTIVITY: {
       float tot = 0;
       for (int c = 1; c <= CH_MAX; c++) tot += g_ppsMgmt[c] + g_ppsData[c];
@@ -434,8 +435,8 @@ static void wifiDraw(uint32_t now) {
 }
 
 static void wifiSubtitle(char* out, size_t n) {
-  if (g_wEverScanned) snprintf(out, n, "%d nets", (int)g_aps.size());
-  else                snprintf(out, n, "tap to scan");
+  if (g_wEverScanned) snprintf(out, n, "%d %s", (int)g_aps.size(), PL((int)g_aps.size(), "network", "networks", "сеть", "сети", "сетей"));
+  else                snprintf(out, n, "%s", L("open to scan", "откройте для поиска"));
 }
 
 const Section wifiSection = {

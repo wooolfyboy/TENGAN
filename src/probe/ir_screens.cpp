@@ -3,6 +3,7 @@
 //  адрес/команда, последние нажатия и сама пачка импульсов.
 // ============================================================
 #include "probe/ir.h"
+#include "core/lang.h"
 #include "core/display.h"
 #include "core/theme.h"
 #include "core/ui.h"
@@ -71,9 +72,9 @@ static void drawIdle(uint32_t now) {
   spr.fillSmoothCircle(rx, cy, 5, C_HOT(), C_BG());
   spr.setTextDatum(MC_DATUM);
   spr.setTextColor(UI_LABEL());
-  txt("POINT ANY REMOTE AT THE STICK", W / 2, 118, 1);
+  txt(L("POINT ANY REMOTE AT TENGAN", "НАПРАВЬТЕ ПУЛЬТ НА TENGAN"), W / 2, 118, 1);
   spr.setTextColor(UI_DIM());
-  txt("PRESS A BUTTON - WE GUESS WHOSE REMOTE IT IS", W / 2, 132, 1);
+  txt(L("PRESS A BUTTON TO SEE WHOSE REMOTE IT IS", "НАЖМИТЕ КНОПКУ - УЗНАЕМ, ЧЕЙ ЭТО ПУЛЬТ"), W / 2, 132, 1);
 }
 
 void drawIr(uint32_t now) {
@@ -82,17 +83,17 @@ void drawIr(uint32_t now) {
   char buf[48];
   spr.fillSprite(C_BG());
   if (m.on && !m.ok) {
-    uiHeader("IR", "error", true);
-    uiEmpty("receiver did not start", "side: back and try again");
-    uiFooter("", "side: back");
+    uiHeader(L("IR", "ИК"), L("error", "ошибка"), true);
+    uiEmpty(L("receiver did not start", "приёмник не запустился"), L("go back and try again", "выйдите и попробуйте снова"));
+    uiFooter("", L("side: back", "кнопка: назад"));
     present();
     return;
   }
-  snprintf(buf, sizeof(buf), m.presses ? "%lu presses" : "listening", (unsigned long)m.presses);
-  uiHeader("IR - whose remote?", buf, false);
+  if (m.presses) snprintf(buf, sizeof(buf), "%lu %s", (unsigned long)m.presses, PL((int)m.presses, "press", "presses", "нажатие", "нажатия", "нажатий")); else snprintf(buf, sizeof(buf), "%s", L("listening", "слушаю"));
+  uiHeader(L("IR · whose remote?", "ИК · чей пульт?"), buf, false);
   if (!m.have) {
     drawIdle(now);
-    uiFooter("receive only", "side: back");
+    uiFooter(L("receive only", "только приём"), L("side: back", "кнопка: назад"));
     present();
     return;
   }
@@ -108,31 +109,31 @@ void drawIr(uint32_t now) {
     hudPanel(bx, 30, 38, 15, 5, C_ACC(), true, C_BG());
     spr.setTextColor(C_BG());
     spr.setTextDatum(MC_DATUM);
-    txt("HOLD", bx + 19, 38, 1);
+    txt(L("HOLD", "ДЕРЖ"), bx + 19, 38, 1);
     spr.setTextDatum(TL_DATUM);
   }
   // марка: «вероятно»
-  bool known = c.brand && strncmp(c.brand, "unknown", 7) && strncmp(c.brand, "NEC remote", 10);
+  bool known = c.brand && strcmp(c.brand, IR_UNKNOWN) && strcmp(c.brand, IR_UNKNOWN_REMOTE) && strcmp(c.brand, IR_NEC_GENERIC);
   spr.setTextColor(C_ACC());
   char br[40]; fitText(c.brand ? c.brand : "", br, sizeof(br), 186, 2);
   txt(br, UI_M + 4, 54, 2);
   spr.setTextColor(UI_DIM());
-  txt(known ? "LIKELY - GUESS BY ADDRESS" : "BRAND NOT IN TABLE", UI_M + 4, 72, 1);
+  txt(known ? L("LIKELY · GUESSED BY ADDRESS", "ВЕРОЯТНО · ПО АДРЕСУ") : L("BRAND NOT IN TABLE", "МАРКИ НЕТ В ТАБЛИЦЕ"), UI_M + 4, 72, 1);
   // адрес / команда / биты
   bool raw = !strcmp(c.proto, "RAW");
   char a[16], k[16], b[8];
   if (raw) { snprintf(a, sizeof a, "--"); hex(k, sizeof k, c.cmd, 8); }
   else { hex(a, sizeof a, c.addr, c.addr > 0xFF ? 4 : 2); hex(k, sizeof k, c.cmd, c.cmd > 0xFF ? 4 : 2); }
   snprintf(b, sizeof b, "%u", c.bits);
-  uiReadout(UI_M + 4, 84, "addr", a, C_HOT());
-  uiReadout(UI_M + 66, 84, raw ? "print" : "cmd", k, C_HOT());
-  uiReadout(UI_M + 152, 84, raw ? "pulses" : "bits", b, UI_LABEL());
+  uiReadout(UI_M + 4, 84, L("addr", "адрес"), a, C_HOT());
+  uiReadout(UI_M + 66, 84, raw ? L("print", "отпечаток") : L("cmd", "команда"), k, C_HOT());
+  uiReadout(UI_M + 152, 84, raw ? L("pulses", "импульсы") : L("bits", "биты"), b, UI_LABEL());
 
   // история нажатий справа
   int hx = 212, hy = 26;
   spr.drawFastVLine(hx - 6, 26, 80, UI_LINE());
   spr.setTextColor(UI_DIM());
-  txt("LAST", hx, hy, 1);
+  txt(L("LAST", "ПОСЛЕДНИЕ"), hx, hy, 1);
   for (int i = 0; i < m.histN && i < 7; i++) {
     const IrCode& h = m.hist[i];
     int y = hy + 12 + i * 11;
@@ -143,13 +144,13 @@ void drawIr(uint32_t now) {
     spr.setTextDatum(TL_DATUM);
     spr.setTextColor(i == 0 ? C_HOT() : scale565(UI_LABEL(), 100 - i * 9));
     txt(f, hx, y, 1);
-    snprintf(buf, sizeof buf, age < 60 ? "%lus" : "%lum", (unsigned long)(age < 60 ? age : age / 60));
+    snprintf(buf, sizeof buf, age < 60 ? L("%lus", "%luс") : L("%lum", "%luм"), (unsigned long)(age < 60 ? age : age / 60));
     spr.setTextDatum(TR_DATUM);
     spr.setTextColor(UI_DIM());
     txt(buf, W - UI_M - 2, y, 1);
   }
   spr.setTextDatum(TL_DATUM);
   drawPulses(UI_M + 4, 116, W - 2 * UI_M - 8, 30, now);
-  uiFooter("click: clear", "side: back");
+  uiFooter(L("click: clear", "нажать: очистить"), L("side: back", "кнопка: назад"));
   present();
 }

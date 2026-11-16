@@ -23,8 +23,8 @@
 #define NFC_HIST     4
 
 struct NfcCard {
-  char     fam[28];                   // «MIFARE Classic 1K», «Bank card (EMV)», ...
-  char     hint[40];                  // «transit / access card - likely»
+  char     fam[48];                   // «MIFARE Classic 1K», «Bank card (EMV)», ...
+  char     hint[96];                  // «transit / access card - likely»
   uint8_t  uid[10];
   uint8_t  uidLen;
   uint16_t atqa;

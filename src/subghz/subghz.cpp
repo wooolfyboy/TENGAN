@@ -12,6 +12,7 @@
 //  разбираются в обоих (Радиопогода берёт отсюда температуру за окном).
 // ============================================================
 #include "core/settings.h"
+#include "core/lang.h"
 #include "subghz/subghz.h"
 #include "subghz/cc1101.h"
 #include "subghz/subghz_model.h"
@@ -171,10 +172,10 @@ static void subFrame(uint32_t now) {
 }
 
 static void subScreenInfo(int i, SubItem& it) {
-  static const char* const names[G_NUM] = { "Spectrum", "Monitor", "Sensors" };
-  static const char* const descs[G_NUM] = { "band + waterfall", "catch remotes", "thermometers, bells" };
+  static const char* const names[G_NUM] = { L("Spectrum", "Спектр"), L("Monitor", "Монитор"), L("Sensors", "Датчики") };
+  static const char* const descs[G_NUM] = { L("band + waterfall", "диапазон и водопад"), L("catch remotes", "ловить пульты"), L("thermometers, bells", "термометры, звонки") };
   it.name = names[i]; it.desc = descs[i];
-  if (!g_ccOk && g_ccTried) { strcpy(it.value, "no chip"); return; }
+  if (!g_ccOk && g_ccTried) { strcpy(it.value, L("no chip", "нет чипа")); return; }
   if (i == G_SPECTRUM) strcpy(it.value, BANDS[g_band].name);
   else if (i == G_SENSORS) { if (g_sensN) sprintf(it.value, "%d", g_sensN); else strcpy(it.value, "-"); }
   else if (g_events)   sprintf(it.value, "%lu", (unsigned long)g_events);
@@ -182,7 +183,7 @@ static void subScreenInfo(int i, SubItem& it) {
 }
 
 static void subSubtitle(char* out, size_t n) {
-  snprintf(out, n, "%s", (g_ccTried && !g_ccOk) ? "no chip" : BANDS[g_band].name);
+  snprintf(out, n, "%s", (g_ccTried && !g_ccOk) ? L("no chip", "нет чипа") : BANDS[g_band].name);
 }
 
 static void subTickFn(uint32_t now) { if (!navInSub()) subTick(now); }

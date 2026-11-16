@@ -7,6 +7,7 @@
 //  ЖДЁМ  — если ноутбук ничего не присылает: что сделать по шагам
 // ============================================================
 #include "core/timeutil.h"
+#include "core/lang.h"
 #include "pc/pc.h"
 #include "core/display.h"
 #include "core/theme.h"
@@ -16,12 +17,12 @@ static uint16_t loadCol(float pct) {                 // загрузка: хол
   return pct >= 90 ? C_ALERT() : heatV(0.25f + 0.75f * pct / 100.0f);
 }
 static void rateStr(float kb, char* out, size_t n) {
-  if (kb >= 1000) snprintf(out, n, "%.1f MB/s", kb / 1024.0f);
-  else            snprintf(out, n, "%d KB/s", (int)kb);
+  if (kb >= 1000) snprintf(out, n, L("%.1f MB/s", "%.1f МБ/с"), kb / 1024.0f);
+  else            snprintf(out, n, L("%d KB/s", "%d КБ/с"), (int)kb);
 }
 static void upStr(uint32_t s, char* out, size_t n) {
-  if (s >= 86400) snprintf(out, n, "up %lud %luh", (unsigned long)(s / 86400), (unsigned long)(s / 3600 % 24));
-  else            snprintf(out, n, "up %luh %lum", (unsigned long)(s / 3600), (unsigned long)(s / 60 % 60));
+  if (s >= 86400) snprintf(out, n, L("up %lud %luh", "работает %lu д %lu ч"), (unsigned long)(s / 86400), (unsigned long)(s / 3600 % 24));
+  else            snprintf(out, n, L("up %luh %lum", "работает %lu ч %lu мин"), (unsigned long)(s / 3600), (unsigned long)(s / 60 % 60));
 }
 static void bar(int x, int y, int w, int h, float pct, uint16_t col) {
   spr.drawRect(x, y, w, h, UI_LINE());
@@ -35,14 +36,14 @@ void drawPc(uint32_t now) {
   spr.fillSprite(C_BG());
   uint32_t age = msSince(now, p.t) / 1000;
   char hdr[32];
-  if (age >= 3) snprintf(hdr, sizeof(hdr), "no data %lus", (unsigned long)age);   // короткая пауза — цифры старые
-  uiHeader("PC", age >= 3 ? hdr : (p.host[0] ? p.host : "laptop"), p.cpu >= 90);
+  if (age >= 3) snprintf(hdr, sizeof(hdr), L("no data %lus", "нет данных %lu с"), (unsigned long)age);   // короткая пауза — цифры старые
+  uiHeader(L("PC", "ПК"), age >= 3 ? hdr : (p.host[0] ? p.host : L("computer", "компьютер")), p.cpu >= 90);
 
   // ---- слева: CPU ----
   spr.setTextDatum(TL_DATUM);
   spr.setTextColor(UI_LABEL());
   txt("CPU", UI_M + 6, UI_TOP + 4, 1);
-  if (p.freq > 0) { snprintf(buf, sizeof(buf), "%.1f GHZ", p.freq); spr.setTextColor(UI_DIM()); txt(buf, UI_M + 34, UI_TOP + 4, 1); }
+  if (p.freq > 0) { snprintf(buf, sizeof(buf), L("%.1f GHZ", "%.1f ГГЦ"), p.freq); spr.setTextColor(UI_DIM()); txt(buf, UI_M + 34, UI_TOP + 4, 1); }
   snprintf(buf, sizeof(buf), "%d%%", (int)lroundf(p.cpu));
   spr.setTextColor(loadCol(p.cpu));
   txt(buf, UI_M + 4, UI_TOP + 14, 6);
@@ -71,33 +72,33 @@ void drawPc(uint32_t now) {
   int y = UI_TOP + 4;
   spr.setTextDatum(TL_DATUM);
   spr.setTextColor(UI_LABEL()); txt("RAM", rx, y, 1);
-  snprintf(buf, sizeof(buf), "%.1f / %.0f GB", p.ramU, p.ramT);
+  snprintf(buf, sizeof(buf), L("%.1f / %.0f GB", "%.1f / %.0f ГБ"), p.ramU, p.ramT);
   spr.setTextDatum(TR_DATUM); spr.setTextColor(C_HOT()); txt(buf, rx + rw, y, 1);
   bar(rx, y + 11, rw, 8, p.ram, loadCol(p.ram));
 
   y += 28;
-  spr.setTextDatum(TL_DATUM); spr.setTextColor(UI_LABEL()); txt("DISK C:", rx, y, 1);
-  snprintf(buf, sizeof(buf), "%d%% FULL", (int)p.disk);
+  spr.setTextDatum(TL_DATUM); spr.setTextColor(UI_LABEL()); txt(L("DISK C:", "ДИСК C:"), rx, y, 1);
+  snprintf(buf, sizeof(buf), L("%d%% FULL", "ЗАНЯТО %d%%"), (int)p.disk);
   spr.setTextDatum(TR_DATUM); spr.setTextColor(C_HOT()); txt(buf, rx + rw, y, 1);
   bar(rx, y + 11, rw, 8, p.disk, p.disk >= 90 ? C_ALERT() : UI_LABEL());
-  snprintf(buf, sizeof(buf), "R %.1f  W %.1f MB/S", p.dR, p.dW);
+  snprintf(buf, sizeof(buf), L("R %.1f  W %.1f MB/S", "Ч %.1f  З %.1f МБ/С"), p.dR, p.dW);
   spr.setTextDatum(TL_DATUM); spr.setTextColor(UI_DIM()); txt(buf, rx, y + 22, 1);
 
   y += 38;
-  spr.setTextColor(UI_LABEL()); txt("NET", rx, y, 1);
+  spr.setTextColor(UI_LABEL()); txt(L("NET", "СЕТЬ"), rx, y, 1);
   rateStr(p.nD, a, sizeof(a)); rateStr(p.nU, b, sizeof(b));
   spr.setTextColor(C_HOT());
-  snprintf(buf, sizeof(buf), "DN %s", a); txt(buf, rx, y + 11, 1);
-  snprintf(buf, sizeof(buf), "UP %s", b); txt(buf, rx, y + 22, 1);
+  snprintf(buf, sizeof(buf), L("DN %s", "ВХ %s"), a); txt(buf, rx, y + 11, 1);
+  snprintf(buf, sizeof(buf), L("UP %s", "ИСХ %s"), b); txt(buf, rx, y + 22, 1);
 
   y += 36;
   if (p.bat >= 0) {
-    spr.setTextColor(UI_LABEL()); txt("BATTERY", rx, y, 1);
-    snprintf(buf, sizeof(buf), "%d%% %s", p.bat, p.plug ? "PLUGGED" : "");
+    spr.setTextColor(UI_LABEL()); txt(L("BATTERY", "БАТАРЕЯ"), rx, y, 1);
+    snprintf(buf, sizeof(buf), "%d%% %s", p.bat, p.plug ? L("PLUGGED", "ОТ СЕТИ") : "");
     spr.setTextDatum(TR_DATUM); spr.setTextColor(p.bat <= 15 && !p.plug ? C_ALERT() : C_HOT()); txt(buf, rx + rw, y, 1);
   }
 
-  char top[40]; snprintf(top, sizeof(top), "top: %s", p.top[0] ? p.top : "-");
+  char top[48]; snprintf(top, sizeof(top), L("top: %s", "больше всех: %s"), p.top[0] ? p.top : "-");
   upStr(p.up, buf, sizeof(buf));
   uiFooter(top, buf);
   present();
@@ -108,8 +109,8 @@ void drawPcCores(uint32_t now) {
   const int W = spr.width();
   char buf[40];
   spr.fillSprite(C_BG());
-  snprintf(buf, sizeof(buf), "%d cores  %d%%", p.nCores, (int)lroundf(p.cpu));
-  uiHeader("Cores", buf, p.cpu >= 90);
+  snprintf(buf, sizeof(buf), L("%d cores  ·  %d%%", "%d ядер  ·  %d%%"), p.nCores, (int)lroundf(p.cpu));
+  uiHeader(L("Cores", "Ядра"), buf, p.cpu >= 90);
   int n = max(1, p.nCores);
   const int x0 = UI_M + 6, x1 = W - UI_M - 6, top = UI_TOP + 8, bot = UI_BOTTOM - 14;
   int slot = (x1 - x0) / n, bw = max(4, slot - (n > 8 ? 3 : 6));
@@ -127,7 +128,7 @@ void drawPcCores(uint32_t now) {
     snprintf(buf, sizeof(buf), "%d", i + 1);
     txt(buf, x + bw / 2, bot + 3, 1);
   }
-  uiFooter("wheel: screens", "side: back");
+  uiFooter(L("wheel: screens", "колесо: экраны"), L("side: back", "кнопка: назад"));
   present();
   (void)now;
 }
@@ -136,22 +137,22 @@ void drawPcWaiting(uint32_t now) {
   const int W = spr.width();
   spr.fillSprite(C_BG());
   bool lost = g_pc.have;
-  uiHeader("PC", lost ? "laptop stopped" : "waiting for laptop", lost);
+  uiHeader(L("PC", "ПК"), lost ? L("computer stopped", "компьютер отключился") : L("waiting for computer", "жду компьютер"), lost);
   spr.setTextDatum(TL_DATUM);
   int x = UI_M + 10, y = UI_TOP + 10;
   spr.setTextColor(C_ACC());  txt("1", x, y, 4);
-  spr.setTextColor(C_HOT());  txt("PLUG THIS DEVICE INTO THE LAPTOP (USB)", x + 22, y + 6, 1);
+  spr.setTextColor(C_HOT());  txt(L("CONNECT TENGAN TO THE COMPUTER (USB)", "ПОДКЛЮЧИТЕ TENGAN К КОМПЬЮТЕРУ (USB)"), x + 22, y + 6, 1);
   y += 34;
   spr.setTextColor(C_ACC());  txt("2", x, y, 4);
-  spr.setTextColor(C_HOT());  txt("ON THE LAPTOP DOUBLE-CLICK", x + 22, y + 2, 1);
-  spr.setTextColor(C_ACC());  txt("start_pc_monitor.bat", x + 22, y + 13, 1);
+  spr.setTextColor(C_HOT());  txt(L("ON THE COMPUTER START", "НА КОМПЬЮТЕРЕ ЗАПУСТИТЕ"), x + 22, y + 2, 1);
+  spr.setTextColor(C_ACC());  txt("TENGAN Desktop", x + 22, y + 13, 1);
   y += 34;
   spr.setTextColor(C_ACC());  txt("3", x, y, 4);
-  spr.setTextColor(C_HOT());  txt("WAIT 5 SECONDS - NUMBERS APPEAR HERE", x + 22, y + 6, 1);
+  spr.setTextColor(C_HOT());  txt(L("WAIT A FEW SECONDS · DATA APPEARS HERE", "ПОДОЖДИТЕ - ДАННЫЕ ПОЯВЯТСЯ ЗДЕСЬ"), x + 22, y + 6, 1);
   // «пульс ожидания»
   int k = (now / 300) % 4;
   for (int i = 0; i < 3; i++) spr.fillRect(W - UI_M - 30 + i * 8, UI_TOP + 112, 5, 5, i < k ? C_ACC() : UI_LINE());
-  uiFooter("", "side: back");
+  uiFooter("", L("side: back", "кнопка: назад"));
   present();
 }
 
@@ -190,8 +191,8 @@ void drawPcMedia(uint32_t now) {
   char buf[48], a[16], b[16];
   spr.fillSprite(C_BG());
   bool trk = p.trk && msSince(now, p.trkT) < 10000;
-  char app[20]; snprintf(app, sizeof(app), "%s", trk && p.app[0] ? p.app : (p.host[0] ? p.host : "laptop"));
-  uiHeader("Media", app);
+  char app[40]; snprintf(app, sizeof(app), "%s", trk && p.app[0] ? p.app : (p.host[0] ? p.host : L("computer", "компьютер")));
+  uiHeader(L("Media", "Музыка"), app);
 
   // ---- справа: громкость узкой полоской (ярче, когда крутишь колесо) ----
   const int vx = W - UI_M - 16, vy = UI_TOP + 6, vh = 92, vw = 10;
@@ -205,7 +206,7 @@ void drawPcMedia(uint32_t now) {
   }
   spr.setTextDatum(TC_DATUM);
   spr.setTextColor(turning ? C_HOT() : UI_LABEL());
-  if (known) snprintf(buf, sizeof(buf), p.mute ? "MUTE" : "%d", p.vol); else snprintf(buf, sizeof(buf), "VOL");
+  if (known) snprintf(buf, sizeof(buf), p.mute ? L("MUTE", "БЕЗ ЗВ.") : "%d", p.vol); else snprintf(buf, sizeof(buf), "%s", L("VOL", "ГРОМК"));
   txt(buf, vx + vw / 2, vy + vh + 4, 1);
 
   const int tx = UI_M + 6, tw = vx - tx - 12;
@@ -249,18 +250,18 @@ void drawPcMedia(uint32_t now) {
     const int gx = px + 16;
     spr.setTextDatum(TL_DATUM);
     spr.setTextColor(UI_LABEL());
-    txt(p.mute ? "MUTED" : "VOLUME", gx, UI_TOP + 22, 1);
+    txt(p.mute ? L("MUTED", "БЕЗ ЗВУКА") : L("VOLUME", "ГРОМКОСТЬ"), gx, UI_TOP + 22, 1);
     spr.setTextColor(p.mute ? UI_DIM() : (turning ? C_HOT() : C_ACC()));
     if (known) { snprintf(buf, sizeof(buf), "%d", p.vol); txt(buf, gx, UI_TOP + 32, 6); }
     else txt("--", gx, UI_TOP + 32, 6);
     spr.setTextColor(UI_DIM());
-    txt("NO TRACK INFO", gx, UI_TOP + 84, 1);
-    txt("WHEEL: VOLUME", gx, UI_TOP + 96, 1);
+    txt(L("NO TRACK INFO", "НЕТ ДАННЫХ О ТРЕКЕ"), gx, UI_TOP + 84, 1);
+    txt(L("WHEEL: VOLUME", "КОЛЕСО: ГРОМКОСТЬ"), gx, UI_TOP + 96, 1);
   } else {
     // ---- название и исполнитель ----
     spr.setTextDatum(TL_DATUM);
     spr.setTextColor(C_HOT());
-    marquee(p.title[0] ? p.title : "(no title)", tx, UI_TOP + 10, tw, 5, now);   // шрифты с кириллицей
+    marquee(p.title[0] ? p.title : L("(no title)", "(без названия)"), tx, UI_TOP + 10, tw, 5, now);   // шрифты с кириллицей
     spr.setTextColor(UI_LABEL());
     char art[96];
     fitText(p.artist, art, sizeof(art), tw, 3);
@@ -289,8 +290,8 @@ void drawPcMedia(uint32_t now) {
     else { spr.fillRect(ix, iy, 5, 16, ic); spr.fillRect(ix + 9, iy, 5, 16, ic); }
     spr.setTextDatum(TL_DATUM);
     spr.setTextColor(UI_LABEL());
-    txt(p.playing ? "PLAYING" : "PAUSED", ix + 22, iy + 4, 1);
+    txt(p.playing ? L("PLAYING", "ИГРАЕТ") : L("PAUSED", "ПАУЗА"), ix + 22, iy + 4, 1);
   }
-  uiFooter("wheel: volume  click: play/pause", "side: back");
+  uiFooter(L("wheel: volume  ·  click: play/pause", "колесо: громкость  ·  нажать: пауза"), L("side: back", "кнопка: назад"));
   present();
 }

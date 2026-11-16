@@ -15,6 +15,10 @@ TENGAN — приложение для компьютера (Windows).
   Авто  — USB, если палка на кабеле, иначе Wi-Fi.
 
 Клавиши: F11 — во весь экран, F2 — снова выбор режима.
+
+Плюс (WIDGET.md): значок в трее (закрытие окна — в трей), всплывашки при событиях
+(NERV / DOMAIN) и мини-виджет поверх всех окон. Решения «что показать» — events.py,
+окна — overlay.py.
 """
 import base64
 import gzip
@@ -27,6 +31,7 @@ import sys
 import threading
 import time
 import urllib.parse
+import urllib.request
 from collections import deque
 
 APP_NAME = "TENGAN Desktop"
@@ -44,6 +49,8 @@ if getattr(sys, "frozen", False) or sys.stdout is None:
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "pc_monitor"))
 import pc_monitor as pm            # noqa: E402  (сбор нагрузки, музыка, звук, медиа-клавиши, поиск палки)
+sys.path.insert(0, HERE)
+from events import Engine, cfg_from_settings, KINDS   # noqa: E402  («мозг» оповещений — без окон)
 
 
 def log(*a):
@@ -136,6 +143,9 @@ class Link:
         self.pending = {}
         self.pages = {}
         self.on_line = None            # монитор ПК: строки без «@» (KEY / AUD)
+        self.on_event = None           # «мозг» оповещений: каждое событие палки (ev, json)
+        self.extra = ""                # что ещё слушать для оповещений/виджета (даже если штаб на другой вкладке)
+        self.page_q = ""               # подписка самой страницы
         self.on_port = None            # монитор ПК: порт открылся / пропал
         self.dev_lang = None           # язык прошивки TENGAN (из события st)
         self.stop = False
@@ -160,6 +170,8 @@ class Link:
                             self.on_port(p)
                         if self.want_q:
                             self.send_line("@W " + self.want_q)
+                        if self.on_event:
+                            self.on_event("_link", "true")
                     except Exception as e:
                         log("USB: не открылся", name, e)
                         time.sleep(2)
@@ -183,6 +195,8 @@ class Link:
             if self.on_port:
                 self.on_port(None)
             self._push("_x", '"nostick"')
+            if self.on_event:
+                self.on_event("_link", "false")
 
     def send_line(self, s):
         p = self.port
@@ -241,6 +255,11 @@ class Link:
             self.on_line(line)
 
     def _push(self, ev, js):
+        if self.on_event and ev[0] != "_":
+            try:
+                self.on_event(ev, js)
+            except Exception as e:
+                log("оповещения:", e)
         with self.cv:
             if ev == "snd" and len(self.events) > 200:   # страница не успевает — старый звук не нужен
                 return
@@ -249,8 +268,31 @@ class Link:
 
     # --- для страницы ---
     def want(self, q):
+        self.page_q = q
+        self._rewant()
+
+    def set_extra(self, parts):
+        if parts != self.extra:
+            self.extra = parts
+            self._rewant()
+
+    def _rewant(self):
+        """Подписка = то, что смотрит штаб, + то, что нужно оповещениям (ble, ir, nfc, sens, wx)."""
+        q = self.page_q                                  # вид «want=ble,wifi&sm=0&sb=1» (как у SSE)
+        if self.extra:
+            head, sep, tail = q.partition("&")
+            if head.startswith("want="):
+                head = head[5:]
+            have = [x for x in head.split(",") if x]
+            for x in self.extra.split(","):
+                if x and x not in have:
+                    have.append(x)
+            q = "want=" + ",".join(have) + (sep + tail if sep else "")
+        if q == self.want_q:
+            return
         self.want_q = q
-        self.send_line("@W " + q)
+        if q:
+            self.send_line("@W " + q)
 
     def poll(self, wait=0.25):
         with self.cv:
@@ -433,6 +475,22 @@ button:hover,button.on{border-color:var(--acc);box-shadow:0 0 18px rgba(255,255,
 #st{min-height:22px;color:var(--acc);letter-spacing:.08em}
 .bar{width:420px;height:3px;background:var(--line)}.bar i{display:block;height:100%;width:0;background:var(--acc)}
 .hint{color:var(--dim);font-size:12px}
+#pb2{background:none;border:1px solid var(--line);color:var(--dim);padding:8px 16px;min-width:0;font-size:13px;letter-spacing:.1em}
+#pb2:hover{color:var(--hot)}
+#pp{position:fixed;inset:0;background:#05080d;display:none;overflow:auto}
+#pp.on{display:block}
+#pp .in{max-width:760px;margin:40px auto;padding:0 20px}
+#pp h2{font-weight:600;letter-spacing:.2em;font-size:22px;margin:0 0 6px}#pp h2 b{color:var(--acc)}
+#pp h3{color:var(--acc);font-size:13px;letter-spacing:.2em;margin:22px 0 6px;text-transform:uppercase}
+.it{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:9px 0;border-bottom:1px solid var(--line)}
+.it span small{display:block;color:var(--dim);font-size:12px}
+.it select,.it input[type=number]{background:#0b1620;color:var(--hot);border:1px solid var(--line);padding:6px 8px;font:14px 'Segoe UI'}
+.it input[type=number]{width:80px}
+.tg{width:54px;height:26px;border:1px solid var(--line);background:#0b1620;position:relative;cursor:pointer;min-width:0;padding:0}
+.tg:after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;background:var(--dim);transition:.15s}
+.tg.on{border-color:var(--acc)}.tg.on:after{left:31px;background:var(--acc)}
+.ppb{display:flex;gap:10px;margin:22px 0 40px}
+.ppb button{min-width:0;padding:10px 18px;font-size:13px}
 </style></head><body><div class="w">
 <h1>TENGAN <b>天眼</b></h1><div class="sub">%SUB%</div>
 <div class="row">
@@ -441,6 +499,7 @@ button:hover,button.on{border-color:var(--acc);box-shadow:0 0 18px rgba(255,255,
 <button data-m="auto">%AUTO_T%<small>%AUTO_S%</small></button>
 </div>
 <div id="st"></div><div class="bar"><i id="pb"></i></div>
+<<<<<<< HEAD
 <div class="hint">%HINT%</div>
 </div><script>
 var last='%LAST%',auto=%AUTO%,cd=3,timer=null;
@@ -448,6 +507,60 @@ var st=document.getElementById('st');
 function go(m){clearInterval(timer);st.textContent='…';fetch('/__app/start?mode='+m).then(function(r){return r.text()}).then(function(t){if(t)st.textContent=t});}
 document.querySelectorAll('button').forEach(function(b){if(b.dataset.m===last)b.classList.add('on');b.onclick=function(){go(b.dataset.m)}});
 if(auto&&last){timer=setInterval(function(){if(cd<=0){go(last);return}st.textContent='%COUNTDOWN%'.replace('{m}',last.toUpperCase()).replace('{n}',cd);cd--},1000);}
+=======
+<div class="hint">F11 — во весь экран · F2 — снова этот выбор · на палке открой раздел Web</div>
+<button id="pb2">⚙ ОПОВЕЩЕНИЯ И ВИДЖЕТ</button>
+</div>
+<div id="pp"><div class="in"><h2>ОПОВЕЩЕНИЯ <b>警報</b> · ВИДЖЕТ</h2>
+<div class="hint">Пороги «близко», «новое», трекеры — общие с палкой и планшетом (штаб → ⚙ ALERTS). Здесь — что и как показывать на этом компьютере.</div>
+<div id="ppl"></div>
+<div class="ppb"><button id="ppt">ПРОВЕРИТЬ ПЛАШКУ</button><button id="ppc">ГОТОВО</button></div></div></div>
+<script>
+(function(){
+var NAMES={new:['Новое устройство рядом','по порогам тревог с палки'],tracker:['Трекер рядом','AirTag и похожие метки'],
+ ir:['Пульт','кто и какую кнопку нажал'],nfc:['Карта / метка NFC','тип карты'],sensor:['Новый датчик 433','термометр, звонок, пульт ворот'],
+ temp:['Температура за окном','если изменилась на 1° и больше'],battery:['Батарея палки','ниже 15%'],link:['Связь с палкой','пропала / вернулась']};
+var L=document.getElementById('ppl'),P=null;
+function set(k,v){fetch('/__app/prefs_set?k='+encodeURIComponent(k)+'&v='+encodeURIComponent(JSON.stringify(v))).then(function(r){return r.json()}).then(function(d){P=d.prefs;draw()})}
+function row(t,h,el){var d=document.createElement('div');d.className='it';d.innerHTML='<span>'+t+(h?'<small>'+h+'</small>':'')+'</span>';d.appendChild(el);L.appendChild(d)}
+function tog(k,v){var b=document.createElement('button');b.className='tg'+(v?' on':'');b.onclick=function(){set(k,!v)};return b}
+function num(k,v,mn,mx,st){var i=document.createElement('input');i.type='number';i.min=mn;i.max=mx;i.step=st;i.value=v;i.onchange=function(){var x=Math.min(mx,Math.max(mn,+i.value));set(k,x)};return i}
+function sel(k,v,opts){var s=document.createElement('select');opts.forEach(function(o){var e=document.createElement('option');e.value=o[0];e.textContent=o[1];if(o[0]===v)e.selected=true;s.appendChild(e)});s.onchange=function(){set(k,s.value)};return s}
+function h3(t){var e=document.createElement('h3');e.textContent=t;L.appendChild(e)}
+function draw(){L.innerHTML='';var p=P;
+ h3('Всплывающие плашки');
+ row('Показывать оповещения','плашка в углу экрана поверх всех окон',tog('popups',p.popups));
+ row('Уведомления Windows вместо плашек','обычные системные, в центре уведомлений',tog('native',p.native));
+ row('Стиль','как вкладка штаба или всегда один',sel('style',p.style,[['auto','как в штабе'],['nerv','NERV'],['domain','DOMAIN']]));
+ row('Угол экрана','',sel('corner',p.corner,[['br','справа внизу'],['bl','слева внизу'],['tr','справа вверху'],['tl','слева вверху']]));
+ row('Сколько висит, с','',num('duration',p.duration,2,15,0.5));
+ row('Не больше в минуту','тревоги могут пройти сверх лимита (не больше двойного)',num('per_min',p.per_min,1,30,1));
+ h3('Что показывать');
+ Object.keys(NAMES).forEach(function(k){row(NAMES[k][0],NAMES[k][1],tog('kinds.'+k,p.kinds[k]))});
+ h3('Тихие часы');
+ row('Включить','в эти часы плашек нет',tog('quiet',p.quiet));
+ row('С (час)','',num('quiet_from',p.quiet_from,0,23,1));row('До (час)','',num('quiet_to',p.quiet_to,0,23,1));
+ row('Трекер рядом — всё равно показать','',tog('quiet_trackers',p.quiet_trackers));
+ h3('Виджет');
+ row('Виджет поверх окон','мини-радар, активность, температура, пульт, карта · двойной клик — штаб',tog('widget',p.widget));
+ row('Непрозрачность','0.3 … 1',num('opacity',p.opacity,0.3,1,0.05));
+ row('Сквозные клики','клики проходят сквозь виджет (выключить — в меню трея)',tog('clickthrough',p.clickthrough));
+ h3('Окно');
+ row('Крестик — в трей','программа работает у часов; выход — из меню значка',tog('tray',p.tray));
+}
+function open_(){fetch('/__app/prefs').then(function(r){return r.json()}).then(function(d){P=d.prefs;draw();document.getElementById('pp').classList.add('on')})}
+document.getElementById('pb2').onclick=open_;
+document.getElementById('ppc').onclick=function(){document.getElementById('pp').classList.remove('on')};
+document.getElementById('ppt').onclick=function(){fetch('/__app/test_popup')};
+if(location.search.indexOf('prefs')>=0)open_();
+})();
+</script><script>
+var last='%LAST%',auto=%AUTO%,cd=3,timer=null;
+var st=document.getElementById('st');
+function go(m){clearInterval(timer);st.textContent='…';fetch('/__app/start?mode='+m).then(function(r){return r.text()}).then(function(t){if(t)st.textContent=t});}
+document.querySelectorAll('button[data-m]').forEach(function(b){if(b.dataset.m===last)b.classList.add('on');b.onclick=function(){go(b.dataset.m)}});
+if(auto&&last){timer=setInterval(function(){if(cd<=0){go(last);return}st.textContent='запуск: '+last.toUpperCase()+' через '+cd+' с · или выбери другой';cd--},1000);}
+>>>>>>> 419e5c2 (Desktop app: tray, styled event popups, always-on-top mini widget (design + implementation))
 setInterval(function(){fetch('/__app/status').then(function(r){return r.json()}).then(function(s){if(s.msg)st.textContent=s.msg;document.getElementById('pb').style.width=(s.pct||0)+'%'}).catch(function(){})},300);
 </script></body></html>"""
 
@@ -456,6 +569,14 @@ class App:
     def __init__(self, link, open_window=True):
         self.link = link
         self.cfg = cfg_load()
+        self.engine = Engine(prefs=self.cfg.get("alerts"))
+        self.eng_lock = threading.Lock()
+        self.mode_on = ""              # режим, в котором штаб реально запущен: usb / wifi
+        self.popups = self.widget = self.tray = self.sse = None
+        self.quitting = False
+        self.hq_style = "nerv"         # вкладка штаба NERV / DOMAIN (читается со страницы)
+        self.ev_t = 0.0                # когда пришло последнее событие палки
+        link.on_event = self.on_stick_event
         self.window = None
         self.html = None
         self.msg = ""
@@ -486,9 +607,9 @@ class App:
         return h
 
     # --- переходы окна ---
-    def launcher(self, autostart=False):
+    def launcher(self, autostart=False, prefs=False):
         if self.window:
-            self.window.load_url("http://127.0.0.1:%d/" % self.port + ("?auto=1" if autostart else ""))
+            self.window.load_url("http://127.0.0.1:%d/" % self.port + ("?auto=1" if autostart else "?prefs=1" if prefs else ""))
 
     def start(self, mode):
         if self.busy:
@@ -498,10 +619,18 @@ class App:
         if mode == "auto":
             mode = "usb" if (self.link.connected() or self.link.find_port()) else "wifi"
         if mode == "wifi":
+<<<<<<< HEAD
             self.msg = self.t("wifi_open")
+=======
+            self.msg = "открываю 192.168.4.1 — компьютер должен быть подключён к Wi-Fi палки"
+            self.mode_on = "wifi"
+            self.apply_prefs()
+>>>>>>> 419e5c2 (Desktop app: tray, styled event popups, always-on-top mini widget (design + implementation))
             if self.window:
                 self.window.load_url(STICK_URL)
             return self.msg
+        self.mode_on = "usb"
+        self.apply_prefs()
         threading.Thread(target=self._start_usb, daemon=True).start()
         return self.t("usb_find")
 
@@ -529,6 +658,146 @@ class App:
             log("USB старт:", e)
         finally:
             self.busy = False
+
+    # ---------- оповещения, виджет, трей ----------
+    def on_stick_event(self, ev, js):
+        with self.eng_lock:
+            if ev == "_link":
+                self.engine.link(js == "true")
+                return
+            self.ev_t = time.time()
+            self.engine.feed_raw(ev, js)
+
+    def on_sse_link(self, ok):
+        with self.eng_lock:
+            self.engine.link(ok)
+
+    def need_events(self):
+        p = self.engine.prefs
+        return bool(p.get("popups") or p.get("widget"))
+
+    def apply_prefs(self):
+        """Включить/выключить то, что нужно оповещениям, под текущий режим и настройки."""
+        need = self.need_events()
+        self.link.set_extra("ble,ir,nfc,sens,wx" if need and self.mode_on == "usb" else "")
+        if need and self.mode_on == "wifi":
+            if self.sse is None:
+                import overlay
+                self.sse = overlay.SseFeed(self.on_stick_event, self.on_sse_link)
+            self.sse.start()
+        elif self.sse:
+            self.sse.stop()
+        if self.widget:
+            self.widget.set_shown(bool(self.engine.prefs.get("widget")))
+        if self.tray:
+            self.tray.refresh()
+
+    def set_pref(self, k, v):
+        p = dict(self.engine.prefs)
+        if k.startswith("kinds."):
+            kk = dict(p["kinds"])
+            kk[k[6:]] = bool(v)
+            p["kinds"] = kk
+        else:
+            p[k] = v
+        self.engine.set_prefs(p)
+        self.cfg["alerts"] = self.engine.prefs
+        cfg_save(self.cfg)
+        self.apply_prefs()
+        if self.widget and k in ("opacity", "clickthrough", "style"):
+            self.widget.apply_style()
+
+    def toggle_pref(self, k):
+        self.set_pref(k, not bool(self.engine.prefs.get(k)))
+
+    def style(self):
+        s = self.engine.prefs.get("style", "auto")
+        return self.hq_style if s == "auto" else s
+
+    def show_main(self, prefs=False):
+        w = self.window
+        if not w:
+            return
+        try:
+            w.show()
+            w.restore()
+        except Exception:
+            pass
+        if prefs:
+            self.launcher(prefs=True)
+
+    def quit(self):
+        self.quitting = True
+        if self.tray:
+            self.tray.stop()
+        try:
+            import webview
+            for w in list(webview.windows):
+                w.destroy()
+        except Exception:
+            pass
+        os._exit(0)
+
+    def _settings_from_stick(self):
+        try:
+            if self.mode_on == "usb" and self.link.connected():
+                js = self.link.api("/api/settings", timeout=3)
+            elif self.mode_on == "wifi":
+                with urllib.request.urlopen("http://192.168.4.1/api/settings", timeout=3) as r:
+                    js = r.read().decode("utf-8")
+            else:
+                return
+            c = cfg_from_settings(json.loads(js))
+            if c:
+                with self.eng_lock:
+                    self.engine.set_cfg(c)
+        except Exception:
+            pass
+
+    def ticker(self):
+        """5 раз в секунду: показать готовые плашки, обновить виджет; раз в 30 с — настройки тревог с палки;
+        раз в 5 с — стиль вкладки штаба (NERV / DOMAIN) со страницы."""
+        last_cfg = 0.0
+        last_style = 0.0
+        while not self.quitting:
+            time.sleep(0.2)
+            now = time.time()
+            if self.need_events() and now - last_cfg > 30:
+                last_cfg = now
+                threading.Thread(target=self._settings_from_stick, daemon=True).start()
+            if self.window and now - last_style > 5:
+                last_style = now
+                try:
+                    v = self.window.evaluate_js("(function(){try{return localStorage.getItem('sub_hq')}catch(e){return null}})()")
+                    if v in ("0", "1", 0, 1):
+                        st = "domain" if str(v) == "1" else "nerv"
+                        if st != self.hq_style:
+                            self.hq_style = st
+                            if self.widget:
+                                self.widget.apply_style()
+                except Exception:
+                    pass
+            if self.mode_on == "usb":
+                self.on_stick_event("_link", "true" if (self.link.connected() and now - self.ev_t < 8) else "false")
+            with self.eng_lock:
+                notes = self.engine.pop()
+                snap = self.engine.snapshot() if (self.widget and self.widget.shown) else None
+            for n in notes:
+                self.show_note(n)
+            if snap is not None:
+                self.widget.update(snap)
+
+    def show_note(self, n):
+        p = self.engine.prefs
+        log("оповещение:", n["kind"], n["title"], n["text"])
+        if p.get("native") or not self.popups:
+            if self.tray and self.tray.notify("%s  %s" % (n.get("kj", ""), n["title"]), n["text"]):
+                return
+        if self.popups:
+            self.popups.show(n, self.style(), p.get("duration", 4.5))
+
+    def prefs_json(self):
+        return json.dumps({"prefs": self.engine.prefs, "kinds": KINDS}, ensure_ascii=False)
 
     def full_html(self):
         h = self.html or "<html><body style='background:#000;color:#fff'>%s</body></html>" % self.t("no_page")
@@ -583,6 +852,24 @@ def make_handler(app):
             elif p == "/__app/home":
                 app.launcher()
                 self._send('{"ok":true}')
+            elif p == "/__app/show":                      # второй запуск программы — показать это окно
+                app.show_main()
+                self._send('{"ok":true}')
+            elif p == "/__app/prefs":
+                self._send(app.prefs_json())
+            elif p == "/__app/prefs_set":
+                k = q.get("k", [""])[0]
+                try:
+                    v = json.loads(q.get("v", ["null"])[0])
+                except Exception:
+                    v = q.get("v", [""])[0]
+                if k:
+                    app.set_pref(k, v)
+                self._send(app.prefs_json())
+            elif p == "/__app/test_popup":                # кнопка «проверить» в настройках
+                app.show_note({"kind": "new", "kj": "接近警告", "title": "TEST · NEW DEVICE NEARBY",
+                               "text": "так будет выглядеть оповещение", "sev": "alert"})
+                self._send('{"ok":true}')
             else:
                 self._send('{"ok":false}', code=404)
 
@@ -610,7 +897,11 @@ def serve(app, port=PORT):
 
 def main():
     import webview
+    import overlay
     log("=== TENGAN desktop ===")
+    if not overlay.single_instance(PORT):
+        log("уже запущено — показал окно первой копии")
+        return
     link = Link()
     Monitor(link)
     app = App(link)
@@ -618,6 +909,21 @@ def main():
     win = webview.create_window(APP_NAME, "http://127.0.0.1:%d/" % app.port, width=1600, height=1000,
                                 background_color="#000000", min_size=(900, 600), js_api=JsApi(app))
     app.window = win
+    # оповещения и виджет (WIDGET.md): свои окна поверх всех + значок в трее
+    for name, make in (("popups", overlay.Popups), ("widget", overlay.Widget), ("tray", overlay.Tray)):
+        try:
+            setattr(app, name, make(app))
+        except Exception as e:
+            log("не включилось:", name, e)
+
+    def on_closing():
+        # крестик — в трей (палка и монитор ПК работают дальше); выход — из меню трея
+        if app.tray and app.tray.icon and app.engine.prefs.get("tray", True) and not app.quitting:
+            win.hide()
+            return False
+        app.quit()
+    win.events.closing += on_closing
+    threading.Thread(target=app.ticker, daemon=True).start()
 
     def on_loaded():
         try:

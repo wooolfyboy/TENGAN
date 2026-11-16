@@ -58,3 +58,9 @@ void drawIr(uint32_t now);
 void iconRemote(int x, int y, uint16_t c, uint16_t bg);
 
 extern const Section irSection;
+
+// подписи-заглушки «марка не определена» (экран сравнивает с ними)
+#include "core/lang.h"
+#define IR_NEC_GENERIC    L("NEC remote (many brands)", "пульт NEC (много марок)")
+#define IR_UNKNOWN_REMOTE L("unknown remote", "неизвестный пульт")
+#define IR_UNKNOWN        L("unknown", "неизвестно")

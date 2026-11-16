@@ -6,6 +6,7 @@
 //  удлиняют вспышки на ~100 мкс, а пульты бывают неточными.
 // ============================================================
 #include "probe/ir.h"
+#include "core/lang.h"
 
 IrModel g_ir;
 
@@ -157,37 +158,37 @@ const char* irBrand(const IrCode& c) {
     switch (c.addr) {
       case 0x04: return "LG TV";
       case 0x02: return "Toshiba TV";
-      case 0x00: return "no-name: LED strip, fan, box";
-      case 0x7A: case 0x7E: return "Yamaha audio";
+      case 0x00: return L("no-name: LED strip, fan, box", "без бренда: лента, вентилятор, приставка");
+      case 0x7A: case 0x7E: return L("Yamaha audio", "Yamaha (аудио)");
     }
-    return "NEC remote (many brands)";
+    return IR_NEC_GENERIC;
   }
   if (!strcmp(p, "NEC-EXT")) {
-    if (c.addr == 0x87EE) return "Apple remote";
-    if (c.addr == 0xEF00) return "RGB LED strip / lamp";
-    return "NEC remote (many brands)";
+    if (c.addr == 0x87EE) return L("Apple remote", "пульт Apple");
+    if (c.addr == 0xEF00) return L("RGB LED strip / lamp", "RGB-лента / лампа");
+    return IR_NEC_GENERIC;
   }
   if (!strcmp(p, "SAMSUNG")) return c.addr == 0x07 ? "Samsung TV" : "Samsung";
   if (!strncmp(p, "SONY", 4)) {
     if (c.bits == 12 && c.addr == 1) return "Sony TV";
-    if (c.bits == 20) return "Sony Blu-ray / AV";
+    if (c.bits == 20) return L("Sony Blu-ray / AV", "Sony Blu-ray / ресивер");
     return "Sony";
   }
   if (!strcmp(p, "RC5")) {
-    switch (c.addr) { case 0: return "Philips TV"; case 5: return "Philips VCR"; case 16: case 17: return "Philips / Marantz audio"; case 20: return "Philips CD"; }
+    switch (c.addr) { case 0: return "Philips TV"; case 5: return L("Philips VCR", "Philips видео"); case 16: case 17: return L("Philips / Marantz audio", "Philips / Marantz аудио"); case 20: return "Philips CD"; }
     return "Philips-style (RC5)";
   }
   if (!strcmp(p, "RC6")) return c.addr == 0 ? "Philips TV" : "Philips-style (RC6)";
-  if (!strncmp(p, "RC6-6", 5)) return c.bits == 32 && c.addr == 0x800F ? "Windows Media Center" : "set-top box (RC6-6)";
-  if (!strcmp(p, "LG")) return "LG (air con / TV)";
+  if (!strncmp(p, "RC6-6", 5)) return c.bits == 32 && c.addr == 0x800F ? "Windows Media Center" : L("set-top box (RC6-6)", "приставка (RC6-6)");
+  if (!strcmp(p, "LG")) return L("LG (air con / TV)", "LG (кондиционер / ТВ)");
   if (!strcmp(p, "JVC")) return "JVC";
   if (!strcmp(p, "KASEIKYO")) {
     switch (c.addr) { case 0x2002: return "Panasonic"; case 0x3254: return "Denon"; case 0xCB23: return "Mitsubishi";
                       case 0x5AAA: return "Sharp"; case 0x0103: return "JVC"; }
-    return "Kaseikyo (Japanese AV)";
+    return L("Kaseikyo (Japanese AV)", "Kaseikyo (японская техника)");
   }
-  if (!strcmp(p, "RAW")) return c.bits >= 70 ? "long frame: air conditioner?" : "unknown remote";
-  return "unknown";
+  if (!strcmp(p, "RAW")) return c.bits >= 70 ? L("long frame: air conditioner?", "длинный кадр: кондиционер?") : IR_UNKNOWN_REMOTE;
+  return IR_UNKNOWN;
 }
 
 // ---------- модель: история, повторы ----------

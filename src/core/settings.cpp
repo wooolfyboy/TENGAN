@@ -75,7 +75,7 @@ static const SetDef DEFS[S_NUM] = {
   { L("Microphone", "Микрофон"), L("microphone for the Sound section", "микрофон для раздела «Звук»"),       P_SOUND,   "mic",        K_BOOL },
   { L("LED meter", "Индикатор"), L("LEDs show loudness", "светодиоды показывают громкость"),          P_SOUND,   "au_leds",    K_BOOL },
   { L("Source", "Источник"), L("auto / microphone / computer audio", "авто / микрофон / звук ПК"),   P_SOUND,   "au_src",     K_ENUM },
-  { L("Near", "Рядом"), L("stronger than this counts as near", "сильнее этого — «рядом»"),   P_ALERT,   "al_near",    K_RANGE, -90, -40, 5, "dBm" },
+  { L("Near", "Рядом"), L("stronger than this counts as near", "сильнее этого - «рядом»"),   P_ALERT,   "al_near",    K_RANGE, -90, -40, 5, "dBm" },
   { L("New device", "Новое устройство"), L("alert: off / near / any", "тревога: выкл / рядом / все"),   P_ALERT,   "al_new",     K_ENUM },
   { L("Tracker", "Трекер"), L("tracker alert: off / near / any", "трекеры: выкл / рядом / все"), P_ALERT,   "al_trk",     K_ENUM },
   { L("New for", "Новое в течение"), L("how long a device counts as new", "сколько устройство считается новым"),    P_ALERT,   "al_newfor",  K_RANGE, 10, 300, 10, "s" },
@@ -88,7 +88,7 @@ static const SetDef DEFS[S_NUM] = {
   { L("Count sound", "Учитывать звук"), L("loudness raises activity", "громкость в активность"),    P_ALERT,   "al_csnd",    K_BOOL },
   { L("Count IR/NFC", "Учитывать ИК/NFC"), L("remotes and cards raise activity", "пульты и карты в активность"),P_ALERT,   "al_cprb",    K_BOOL },
   { L("Blinking", "Мигание"), L("blink on alerts", "мигать при тревоге"),             P_ALERT,   "al_blink",   K_BOOL },
-  { L("Alert banner", "Плашка тревоги"), L("show the proximity warning", "показывать «接近警告»"),      P_ALERT,   "al_plate",   K_BOOL },
+  { L("Alert banner", "Плашка тревоги"), L("show the proximity warning", "показывать плашку тревоги"),      P_ALERT,   "al_plate",   K_BOOL },
 };
 static const char* const PAGE_NAMES[P_NUM] = { L("General", "Общие"), "Bluetooth", "Wi-Fi", "Sub-GHz", L("Sound", "Звук"), L("Alerts", "Тревоги") };
 static const char* const PAGE_IDS[P_NUM]   = { "general", "ble", "wifi", "sub", "snd", "alert" };

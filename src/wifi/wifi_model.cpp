@@ -3,6 +3,7 @@
 //  (их используют и логика, и экраны, и симулятор экрана на ПК)
 // ============================================================
 #include <esp_wifi.h>
+#include "core/lang.h"
 #include "wifi/wifi_model.h"
 #include "wifi/ouidb.h"          // база производителей — подключается только здесь
 #include "core/display.h"
@@ -41,7 +42,7 @@ uint64_t macKey(const uint8_t* m) {
 // ---------- подписи и цвета ----------
 const char* encName(uint8_t e) {
   switch (e) {
-    case WIFI_AUTH_OPEN:            return "open";
+    case WIFI_AUTH_OPEN:            return L("open", "открытая");
     case WIFI_AUTH_WEP:             return "WEP";
     case WIFI_AUTH_WPA_PSK:         return "WPA";
     case WIFI_AUTH_WPA2_PSK:        return "WPA2";
@@ -51,7 +52,7 @@ const char* encName(uint8_t e) {
     case WIFI_AUTH_WPA2_WPA3_PSK:   return "WPA2/WPA3";
     case WIFI_AUTH_OWE:             return "OWE";
     case WIFI_AUTH_WAPI_PSK:        return "WAPI";
-    default:                        return "other";
+    default:                        return L("other", "другая");
   }
 }
 
@@ -61,7 +62,7 @@ const char* genName(uint8_t g) {
 }
 
 
-const char* ssidOr(const Ap& a) { return a.ssid[0] ? a.ssid : "(hidden)"; }
+const char* ssidOr(const Ap& a) { return a.ssid[0] ? a.ssid : L("(hidden)", "(скрыта)"); }
 
 // цель для FIND: выбранная в списке сеть, иначе самая сильная
 uint64_t findTarget() {

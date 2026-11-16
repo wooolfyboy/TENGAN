@@ -3,6 +3,7 @@
 //  Работает, только пока раздел открыт или планшет подписан на "ir".
 // ============================================================
 #include "probe/ir.h"
+#include "core/lang.h"
 #include "core/jsonutil.h"
 #include "core/crumb.h"
 #include "core/board.h"
@@ -86,7 +87,7 @@ void irJson(String& o) {
 
 // ---------- раздел ----------
 static void irSubtitle(char* out, size_t n) {
-  if (g_ir.have) snprintf(out, n, "last: %s", g_ir.last.proto);
+  if (g_ir.have) snprintf(out, n, L("last: %s", "пульт: %s"), g_ir.last.proto);
   else           snprintf(out, n, "38 kHz");
 }
 static void irEnter() { irStart(); }
@@ -95,7 +96,7 @@ static void irClick() { g_ir.histN = 0; g_ir.have = false; g_ir.rawN = 0; }   //
 static void irRotate(int) {}
 
 const Section irSection = {
-  "IR", 230, 90, 120, iconRemote, irSubtitle,
+  L("IR", "ИК"), 230, 90, 120, iconRemote, irSubtitle,
   irEnter, irLeave,
   0, nullptr, nullptr, nullptr, nullptr,
   irClick, irRotate, nullptr, irTick, drawIr,

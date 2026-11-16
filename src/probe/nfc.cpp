@@ -7,6 +7,7 @@
 //  платёжная ли (только SELECT PPSE, ответ сразу затираем), NDEF метки.
 // ============================================================
 #include <Wire.h>
+#include "core/lang.h"
 #include "probe/nfc.h"
 #include "core/jsonutil.h"
 #include "core/crumb.h"
@@ -240,8 +241,8 @@ void nfcJson(String& o) {
 
 // ---------- раздел ----------
 static void nfcSubtitle(char* out, size_t n) {
-  if (g_nfc.state == NFC_NOREADER) snprintf(out, n, "no chip");
-  else if (g_nfc.taps) snprintf(out, n, "%lu cards", (unsigned long)g_nfc.taps);
+  if (g_nfc.state == NFC_NOREADER) snprintf(out, n, "%s", L("no chip", "нет чипа"));
+  else if (g_nfc.taps) snprintf(out, n, "%lu %s", (unsigned long)g_nfc.taps, PL((int)g_nfc.taps, "card", "cards", "карта", "карты", "карт"));
   else snprintf(out, n, "13.56 MHz");
 }
 static void nfcEnter() { nfcStart(); }

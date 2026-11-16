@@ -2,6 +2,7 @@
 //  pc.cpp — раздел PC: приём строк с ноутбука по USB и сам раздел
 // ============================================================
 #include "core/timeutil.h"
+#include "core/lang.h"
 #include "core/jsonutil.h"
 #include "pc/pc.h"
 #include "core/display.h"
@@ -161,8 +162,8 @@ void pcSendLine(const char* s) {
 
 // ---------- раздел ----------
 static void pcSubtitle(char* out, size_t n) {
-  if (pcLive(millis())) snprintf(out, n, "%d%% cpu", (int)g_pc.cpu);
-  else                  snprintf(out, n, "usb laptop");
+  if (pcLive(millis())) snprintf(out, n, L("%d%% cpu", "%d%% ЦП"), (int)g_pc.cpu);
+  else                  snprintf(out, n, "%s", L("via USB", "по USB"));
 }
 static void pcEnter() { g_pcPage = 0; }
 static void pcLeave() {}
@@ -192,7 +193,7 @@ static void pcDraw(uint32_t now) {
 }
 
 const Section pcSection = {
-  "PC", 120, 220, 200, iconLaptop, pcSubtitle,
+  L("PC", "ПК"), 120, 220, 200, iconLaptop, pcSubtitle,
   pcEnter, pcLeave,
   0, nullptr, nullptr, nullptr, nullptr,
   pcClick, pcRotate, pcBack, nullptr, pcDraw,

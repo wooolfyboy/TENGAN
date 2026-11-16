@@ -26,8 +26,8 @@ void drawSpectrum() {
   spr.fillSprite(C_BG());
   int mi = 0;
   for (int i = 1; i < SP_N; i++) if (g_spCur[i] > g_spCur[mi]) mi = i;
-  snprintf(buf, sizeof(buf), "peak %.2f  %d dBm", spFreq(mi), g_spCur[mi]);
-  char title[24]; snprintf(title, sizeof(title), "Spectrum %s", BANDS[g_band].name);
+  snprintf(buf, sizeof(buf), L("peak %.2f  ·  %d dBm", "пик %.2f  ·  %d дБм"), spFreq(mi), g_spCur[mi]);
+  char title[48]; snprintf(title, sizeof(title), L("Spectrum %s", "Спектр %s"), BANDS[g_band].name);
   uiHeader(title, buf, g_spCur[mi] > -60);
 
   int pl = UI_M + 4, pr = W - UI_M - 4, pt = UI_TOP, pb = UI_TOP + 54;
@@ -62,11 +62,11 @@ void drawSpectrum() {
   spr.setTextColor(UI_DIM());
   snprintf(buf, sizeof(buf), "%.2f", BANDS[g_band].lo);
   spr.setTextDatum(TL_DATUM); txt(buf, pl, UI_BOTTOM - 6, 1);
-  snprintf(buf, sizeof(buf), "%.2f MHZ", (BANDS[g_band].lo + BANDS[g_band].hi) / 2);
+  snprintf(buf, sizeof(buf), L("%.2f MHZ", "%.2f МГЦ"), (BANDS[g_band].lo + BANDS[g_band].hi) / 2);
   spr.setTextDatum(TC_DATUM); txt(buf, W / 2, UI_BOTTOM - 6, 1);
   snprintf(buf, sizeof(buf), "%.2f", BANDS[g_band].hi);
   spr.setTextDatum(TR_DATUM); txt(buf, pr, UI_BOTTOM - 6, 1);
-  uiFooter("wheel: screens  click: band", "side: back");
+  uiFooter(L("wheel: screens  ·  click: band", "колесо: экраны  ·  нажать: диапазон"), L("side: back", "кнопка: назад"));
   present();
 }
 
@@ -78,8 +78,8 @@ void drawMonitor(uint32_t now) {
   char buf[48];
   spr.fillSprite(C_BG());
   int cur = g_monN ? g_mon[g_monN - 1] : -120;
-  snprintf(buf, sizeof(buf), "%d dBm  %s", cur, g_burst ? "signal!" : "quiet");
-  char title[24]; snprintf(title, sizeof(title), "Monitor %.2f", BANDS[g_band].mon);
+  snprintf(buf, sizeof(buf), L("%d dBm  ·  %s", "%d дБм  ·  %s"), cur, g_burst ? L("signal!", "сигнал!") : L("quiet", "тихо"));
+  char title[48]; snprintf(title, sizeof(title), L("Monitor %.2f", "Монитор %.2f"), BANDS[g_band].mon);
   uiHeader(title, buf, g_burst);
 
   // лента сигнала (~6 с), линия шума и порог срабатывания
@@ -93,7 +93,7 @@ void drawMonitor(uint32_t now) {
     bool hi = g_mon[i] > g_floor + BURST_ON_DB;
     spr.drawFastVLine(x, y, gy + gh - 3 - y, hi ? heat(g_mon[i] + 10) : UI_LINE());
   }
-  snprintf(buf, sizeof(buf), "NOISE %d DBM   - - TRIGGER", (int)g_floor);
+  snprintf(buf, sizeof(buf), L("NOISE %d DBM   - - TRIGGER", "ШУМ %d ДБМ   - - ПОРОГ"), (int)g_floor);
   spr.setTextDatum(TL_DATUM);
   spr.setTextColor(UI_DIM());
   txt(buf, gx + 5, gy + 3, 1);
@@ -105,16 +105,16 @@ void drawMonitor(uint32_t now) {
   spr.setTextColor(C_HOT());
   txt(buf, UI_M + 8, ly, 6);
   spr.setTextColor(UI_DIM());
-  txt("BURSTS", UI_M + 8, ly + 46, 1);
+  txt(L("BURSTS", "ВСПЛЕСКИ"), UI_M + 8, ly + 46, 1);
   int tx = 96;
   spr.setTextColor(UI_DIM());
-  txt("WHEN", tx, ly, 1); txt("LENGTH", tx + 70, ly, 1); txt("PEAK", tx + 130, ly, 1);
+  txt(L("WHEN", "КОГДА"), tx, ly, 1); txt(L("LENGTH", "ДЛИНА"), tx + 70, ly, 1); txt(L("PEAK", "ПИК"), tx + 130, ly, 1);
   for (int i = 0; i < g_evN && i < 4; i++) {
     const Burst& b = g_ev[g_evN - 1 - i];
     uint32_t ago = (now - b.t) / 1000;
-    if (ago < 60)        snprintf(buf, sizeof(buf), "%lus ago", (unsigned long)ago);
-    else if (ago < 3600) snprintf(buf, sizeof(buf), "%lum ago", (unsigned long)(ago / 60));
-    else                 snprintf(buf, sizeof(buf), "%luh ago", (unsigned long)(ago / 3600));
+    if (ago < 60)        snprintf(buf, sizeof(buf), L("%lus ago", "%lu с наз."), (unsigned long)ago);
+    else if (ago < 3600) snprintf(buf, sizeof(buf), L("%lum ago", "%lu мин наз."), (unsigned long)(ago / 60));
+    else                 snprintf(buf, sizeof(buf), L("%luh ago", "%lu ч наз."), (unsigned long)(ago / 3600));
     int y = ly + 11 + i * 12;
     spr.setTextColor(i == 0 ? C_HOT() : UI_LABEL());
     txt(buf, tx, y, 1);
@@ -125,9 +125,9 @@ void drawMonitor(uint32_t now) {
   }
   if (g_evN == 0) {
     spr.setTextColor(UI_DIM());
-    txt("PRESS A CAR KEY OR GATE REMOTE NEARBY", tx, ly + 14, 1);
+    txt(L("PRESS A CAR KEY OR GATE REMOTE NEARBY", "НАЖМИТЕ РЯДОМ БРЕЛОК ИЛИ ПУЛЬТ ВОРОТ"), tx, ly + 14, 1);
   }
-  uiFooter("wheel: screens  click: band", "side: back");
+  uiFooter(L("wheel: screens  ·  click: band", "колесо: экраны  ·  нажать: диапазон"), L("side: back", "кнопка: назад"));
   present();
 }
 
@@ -135,10 +135,10 @@ void drawMonitor(uint32_t now) {
 void drawCcMissing() {
   char buf[40];
   spr.fillSprite(C_BG());
-  uiHeader("Sub-GHz", "radio not found", true);
-  snprintf(buf, sizeof(buf), "chip answered 0x%02X", g_ccVersion);
-  uiEmpty("CC1101 not found", buf);
-  uiFooter("wheel: screens", "side: back");
+  uiHeader("Sub-GHz", L("radio not found", "радио не найдено"), true);
+  snprintf(buf, sizeof(buf), L("chip answered 0x%02X", "ответ чипа 0x%02X"), g_ccVersion);
+  uiEmpty(L("CC1101 not found", "CC1101 не найден"), buf);
+  uiFooter(L("wheel: screens", "колесо: экраны"), L("side: back", "кнопка: назад"));
   present();
 }
 
@@ -148,9 +148,9 @@ void drawCcMissing() {
 // ============================================================
 static void agoStr(char* b, size_t n, uint32_t ms) {
   uint32_t s = ms / 1000;
-  if (s < 60) snprintf(b, n, "%lus", (unsigned long)s);
-  else if (s < 3600) snprintf(b, n, "%lum", (unsigned long)(s / 60));
-  else snprintf(b, n, "%luh", (unsigned long)(s / 3600));
+  if (s < 60) snprintf(b, n, L("%lus", "%luс"), (unsigned long)s);
+  else if (s < 3600) snprintf(b, n, L("%lum", "%luм"), (unsigned long)(s / 60));
+  else snprintf(b, n, L("%luh", "%luч"), (unsigned long)(s / 3600));
 }
 
 // короткое имя протокола для таблицы
@@ -159,8 +159,8 @@ static void shortName(const SensRec& r, char* b, size_t n) {
   if (!strncmp(p, "LaCrosse-", 9)) p = "LaCrosse";
   else if (!strncmp(p, "FineOffset-", 11)) p = "FineOffset";
   else if (!strncmp(p, "Acurite-", 8)) p = "Acurite";
-  if (r.kind == OOK_REMOTE) snprintf(b, n, "%s %04lX", strcmp(r.proto, "Rolling") ? "BELL/REMOTE" : "ROLLING", (unsigned long)(r.id & 0xFFFF));
-  else if (r.ch) snprintf(b, n, "%s CH%d", p, r.ch);
+  if (r.kind == OOK_REMOTE) snprintf(b, n, "%s %04lX", strcmp(r.proto, "Rolling") ? L("BELL/REMOTE", "ЗВОНОК/ПУЛЬТ") : L("ROLLING", "ПЛАВАЮЩИЙ"), (unsigned long)(r.id & 0xFFFF));
+  else if (r.ch) snprintf(b, n, L("%s CH%d", "%s К%d"), p, r.ch);
   else snprintf(b, n, "%s %02lX", p, (unsigned long)(r.id & 0xFF));
   utf8UpperInPlace(b);
 }
@@ -174,7 +174,7 @@ static void drawPulseTrain(int x0, int y0, int w, int h) {
   spr.setTextDatum(TL_DATUM);
   if (!L.valid) {
     spr.setTextColor(UI_DIM());
-    txt("NO SIGNAL YET", x0 + 6, y0 + 4, 1);
+    txt(L("NO SIGNAL YET", "СИГНАЛОВ ПОКА НЕТ"), x0 + 6, y0 + 4, 1);
     for (int x = x0 + 6; x < x0 + w - 6; x += 3) spr.drawPixel(x, y0 + h - 8, UI_LINE());
     return;
   }
@@ -218,10 +218,10 @@ void drawSensors(uint32_t now) {
   int W = spr.width();
   char buf[48];
   spr.fillSprite(C_BG());
-  char title[24]; snprintf(title, sizeof(title), "Sensors %.2f", BANDS[g_band].mon);
+  char title[48]; snprintf(title, sizeof(title), L("Sensors %.2f", "Датчики %.2f"), BANDS[g_band].mon);
   bool fresh = g_sensLast.valid && msSince(now, g_sensLast.ms) < 1500;
-  if (g_sensN) snprintf(buf, sizeof buf, "%d heard%s", g_sensN, fresh ? "  rx!" : "");
-  else snprintf(buf, sizeof buf, "%s", fresh ? "rx!" : "listening");
+  if (g_sensN) snprintf(buf, sizeof buf, L("%d heard%s", "услышано %d%s"), g_sensN, fresh ? L("  · rx", "  · приём") : "");
+  else snprintf(buf, sizeof buf, "%s", fresh ? L("rx", "приём") : L("listening", "слушаю"));
   uiHeader(title, buf, fresh);
 
   uint8_t idx[SENS_MAX];
@@ -230,10 +230,10 @@ void drawSensors(uint32_t now) {
   if (!n) {
     spr.setTextDatum(MC_DATUM);
     spr.setTextColor(UI_LABEL());
-    txt("LISTENING...", W / 2, top + 26, 4);
+    txt(L("LISTENING...", "СЛУШАЮ..."), W / 2, top + 26, 4);
     spr.setTextColor(UI_DIM());
-    txt("OUTDOOR THERMOMETERS, DOORBELLS, REMOTES", W / 2, top + 52, 1);
-    snprintf(buf, sizeof buf, "%lu PACKETS  %lu NOISE", (unsigned long)g_sensPackets, (unsigned long)g_sensNoise);
+    txt(L("OUTDOOR THERMOMETERS, DOORBELLS, REMOTES", "УЛИЧНЫЕ ТЕРМОМЕТРЫ, ЗВОНКИ, ПУЛЬТЫ"), W / 2, top + 52, 1);
+    snprintf(buf, sizeof buf, L("%lu PACKETS  ·  %lu NOISE", "%lu ПОСЫЛОК  ·  %lu ШУМ"), (unsigned long)g_sensPackets, (unsigned long)g_sensNoise);
     txt(buf, W / 2, top + 66, 1);
   }
   int shown = n > rows ? rows - 1 : n;             // не влезли — последняя строка «+N»
@@ -251,7 +251,7 @@ void drawSensors(uint32_t now) {
     spr.setTextDatum(TR_DATUM);
     if (r.kind == OOK_REMOTE) {
       spr.setTextColor(old ? UI_DIM() : C_HOT());
-      if (r.btn) snprintf(buf, sizeof buf, "BTN %d", r.btn); else strcpy(buf, "PRESS");
+      if (r.btn) snprintf(buf, sizeof buf, L("BTN %d", "КН %d"), r.btn); else strcpy(buf, L("PRESS", "НАЖАТИЕ"));
       txt(buf, 172, y + 4, 1);
     } else {
       snprintf(buf, sizeof buf, "%.1f", r.t);
@@ -278,11 +278,11 @@ void drawSensors(uint32_t now) {
     txt(buf, W - UI_M - 2, y + 4, 1);
   }
   if (n > rows) {
-    snprintf(buf, sizeof buf, "+%d MORE ON TABLET", n - shown);
+    snprintf(buf, sizeof buf, L("+%d MORE IN THE APP", "+%d ЕЩЁ В ПРИЛОЖЕНИИ"), n - shown);
     spr.setTextDatum(TL_DATUM); spr.setTextColor(UI_DIM());
     txt(buf, UI_M + 4, top + shown * rowH + 4, 1);
   }
   drawPulseTrain(UI_M, 108, W - 2 * UI_M, UI_BOTTOM - 108);
-  uiFooter("wheel: screens  click: band", "side: back");
+  uiFooter(L("wheel: screens  ·  click: band", "колесо: экраны  ·  нажать: диапазон"), L("side: back", "кнопка: назад"));
   present();
 }

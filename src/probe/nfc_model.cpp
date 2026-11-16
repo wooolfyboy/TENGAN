@@ -4,6 +4,7 @@
 //  Без железа — собирается и в симуляторе.
 // ============================================================
 #include "probe/nfc.h"
+#include "core/lang.h"
 
 NfcModel g_nfc;
 
@@ -13,33 +14,33 @@ static void put(NfcCard& c, const char* fam, const char* hint) {
 }
 
 void nfcClassify(NfcCard& c, int ulVer) {
-  if (c.felica) { put(c, "FeliCa", "Japan transit / e-money - likely"); return; }
-  if (c.bank)   { put(c, "Bank card (EMV)", "tap-to-pay card or phone"); return; }
+  if (c.felica) { put(c, "FeliCa", L("Japan transit / e-money · likely", "проезд / e-money (Япония) · вероятно")); return; }
+  if (c.bank)   { put(c, L("Bank card (EMV)", "Банковская карта (EMV)"), L("tap-to-pay card or phone", "бесконтактная оплата")); return; }
   uint8_t sak = c.sak & 0x7F;                    // бит 7 (0x80) у некоторых — «каскад», не тип
   switch (c.sak) {
-    case 0x09: put(c, "MIFARE Mini", "old transit / access card"); return;
-    case 0x08: case 0x88: put(c, "MIFARE Classic 1K", "transit pass / door key - likely"); return;
-    case 0x18: put(c, "MIFARE Classic 4K", "transit / campus card - likely"); return;
-    case 0x10: put(c, "MIFARE Plus 2K", "transit / access card - likely"); return;
-    case 0x11: put(c, "MIFARE Plus 4K", "transit / access card - likely"); return;
-    case 0x28: put(c, "Classic + smart chip", "transit + smart card - likely"); return;
-    case 0x38: put(c, "Classic 4K + smart chip", "transit + smart card - likely"); return;
+    case 0x09: put(c, "MIFARE Mini", L("old transit / access card", "старая проездная / пропуск")); return;
+    case 0x08: case 0x88: put(c, "MIFARE Classic 1K", L("transit pass / door key · likely", "проездной / ключ от двери · вероятно")); return;
+    case 0x18: put(c, "MIFARE Classic 4K", L("transit / campus card · likely", "проездная / студенческая · вероятно")); return;
+    case 0x10: put(c, "MIFARE Plus 2K", L("transit / access card · likely", "проездная / пропуск · вероятно")); return;
+    case 0x11: put(c, "MIFARE Plus 4K", L("transit / access card · likely", "проездная / пропуск · вероятно")); return;
+    case 0x28: put(c, L("Classic + smart chip", "Classic + смарт-чип"), L("transit + smart card · likely", "проездная + смарт-карта · вероятно")); return;
+    case 0x38: put(c, L("Classic 4K + smart chip", "Classic 4K + смарт-чип"), L("transit + smart card · likely", "проездная + смарт-карта · вероятно")); return;
   }
   if (sak == 0x00) {
     switch (ulVer) {
-      case 0x0F: put(c, "NTAG213", "sticker / tag - 144 bytes"); return;
-      case 0x11: put(c, "NTAG215", "tag / game figure - 504 bytes"); return;
-      case 0x13: put(c, "NTAG216", "sticker / tag - 888 bytes"); return;
-      case 0x0B: put(c, "Ultralight EV1", "one-trip ticket / tag - likely"); return;
-      case 0x0E: put(c, "Ultralight EV1", "ticket / tag - likely"); return;
+      case 0x0F: put(c, "NTAG213", L("sticker / tag · 144 bytes", "наклейка / метка · 144 байта")); return;
+      case 0x11: put(c, "NTAG215", L("tag / game figure · 504 bytes", "метка / игровая фигурка · 504 байта")); return;
+      case 0x13: put(c, "NTAG216", L("sticker / tag · 888 bytes", "наклейка / метка · 888 байт")); return;
+      case 0x0B: put(c, "Ultralight EV1", L("single-ride ticket / tag · likely", "разовый билет / метка · вероятно")); return;
+      case 0x0E: put(c, "Ultralight EV1", L("ticket / tag · likely", "билет / метка · вероятно")); return;
     }
-    put(c, "Ultralight / NTAG", "ticket, sticker or tag - likely"); return;
+    put(c, "Ultralight / NTAG", L("ticket, sticker or tag · likely", "билет, наклейка или метка · вероятно")); return;
   }
   if (c.sak & 0x20) {
-    if (c.atqa == 0x0344) { put(c, "MIFARE DESFire", "transit / access card - likely"); return; }
-    put(c, "Smart card (ISO-DEP)", "ID / access / transit - unknown"); return;
+    if (c.atqa == 0x0344) { put(c, "MIFARE DESFire", L("transit / access card · likely", "проездная / пропуск · вероятно")); return; }
+    put(c, L("Smart card (ISO-DEP)", "Смарт-карта (ISO-DEP)"), L("ID / access / transit · unknown", "удостоверение / пропуск / проезд · неизвестно")); return;
   }
-  put(c, "ISO 14443-A tag", "unknown chip");
+  put(c, L("ISO 14443-A tag", "Метка ISO 14443-A"), L("unknown chip", "неизвестный чип"));
 }
 
 // ---------- NDEF ----------
@@ -85,10 +86,10 @@ static void parseMsg(const uint8_t* p, int n, NfcCard& c) {
       if (1 + ll <= avail) addRec(c, "", pay + 1 + ll, avail - 1 - ll);
     } else if (tnf == 2) {                                   // MIME: показываем только тип (vCard, Wi-Fi — личное/пароль)
       bool wifi = tl >= 19 && !memcmp(type, "application/vnd.wfa", 19);
-      if (wifi) addRec(c, "Wi-Fi settings (hidden)", nullptr, 0);
-      else addRec(c, "data: ", type, tl);
+      if (wifi) addRec(c, L("Wi-Fi settings (hidden)", "настройки Wi-Fi (скрыто)"), nullptr, 0);
+      else addRec(c, L("data: ", "данные: "), type, tl);
     } else if (tnf == 4) {
-      addRec(c, "app: ", type, tl);                          // android.com:pkg и т.п.
+      addRec(c, L("app: ", "приложение: "), type, tl);                          // android.com:pkg и т.п.
     }
     i += pl;
     if (h & 0x40) break;                                     // ME — последняя запись

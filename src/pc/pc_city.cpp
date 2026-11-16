@@ -8,6 +8,7 @@
 //  нажатие колеса — прожектор на следующую башню.
 // ============================================================
 #include <algorithm>
+#include "core/lang.h"
 #include "pc/pc.h"
 #include "core/display.h"
 #include "core/theme.h"
@@ -180,27 +181,27 @@ void drawPcCity(uint32_t now) {
   int alive = 0; for (auto& t : s_tw) if (t.alive) alive++;
   if (s_sel >= 0 && s_tw[s_sel].alive) {
     Tower& t = s_tw[s_sel];
-    spr.setTextColor(UI_LABEL()); txt("SPOTLIGHT", px, UI_TOP + 4, 1);
+    spr.setTextColor(UI_LABEL()); txt(L("SPOTLIGHT", "В ФОКУСЕ"), px, UI_TOP + 4, 1);
     spr.setTextColor(C_HOT()); char nm[20]; fitText(t.name, nm, sizeof(nm), 100, 2); txt(nm, px, UI_TOP + 16, 2);
     snprintf(buf, sizeof(buf), "%.1f%%", t.cpu);
     spr.setTextColor(t.cpu > 50 ? C_ALERT() : C_ACC()); txt(buf, px, UI_TOP + 38, 4);
     spr.setTextColor(UI_LABEL()); txt("CPU", px, UI_TOP + 64, 1);
-    if (t.ram >= 1024) snprintf(buf, sizeof(buf), "%.1f GB RAM", t.ram / 1024); else snprintf(buf, sizeof(buf), "%d MB RAM", (int)t.ram);
+    if (t.ram >= 1024) snprintf(buf, sizeof(buf), L("%.1f GB RAM", "%.1f ГБ ОЗУ"), t.ram / 1024); else snprintf(buf, sizeof(buf), L("%d MB RAM", "%d МБ ОЗУ"), (int)t.ram);
     spr.setTextColor(C_HOT()); txt(buf, px, UI_TOP + 78, 1);
-    if (t.fg) { spr.setTextColor(C_ACC()); txt("ACTIVE WINDOW", px, UI_TOP + 92, 1); }
+    if (t.fg) { spr.setTextColor(C_ACC()); txt(L("ACTIVE WINDOW", "АКТИВНОЕ ОКНО"), px, UI_TOP + 92, 1); }
   } else {
-    spr.setTextColor(UI_LABEL()); txt("PROGRAMS", px, UI_TOP + 4, 1);
+    spr.setTextColor(UI_LABEL()); txt(L("PROGRAMS", "ПРОГРАММЫ"), px, UI_TOP + 4, 1);
     snprintf(buf, sizeof(buf), "%d", alive);
     spr.setTextColor(C_HOT()); txt(buf, px, UI_TOP + 16, 4);
     spr.setTextColor(UI_DIM());
-    txt("HEIGHT  CPU", px, UI_TOP + 50, 1);
-    txt("WIDTH   RAM", px, UI_TOP + 62, 1);
-    txt("WHITE   ACTIVE", px, UI_TOP + 74, 1);
-    spr.setTextColor(C_ALERT()); txt("ORANGE  >50% CPU", px, UI_TOP + 86, 1);
+    txt(L("HEIGHT  CPU", "ВЫСОТА  ЦП"), px, UI_TOP + 50, 1);
+    txt(L("WIDTH   RAM", "ШИРИНА  ОЗУ"), px, UI_TOP + 62, 1);
+    txt(L("WHITE   ACTIVE", "БЕЛЫЙ   АКТИВНО"), px, UI_TOP + 74, 1);
+    spr.setTextColor(C_ALERT()); txt(L("ORANGE  >50% CPU", "ЦВЕТ    >50% ЦП"), px, UI_TOP + 86, 1);
   }
-  if (!pcCityLive(now)) { spr.setTextColor(UI_DIM()); txt("WAITING FOR DATA", px, UI_TOP + 110, 1); }
-  snprintf(buf, sizeof(buf), "%d%% total", (int)lroundf(g_pc.cpu));
-  uiHeader("Process city", buf, g_pc.cpu >= 90);
-  uiFooter("wheel: screens  click: spotlight", "side: back");
+  if (!pcCityLive(now)) { spr.setTextColor(UI_DIM()); txt(L("WAITING FOR DATA", "ЖДУ ДАННЫЕ"), px, UI_TOP + 110, 1); }
+  snprintf(buf, sizeof(buf), L("%d%% total", "всего %d%%"), (int)lroundf(g_pc.cpu));
+  uiHeader(L("Process city", "Город процессов"), buf, g_pc.cpu >= 90);
+  uiFooter(L("wheel: screens  ·  click: spotlight", "колесо: экраны  ·  нажать: фокус"), L("side: back", "кнопка: назад"));
   present();
 }

@@ -11,6 +11,7 @@
 //  Пины и настройки — из примера test_mic_speaker репозитория LilyGO.
 // ============================================================
 #include <driver/i2s_pdm.h>
+#include "core/lang.h"
 #include <driver/i2s_std.h>
 #include "audio/audio.h"
 #include "audio/audio_model.h"
@@ -46,10 +47,10 @@ bool   g_auXYStereo = false;
 static uint32_t s_pcAudT = 0;
 
 const char* levelWord(float db) {
-  if (db < -55) return "QUIET";
-  if (db < -40) return "NORMAL";
-  if (db < -25) return "LOUD";
-  return "VERY LOUD";
+  if (db < -55) return L("QUIET", "ТИХО");
+  if (db < -40) return L("NORMAL", "НОРМА");
+  if (db < -25) return L("LOUD", "ГРОМКО");
+  return L("VERY LOUD", "ОЧЕНЬ ГРОМКО");
 }
 
 // ---------- обмен задача микрофона -> основной цикл ----------
@@ -325,9 +326,9 @@ void audioPcFrame(float level, int hz, const uint8_t* bands, const int8_t* wave,
 }
 
 static void sndSubtitle(char* out, size_t n) {
-  if (g_auFromPc) snprintf(out, n, "laptop");
+  if (g_auFromPc) snprintf(out, n, "%s", L("from PC", "с ПК"));
   else if (s_micRun && g_micOk) snprintf(out, n, "%d dBfs", (int)g_au.level);
-  else                     snprintf(out, n, g_micEn ? "listen" : "mic off");
+  else                     snprintf(out, n, "%s", g_micEn ? L("listen", "слушать") : L("mic off", "мик. выкл"));
 }
 static bool s_micTried = false;             // микрофон уже пробовали запустить (не долбить драйвер, если не встал)
 static bool s_pcAsked = false;              // просили ноут слать звук
@@ -345,13 +346,13 @@ static void sndLeave() {
   g_auFromPc = false;
 }
 static void sndInfo(int i, SubItem& it) {
-  static const char* const names[A_NUM] = { "Bars", "Terrain", "Reactor", "Level", "Scope", "XY" };
-  static const char* const descs[A_NUM] = { "sound spectrum", "3D sound mountains", "pulse animation", "noise meter", "waveform", "oscilloscope XY" };
+  static const char* const names[A_NUM] = { L("Spectrum", "Спектр"), L("Terrain", "Рельеф"), L("Reactor", "Реактор"), L("Level", "Уровень"), L("Waveform", "Волна"), "XY" };
+  static const char* const descs[A_NUM] = { L("sound spectrum", "спектр звука"), L("3D sound mountains", "3D-горы из звука"), L("pulse animation", "пульсирующая анимация"), L("noise meter", "шумомер"), L("waveform", "форма волны"), L("oscilloscope XY", "осциллограф XY") };
   it.name = names[i]; it.desc = descs[i]; it.value[0] = 0;
-  if (!g_micEn) { strcpy(it.value, "mic off"); return; }
-  if (!g_micOk) { strcpy(it.value, "no mic"); return; }
+  if (!g_micEn) { strcpy(it.value, L("mic off", "мик. выкл")); return; }
+  if (!g_micOk) { strcpy(it.value, L("no mic", "нет мик.")); return; }
   if (i == A_LEVEL) snprintf(it.value, sizeof(it.value), "%d dBfs", (int)g_au.level);
-  if (i == A_BARS && g_au.energy > 0.15f) snprintf(it.value, sizeof(it.value), "%d Hz", (int)g_au.domHz);
+  if (i == A_BARS && g_au.energy > 0.15f) snprintf(it.value, sizeof(it.value), L("%d Hz", "%d Гц"), (int)g_au.domHz);
 }
 static int  sndNow() { return g_aMode; }
 static void sndOpen(int m) { g_aMode = m; if (m == A_LEVEL) { g_auMax = -120; } }
@@ -401,7 +402,7 @@ static void sndDraw(uint32_t now) {
 
 
 const Section soundSection = {
-  "Sound", 120, 200, 255, iconMic, sndSubtitle,
+  L("Sound", "Звук"), 120, 200, 255, iconMic, sndSubtitle,
   sndEnter, sndLeave,
   A_NUM, sndInfo, sndNow, sndOpen, sndClose,
   sndClick, sndRotate, nullptr, sndTick, sndDraw,

@@ -103,7 +103,7 @@ uint16_t scale565(uint16_t c, int pct) {
 static const GFXfont* fontForText(const char* s, int size) {
   const GFXfont* f = fontFor(size);
 #if LANG_RU
-  bool hi = false; for (const char* p = s; *p; p++) if ((uint8_t)*p >= 0x80) { hi = true; break; }
+  bool hi = false; for (const char* p = s; *p; p++) if ((uint8_t)*p == 0xD0 || (uint8_t)*p == 0xD1) { hi = true; break; }   // кириллица
   if (hi) {
     if (size == 2 || size == 1) return &PLY13;
     if (size == 4) return &PLB20;

@@ -7,6 +7,7 @@
 //  памяти это не стоит.
 // ============================================================
 #pragma once
+#include <stddef.h>
 
 #ifdef TENGAN_LANG_RU
   #define L(en, ru) (ru)

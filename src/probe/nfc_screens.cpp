@@ -57,9 +57,9 @@ static void drawIdle(uint32_t now) {
   card(x, cy - 26, 88, 54, scale565(UI_LABEL(), 50 + (int)(slide * 50)), UI_PANEL(), true, false);
   spr.setTextDatum(MC_DATUM);
   spr.setTextColor(UI_LABEL());
-  txt("TOUCH A CARD TO THE STICK", W / 2, 122, 1);
+  txt(L("TOUCH A CARD TO TENGAN", "ПРИЛОЖИТЕ КАРТУ К TENGAN"), W / 2, 122, 1);
   spr.setTextColor(UI_DIM());
-  txt("READ ONLY: CARD TYPE AND PUBLIC TAG DATA", W / 2, 136, 1);
+  txt(L("READ ONLY: CARD TYPE AND PUBLIC TAG DATA", "ТОЛЬКО ЧТЕНИЕ: ТИП КАРТЫ И ОТКРЫТЫЕ ДАННЫЕ"), W / 2, 136, 1);
 }
 
 void drawNfc(uint32_t now) {
@@ -68,17 +68,17 @@ void drawNfc(uint32_t now) {
   char buf[64];
   spr.fillSprite(C_BG());
   if (m.state == NFC_NOREADER) {
-    uiHeader("NFC", "no chip", true);
-    uiEmpty("NFC chip not found", "this board may have no PN532 - click: try again");
-    uiFooter("click: retry", "side: back");
+    uiHeader("NFC", L("no chip", "нет чипа"), true);
+    uiEmpty(L("NFC chip not found", "чип NFC не найден"), L("this model may have no NFC · click: try again", "у этой модели может не быть NFC · нажать: повтор"));
+    uiFooter(L("click: retry", "нажать: повтор"), L("side: back", "кнопка: назад"));
     present();
     return;
   }
-  snprintf(buf, sizeof buf, m.taps ? "%lu cards" : "scanning", (unsigned long)m.taps);
-  uiHeader("NFC - what card?", buf, false);
+  if (m.taps) snprintf(buf, sizeof buf, "%lu %s", (unsigned long)m.taps, PL((int)m.taps, "card", "cards", "карта", "карты", "карт")); else snprintf(buf, sizeof buf, "%s", L("scanning", "поиск"));
+  uiHeader(L("NFC · what card?", "NFC · что за карта?"), buf, false);
   if (!m.have) {
     drawIdle(now);
-    uiFooter("receive only", "side: back");
+    uiFooter(L("read only", "только чтение"), L("side: back", "кнопка: назад"));
     present();
     return;
   }
@@ -91,8 +91,8 @@ void drawNfc(uint32_t now) {
   card(cx, cy, cw, ch, m.present ? C_ACC() : UI_LINE(), m.present ? UI_PANEL() : C_BG(), chip, c.bank);
   spr.setTextDatum(TC_DATUM);
   spr.setTextColor(m.present ? C_HOT() : UI_DIM());
-  if (m.present) txt("ON THE STICK", cx + cw / 2, cy + ch + 8, 1);
-  else { uint32_t s = age / 1000; snprintf(buf, sizeof buf, s < 60 ? "LAST CARD %lus AGO" : "LAST CARD %lum AGO", (unsigned long)(s < 60 ? s : s / 60)); txt(buf, cx + cw / 2, cy + ch + 8, 1); }
+  if (m.present) txt(L("ON THE READER", "НА СЧИТЫВАТЕЛЕ"), cx + cw / 2, cy + ch + 8, 1);
+  else { uint32_t s = age / 1000; snprintf(buf, sizeof buf, s < 60 ? L("LAST CARD %lus AGO", "КАРТА %lu С НАЗАД") : L("LAST CARD %lum AGO", "КАРТА %lu МИН НАЗАД"), (unsigned long)(s < 60 ? s : s / 60)); txt(buf, cx + cw / 2, cy + ch + 8, 1); }
 
   // справа: тип, подсказка, UID, ATQA/SAK, записи
   int tx = 140, tw = W - tx - UI_M - 2;
@@ -102,7 +102,7 @@ void drawNfc(uint32_t now) {
   fitText(c.fam, f, sizeof f, tw, 2);
   txt(f, tx, 26, 2);
   spr.setTextColor(C_ACC());
-  char hu[88]; utf8Upper(c.hint, hu, sizeof hu);
+  char hu[100]; utf8Upper(c.hint, hu, sizeof hu);
   fitText(hu, f, sizeof f, tw, 1);
   txt(f, tx, 44, 1);
   // UID: первые два байта, остальное — точки
@@ -120,10 +120,10 @@ void drawNfc(uint32_t now) {
   int y = 88;
   if (c.bank) {
     spr.setTextColor(UI_DIM());
-    txt("NUMBER, NAME: NOT READ", tx, y + 4, 1);
+    txt(L("NUMBER AND NAME ARE NOT READ", "НОМЕР И ИМЯ НЕ ЧИТАЮТСЯ"), tx, y + 4, 1);
   } else if (c.nNdef) {
     spr.setTextColor(UI_DIM());
-    txt("TAG SAYS", tx, y, 1);
+    txt(L("ON THE TAG", "НА МЕТКЕ"), tx, y, 1);
     for (int i = 0; i < c.nNdef && i < 2; i++) {
       spr.setTextColor(i == 0 ? C_HOT() : UI_LABEL());
       fitText(c.ndef[i], f, sizeof f, tw, 3);
@@ -131,7 +131,7 @@ void drawNfc(uint32_t now) {
     }
   } else {
     spr.setTextColor(UI_DIM());
-    txt(c.isoDep ? "PROTECTED CHIP - NOTHING PUBLIC" : "NO PUBLIC RECORDS", tx, y + 4, 1);
+    txt(c.isoDep ? L("PROTECTED CHIP · NOTHING PUBLIC", "ЗАЩИЩЁННЫЙ ЧИП · ОТКРЫТОГО НЕТ") : L("NO PUBLIC RECORDS", "ОТКРЫТЫХ ЗАПИСЕЙ НЕТ"), tx, y + 4, 1);
   }
   // история: последние карты
   spr.setTextDatum(TL_DATUM);
@@ -144,6 +144,6 @@ void drawNfc(uint32_t now) {
     txt(f, tx, 134 + (i - 1) * 10, 1);
     if (i >= 2) break;
   }
-  uiFooter("read only", "side: back");
+  uiFooter(L("read only", "только чтение"), L("side: back", "кнопка: назад"));
   present();
 }

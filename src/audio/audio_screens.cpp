@@ -4,6 +4,7 @@
 //  BARS (спектр) · REACTOR (анимация) · LEVEL (шумомер) · SCOPE (волна)
 // ============================================================
 #include "audio/audio_model.h"
+#include "core/lang.h"
 #include "core/timeutil.h"
 #include "core/display.h"
 #include "core/theme.h"
@@ -14,14 +15,14 @@
 // справа в шапке — откуда звук: MIC / PC (в режиме «авто» — AUTO MIC / AUTO PC)
 static const char* src(const char* right) {
   static char buf[56];
-  const char* tag = g_auFromPc ? "PC" : "MIC";            // откуда звук сейчас (выбор — в настройках)
+  const char* tag = g_auFromPc ? L("PC", "ПК") : L("MIC", "МИК");            // откуда звук сейчас (выбор — в настройках)
   snprintf(buf, sizeof(buf), "%s  %s", tag, right ? right : "");
   return buf;
 }
 
 static void hzStr(float hz, char* out, size_t n) {
-  if (hz >= 1000) snprintf(out, n, "%.1f kHz", hz / 1000.0f);
-  else            snprintf(out, n, "%d Hz", (int)hz);
+  if (hz >= 1000) snprintf(out, n, L("%.1f kHz", "%.1f кГц"), hz / 1000.0f);
+  else            snprintf(out, n, L("%d Hz", "%d Гц"), (int)hz);
 }
 
 // ============================================================
@@ -33,7 +34,7 @@ void drawAuBars(uint32_t now) {
   spr.fillSprite(C_BG());
   hzStr(g_au.domHz, hz, sizeof(hz));
   snprintf(buf, sizeof(buf), "%d dBfs  %s", (int)g_au.level, g_au.energy > 0.15f ? hz : "--");
-  uiHeader("Sound spectrum", src(buf));
+  uiHeader(L("Spectrum", "Спектр"), src(buf));
 
   const int x0 = UI_M + 8, base = 112, hMax = 84, step = (W - 2 * x0) / AU_BANDS;
   for (int k = 0; k < AU_BANDS; k++) {
@@ -58,7 +59,7 @@ void drawAuBars(uint32_t now) {
     float pos = logf(marks[i] / 60.0f) / logf(8000.0f / 60.0f);
     txt(lbl[i], x0 + (int)(pos * step * AU_BANDS), UI_BOTTOM - 4, 1);
   }
-  uiFooter("wheel: screens", "side: back");
+  uiFooter(L("wheel: screens", "колесо: экраны"), L("side: back", "кнопка: назад"));
   present();
 }
 
@@ -68,7 +69,7 @@ void drawAuBars(uint32_t now) {
 void drawReactor(uint32_t now) {
   int W = spr.width();
   spr.fillSprite(C_BG());
-  uiHeader("Reactor", src(levelWord(g_au.level)), g_au.level >= -25);
+  uiHeader(L("Reactor", "Реактор"), src(levelWord(g_au.level)), g_au.level >= -25);
   int cx = W / 2, cy = 90;
   float e = g_au.energy;
   float rot = now * 0.0004f + e * 0.8f;
@@ -107,10 +108,10 @@ void drawReactor(uint32_t now) {
   hzStr(g_au.domHz, buf, sizeof(buf));
   spr.setTextDatum(TR_DATUM);
   spr.setTextColor(UI_DIM());
-  txt("DOMINANT", W - UI_M - 8, UI_TOP + 4, 1);
+  txt(L("DOMINANT", "ОСНОВНАЯ"), W - UI_M - 8, UI_TOP + 4, 1);
   spr.setTextColor(e > 0.15f ? C_HOT() : UI_DIM());
   txt(e > 0.15f ? buf : "--", W - UI_M - 8, UI_TOP + 14, 2);
-  uiFooter("wheel: screens", "side: back");
+  uiFooter(L("wheel: screens", "колесо: экраны"), L("side: back", "кнопка: назад"));
   present();
 }
 
@@ -122,19 +123,19 @@ void drawLevel(uint32_t now) {
   char buf[32];
   spr.fillSprite(C_BG());
   bool loud = g_au.level >= -25;
-  uiHeader("Noise meter", src(levelWord(g_au.level)), loud);
+  uiHeader(L("Noise meter", "Шумомер"), src(levelWord(g_au.level)), loud);
 
   spr.setTextDatum(TL_DATUM);
   spr.setTextColor(loud ? C_ALERT() : C_HOT());
   txtNum((long)lroundf(g_au.level), UI_M + 8, UI_TOP + 2, 6);
   spr.setTextColor(UI_DIM());
-  txt("DBFS  (0 = MIC MAXIMUM)", UI_M + 8, UI_TOP + 50, 1);
+  txt(L("DBFS  (0 = MIC MAXIMUM)", "ДБFS  (0 = МАКСИМУМ МИКРОФОНА)"), UI_M + 8, UI_TOP + 50, 1);
   snprintf(buf, sizeof(buf), "%d", (int)g_au.peak);
-  uiReadout(150, UI_TOP + 4, "peak", buf, C_HOT());
+  uiReadout(150, UI_TOP + 4, L("peak", "пик"), buf, C_HOT());
   snprintf(buf, sizeof(buf), "%d", (int)g_auMax);
-  uiReadout(204, UI_TOP + 4, "max", buf, C_HOT());
+  uiReadout(204, UI_TOP + 4, L("max", "макс"), buf, C_HOT());
   snprintf(buf, sizeof(buf), "%d", (int)g_auAvg);
-  uiReadout(254, UI_TOP + 4, "avg", buf, C_HOT());
+  uiReadout(254, UI_TOP + 4, L("avg", "сред"), buf, C_HOT());
 
   // сегментная шкала -80..0 dBFS; выше -25 — тревога
   int mx = UI_M + 8, mw = W - 2 * mx, my = UI_TOP + 62, segs = 40, sw = mw / segs;
@@ -163,8 +164,8 @@ void drawLevel(uint32_t now) {
   }
   spr.setTextDatum(TL_DATUM);
   spr.setTextColor(UI_DIM());
-  txt("1 MIN", gx + 5, gy + 3, 1);
-  uiFooter("wheel: screens  click: reset max", "side: back");
+  txt(L("1 MIN", "1 МИН"), gx + 5, gy + 3, 1);
+  uiFooter(L("wheel: screens  ·  click: reset max", "колесо: экраны  ·  нажать: сброс"), L("side: back", "кнопка: назад"));
   present();
 }
 
@@ -176,7 +177,7 @@ void drawWave(uint32_t now) {
   char buf[40];                                  // «AUTO GAIN X16000  RAW 32767  L» — 30 символов
   spr.fillSprite(C_BG());
   hzStr(g_au.domHz, buf, sizeof(buf));
-  uiHeader("Waveform", src(g_au.energy > 0.15f ? buf : "listening"));
+  uiHeader(L("Waveform", "Волна"), src(g_au.energy > 0.15f ? buf : L("listening", "слушаю")));
   int gx = UI_M + 4, gy = UI_TOP, gw = W - 2 * UI_M - 8, gh = UI_BOTTOM - UI_TOP + 2, cy = gy + gh / 2;
   uiFrame(gx, gy, gw, gh, UI_LINE());
   for (int x = gx + 4; x < gx + gw - 4; x += 4) spr.drawPixel(x, cy, UI_LINE());
@@ -199,11 +200,11 @@ void drawWave(uint32_t now) {
     }
     px = x; py = y;
   }
-  snprintf(buf, sizeof(buf), "AUTO GAIN X%d  RAW %d  %s", max(1, 16000 / amp), g_micDiag.rawPeak, g_micDiag.slot ? "R" : "L");
+  snprintf(buf, sizeof(buf), L("AUTO GAIN X%d", "АВТОУСИЛЕНИЕ X%d"), max(1, 16000 / amp));
   spr.setTextDatum(TL_DATUM);
   spr.setTextColor(UI_DIM());
   txt(buf, gx + 5, gy + 3, 1);
-  uiFooter("wheel: screens", "side: back");
+  uiFooter(L("wheel: screens", "колесо: экраны"), L("side: back", "кнопка: назад"));
   present();
 }
 
@@ -211,29 +212,29 @@ void drawMicMissing() {
   char buf[48];
   spr.fillSprite(C_BG());
   if (g_micDiag.disabled) {
-    uiHeader("Sound", "microphone off");
-    uiEmpty("microphone off", "turn on: settings > sound");
-    uiFooter("", "side: back");
+    uiHeader(L("Sound", "Звук"), L("microphone off", "микрофон выключен"));
+    uiEmpty(L("microphone off", "микрофон выключен"), L("turn it on in Settings > Sound", "включите: Настройки > Звук"));
+    uiFooter("", L("side: back", "кнопка: назад"));
     present();
     return;
   }
-  static const char* const stages[] = { "not started", "no free channel", "config rejected",
-                                         "start failed", "running" };
-  uiHeader("Mic check", g_micDiag.stage == 4 ? "no sound data" : "driver error", true);
+  static const char* const stages[] = { L("not started", "не запущен"), L("no free channel", "нет канала"), L("config rejected", "отказ настроек"),
+                                         L("start failed", "не стартовал"), L("running", "работает") };
+  uiHeader(L("Microphone", "Микрофон"), g_micDiag.stage == 4 ? L("no sound data", "нет данных") : L("driver error", "ошибка драйвера"), true);
   int x = UI_M + 8, y = UI_TOP + 4;
-  uiReadout(x, y, "driver", stages[constrain(g_micDiag.stage, 0, 4)], g_micDiag.stage == 4 ? C_HOT() : C_ALERT());
+  uiReadout(x, y, L("driver", "драйвер"), stages[constrain(g_micDiag.stage, 0, 4)], g_micDiag.stage == 4 ? C_HOT() : C_ALERT());
   snprintf(buf, sizeof(buf), "%lu", (unsigned long)g_micDiag.blocks);
-  uiReadout(x, y + 30, "blocks", buf, g_micDiag.blocks ? C_HOT() : C_ALERT());
+  uiReadout(x, y + 30, L("blocks", "блоки"), buf, g_micDiag.blocks ? C_HOT() : C_ALERT());
   snprintf(buf, sizeof(buf), "%lu", (unsigned long)g_micDiag.timeouts);
-  uiReadout(x + 90, y + 30, "timeouts", buf, C_HOT());
+  uiReadout(x + 90, y + 30, L("timeouts", "таймауты"), buf, C_HOT());
   snprintf(buf, sizeof(buf), "%d", g_micDiag.rawPeak);
-  uiReadout(x + 180, y + 30, "raw peak", buf, C_HOT());
-  uiReadout(x, y + 60, "channel", g_micDiag.slot ? "right" : "left", C_HOT());
+  uiReadout(x + 180, y + 30, L("raw peak", "пик"), buf, C_HOT());
+  uiReadout(x, y + 60, L("channel", "канал"), g_micDiag.slot ? L("right", "правый") : L("left", "левый"), C_HOT());
   spr.setTextDatum(TL_DATUM);
   spr.setTextColor(UI_DIM());
-  txt("PDM MIC: CLK GPIO39, DATA GPIO42, I2S0, 16 KHZ", x, y + 96, 1);
-  txt("SEND A PHOTO OF THIS SCREEN TO THE DEVELOPER", x, y + 108, 1);
-  uiFooter("", "side: back");
+  txt(L("THE MICROPHONE IS NOT RESPONDING", "МИКРОФОН НЕ ОТВЕЧАЕТ"), x, y + 96, 1);
+  txt(L("RESTART THE DEVICE; IF IT REPEATS, CONTACT SUPPORT", "ПЕРЕЗАПУСТИТЕ УСТРОЙСТВО; ЕСЛИ ПОВТОРИТСЯ - В ПОДДЕРЖКУ"), x, y + 108, 1);
+  uiFooter("", L("side: back", "кнопка: назад"));
   present();
 }
 
@@ -336,8 +337,8 @@ void drawTerrain(uint32_t now) {
       px = sx; py = sy; pbx = bx; pby = by; ph = h[c];
     }
   }
-  uiHeader("Terrain", src(buf), g_au.level >= -25);
-  uiFooter("wheel: screens", "side: back");
+  uiHeader(L("Terrain", "Рельеф"), src(buf), g_au.level >= -25);
+  uiFooter(L("wheel: screens", "колесо: экраны"), L("side: back", "кнопка: назад"));
   present();
 }
 
@@ -389,14 +390,14 @@ void drawXY(uint32_t now) {
   // подписи осей
   spr.setTextDatum(TL_DATUM);
   spr.setTextColor(UI_DIM());
-  txt(g_auFromPc ? "L" : "NOW", x0 + side + 6, cy - 4, 1);
-  txt(g_auFromPc ? "R" : "LATER", x0 - 30, y0 + 2, 1);
+  txt(g_auFromPc ? L("L", "Л") : L("NOW", "СЕЙЧАС"), x0 + side + 6, cy - 4, 1);
+  txt(g_auFromPc ? L("R", "П") : L("LATER", "ПОЗЖЕ"), x0 - 30, y0 + 2, 1);
   char buf[24];
   snprintf(buf, sizeof(buf), "%d dBfs", (int)g_au.level);
   spr.setTextColor(UI_LABEL());
   txt(buf, UI_M + 6, UI_BOTTOM - 12, 1);
-  uiHeader("XY scope", src(g_auFromPc ? (g_auXYStereo ? "stereo" : "mono") : "mic phase"));
-  uiFooter("wheel: screens", "side: back");
+  uiHeader(L("XY scope", "Осциллограф XY"), src(g_auFromPc ? (g_auXYStereo ? L("stereo", "стерео") : L("mono", "моно")) : L("mic phase", "фаза микрофона")));
+  uiFooter(L("wheel: screens", "колесо: экраны"), L("side: back", "кнопка: назад"));
   present();
   (void)now;
 }
@@ -404,9 +405,9 @@ void drawXY(uint32_t now) {
 // выбран источник «ноутбук», а звук от него не приходит
 void drawPcAudioWait(uint32_t now) {
   spr.fillSprite(C_BG());
-  uiHeader("Sound", src("waiting"));
-  uiEmpty("waiting for laptop audio", "run start_pc_monitor.bat on the laptop");
-  uiFooter("wheel: screens", "side: back");
+  uiHeader(L("Sound", "Звук"), src(L("waiting", "ожидание")));
+  uiEmpty(L("waiting for computer audio", "жду звук с компьютера"), L("run TENGAN Desktop on the computer", "запустите TENGAN Desktop на компьютере"));
+  uiFooter(L("wheel: screens", "колесо: экраны"), L("side: back", "кнопка: назад"));
   present();
   (void)now;
 }

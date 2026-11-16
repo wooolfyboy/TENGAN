@@ -2,7 +2,7 @@
 """Превращает TTF-шрифт в растровый шрифт формата Adafruit GFX (его понимает TFT_eSPI).
 
 Запуск:  python3 tools/gen_gfxfont.py fonts/ShareTechMono-Regular.ttf 15 STM15 > src/core/fonts/STM15.h
-Символы — печатный ASCII (0x20..0x7E). С флагом --cyr ещё и кириллица (до U+045F:
+Символы — печатный ASCII (0x20..0x7E). С --latin1 ещё · « » ° ×; с --cyr — они же и кириллица (до U+045F:
 А–я, Ё, ё и др.); коды между ними — пустые (GFX-шрифту нужна сплошная таблица).
 TFT_eSPI сам разбирает UTF-8, поэтому русский текст выводится как есть. Нужен Pillow.
 """
@@ -12,14 +12,16 @@ from PIL import Image, ImageDraw, ImageFont
 def main():
     path, size, name = sys.argv[1], int(sys.argv[2]), sys.argv[3]
     cyr = "--cyr" in sys.argv[4:]
-    last = 0x45F if cyr else 0x7E
+    lat = "--latin1" in sys.argv[4:] or cyr     # из Latin-1 только нужное интерфейсу: · « » ° ×
+    last = 0x45F if cyr else 0xFF if lat else 0x7E
+    EXTRA = {0xB7, 0xAB, 0xBB, 0xB0, 0xD7}
     font = ImageFont.truetype(path, size)
     ascent, descent = font.getmetrics()
     bitmap = bytearray()
     glyphs = []
     for code in range(0x20, last + 1):
         ch = chr(code)
-        if 0x7F <= code < 0x400:                 # между ASCII и кириллицей — пустые места
+        if 0x7F <= code < 0x400 and not (lat and code in EXTRA):   # между ASCII и кириллицей — пустые места
             glyphs.append((len(bitmap), 0, 0, 0, 0, 0, "?"))
             continue
         adv = int(round(font.getlength(ch)))

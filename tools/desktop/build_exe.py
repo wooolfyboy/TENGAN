@@ -24,6 +24,14 @@ args = [
     "--collect-all", "pyaudiowpatch",
     "--collect-all", "winrt",
     "--hidden-import", "clr",
+    # трей, всплывашки, виджет (WIDGET.md)
+    "--paths", HERE,
+    "--hidden-import", "events",
+    "--hidden-import", "overlay",
+    "--hidden-import", "overlay_html",
+    "--collect-submodules", "pystray",
+    "--hidden-import", "PIL.Image",
+    "--add-data", os.path.join(HERE, "tengan.ico") + os.pathsep + ".",   # значок для трея внутри exe
     os.path.join(HERE, "tengan_desktop.py"),
 ]
 print(" ".join(args), flush=True)
