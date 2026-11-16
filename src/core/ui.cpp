@@ -50,18 +50,14 @@ void uiHeader(const char* title, const char* right, bool rightAlert) {
 
 void uiFooter(const char* left, const char* right) {
   int W = spr.width();
-  char t[60];
+  char l[60] = "", r[60] = "";
+  if (left && left[0]) upper(left, l, sizeof(l));
+  if (right && right[0]) upper(right, r, sizeof(r));
+  // не влезает в строку — тот же шрифт, на ступень мельче (одинаково для обоих языков)
+  int room = W - 2 * (UI_M + 8) - 10, sz = (txtW(l, 1) + txtW(r, 1) <= room) ? 1 : 8;
   spr.setTextColor(UI_DIM());
-  if (left && left[0]) {
-    upper(left, t, sizeof(t));
-    spr.setTextDatum(BL_DATUM);
-    txt(t, UI_M + 8, UI_FOOT_Y, 1);
-  }
-  if (right && right[0]) {
-    upper(right, t, sizeof(t));
-    spr.setTextDatum(BR_DATUM);
-    txt(t, W - UI_M - 8, UI_FOOT_Y, 1);
-  }
+  if (l[0]) { spr.setTextDatum(BL_DATUM); txt(l, UI_M + 8, UI_FOOT_Y, sz); }
+  if (r[0]) { spr.setTextDatum(BR_DATUM); txt(r, W - UI_M - 8, UI_FOOT_Y, sz); }
 }
 
 void uiFrame(int x, int y, int w, int h, uint16_t col) {
