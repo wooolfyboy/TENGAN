@@ -1,6 +1,59 @@
 // ---- SUB-GHZ (CC1101, только приём): 3D-водопад и монитор всплесков ----
 // Spectrum: время уходит вглубь рельефом, спереди — светящаяся линия спектра.
 // Monitor: уровень на частоте полосы, всплески и их список.
+// ---- WebGL: сетка-рельеф под ту же камеру T.orbit, что и HUD (подписи совпадают с вершинами) ----
+// T.glOrbit.grid(name, C, R) -> { set(heights), draw(P, cam, vp, geo, extra) }; heights[r*C+c], r=0 — ближний ряд.
+// Вершинный шейдер повторяет T.orbit.p(): поворот yaw/pitch, перспектива F/(D+z) — HUD и меш не расходятся.
+if (T.GL && T.GL.ok && !T.glOrbit) (() => {
+  const gl = T.GL.gl, deriv = !!gl.getExtension('OES_standard_derivatives');
+  const VS = `precision highp float;
+attribute vec2 gr; attribute float hh;
+uniform vec4 cam; uniform vec4 prj; uniform vec2 vp; uniform vec4 geo; uniform float zoff; uniform float hs;
+varying vec3 wp; varying float vd; varying float vh; varying vec2 vg;
+void main(){
+  float x=geo.x+gr.x*geo.y, z=geo.z+(gr.y+zoff)*geo.w, y=hh*hs;
+  float x1=x*cam.x-z*cam.y, z1=x*cam.y+z*cam.x;
+  float y2=y*cam.z+z1*cam.w, z2=-y*cam.w+z1*cam.z, d=max(.05,prj.x+z2);
+  vec2 s=vec2(prj.z+x1*prj.y/d, prj.w-y2*prj.y/d);
+  vec2 ndc=vec2(s.x/vp.x*2.-1., 1.-s.y/vp.y*2.);
+  wp=vec3(x,y,z); vd=d; vh=hh; vg=vec2(gr.x,gr.y+zoff);
+  gl_Position=vec4(ndc*d, (clamp(d/60.,0.,1.)*2.-1.)*d, d);
+}`;
+  const head = (deriv ? '#extension GL_OES_standard_derivatives : enable\n' : '#define NODERIV\n') + 'precision highp float;\n';
+  const grids = new Map();
+  T.glOrbit = {
+    deriv, VS, head,
+    prog: fs => T.GL.prog(head + fs, VS),
+    grid(name, C, R) {
+      let G = grids.get(name); if (G) return G;
+      const n = C * R, gr = new Float32Array(n * 2), idx = new Uint16Array((C - 1) * (R - 1) * 6);
+      for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) { gr[(r * C + c) * 2] = c; gr[(r * C + c) * 2 + 1] = r; }
+      let k = 0;
+      for (let r = 0; r < R - 1; r++) for (let c = 0; c < C - 1; c++) { const a = r * C + c, b = a + 1, d = a + C, e = d + 1; idx[k++] = a; idx[k++] = d; idx[k++] = b; idx[k++] = b; idx[k++] = d; idx[k++] = e; }
+      const bg = T.GL.buf(name + ':g', gr), bi = T.GL.buf(name + ':i', idx, true), bh = T.GL.buf(name + ':h', new Float32Array(n), false, true);
+      G = {
+        C, R, n: idx.length,
+        set(h) { gl.bindBuffer(gl.ARRAY_BUFFER, bh); gl.bufferSubData(gl.ARRAY_BUFFER, 0, h); },
+        // cam: T.orbit (после frame); vp: [w,h] CSS; geo: [x0, dx, z0, dz]; extra: прочие uniform
+        draw(P, cam, vp, geo, extra = {}) {
+          if (!P) return;
+          gl.useProgram(P.p);
+          gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+          gl.bindBuffer(gl.ARRAY_BUFFER, bg); gl.enableVertexAttribArray(P.a.gr); gl.vertexAttribPointer(P.a.gr, 2, gl.FLOAT, false, 0, 0);
+          gl.bindBuffer(gl.ARRAY_BUFFER, bh); gl.enableVertexAttribArray(P.a.hh); gl.vertexAttribPointer(P.a.hh, 1, gl.FLOAT, false, 0, 0);
+          gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, bi);
+          T.GL.set(P, Object.assign({ cam: [cam.cs, cam.sn, cam.cp, cam.sp], prj: [cam.D, cam.F, cam.cx, cam.cy], vp, geo, zoff: 0, hs: 1, res: [T.GL.w, T.GL.h], k: T.GL.w / vp[0] }, extra));
+          gl.drawElements(gl.TRIANGLES, this.n, gl.UNSIGNED_SHORT, 0);
+          gl.disableVertexAttribArray(P.a.hh); gl.disableVertexAttribArray(P.a.gr); gl.disable(gl.DEPTH_TEST);
+        },
+      };
+      grids.set(name, G); return G;
+    },
+    // '#rrggbb' -> [r,g,b] 0..1
+    rgb: hex => { const n = parseInt(String(hex).slice(1), 16); return [(n >> 16) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255]; },
+  };
+})();
+
 (() => {
 const BANDS = ['315', '433.92', '868', '915'];
 const lvl = v => T.clamp((v + 120 - 10) / 70);          // как wfColor на палке
@@ -68,6 +121,60 @@ T.views.push({
     T.finish(g, w, h);
   },
 
+  // WebGL-водопад: меш до ROWS_GL строк, цвет по высоте, светящиеся строки и пики, туман вглубь
+  spectrumGL(g, w, h, cam, n, X, Z, HY) {
+    const RG = 64, O = T.glOrbit;
+    if (!this.glP) {
+      this.glP = O.prog(`
+uniform vec3 cBg, cAcc, cHot, cLine, cAlert; uniform float flash, rows, sumi;
+varying vec3 wp; varying float vd; varying float vh; varying vec2 vg;
+void main(){
+  float v=clamp(vh/.75,0.,1.);
+  float fog=clamp(1.-vg.y/rows*.9,.08,1.);
+  float shade=.6;
+#ifndef NODERIV
+  vec3 nn=normalize(cross(dFdx(wp),dFdy(wp))); if(nn.y<0.) nn=-nn;
+  shade=clamp(dot(nn,normalize(vec3(-.3,.8,-.5))),0.,1.);
+  float aa=fwidth(vg.y), ax=fwidth(vg.x);
+#else
+  float aa=.05, ax=.05;
+#endif
+  float dr=abs(fract(vg.y+.5)-.5), lr=1.-smoothstep(aa*.6,aa*1.6,dr);
+  float dc=abs(fract(vg.x/8.+.5)-.5)*8., lc=(1.-smoothstep(ax*.6,ax*1.6,dc))*.35;
+  vec3 heat=v<.5?mix(cLine,cAcc,v*2.):mix(cAcc,cHot,(v-.5)*2.);
+  vec3 col; float a=.94;
+  if(sumi<.5){
+    col=cBg*.7+cAcc*.05*shade+cAcc*.07*v;
+    col+=heat*((lr*(.35+.75*v)+lc*v)*fog+v*v*.35*fog);
+    col+=cHot*pow(v,5.)*(1.2+flash)*fog;
+  }else{
+    col=mix(cBg,cAcc,(.05+.18*(1.-shade)+.25*v)*fog);
+    col=mix(col,cAcc,clamp((lr*(.2+.75*v)+lc*.3*v)*fog,0.,1.));
+    col=mix(col,cAlert,smoothstep(.75,.95,v)*.8*fog);
+  }
+  gl_FragColor=vec4(col*a,a);
+}`);
+      this.glH = new Float32Array(n * RG);
+    }
+    const G = O.grid('subwf' + n, n, RG);
+    if (this.glN !== n) { this.glN = n; this.glH = new Float32Array(n * RG); this.glKey = null; }
+    const rows = S.subWf;
+    if (this.glKey !== S.subT) {
+      this.glKey = S.subT;
+      const H = this.glH;
+      for (let r = 0; r < RG; r++) { const row = rows[r]; for (let i = 0; i < n; i++) H[r * n + i] = row ? HY * Math.pow(lvl(row[i] ?? -120), 1.2) : 0; }
+      G.set(H);
+    }
+    T.floorGrid(g, cam, 1.8, 0.2);
+    T.GL.begin(w, h);
+    const C = T.C, sumi = T.theme === 'sumi';
+    G.draw(this.glP, cam, [w, h], [X(0), X(1) - X(0), Z(0), Z(1) - Z(0)], {
+      cBg: O.rgb(C.bg), cAcc: O.rgb(C.acc), cHot: O.rgb(C.hot), cLine: O.rgb(sumi ? C.dim : C.line), cAlert: O.rgb(C.alert),
+      flash: this.flash, rows: Math.min(RG, rows.length || 1), sumi: sumi ? 1 : 0,
+    });
+    T.GL.draw(g, 0, 0, w, h);
+  },
+
   // ---------- SPECTRUM: 3D-водопад ----------
   spectrum(g, w, h, u, m, y0, dt, d, title) {
     const cam = this.cam, portrait = h > w * 1.05, cur = d.cur || [], n = cur.length || BINS;
@@ -82,6 +189,8 @@ T.views.push({
     this.flash = Math.max(burst ? 1 : 0, this.flash - dt * 1.5);
     // «фейк»: рельеф меняется только с новой строкой данных (~7 раз в с) или при повороте камеры —
     // рисуем его в отдельный слой и в остальные кадры просто кладём готовую картинку
+    if (T.glOrbit && T.GL.ok) this.spectrumGL(g, w, h, cam, n, X, Z, HY);
+    else {
     const rows = S.subWf, R = Math.min(ROWS, rows.length), cv = this.cv.cv;
     const key = `${S.subT}|${cam.yaw.toFixed(3)}|${cam.pitch.toFixed(3)}|${cv.width}x${cv.height}`;
     if (!this.layer) { this.layer = document.createElement('canvas'); this.lg = this.layer.getContext('2d'); }
@@ -110,6 +219,7 @@ T.views.push({
       g = keep;
     }
     g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(this.layer, 0, 0); g.restore();
+    }
     // передняя линия + пики
     if (cur.length) {
       const z = Z(0) - 0.02;
