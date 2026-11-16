@@ -1,26 +1,23 @@
 """
 Собрать «прошивальщик в одном файле»: HTML-страница, внутри которой уже лежат
-прошивка (tengan_full_0x0_<lang>.bin) и библиотека esptool-js. Пишется всё, кроме
+прошивка (tengan_full_0x0.bin) и библиотека esptool-js. Пишется всё, кроме
 области настроек (NVS, 0x9000..0xE000) — настройки устройства сохраняются.
 Открыл в Chrome/Edge → кнопка «Установить» → готово. Ни адресов, ни файлов.
 
-    python tools/flasher/make_flasher.py <full_0x0.bin> <out.html> <версия> [en|ru]
+    python tools/flasher/make_flasher.py <full_0x0.bin> <out.html> <версия>
 
-Язык страницы: 4-й аргумент; если его нет — по имени файла (*_ru.html → ru), иначе en.
+Страница на двух языках (EN / RU): по языку браузера, переключатель вверху.
 """
 import base64, datetime, html as htmlmod, json, os, re, sys
 
 here = os.path.dirname(os.path.abspath(__file__))
 fw_path, out_path, version = sys.argv[1], sys.argv[2], sys.argv[3]
-lang = sys.argv[4] if len(sys.argv) > 4 else ("ru" if re.search(r"[_-]ru\.html?$", out_path) else "en")
-if lang not in ("en", "ru"):
-    sys.exit("language must be en or ru")
 
 # тексты страницы. HTML-ключи (h_*) можно размечать <b>, остальные — простой текст для JS
 TEXT = {
     "en": {
         "title": "TENGAN %(v)s — firmware installer",
-        "sub": "firmware installer · version %(v)s · English · built %(b)s",
+        "sub": "firmware installer · version %(v)s · built %(b)s",
         "btn": "INSTALL FIRMWARE",
         "idle": "Connect TENGAN with a USB cable and press the button.",
         "h_s1": "Close <b>TENGAN Desktop</b> and any other app that uses the device's USB port.",
@@ -41,7 +38,7 @@ TEXT = {
     },
     "ru": {
         "title": "TENGAN %(v)s — установка прошивки",
-        "sub": "установка прошивки · версия %(v)s · русский язык · сборка %(b)s",
+        "sub": "установка прошивки · версия %(v)s · сборка %(b)s",
         "btn": "УСТАНОВИТЬ ПРОШИВКУ",
         "idle": "Подключите TENGAN USB-кабелем и нажмите кнопку.",
         "h_s1": "Закройте <b>TENGAN Desktop</b> и другие программы, которые используют USB-порт устройства.",
@@ -79,17 +76,15 @@ if fw[0] != 0xE9 or fw[0x8000:0x8002] != b"\xaa\x50":
     sys.exit("not a full 0x0 image (bootloader + partition table expected)")
 
 built = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
-t = TEXT[lang]
 page = open(os.path.join(here, "flasher_template.html"), encoding="utf-8").read()
-for k in ("title", "sub", "btn", "idle", "details"):
-    page = page.replace("{{%s}}" % k, htmlmod.escape(t[k] % {"v": version, "b": built}))
-for k in ("s1", "s2", "s3", "s4", "note"):
-    page = page.replace("{{%s}}" % k, t["h_" + k])
-js = {k: t[k] for k in ("noserial", "nopick", "connect", "wrongchip", "write", "done", "busy", "fail1", "fail2")}
-page = page.replace("__LANG__", lang).replace("__JS_TEXT__", json.dumps(js, ensure_ascii=False))
+js = {}
+for lg, t in TEXT.items():                          # оба языка — в странице, выбор при открытии
+    d = {k: (v % {"v": version, "b": built} if isinstance(v, str) and k in ("title", "sub") else v) for k, v in t.items()}
+    js[lg] = d
+page = page.replace("__VER__", htmlmod.escape(version)).replace("__JS_TEXT__", json.dumps(js, ensure_ascii=False))
 if "{{" in page:
     sys.exit("flasher template: unfilled placeholder")
 html = (page.replace("__ESPTOOL__", bundle)
             .replace("__FIRMWARE_B64__", base64.b64encode(fw).decode()))
 open(out_path, "w", encoding="utf-8").write(html)
-print("%s [%s]: %.1f MB (firmware %.2f MB)" % (out_path, lang, len(html) / 1048576, len(fw) / 1048576))
+print("%s [en+ru]: %.1f MB (firmware %.2f MB)" % (out_path, len(html) / 1048576, len(fw) / 1048576))

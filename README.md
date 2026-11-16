@@ -59,10 +59,10 @@ on the device, on a tablet (TENGAN Tablet) and on a computer (TENGAN Desktop).<b
 <td width="55%">
 
 1. Download the flasher from [**Releases**](https://github.com/wolfyboy1488/lilygostuff/releases/latest):
-   **`flash_tengan_en.html`** (English) or **`flash_tengan_ru.html`** (Russian).
+   **`flash_tengan.html`** — one firmware for English and Russian.
 2. Connect the T-Embed to your computer with a USB cable and open the file in **Chrome** or **Edge**.
 3. Press **Flash** and pick *USB JTAG/serial debug unit*.
-4. When it says **Done**, reconnect the cable.
+4. When it says **Done**, reconnect the cable. At first start TENGAN asks for the language: **English** or **Русский**.
 
 The firmware is inside the file — no addresses, no file picking. Settings are **kept** when you reflash.
 
@@ -300,7 +300,7 @@ No, ESP32-S3 works in 2.4 GHz only.
 <details>
 <summary><b>How do I switch the language?</b></summary>
 
-Flash the edition you want (`flash_tengan_en.html` or `flash_tengan_ru.html`). Settings are kept.
+On the device: **Settings › Language** (English / Русский). It switches at once; TENGAN Tablet and TENGAN Desktop follow the device.
 
 </details>
 
@@ -311,8 +311,8 @@ Flash the edition you want (`flash_tengan_en.html` or `flash_tengan_ru.html`). S
 <details>
 <summary><b>Firmware</b></summary>
 
-You need [PlatformIO](https://platformio.org/). English and Russian firmware are separate build environments
-(see `platformio.ini`); each carries the tablet page in its language.
+You need [PlatformIO](https://platformio.org/). One firmware for both languages: strings are written as
+`L("English", "Русский")` (`src/core/lang.h`), the language is chosen on the device.
 
 ```bash
 pio run
@@ -331,9 +331,9 @@ Single-file flasher: `python tools/flasher/make_flasher.py tengan_full_0x0.bin f
 <details>
 <summary><b>Tablet page</b></summary>
 
-`tools/webapp/src` (HTML, CSS, JS) → `python3 tools/webapp/build.py` → `src/web/tablet_page_en.h` and
-`src/web/tablet_page_ru.h`. UI text is written in English; Russian is the dictionary `tools/webapp/i18n/ru.json`,
-applied when text is drawn. CI check: `build.py --check`.
+`tools/webapp/src` (HTML, CSS, JS) → `python3 tools/webapp/build.py` → `src/web/tablet_page.h`.
+UI text is written in English; Russian is the built-in dictionary `tools/webapp/i18n/ru.json`, applied when text
+is drawn; the page follows the device language live. CI check: `build.py --check`.
 Without a device: `python3 tools/webapp/mock.py page.html 8090 [ru] [kurenai]`.
 
 </details>

@@ -59,10 +59,10 @@ Bluetooth · Wi-Fi · Sub-GHz · ИК · NFC · звук · монитор ПК 
 <td width="55%">
 
 1. Скачай прошивальщик со страницы [**Releases**](https://github.com/wolfyboy1488/lilygostuff/releases/latest):
-   **`flash_tengan_ru.html`** — русская версия, **`flash_tengan_en.html`** — английская.
+   **`flash_tengan.html`** — одна прошивка для русского и английского.
 2. Подключи T-Embed к компьютеру USB-кабелем и открой файл в **Chrome** или **Edge**.
 3. Нажми **«Прошить»** и выбери в списке *USB JTAG/serial debug unit*.
-4. Когда появится **«Готово»**, переподключи кабель.
+4. Когда появится **«Готово»**, переподключи кабель. При первом включении TENGAN спросит язык: **English** или **Русский**.
 
 Прошивка уже внутри файла — ни адресов, ни выбора файлов. Настройки при перепрошивке **сохраняются**.
 
@@ -300,7 +300,7 @@ Bluetooth · Wi-Fi · Sub-GHz · ИК · NFC · звук · монитор ПК 
 <details>
 <summary><b>Как переключить язык?</b></summary>
 
-Прошей версию нужного языка (`flash_tengan_ru.html` или `flash_tengan_en.html`). Настройки сохранятся.
+На устройстве: **Настройки › Язык** (English / Русский). Меняется сразу; TENGAN Tablet и TENGAN Desktop переключаются вслед за устройством.
 
 </details>
 
@@ -311,8 +311,8 @@ Bluetooth · Wi-Fi · Sub-GHz · ИК · NFC · звук · монитор ПК 
 <details>
 <summary><b>Прошивка</b></summary>
 
-Нужен [PlatformIO](https://platformio.org/). Русская и английская прошивки — разные окружения сборки
-(см. `platformio.ini`), каждая несёт страницу планшета своего языка.
+Нужен [PlatformIO](https://platformio.org/). Прошивка одна на оба языка: строки пишутся как
+`L("English", "Русский")` (`src/core/lang.h`), язык выбирается на устройстве.
 
 ```bash
 pio run
@@ -331,9 +331,9 @@ esptool --chip esp32s3 merge-bin -o tengan_full_0x0.bin 0x0 bootloader.bin 0x800
 <details>
 <summary><b>Страница планшета</b></summary>
 
-`tools/webapp/src` (HTML, CSS, JS) → `python3 tools/webapp/build.py` → `src/web/tablet_page_en.h` и
-`src/web/tablet_page_ru.h`. Текст интерфейса пишется по-английски; русский — словарь `tools/webapp/i18n/ru.json`,
-перевод подставляется при выводе текста. Проверка в CI: `build.py --check`.
+`tools/webapp/src` (HTML, CSS, JS) → `python3 tools/webapp/build.py` → `src/web/tablet_page.h`.
+Текст интерфейса пишется по-английски; русский — встроенный словарь `tools/webapp/i18n/ru.json`, перевод
+подставляется при выводе текста; страница сразу следует языку устройства. Проверка в CI: `build.py --check`.
 Для разработки без устройства: `python3 tools/webapp/mock.py page.html 8090 [ru] [kurenai]`.
 
 </details>

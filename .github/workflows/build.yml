@@ -1,5 +1,6 @@
-# Сборка прошивки (английская и русская) на каждый пуш. На тег вида v1.0 — ещё и GitHub Release:
-# для каждого языка полный образ (USB, 0x0), firmware для обновления по Wi-Fi и установщик-страница.
+# Сборка прошивки на каждый пуш. На тег вида v1.0 — ещё и GitHub Release: полный образ (USB, 0x0),
+# firmware для обновления по Wi-Fi и установщик-страница. Прошивка одна на оба языка
+# (English / Русский выбирается на устройстве).
 # Релиз можно сделать и без тега: Actions → build → Run workflow → release_tag = v1.1
 # (тег создастся сам на собранном коммите).
 name: build
@@ -42,24 +43,19 @@ jobs:
       - name: Tablet page is up to date
         run: python tools/webapp/build.py --check
 
-      - name: Build (English and Russian)
-        run: |
-          pio run -e t-embed-cc1101
-          pio run -e t-embed-cc1101-ru
+      - name: Build
+        run: pio run
 
-      - name: Make images and installers
+      - name: Make image and installer
         run: |
+          B=.pio/build/t-embed-cc1101
           APP0=$(find ~/.platformio/packages -name boot_app0.bin | head -1)
-          VER="${{ inputs.release_tag || github.ref_name }}"
           mkdir -p dist
-          for L in en ru; do
-            B=.pio/build/t-embed-cc1101; [ $L = ru ] && B=.pio/build/t-embed-cc1101-ru
-            esptool.py --chip esp32s3 merge_bin -o dist/tengan_full_0x0_$L.bin \
-              0x0 $B/bootloader.bin 0x8000 $B/partitions.bin 0xe000 "$APP0" 0x10000 $B/firmware.bin
-            cp $B/firmware.bin dist/tengan_firmware_ota_$L.bin
-            # установщик в одном файле: открыть в Chrome/Edge → «Установить прошивку»
-            python tools/flasher/make_flasher.py dist/tengan_full_0x0_$L.bin dist/flash_tengan_$L.html "$VER" $L
-          done
+          esptool.py --chip esp32s3 merge_bin -o dist/tengan_full_0x0.bin \
+            0x0 $B/bootloader.bin 0x8000 $B/partitions.bin 0xe000 "$APP0" 0x10000 $B/firmware.bin
+          cp $B/firmware.bin dist/tengan_firmware_ota.bin
+          # установщик в одном файле (английский и русский на одной странице): открыть в Chrome/Edge → «Установить»
+          python tools/flasher/make_flasher.py dist/tengan_full_0x0.bin dist/flash_tengan.html "${{ inputs.release_tag || github.ref_name }}"
           ls -la dist
 
       - uses: actions/upload-artifact@v4
@@ -81,25 +77,25 @@ jobs:
           body: |
             ## Install
 
-            Each firmware file comes in two languages: **_en** is English, **_ru** is Russian. Choose one; your settings are kept when you switch.
+            One firmware for both languages: choose **English** or **Русский** on the device at first start (later: Settings › Language). Your settings are kept when you update.
 
             | File | What it is |
             |---|---|
-            | **flash_tengan_en.html** / **flash_tengan_ru.html** | The easiest way to install. Open it in Chrome or Edge, press *Install firmware* and choose the device. |
-            | **tengan_full_0x0_en.bin** / **tengan_full_0x0_ru.bin** | Full image for USB flashing at address 0x0 (esptool or esptool-js). |
-            | **tengan_firmware_ota_en.bin** / **tengan_firmware_ota_ru.bin** | Wireless update: Web section on the device → open the page → Update. |
+            | **flash_tengan.html** | The easiest way to install. Open it in Chrome or Edge, press *Install firmware* and choose the device. |
+            | **tengan_full_0x0.bin** | Full image for USB flashing at address 0x0 (esptool or esptool-js). |
+            | **tengan_firmware_ota.bin** | Wireless update: Web section on the device → open the page → Update. |
             | **tengan_tablet.apk** | TENGAN Tablet for Android. Copy it to the tablet, open it and allow installation. |
             | **tengan_desktop.exe** | TENGAN Desktop for Windows: the dashboard and PC monitor, over USB or Wi-Fi. |
 
             ## Установка
 
-            Каждый файл прошивки есть в двух вариантах: **_ru** — русский интерфейс, **_en** — английский. Настройки при смене языка сохраняются.
+            Одна прошивка на оба языка: **English** или **Русский** выбирается на устройстве при первом включении (потом — Настройки › Язык). Настройки при обновлении сохраняются.
 
             | Файл | Назначение |
             |---|---|
-            | **flash_tengan_ru.html** / **flash_tengan_en.html** | Самый простой способ. Откройте файл в Chrome или Edge, нажмите «Установить прошивку» и выберите устройство. |
-            | **tengan_full_0x0_ru.bin** / **tengan_full_0x0_en.bin** | Полный образ для прошивки по USB с адреса 0x0 (esptool или esptool-js). |
-            | **tengan_firmware_ota_ru.bin** / **tengan_firmware_ota_en.bin** | Обновление по Wi-Fi: раздел «Веб» на устройстве → открыть страницу → «Обновление». |
+            | **flash_tengan.html** | Самый простой способ. Откройте файл в Chrome или Edge, нажмите «Установить прошивку» и выберите устройство. |
+            | **tengan_full_0x0.bin** | Полный образ для прошивки по USB с адреса 0x0 (esptool или esptool-js). |
+            | **tengan_firmware_ota.bin** | Обновление по Wi-Fi: раздел «Веб» на устройстве → открыть страницу → «Обновление». |
             | **tengan_tablet.apk** | TENGAN Tablet для Android. Скопируйте на планшет, откройте и разрешите установку. |
             | **tengan_desktop.exe** | TENGAN Desktop для Windows: панель управления и монитор ПК, по USB или Wi-Fi. |
 

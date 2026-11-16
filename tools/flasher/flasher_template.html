@@ -1,12 +1,13 @@
 <!doctype html>
-<html lang="__LANG__"><head><meta charset="utf-8">
+<html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{{title}}</title>
+<title>TENGAN __VER__</title>
 <style>
 :root{--bg:#02090b;--panel:#071419;--line:#12303a;--acc:#3fd9ff;--hot:#eafcff;--steel:#7f97a3;--alert:#ff8a3d;--ok:#7dffb0}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--hot);font:16px/1.5 ui-monospace,Menlo,Consolas,monospace}
 main{max-width:620px;margin:0 auto;padding:32px 16px 60px}
 h1{color:var(--acc);font-size:22px;letter-spacing:.08em;margin:0}.ver{color:var(--steel);margin:2px 0 24px}
+.top{display:flex;align-items:center;gap:12px}.sp{flex:1}.lg{display:flex;gap:4px}.lg button{width:auto;padding:6px 10px;background:transparent;color:var(--steel);border:1px solid var(--line);font-weight:600}.lg button.on{background:var(--acc);color:var(--bg);border-color:var(--acc)}
 .card{background:var(--panel);border:1px solid var(--line);padding:18px;margin-bottom:16px;clip-path:polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,14px 100%,0 calc(100% - 14px))}
 button{background:var(--acc);color:var(--bg);border:0;font:inherit;font-weight:700;letter-spacing:.06em;padding:16px;cursor:pointer;width:100%}
 button:disabled{background:var(--line);color:var(--steel);cursor:default}
@@ -15,24 +16,24 @@ button:disabled{background:var(--line);color:var(--steel);cursor:default}
 ol{padding-left:22px;margin:0}li{margin:5px 0}b{color:var(--acc)}
 details{color:var(--steel);font-size:13px}pre{white-space:pre-wrap;max-height:200px;overflow:auto;margin:6px 0 0}
 </style></head><body><main>
-<h1>// TENGAN</h1>
-<div class="ver">{{sub}}</div>
+<div class="top"><h1>// TENGAN</h1><span class="sp"></span><div class="lg"><button data-l="en">EN</button><button data-l="ru">RU</button></div></div>
+<div class="ver" data-t="sub"></div>
 
 <div class="card">
- <button id="go">{{btn}}</button>
+ <button id="go" data-t="btn"></button>
  <div class="bar"><i id="bar"></i></div>
- <div id="st">{{idle}}</div>
+ <div id="st" data-t="idle"></div>
 </div>
 
 <div class="card"><ol>
- <li>{{s1}}</li>
- <li>{{s2}}</li>
- <li>{{s3}}</li>
- <li>{{s4}}</li>
+ <li data-h="s1"></li>
+ <li data-h="s2"></li>
+ <li data-h="s3"></li>
+ <li data-h="s4"></li>
 </ol>
-<p style="color:var(--steel);font-size:14px;margin:12px 0 0">{{note}}</p></div>
+<p style="color:var(--steel);font-size:14px;margin:12px 0 0" data-h="note"></p></div>
 
-<details><summary>{{details}}</summary><pre id="log"></pre></details>
+<details><summary data-t="details"></summary><pre id="log"></pre></details>
 </main>
 <!-- esptool-js: separate module (own variable names) -->
 <script type="module">
@@ -40,10 +41,23 @@ __ESPTOOL__
 </script>
 <script type="module">
 const { ESPLoader, Transport } = window.__esptool;
-const T = __JS_TEXT__;
+const TX = __JS_TEXT__;                       // тексты страницы на двух языках
+let LG = 'en';
+try { LG = localStorage.getItem('lang') || ((navigator.language || '').toLowerCase().startsWith('ru') ? 'ru' : 'en'); } catch (e) {}
+let T = TX[LG];
+const applyLang = l => {
+  LG = TX[l] ? l : 'en'; T = TX[LG]; document.documentElement.lang = LG;
+  try { localStorage.setItem('lang', LG); } catch (e) {}
+  document.title = T.title;
+  document.querySelectorAll('[data-t]').forEach(e => { if (!(e.id === 'st' && e.dataset.busy)) e.textContent = T[e.dataset.t]; });
+  document.querySelectorAll('[data-h]').forEach(e => { e.innerHTML = T['h_' + e.dataset.h]; });
+  document.querySelectorAll('.lg button').forEach(b => b.classList.toggle('on', b.dataset.l === LG));
+};
+document.querySelectorAll('.lg button').forEach(b => b.onclick = () => applyLang(b.dataset.l));
+applyLang(LG);
 const FW = "__FIRMWARE_B64__";
 const $ = id => document.getElementById(id);
-const st = (t, cls) => { $('st').textContent = t; $('st').className = cls || ''; };
+const st = (t, cls) => { $('st').textContent = t; $('st').className = cls || ''; $('st').dataset.busy = 1; };
 const log = t => { $('log').textContent += t; };
 const term = { clean() { $('log').textContent = ''; }, writeLine(t) { log(t + '\n'); }, write(t) { log(t); } };
 
