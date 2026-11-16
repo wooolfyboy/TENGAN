@@ -8,6 +8,7 @@
 #include "core/fonts/STM14.h"
 #include "core/lang.h"
 #if LANG_RU
+#include "core/fonts/PLY11.h"
 #include "core/fonts/PLY13.h"   // русская сборка: Play с кириллицей вместо STM14 / RAJ24 / RAJ44
 #include "core/fonts/PLB20.h"
 #include "core/fonts/PLB36.h"
@@ -105,7 +106,8 @@ static const GFXfont* fontForText(const char* s, int size) {
 #if LANG_RU
   bool hi = false; for (const char* p = s; *p; p++) if ((uint8_t)*p == 0xD0 || (uint8_t)*p == 0xD1) { hi = true; break; }   // кириллица
   if (hi) {
-    if (size == 2 || size == 1) return &PLY13;
+    if (size == 1) return &PLY11;                      // мелкий встроенный 6x8 — без кириллицы
+    if (size == 2) return &PLY13;
     if (size == 4) return &PLB20;
     if (size == 6) return &PLB36;
   }
