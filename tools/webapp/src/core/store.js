@@ -40,7 +40,7 @@ T.loadCfg = () => {
   return fetch(T.apiBase() + '/api/settings', { cache: 'no-store' }).then(r => r.json()).then(S.cfgFromSettings).catch(() => {});
 };
 setTimeout(T.loadCfg, 1500); setInterval(T.loadCfg, 15000);
-// «новое» и «трекер» по настройкам: штаб NERV/DOMAIN и лента событий судят одинаково
+// «новое» и «трекер» по настройкам: штаб и лента событий судят одинаково
 S.isNew = (e, now) => {
   const c = S.cfg; if (e.first || !c.al_new) return false;
   if (now - e.born > c.al_newfor * 1000) return false;
