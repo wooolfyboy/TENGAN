@@ -8,10 +8,11 @@ if (T.GL && T.GL.ok && !T.glOrbit) (() => {
   const gl = T.GL.gl, deriv = !!gl.getExtension('OES_standard_derivatives');
   const VS = `precision highp float;
 attribute vec2 gr; attribute float hh;
-uniform vec4 cam; uniform vec4 prj; uniform vec2 vp; uniform vec4 geo; uniform float zoff; uniform float hs;
+uniform vec4 cam; uniform vec4 prj; uniform vec2 vp; uniform vec4 geo; uniform float zoff; uniform float hs; uniform float spread; uniform float fitw;
 varying vec3 wp; varying float vd; varying float vh; varying vec2 vg;
 void main(){
-  float x=geo.x+gr.x*geo.y, z=geo.z+(gr.y+zoff)*geo.w, y=hh*hs;
+  float z=geo.z+(gr.y+zoff)*geo.w, y=hh*hs;
+  float x=(geo.x+gr.x*geo.y)*(fitw>0.?fitw*max(.2,prj.x+z*cam.z):1.+spread*abs(gr.y+zoff));   // fitw: каждый ряд во всю ширину кадра
   float x1=x*cam.x-z*cam.y, z1=x*cam.y+z*cam.x;
   float y2=y*cam.z+z1*cam.w, z2=-y*cam.w+z1*cam.z, d=max(.05,prj.x+z2);
   vec2 s=vec2(prj.z+x1*prj.y/d, prj.w-y2*prj.y/d);
@@ -42,7 +43,7 @@ void main(){
           gl.bindBuffer(gl.ARRAY_BUFFER, bg); gl.enableVertexAttribArray(P.a.gr); gl.vertexAttribPointer(P.a.gr, 2, gl.FLOAT, false, 0, 0);
           gl.bindBuffer(gl.ARRAY_BUFFER, bh); gl.enableVertexAttribArray(P.a.hh); gl.vertexAttribPointer(P.a.hh, 1, gl.FLOAT, false, 0, 0);
           gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, bi);
-          T.GL.set(P, Object.assign({ cam: [cam.cs, cam.sn, cam.cp, cam.sp], prj: [cam.D, cam.F, cam.cx, cam.cy], vp, geo, zoff: 0, hs: 1, res: [T.GL.w, T.GL.h], k: T.GL.w / vp[0] }, extra));
+          T.GL.set(P, Object.assign({ cam: [cam.cs, cam.sn, cam.cp, cam.sp], prj: [cam.D, cam.F, cam.cx, cam.cy], vp, geo, zoff: 0, hs: 1, spread: 0, fitw: 0, res: [T.GL.w, T.GL.h], k: T.GL.w / vp[0] }, extra));
           gl.drawElements(gl.TRIANGLES, this.n, gl.UNSIGNED_SHORT, 0);
           gl.disableVertexAttribArray(P.a.hh); gl.disableVertexAttribArray(P.a.gr); gl.disable(gl.DEPTH_TEST);
         },

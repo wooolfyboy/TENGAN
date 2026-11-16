@@ -55,6 +55,80 @@
     return { pts, br };
   };
 
+  // ---- WebGL: небо, облака (fbm, три слоя, едут по ветру), дождь, вспышка — одним шейдером ----
+  const PAPER = 'vec3(.925,.894,.831)', INK = 'vec3(.106,.094,.078)';
+  const WXFS = `uniform vec2 res; uniform vec2 css; uniform float t, ink, wx, clouds, rain, storm, flash, night, slant, u, trend; uniform vec3 sun;
+  ` + T.GL.NOISE + `
+  vec2 fragCss(){ return vec2(gl_FragCoord.x, res.y-gl_FragCoord.y)/res*css; }
+  void main(){
+    vec2 p=fragCss(); float H=css.y, y=p.y/H;                 // 0 — верх, 1 — горизонт
+    vec2 q=p/H;
+    bool K=ink>.5;
+    vec3 P=${PAPER}, I=${INK};
+    vec3 col; float dark=1.-storm*.5;
+    if(K) col=P*(1.-.05*y)-vec3(.04)*storm;
+    else col=mix(vec3(.02,.03,.05),vec3(.055,.13,.19)*dark,y*y);
+    // светило: ночью луна, днём солнце (в SUMI — киноварь)
+    float sd=length(p-sun.xy);
+    if(K){ float dd=smoothstep(sun.z,sun.z-1.5,sd);
+      if(night>.5) col=mix(col,mix(P,I,.35),smoothstep(1.5,0.,abs(sd-sun.z*.8))*.8); else col=mix(col,vec3(.76,.23,.17),dd*.9); }
+    else { col+=vec3(.7,.9,1.)*(smoothstep(sun.z*.8,sun.z*.75,sd)*.85*night + exp(-sd/(sun.z*3.))*.10); }
+    // звёзды сквозь просветы
+    vec2 sc=floor(p/(u*1.7)); float hs=hash(sc), hs2=hash(sc+3.1);
+    float star=step(.93,hs)*smoothstep(.10,.0,length(fract(p/(u*1.7))-.5-(vec2(hs,hs2)-.5)*.6))*(.55+.45*sin(t*1.3+hs*60.))*(.4+(hs-.93)*8.6)*smoothstep(.85,.4,y);
+    // облака: три слоя, ближние крупнее и быстрее
+    float cover=0., light=0.;
+    for(int i=0;i<3;i++){
+      float fi=float(i), sc2=1.6-fi*.45;
+      vec2 uv=q*vec2(sc2*1.4,sc2*2.6)+vec2(wx*(.5+fi*.35)*1.6+fi*13.1, fi*3.7);
+      float d=fbm(uv)+.5*fbm(uv*2.3+vec2(t*.015,0.))-.25;
+      float thr=mix(.78,.28,clouds)-fi*.03;
+      float prof=smoothstep(.0,.15,y)*smoothstep(1.,.45,y-fi*.12);
+      float a=smoothstep(thr,thr+.22,d)*prof*(.55+fi*.2);
+      float lt=clamp((fbm(uv-vec2(0.,.06))-fbm(uv))*4.+.5,0.,1.);   // верх облака светлее
+      if(K){
+        float e=a*(1.-a)*1.2+a*.35+(noise(gl_FragCoord.xy*.45)-.5)*.06*a;   // размывка: край темнее (акварель)
+        col=mix(col,I,clamp(e*(.55+storm*.5),0.,.85));
+      } else {
+        vec3 cc=mix(vec3(.05,.09,.12)*dark,vec3(.30,.44,.52)*(.6+.4*dark),lt);
+        cc+=vec3(.55,.70,.80)*flash*(.5+lt);
+        col=mix(col,cc,a);
+      }
+      cover=max(cover,a);
+    }
+    if(!K) col+=vec3(.92,.98,1.)*star*(1.-cover)*clamp(1.-clouds*1.1,0.,1.)*.8;
+    // свечение города у горизонта
+    if(!K) col+=vec3(.15,.6,.75)*exp(-length(vec2((p.x/css.x-.5)*1.4,1.-y))*3.)*(.10+.06*(1.-clouds));
+    // дождь: косые штрихи, два слоя
+    if(rain>.01){
+      for(int k=0;k<2;k++){
+        float fk=float(k), cw=u*(.9-fk*.35);
+        vec2 r=vec2(p.x+p.y*slant, p.y);
+        float cx=floor(r.x/cw), hh=hash(vec2(cx,fk));
+        if(hh<rain*.9){
+          float sp=(1.3+hh*.8)*(1.+fk*.4), len=(.06+.06*rain)*(1.-fk*.3);
+          float ph=fract(y*(1.+fk)-t*sp+hh*7.);
+          float s=smoothstep(len,0.,ph)*smoothstep(.0,.02,ph)*smoothstep(.5,.0,abs(fract(r.x/cw)-.5)-.12);
+          if(K) col=mix(col,I,s*.35); else col+=vec3(.45,.6,.7)*s*(.35+.3*rain)*(1.-fk*.4);
+        }
+      }
+    }
+    // вспышка молнии — всё небо
+    col=K? mix(col,P,flash*.55): col+vec3(.30,.40,.48)*flash*.6;
+    gl_FragColor=vec4(col,1.);
+  }`;
+  let WXP;
+  const glSky = (g, w, hz, u, t, s, F, night, ink, sun) => {
+    const GL = T.GL; if (!GL || !GL.ok) return false;
+    if (WXP === undefined) WXP = GL.prog(WXFS);
+    if (!WXP) return false;
+    GL.begin(w, hz, 0.5, [0, 0, 0, 1]);
+    GL.quad(WXP, { css: [w, hz], t, ink: ink ? 1 : 0, wx: W8.wx, clouds: s.clouds, rain: s.rain, storm: s.storm, flash: F, night: night ? 1 : 0, slant: 0.15 + s.wind * 0.6, u, trend: s.trend, sun });
+    GL.draw(g, 0, 0, w, hz);
+    return true;
+  };
+  W8.wx = 0;
+
   V.weather = function (g, w, h, L, dt, t) {
     const { u, m, top, bot } = L, ink = T.theme === 'sumi', d = S.wx, s = S.wxs;
     if (!d || !d.ok) {
@@ -70,6 +144,10 @@
     else if (s.storm > 0.55 && Math.random() < dt * s.storm * 0.25) { W8.flash = 0.8; W8.bolt = makeBolt(w, top + (hz - top) * 0.25, hz); W8.boltT = 0; }
     W8.flash = Math.max(0, W8.flash - dt * 2.2); W8.boltT += dt;
     const F = W8.flash * (0.6 + 0.4 * Math.sin(W8.boltT * 60));   // мерцание вспышки
+    W8.wx += dt * wind;
+    const sx0 = w * 0.72, sy0 = top + (hz - top) * 0.32, sr0 = u * (3 + 1.5 * (1 - s.clouds));
+    const GLW = glSky(g, w, hz, u, t, s, F, night, ink, [sx0, sy0, ink ? sr0 : u * 2.2]);
+    if (!GLW) {
 
     // ---- небо ----
     if (ink) {
@@ -113,6 +191,7 @@
       if (F > 0.02 && !ink) { g.globalAlpha = Math.min(1, a) * F * 0.7; g.globalCompositeOperation = 'lighter'; g.drawImage(tex('denko', c.tex), x, y, cw, ch); g.globalCompositeOperation = 'source-over'; }
     }
     g.globalAlpha = 1;
+    }
 
     // ---- молния ----
     if (W8.bolt && W8.boltT < 0.45) {
@@ -130,7 +209,7 @@
     }
 
     // ---- дождь: косые штрихи, сколько капель — по дождю, наклон — по ветру ----
-    const nRain = Math.round(s.rain * N_RAIN);
+    const nRain = GLW ? 0 : Math.round(s.rain * N_RAIN);
     if (nRain > 0) {
       const slant = 0.15 + s.wind * 0.6, len = u * (1.2 + s.rain * 1.6), vy = (bot - top) * (0.9 + s.rain * 0.8);
       const tt = T.theme; if (ink) T.theme = 'raw';

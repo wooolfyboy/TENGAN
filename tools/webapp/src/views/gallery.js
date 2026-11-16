@@ -222,11 +222,10 @@ T.galGL = (() => {
     vec3 ro=vec3(0.), rd=normalize(vec3(d2,1.));
     mat3 M=rz(Bb)*rx(Aa), Mi=rx(-Aa)*rz(-Bb);     // мир -> тело тора
     vec3 c0=vec3(0.,0.,K2);
-    // тор donut.c лежит в плоскости XY с осью Y — поворачиваем (оси y<->z)
     float tt=K2-3.4, md=9.;
     vec3 q; bool hit=false;
     for(int i=0;i<80;i++){
-      q=Mi*(ro+rd*tt-c0); q=q.xzy;
+      q=Mi*(ro+rd*tt-c0);
       float d=sdT(q); md=min(md,d);
       if(d<.002){hit=true;break;}
       tt+=d*.9; if(tt>K2+3.6)break;
@@ -237,7 +236,7 @@ T.galGL = (() => {
     }
     vec2 e=vec2(.002,0.);
     vec3 n=normalize(vec3(sdT(q+e.xyy)-sdT(q-e.xyy),sdT(q+e.yxy)-sdT(q-e.yxy),sdT(q+e.yyx)-sdT(q-e.yyx)));
-    vec3 nw=M*n.xzy;                                  // нормаль в мире
+    vec3 nw=M*n;                                  // нормаль в мире
     vec3 L=normalize(vec3(0.,.7071,-.7071));
     float lam=max(0.,dot(nw,L)), fres=pow(1.-max(0.,dot(nw,-rd)),3.);
     float th=atan(q.y,length(q.xz)-2.1), ph=atan(q.z,q.x);
@@ -368,8 +367,10 @@ T.views.push({
       for (let i = 0; i < 16; i++) for (let b = 0; b < 4; b++) { const j = i ^ (1 << b); if (j < i) continue; g.moveTo(Q[i][0], Q[i][1]); g.lineTo(Q[j][0], Q[j][1]); }
       g.stroke();
     }
-    // рёбра: дальние (по w) — тусклее и тоньше
+    // рёбра: WebGL — светящиеся трубки; иначе 2D-линии (дальние по w — тусклее и тоньше)
     const E = [];
+    const glT = T.galGL.tess(g, w, h, P, u);
+    if (!glT)
     for (let i = 0; i < 16; i++) for (let b = 0; b < 4; b++) { const j = i ^ (1 << b); if (j > i) E.push([i, j, (P[i][2] + P[j][2]) / 2]); }
     E.sort((a, b) => a[2] - b[2]);
     for (const [i, j, wv] of E) {
@@ -377,8 +378,9 @@ T.views.push({
       g.strokeStyle = T.heat(v, 0.85); g.lineWidth = u * (0.1 + 0.12 * v);
       g.beginPath(); g.moveTo(P[i][0], P[i][1]); g.lineTo(P[j][0], P[j][1]); g.stroke();
     }
+    if (glT) g.globalCompositeOperation = 'lighter';     // вершины поверх трубок — светом, не тёмными точками
     for (const p of P) { const v = T.clamp(0.5 + p[2] * 0.4); g.fillStyle = T.heat(v); g.beginPath(); g.arc(p[0], p[1], u * (0.22 + 0.22 * v), 0, T.TAU); g.fill(); }
-    g.lineCap = 'butt';
+    g.globalCompositeOperation = 'source-over'; g.lineCap = 'butt';
     const deg = a => String(Math.round(((a * 180 / Math.PI) % 360 + 360) % 360)).padStart(3, '0');
     return {
       status: '4D hypercube · 16 vertices · 32 edges',
@@ -393,6 +395,7 @@ T.views.push({
     this.dust.draw(g, this.dcam);
     const Aa = this.ph * 0.8, Bb = this.ph * 0.45, cA = Math.cos(Aa), sA = Math.sin(Aa), cB = Math.cos(Bb), sB = Math.sin(Bb);
     const R1 = 1, R2 = 2.1, K2 = 6.5, K1 = Math.min(w, bot - top) * 0.88, cx = w / 2, cy = (top + bot) / 2, U = 120, V = 30;
+    if (T.galGL.torus(g, w, h, { Aa, Bb, K1, K2, cen: [cx, cy], t: this.ph })) return { status: 'ray-traced torus · 120×30 lights', hint: '±: speed', right: 'R1 1.0  R2 2.1  K2 6.5 · webgl' };
     const pts = this.tp || (this.tp = new Float32Array(U * V * 4));
     let n = 0;
     for (let i = 0; i < V; i++) {
@@ -569,10 +572,13 @@ T.views.push({
     const sunAlt = c.sun.alt, day = sunAlt > -6, night = sunAlt < -12;
     // купол: цвет неба по высоте Солнца
     const sky0 = day ? [16, 52, 72] : night ? [6, 14, 22] : [10, 30, 44], sky1 = day ? [8, 26, 38] : night ? [4, 9, 15] : [6, 18, 28];
-    const bg = g.createRadialGradient(cx, cy, 0, cx, cy, R); bg.addColorStop(0, T.rgb(sky1)); bg.addColorStop(1, T.rgb(sky0));
-    g.fillStyle = bg; g.beginPath(); g.arc(cx, cy, R, 0, T.TAU); g.fill();
-    // зарево у горизонта со стороны Солнца (сумерки)
-    if (sunAlt > -18 && sunAlt < 8) {
+    const glSky = T.galGL.sky(g, cx, cy, R, {
+      t: tt, rot: rot * D2R, lat: c.P.lat * D2R, lst: (A.gmst(A.jd(now)) + c.P.lon) * D2R,
+      sunAlt: sunAlt * D2R, sunAz: c.sun.az * D2R, day: T.clamp((sunAlt + 6) / 8), night: T.clamp((-6 - sunAlt) / 8),
+    });
+    if (!glSky) { const bg = g.createRadialGradient(cx, cy, 0, cx, cy, R); bg.addColorStop(0, T.rgb(sky1)); bg.addColorStop(1, T.rgb(sky0)); g.fillStyle = bg; g.beginPath(); g.arc(cx, cy, R, 0, T.TAU); g.fill(); }
+    // зарево у горизонта со стороны Солнца (сумерки) — в WebGL оно в шейдере
+    if (!glSky && sunAlt > -18 && sunAlt < 8) {
       const q = (c.sun.az - rot) * D2R, gx = cx - R * Math.sin(q), gy = cy - R * Math.cos(q), k = 1 - Math.abs(sunAlt + 5) / 13;
       const gr = g.createRadialGradient(gx, gy, 0, gx, gy, R * 0.9); gr.addColorStop(0, `rgba(62,230,255,${0.22 * T.clamp(k)})`); gr.addColorStop(1, 'rgba(62,230,255,0)');
       g.save(); g.beginPath(); g.arc(cx, cy, R, 0, T.TAU); g.clip(); g.fillStyle = gr; g.fillRect(cx - R, cy - R, 2 * R, 2 * R); g.restore();
@@ -731,7 +737,10 @@ T.views.push({
     g.fillStyle = 'rgba(150,175,192,.5)'; g.beginPath();
     for (const s of this.bgStars) { const r = 0.6 + s[2] * 1.2; g.rect(s[0] * w, s[1] * h, r, r); }
     g.fill();
-    // атмосфера
+    // WebGL: освещённая Земля (суша, океан с бликом, огни ночи, облака, атмосфера); иначе 2D-диск
+    const jd0 = A.jd(now), sun0 = A.sun(jd0), sLon0 = ((sun0.ra - A.gmst(jd0)) % 360 + 540) % 360 - 180, sv0 = view(sun0.dec, sLon0);
+    const glG = T.galGL.globe(g, cx, cy, R, l0, b0, sv0, tt);
+    if (!glG) {
     const at = g.createRadialGradient(cx, cy, R * 0.96, cx, cy, R * 1.14); at.addColorStop(0, 'rgba(62,230,255,.45)'); at.addColorStop(0.3, 'rgba(62,230,255,.12)'); at.addColorStop(1, 'rgba(62,230,255,0)');
     g.fillStyle = at; g.beginPath(); g.arc(cx, cy, R * 1.14, 0, T.TAU); g.fill();
     // день и ночь: свет считается для каждой точки диска (в малом разрешении)
@@ -755,6 +764,7 @@ T.views.push({
     }
     this.gOff.getContext('2d').putImageData(this.gImg, 0, 0);
     g.imageSmoothingEnabled = true; g.drawImage(this.gOff, cx - R, cy - R, 2 * R, 2 * R);
+    }
     // сетка 30°
     g.lineWidth = 1; g.strokeStyle = 'rgba(62,230,255,.12)'; g.beginPath();
     const poly = pts => { let have = false; for (const v of pts) { if (v[2] > 0) { const p = scr(v); have ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]); have = true; } else have = false; } };
@@ -768,14 +778,16 @@ T.views.push({
       for (const ll of Lp) {
         const v = view(ll[0], ll[1]);
         if (v[2] > 0 && prev && prev[2] > 0) {
-          const a = scr(prev), b = scr(v), lit = (v[0] * sv[0] + v[1] * sv[1] + v[2] * sv[2]) > 0;
+          const a = scr(prev), b = scr(v), lit = (v[0] * sv0[0] + v[1] * sv0[1] + v[2] * sv0[2]) > 0;
           const pp = lit ? dayP : nightP; pp.moveTo(a[0], a[1]); pp.lineTo(b[0], b[1]);
         }
         prev = v;
       }
     }
-    g.lineWidth = 1.3; g.strokeStyle = 'rgba(62,230,255,.9)'; g.stroke(dayP); g.strokeStyle = 'rgba(62,230,255,.35)'; g.stroke(nightP);
-    g.strokeStyle = 'rgba(62,230,255,.7)'; g.lineWidth = 1.5; g.beginPath(); g.arc(cx, cy, R, 0, T.TAU); g.stroke();
+    if (!glG) {
+      g.lineWidth = 1.3; g.strokeStyle = 'rgba(62,230,255,.9)'; g.stroke(dayP); g.strokeStyle = 'rgba(62,230,255,.35)'; g.stroke(nightP);
+      g.strokeStyle = 'rgba(62,230,255,.7)'; g.lineWidth = 1.5; g.beginPath(); g.arc(cx, cy, R, 0, T.TAU); g.stroke();
+    }
     // дом
     const hv = view(P.lat, P.lon);
     if (hv[2] > 0) {

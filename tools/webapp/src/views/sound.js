@@ -20,7 +20,9 @@
       const st = T.el('div', 'stage'); this.root.appendChild(st);
       this.cv = T.canvas(st, 2);
       main.appendChild(this.root);
-      this.ROWS = 40; this.COLS = 72; this.rows = []; this.rowT = 0; this.top = 0.3;
+      this.ROWS = 40; this.COLS = 72; this.rows = [];
+      if (T.glOrbit && T.GL.ok) { this.ROWS = 110; this.COLS = 128; }   // WebGL-рельеф: гуще и глубже
+      this.rowT = 0; this.top = 0.3;
       this.tilt = 0; this.wave = new Float32Array(64);
       this.parts = []; this.bassPrev = 0; this.spin = 0; this.lvS = -90; this.pkS = -90; this.pkHold = -90; this.pkT = 0;
       this.trW = trail(this.cv); this.trX = trail(this.cv);
@@ -114,19 +116,21 @@
       while (this.rowT > 0.025) {
         this.rowT -= 0.025;
         const C = this.COLS, raw = new Float32Array(C);
-        for (let c = 0; c < C; c++) { const k = c * 31 / (C - 1), k0 = Math.floor(k), f = k - k0; const b = S.bands[k0] * (1 - f) + S.bands[Math.min(31, k0 + 1)] * f; raw[c] = b * b; }
+        const canyon = C === 128;   // WebGL: каньон — басы стенами по краям, верхи в долине по центру
+        for (let c = 0; c < C; c++) { const k = canyon ? (1 - Math.abs(c / (C - 1) * 2 - 1)) * 30 : c * 31 / (C - 1), k0 = Math.floor(k), f = k - k0; const b = S.bands[k0] * (1 - f) + S.bands[Math.min(31, k0 + 1)] * f; raw[c] = b * b; }
         for (let pass = 0; pass < 2; pass++) for (let c = 1; c < C - 1; c++) raw[c] = (raw[c - 1] + 2 * raw[c] + raw[c + 1]) / 4;
         let mx = 0; for (let c = 0; c < C; c++) mx = Math.max(mx, raw[c]);
         this.top = Math.max(mx, this.top * 0.992, 0.12);
         const prev = this.rows[0], row = new Float32Array(C), loud = T.clamp(S.energy * 1.6, 0, 1);
         for (let c = 0; c < C; c++) {
-          const v = 1 - Math.exp(-2.2 * raw[c] / this.top), edge = Math.sin(Math.PI * (c + 0.5) / C);
+          const v = 1 - Math.exp(-2.2 * raw[c] / this.top), edge = canyon ? 0.3 + 0.7 * Math.pow(Math.abs(c / (C - 1) * 2 - 1), 0.7) : Math.sin(Math.PI * (c + 0.5) / C);
           const hh = v * (0.35 + 0.65 * loud) * (0.45 + 0.55 * edge) + 0.04 + 0.05 * ((T.hash(this.rows.length * 977 + c) & 255) / 255) * (0.3 + v);
-          row[c] = prev ? prev[c] * 0.35 + hh * 0.65 : hh;
+          row[c] = prev ? prev[c] * (canyon ? 0.5 : 0.35) + hh * (canyon ? 0.5 : 0.65) : hh;
         }
         let rm = 0; for (let c = 0; c < C; c++) rm = Math.max(rm, row[c]); row.max = rm;
         this.rows.unshift(row); if (this.rows.length > this.ROWS) this.rows.pop();
       }
+      if (T.glOrbit && T.GL.ok && this.COLS === 128) return this.terrainGL(g, w, h, u, top);
       if (T.theme === 'sumi') return this.terrainInk(g, w, h, u, top);
       const hy = top + (h - top) * (0.16 - this.tilt * 0.12), camH = 1.25 + this.tilt * 0.6, cx = w / 2;
       const F = Math.max(Math.min(w, h * 1.6) * 0.62, (h * 0.97 - hy) * 1.5 / camH);
@@ -148,6 +152,109 @@
         g.fill();
         g.strokeStyle = T.heat(0.3 + 0.7 * (row.max || 0), fade); g.lineWidth = r < 3 ? 2 : 1.1; g.stroke();
       }
+    },
+
+    // WebGL: полёт над рельефом звука. Новый хребет рождается у горизонта и плывёт к камере;
+    // свет по нормалям, сетка-«трон» (DENKO) или тушь и туман-сансуй (SUMI), солнце на горизонте.
+    terrainGL(g, w, h, u, top) {
+      const O = T.glOrbit, C = this.COLS, R = this.ROWS, sumi = T.theme === 'sumi';
+      if (!this.tgP) {
+        this.tgSky = T.GL.prog(T.GL.NOISE + `
+uniform vec2 res; uniform float t, hy, sumi, lv; uniform vec3 sun, cBg, cAcc, cHot, cAlert;
+void main(){
+  vec2 p=gl_FragCoord.xy; float y=(p.y-hy)/res.y;
+  vec3 col;
+  float d=length(p-sun.xy)/sun.z;
+  if(sumi<.5){
+    col=mix(cBg+cAcc*.10,cBg*.9,smoothstep(0.,.45,y));
+    vec2 q=floor(p/3.); float st=step(.9975,hash(q))*smoothstep(.02,.2,y)*(.5+.5*sin(t*2.+hash(q+7.)*40.));
+    col+=vec3(st)*.8;
+    vec3 sc=mix(cAcc,cHot,smoothstep(-.3,1.,(p.y-sun.y)/sun.z));
+    float disk=smoothstep(1.,.985,d);
+    float below=(sun.y-p.y)/sun.z;   // нижняя половина солнца режется полосами
+    if(below>0.){ float band=fract(below*6.); disk*=step(below*.55,band); }
+    col=mix(col,sc,disk*step(hy,p.y));
+    col+=cAcc*exp(-d*1.6)*(.35+lv*.5);
+  }else{
+    float paper=.96+.04*fbm(p/80.);
+    col=cBg*paper;
+    col=mix(col,cBg*.86,smoothstep(.0,.6,y)*.35);
+    float edge=.03*fbm(p/18.+3.);
+    float disk=smoothstep(1.+edge,.9+edge,d);
+    col=mix(col,cAlert,disk*.85);
+    col=mix(col,cAlert,exp(-d*2.5)*.12);
+  }
+  gl_FragColor=vec4(col,1.);
+}`);
+        this.tgP = O.prog(T.GL.NOISE + `
+uniform vec3 cBg, cAcc, cHot, cLine, cAlert; uniform float sumi, lv, t;
+varying vec3 wp; varying float vd; varying float vh; varying vec2 vg;
+void main(){
+  float v=clamp(vh,0.,1.);
+  float shade=.6;
+#ifndef NODERIV
+  vec3 nn=normalize(cross(dFdx(wp),dFdy(wp))); if(nn.y<0.) nn=-nn;
+  shade=clamp(dot(nn,normalize(vec3(.35,.55,.75))),0.,1.);
+  float ay=fwidth(vg.y), ax=fwidth(vg.x);
+#else
+  float ay=.05, ax=.05;
+#endif
+  float fog=exp(-max(0.,vd-1.)*.13);
+  vec3 col;
+  if(sumi<.5){
+    float dr=abs(fract(vg.y+.5)-.5), dc=abs(fract(vg.x/4.+.5)-.5)*4.;
+    float lr=1.-smoothstep(ay*.5,ay*1.5,dr), lc=1.-smoothstep(ax*.5,ax*1.5,dc);
+    vec3 heat=v<.5?mix(cLine,cAcc,v*2.):mix(cAcc,cHot,(v-.5)*2.);
+    col=cBg*.8+cAcc*.10*shade*shade+cAcc*.05;
+    col+=heat*(lr*.9+lc*.22*fog)*(.25+.9*v);
+    col+=cHot*pow(v,4.)*.9;
+    col=mix(cBg+cAcc*.10,col,fog);
+  }else{
+    // тушь: темнее к гребням и на склонах, «морщины» кисти (цунь) по высоте, грани почти не видны
+    float ink=.06+.16*(1.-shade)+.55*smoothstep(.15,.9,v);
+    ink*=.7+.6*fbm(vec2(wp.x*6.,vh*14.+wp.z*.5));
+    col=mix(cBg,cAcc,clamp(ink,0.,1.)*.75);
+    float ct=abs(fract(vh*9.+.5)-.5);
+#ifndef NODERIV
+    float aw=fwidth(vh*9.);
+#else
+    float aw=.05;
+#endif
+    col=mix(col,cAcc,(1.-smoothstep(aw*.5,aw*1.8,ct))*.45);
+    float mist=fog*(.75+.25*fbm(vec2(wp.x*.4+t*.05,vd*.3)));
+    col=mix(cBg,col,clamp(mist,0.,1.));
+  }
+  gl_FragColor=vec4(col,1.);
+}`);
+        this.tgH = new Float32Array(C * R); this.tgN = -1;
+        this.tcam = T.orbit(0, 0.22, 3.0);
+      }
+      const cam = this.tcam;
+      cam.pitch = 0.22 + this.tilt * 0.2;
+      const F = w * 0.55, cy = top + (h - top) * 0.45;
+      cam.frame(w / 2, cy, F);
+      // высоты: новый ряд (индекс 0) — на горизонте
+      const G = O.grid('sndTerrain', C, R);
+      if (this.tgN !== this.rows.length || this.rows[0] !== this.tgLast) {
+        this.tgN = this.rows.length; this.tgLast = this.rows[0];
+        const H = this.tgH;
+        for (let r = 0; r < R; r++) { const row = this.rows[r]; for (let c = 0; c < C; c++) H[r * C + c] = row ? row[c] : 0; }
+        G.set(H);
+      }
+      const hyCss = cy - F * Math.tan(cam.pitch);
+      T.GL.begin(w, h);
+      const k = T.GL.w / w, lv = this.rows[0] ? this.rows[0].max : 0;
+      const Cc = T.C, col = O.rgb;
+      const sunX = w * 0.66, sunR = u * (sumi ? 3.2 + lv * 1.5 : 3.6 + S.energy * 2.5);
+      T.GL.quad(this.tgSky, { t: performance.now() / 1000, hy: (h - hyCss) * k, sumi: sumi ? 1 : 0, lv,
+        sun: [sunX * k, (h - hyCss + sunR * 0.45) * k, sunR * k], cBg: col(Cc.bg), cAcc: col(Cc.acc), cHot: col(Cc.hot), cAlert: col(Cc.alert) });
+      const zFar = -2.2 + (R - 1) * 0.13;
+      G.draw(this.tgP, cam, [w, h], [-1, 2 / (C - 1), zFar, -0.13], {
+        zoff: this.rowT / 0.025, hs: 0.75, fitw: (w / 2) / F * 1.04, sumi: sumi ? 1 : 0, lv, t: performance.now() / 1000,
+        cBg: col(Cc.bg), cAcc: col(Cc.acc), cHot: col(Cc.hot), cLine: col(sumi ? Cc.dim : Cc.line), cAlert: col(Cc.alert),
+      });
+      T.GL.draw(g, 0, 0, w, h);
+      if (sumi) T.ink.hanko(g, w - u * 6.5, h - u * 7.5, u * 2.2, ['音'], { seed: 12, rot: -0.04 });
     },
     // SUMI: история спектра — гряды гор (сансуй): ближние тёмные, дальние тают в тумане, красное солнце
     terrainInk(g, w, h, u, top) {
