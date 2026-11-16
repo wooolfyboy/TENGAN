@@ -94,6 +94,7 @@ const loop = now => {
     fpsN = 0; fpsT = 0;
   }
   if (T.Stream.mode === 'live' && now - T.Stream.lastMsg > 6000) T.Stream.setLink('off');
+  if (T.Stream.mode === 'usb' && now - T.Stream.lastMsg > 6000) T.Stream.setLink('usbwait');
 };
 // старт (boot.js): сначала «запуск» со шкалой — связь, радио раздела (по умолчанию Bluetooth),
 // данные, сцена; потом красивая заставка; потом раздел

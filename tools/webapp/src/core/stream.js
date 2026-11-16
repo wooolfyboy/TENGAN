@@ -1,5 +1,25 @@
 // ---- канал с палкой: «вторая дверь» (SSE, порт 81), запасной — опрос /api/* ----
 const Stream = T.Stream = { es: null, want: '', mode: 'off', lastMsg: 0, pollT: null };
+// приложение для компьютера (tools/desktop) кладёт в страницу window.TENGAN_DESKTOP;
+// в режиме USB данные идут по кабелю через мост window.TenganUSB (want / api / poll)
+const USB = window.TENGAN_DESKTOP && window.TENGAN_DESKTOP.mode === 'usb' ? window.TenganUSB : null;
+T.desktop = !!window.TENGAN_DESKTOP;
+// события потока — одни и те же для Wi-Fi (SSE) и USB
+const H = {
+  st: d => { S.onSt(d); T.app && T.app.status(); },
+  ble: d => S.onBle(d), wifi: d => S.onWifi(d), snd: d => S.onSnd(d), sub: d => S.onSub(d), pc: d => S.onPc(d),
+  sat: d => S.onSat(d), wx: d => S.onWx(d), ir: d => S.onIr(d), nfc: d => S.onNfc(d), sens: d => S.onSens(d),
+};
+if (USB) {
+  // запросы /api/… — тоже по кабелю (страница их не замечает: обычный fetch)
+  const of = window.fetch.bind(window);
+  window.fetch = (u, o) => {
+    const url = typeof u === 'string' ? u : (u && u.url) || '';
+    const i = url.indexOf('/api/');
+    if (i < 0) return of(u, o);
+    return USB.api(url.slice(i)).then(t => new Response(t, { status: 200, headers: { 'Content-Type': 'application/json' } }));
+  };
+}
 const host = () => T.stickHost();
 const ssePort = () => new URLSearchParams(location.search).get('sse') || '81';
 const apiBase = () => T.apiBase();
@@ -7,11 +27,12 @@ const apiBase = () => T.apiBase();
 Stream.setLink = (mode) => {
   Stream.mode = mode;
   const d = document.getElementById('link'), t = document.getElementById('linkTxt');
-  d.className = 'dot ' + (mode === 'live' ? 'live' : mode === 'poll' ? 'poll' : 'off');
-  t.textContent = mode === 'live' ? 'LIVE' : mode === 'poll' ? 'POLL' : 'NO LINK';
+  d.className = 'dot ' + (mode === 'live' || mode === 'usb' ? 'live' : mode === 'poll' || mode === 'usbwait' ? 'poll' : 'off');
+  t.textContent = mode === 'live' ? 'LIVE' : mode === 'poll' ? 'POLL' : mode === 'usb' ? 'USB' : mode === 'usbwait' ? 'USB · OPEN WEB ON STICK' : mode === 'usboff' ? 'USB · NO STICK' : 'NO LINK';
 };
 Stream.connect = (want) => {
   Stream.want = want;
+  if (USB) { Stream.usb(want); return; }
   if (Stream.es) { Stream.es.close(); Stream.es = null; }
   clearInterval(Stream.pollT); Stream.pollT = null;
   let opened = false;
@@ -19,9 +40,7 @@ Stream.connect = (want) => {
   Stream.es = es;
   const on = (ev, fn) => es.addEventListener(ev, e => { Stream.lastMsg = performance.now(); try { fn(JSON.parse(e.data)); } catch (x) {} });
   es.onopen = () => { opened = true; Stream.setLink('live'); };
-  on('st', d => { S.onSt(d); T.app && T.app.status(); });
-  on('ble', S.onBle); on('wifi', S.onWifi); on('snd', S.onSnd); on('sub', S.onSub); on('pc', S.onPc); on('sat', S.onSat); on('wx', S.onWx);
-  on('ir', S.onIr); on('nfc', S.onNfc); on('sens', S.onSens);
+  for (const k in H) on(k, H[k]);
   es.onerror = () => { if (Stream.mode === 'live') Stream.setLink('off'); };
   setTimeout(() => { if (!opened && Stream.es === es) { es.close(); Stream.es = null; Stream.poll(want); } }, 5000);
 };
@@ -61,4 +80,25 @@ Stream.poll = (want) => {
   // запасной путь — временный: через 8 с снова пробуем нормальный поток
   clearTimeout(Stream.retryT);
   Stream.retryT = setTimeout(() => { if (Stream.mode === 'poll' && Stream.want === want) Stream.connect(want); }, 8000);
+};
+
+// ---- USB (приложение для компьютера): подписка + длинный опрос моста ----
+// Мост раз в ≤0.25 с отдаёт пачку «[[событие, данные], …]»; «_x» — служебное от приложения/палки.
+Stream.usb = (want) => {
+  USB.want(want).catch(() => {});
+  if (Stream.usbLoop) return;
+  Stream.usbLoop = true;
+  if (Stream.mode !== 'usb') Stream.setLink('usbwait');
+  (async () => {
+    for (;;) {
+      let batch;
+      try { batch = JSON.parse(await USB.poll()); } catch (e) { await new Promise(r => setTimeout(r, 500)); continue; }
+      for (const [ev, d] of batch) {
+        if (ev === '_x') { Stream.setLink(d === 'web' ? 'usbwait' : d === 'nostick' ? 'usboff' : Stream.mode); continue; }
+        Stream.lastMsg = performance.now();
+        if (Stream.mode !== 'usb') Stream.setLink('usb');
+        const f = H[ev]; if (f) try { f(d); } catch (x) {}
+      }
+    }
+  })();
 };
