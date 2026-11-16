@@ -12,6 +12,7 @@
 //
 //  Весь код: Claude. Распиновка — из репозитория LilyGO.
 // ============================================================
+#include "core/crumb.h"
 #include <Arduino.h>
 #include "core/board.h"
 #include "core/display.h"
@@ -53,6 +54,7 @@ static void confirmFirmware(uint32_t now) {
 }
 
 void setup() {
+  crumbBoot();          // «чёрный ящик»: причина прошлого сброса и последний шаг
   checkWakeHold();      // включение после «выключения»: только удержанием боковой кнопки
 
   // общая шина SPI: все устройства — «не выбраны», пока не начнём с ними работать
@@ -79,13 +81,13 @@ void setup() {
 
 void loop() {
   static uint32_t lastDraw = 0;
-  inputPoll();
+  crumb("input");   inputPoll();
   uint32_t now = millis();
-  bleSample(now);
+  crumb("ble sample"); bleSample(now);
   ledsTick();
   batTick(now);
-  pcPoll(now);                        // строки с ноутбука по USB (раздел PC)
-  navTick(now);                       // работа открытого раздела (сканы, развёртки)
+  crumb("pc poll"); pcPoll(now);                        // строки с ноутбука по USB (раздел PC)
+  crumb("nav tick"); navTick(now);                       // работа открытого раздела (сканы, развёртки)
 
   powerIdleTick(now);
   confirmFirmware(now);
@@ -93,11 +95,11 @@ void loop() {
   uint32_t frame = powerIdle() ? REDRAW_MS * 4 : (g_fastFrame ? 33 : REDRAW_MS);
   if (now - lastDraw >= frame) {
     lastDraw = now;
-    bleUpdate(now);                   // нужно всегда: меню показывает число устройств, лента — события
+    crumb("ble update"); bleUpdate(now);                   // нужно всегда: меню показывает число устройств, лента — события
     g_fastFrame = false;              // экран сам попросит снова, если ему нужно
     if (g_powerHold) drawPowerHold();
-    else             navDraw(now);
-    settingsAutosave(now);
+    else             { crumb("draw"); navDraw(now); }
+    crumb("autosave"); settingsAutosave(now);
   }
   delay(5);
 }

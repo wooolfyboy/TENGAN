@@ -189,7 +189,9 @@ static void drawPond(uint32_t now, int cx, int cy) {
   drawKoi(now, PI, cx, cy, true);
 }
 
+#include "core/crumb.h"
 void drawWebLink(const WebLink& l, uint32_t now) {
+  crumb(g_theme == THEME_SUMI ? "draw link sumi" : "draw link denko");
   const int W = spr.width(), H = spr.height(), cx = W / 2, cy = H / 2 - 6;
   spr.fillSprite(C_BG());
   if (g_theme == THEME_SUMI) drawPond(now, cx, cy); else drawEye(now, cx, cy);

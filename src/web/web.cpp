@@ -34,6 +34,7 @@
 #include "gallery/weather.h"
 #include "core/settings.h"
 #include "core/version.h"
+#include "core/crumb.h"
 #include "core/battery.h"
 #include "core/display.h"
 #include "core/leds.h"
@@ -348,8 +349,8 @@ static void sseTick(uint32_t now) {
       o += ",\"usb\":"; o += g_bat.bus ? 1 : 0; o += ",\"chg\":"; o += g_bat.chg;
       o += ",\"cli\":"; o += WiFi.softAPgetStationNum(); o += ",\"heap\":"; o += ESP.getFreeHeap() / 1024;
       o += ",\"theme\":\""; o += g_theme == THEME_SUMI ? "sumi" : "denko"; o += '"';
-    o += ",\"ver\":\"" FW_VERSION "\"";
       o += ",\"ver\":\"" FW_VERSION "\"";
+      o += ",\"rst\":"; jsonStr(o, crumbLastReason()); o += ",\"rstStep\":"; jsonStr(o, crumbLastStep());
       o += ",\"radio\":\""; o += bleRadioActive() ? "b" : ""; o += s_scanMs && now - s_scanMs < 25000 ? "w" : "";
       o += s_subOn ? "s" : ""; o += s_sndOn ? "m" : ""; o += pcLive(now) ? "p" : ""; o += '"';
       o += '}';
@@ -422,6 +423,7 @@ static void webStart() {
   // планшет как пульт управления: настройки палки, подписи устройств, действия
   s_srv->on("/api/settings", [] { String o; settingsJson(o); sendJson(o); });
   s_srv->on("/api/set", [] {
+    { char c[48]; snprintf(c, sizeof c, "api set %s=%s", s_srv->arg("k").c_str(), s_srv->arg("v").c_str()); crumb(c); }
     String o; settingsSetKey(s_srv->arg("k").c_str(), s_srv->arg("v").c_str(), o); sendJson(o);
   });
   s_srv->on("/api/label", [] {
@@ -462,6 +464,7 @@ static void webStart() {
     o += ",\"build\":\"" __DATE__ " " __TIME__ "\"";
     o += ",\"theme\":\""; o += g_theme == THEME_SUMI ? "sumi" : "denko"; o += '"';
     o += ",\"ver\":\"" FW_VERSION "\"";
+    o += ",\"rst\":"; jsonStr(o, crumbLastReason()); o += ",\"rstStep\":"; jsonStr(o, crumbLastStep());
     o += ",\"ssid\":\""; o += s_ssid; o += "\"}";
     sendJson(o);
   });
@@ -502,11 +505,12 @@ static void webStop() {
 }
 
 static void webTick(uint32_t now) {
+  crumb("web tick");
   if (!s_on || !s_ok) return;
   s_dns.processNextRequest();
-  s_srv->handleClient();
+  crumb("web http"); s_srv->handleClient();
   scanCollect();
-  sseTick(millis());
+  crumb("web sse"); sseTick(millis());
   bool sBle, sWifi, sSnd, sWx; int subM, subB;
   int nSse = sseClients(sBle, sWifi, sSnd, subM, subB, sWx);
   // радиопогода на планшете: Bluetooth + CC1101 монитор 433.92 + микрофон (Wi-Fi не трогаем — мешал бы)

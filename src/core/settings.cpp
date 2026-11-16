@@ -5,6 +5,7 @@
 #include "core/timeutil.h"
 #include "core/settings.h"
 #include "core/version.h"
+#include "core/crumb.h"
 #include "core/jsonutil.h"
 #include "core/display.h"
 #include "core/theme.h"
@@ -260,7 +261,7 @@ static void itemJson(int id, String& o) {
       o += ",\"type\":\"bool\",\"v\":"; o += getVal(id) ? 1 : 0;
       break;
     default:
-      if (id == S_VERSION) snprintf(b, sizeof(b), "v%s", FW_VERSION);
+      if (id == S_VERSION) { if (crumbWasCrash()) snprintf(b, sizeof(b), "v%s · last reset: %s @ %s", FW_VERSION, crumbLastReason(), crumbLastStep()); else snprintf(b, sizeof(b), "v%s", FW_VERSION); }
       else if (g_bat.ok) snprintf(b, sizeof(b), "%d%%  %.2f V", g_bat.soc, g_bat.mv / 1000.0f);
       else snprintf(b, sizeof(b), "n/a");
       o += ",\"type\":\"info\",\"v\":"; jsonStr(o, b);
@@ -323,7 +324,9 @@ void drawSettings() {
   g_setItem = constrain(g_setItem, 0, n - 1);
   int cur = ids[g_setItem];
   char batLine[64]; batSummary(batLine, sizeof(batLine));
-  uiHeader(PAGE_NAMES[g_setPage], cur == S_BATTERY ? batLine : DEFS[cur].hint);
+  char rst[72] = "";
+  if (cur == S_VERSION && crumbWasCrash()) snprintf(rst, sizeof(rst), "last reset: %s @ %s", crumbLastReason(), crumbLastStep());
+  uiHeader(PAGE_NAMES[g_setPage], cur == S_BATTERY ? batLine : rst[0] ? rst : DEFS[cur].hint, rst[0] != 0);
   const int rh = 18;
   int rows = min(n, SET_ROWS);
   int first = constrain(g_setItem - (rows - 1), 0, n - rows);
