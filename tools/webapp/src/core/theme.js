@@ -48,5 +48,10 @@
   setTimeout(() => { if (!T.themeHold) T.themeFallback(); }, 9000);
   // пока идёт экран запуска (boot.js держит T.themeHold) — остаёмся чёрно-белыми, тема включается разом перед заставкой
   T.themeHold = !new URLSearchParams(location.search).has('noboot');
-  setInterval(() => { const st = T.S && T.S.st; if (!urlTheme && !T.themeHold && st && st.theme && st.theme !== T.theme) T.setTheme(st.theme); }, 400);
+  const urlLang = new URLSearchParams(location.search).get('lang');
+  setInterval(() => {
+    const st = T.S && T.S.st; if (T.themeHold || !st) return;
+    if (!urlTheme && st.theme && st.theme !== T.theme) T.setTheme(st.theme);
+    if (!urlLang && st.lang && st.lang !== T.LANG) T.setLang(st.lang);      // язык — как на устройстве (меняется только там)
+  }, 400);
 })();

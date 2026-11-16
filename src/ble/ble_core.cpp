@@ -466,8 +466,8 @@ static void bleEnter() { wifiRadioOff(); bleRadioOn(); }
 static void bleLeave() { bleRadioOff(); ledsOff(); }   // вышли — радио и лента выключены
 
 static void bleScreenInfo(int i, SubItem& it) {
-  static const char* const names[NUM_MODES] = { L("Overview", "Обзор"), L("Scope", "Радар"), L("City", "Город"), L("Nearest", "Ближайшее"), L("Devices", "Устройства"), L("Weather", "Погода") };
-  static const char* const descs[NUM_MODES] = { L("count, trend, types", "число, тренд, типы"), L("radar picture", "картина вокруг"), L("3D: devices as towers", "3D: башни-устройства"), L("closest device", "самое близкое"),
+  const char* const names[NUM_MODES] = { L("Overview", "Обзор"), L("Scope", "Радар"), L("City", "Город"), L("Nearest", "Ближайшее"), L("Devices", "Устройства"), L("Weather", "Погода") };
+  const char* const descs[NUM_MODES] = { L("count, trend, types", "число, тренд, типы"), L("radar picture", "картина вокруг"), L("3D: devices as towers", "3D: башни-устройства"), L("closest device", "самое близкое"),
     L("list + details", "список и подробности"), L("BLE thermometers", "BLE-термометры") };
   it.name = names[i]; it.desc = descs[i]; it.value[0] = 0;
   switch (i) {

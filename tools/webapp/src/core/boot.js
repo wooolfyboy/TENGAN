@@ -125,6 +125,7 @@ T.boot = (first) => {
       // запуск закончен: включаем тему палки разом (весь запуск был чёрно-белым), дальше заставка уже в теме
       T.themeHold = false;
       if (!new URLSearchParams(location.search).get('theme')) { if (T.S.st && T.S.st.theme) T.setTheme(T.S.st.theme); else T.themeFallback(); }
+      if (!new URLSearchParams(location.search).get('lang') && T.S.st && T.S.st.lang) T.setLang(T.S.st.lang);
       if (T.reduce) { afterAnim(now); return false; } phase = 'anim'; t0 = now; T.app.hold = true; return false; }   // всё поднято — сцену на паузу, заставка
     return true;
   };

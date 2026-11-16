@@ -17,6 +17,8 @@ static const uint32_t MIN_PKTS = 2;        // одиночный случайн�
 
 enum { THEME_DENKO = 0, THEME_KURENAI = 1, THEME_N = 2 };                  // темы: DENKŌ 電光 (электрический свет, HUD); TENGAN — имя прошивки. Новые — потом
 extern bool g_screenOff;                   // экран погашен с планшета (палка работает); любое касание палки включает
+extern int g_lang;                         // язык интерфейса: 0 English, 1 Русский (core/lang.h)
+extern bool g_langAsk;                     // язык не выбран (первый запуск) — показать выбор
 extern int g_theme;                        // оформление (THEME_*), меняется в General
 extern int g_range;                        // индекс в RANGES
 extern int g_thresh;                       // порог событий для светодиодов (0 = выкл)
@@ -40,6 +42,7 @@ void settingsBegin();                      // загрузить и примен
 void applyBrightness();
 void settingsAutosave(uint32_t now);       // сохранить через 3 с после изменения
 void settingsSaveNow();
+void settingsSetLang(int lang);           // выбор языка при первом запуске (сохраняет сразу)
 void settingsTouch();                      // отметить: настройки изменились (сохранить позже)
 void settingsJson(String& o);              // для планшета: все пункты настроек (/api/settings)
 bool settingsSetKey(const char* key, const char* val, String& o);   // поменять пункт по ключу (/api/set), o — ответ

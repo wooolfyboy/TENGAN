@@ -2,15 +2,15 @@
 //  web_page.h — лёгкая страница TENGAN для телефона (/lite).
 //  Вся страница — один файл: разметка, стиль и скрипт. Меню из шести
 //  вкладок; каждая сама спрашивает у устройства свои данные (/api/...).
-//  Язык — как у прошивки: <html lang> подставляется при сборке, тексты — L("en","ru").
+//  Язык — как на устройстве: <html lang> подставляется при отдаче (web.cpp), тексты — L("en","ru") в скрипте.
 //  Вкладки Sub-GHz и Sound включают CC1101 / микрофон, пока открыты.
 // ============================================================
 #pragma once
 #include <Arduino.h>
 #include "core/lang.h"
 
-static const char WEB_PAGE[] PROGMEM = R"HTML(<!doctype html>
-<html lang=")HTML" LANG_CODE R"HTML("><head><meta charset="utf-8">
+static const char WEB_PAGE_HEAD[] PROGMEM = "<!doctype html>\n<html lang=\"";   // + "en"/"ru" (web.cpp) + WEB_PAGE
+static const char WEB_PAGE[] PROGMEM = R"HTML("><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>TENGAN</title>
 <style>

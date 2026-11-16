@@ -108,7 +108,7 @@ static void drawSectionSub(const Section* s) {
   SubItem items[8];
   int n = min(s->nScreens, 8);
   for (int i = 0; i < n; i++) s->screenInfo(i, items[i]);
-  char title[40]; utf8Upper(s->title, title, sizeof title);
+  char title[40]; utf8Upper(LT(s->title), title, sizeof title);
   drawSubmenu(title, C(s->r, s->g, s->b), items, n, s_subSel);
 }
 
@@ -173,7 +173,7 @@ static void drawMainMenuHud() {
     if (sel) hudPanel(x, y0, cw, ch, 12, pbg, true, bg);
     hudPanel(x, y0, cw, ch, 12, sel ? acc : UI_LINE(), false, bg);
     s->icon(cx, y0 + 30, sel ? (themeKurenai() ? C_SELFG() : acc) : C(110, 110, 125), pbg);
-    char title[40]; utf8Upper(s->title, title, sizeof title);
+    char title[40]; utf8Upper(LT(s->title), title, sizeof title);
     spr.setTextDatum(TC_DATUM);
     spr.setTextColor(sel ? C_SELFG() : steel);
     txt(title, cx, y0 + 62, txtW(title, 2) > cw - 4 ? 1 : 2);   // длинное название — мельче

@@ -346,8 +346,8 @@ static void sndLeave() {
   g_auFromPc = false;
 }
 static void sndInfo(int i, SubItem& it) {
-  static const char* const names[A_NUM] = { L("Spectrum", "Спектр"), L("Terrain", "Рельеф"), L("Reactor", "Реактор"), L("Level", "Уровень"), L("Waveform", "Волна"), "XY" };
-  static const char* const descs[A_NUM] = { L("sound spectrum", "спектр звука"), L("3D sound mountains", "3D-горы из звука"), L("pulse animation", "пульсирующая анимация"), L("noise meter", "шумомер"), L("waveform", "форма волны"), L("oscilloscope XY", "осциллограф XY") };
+  const char* const names[A_NUM] = { L("Spectrum", "Спектр"), L("Terrain", "Рельеф"), L("Reactor", "Реактор"), L("Level", "Уровень"), L("Waveform", "Волна"), "XY" };
+  const char* const descs[A_NUM] = { L("sound spectrum", "спектр звука"), L("3D sound mountains", "3D-горы из звука"), L("pulse animation", "пульсирующая анимация"), L("noise meter", "шумомер"), L("waveform", "форма волны"), L("oscilloscope XY", "осциллограф XY") };
   it.name = names[i]; it.desc = descs[i]; it.value[0] = 0;
   if (!g_micEn) { strcpy(it.value, L("mic off", "мик. выкл")); return; }
   if (!g_micOk) { strcpy(it.value, L("no mic", "нет мик.")); return; }
@@ -402,7 +402,7 @@ static void sndDraw(uint32_t now) {
 
 
 const Section soundSection = {
-  L("Sound", "Звук"), 120, 200, 255, iconMic, sndSubtitle,
+  LP("Sound", "Звук"), 120, 200, 255, iconMic, sndSubtitle,
   sndEnter, sndLeave,
   A_NUM, sndInfo, sndNow, sndOpen, sndClose,
   sndClick, sndRotate, nullptr, sndTick, sndDraw,

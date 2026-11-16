@@ -172,8 +172,8 @@ static void subFrame(uint32_t now) {
 }
 
 static void subScreenInfo(int i, SubItem& it) {
-  static const char* const names[G_NUM] = { L("Spectrum", "Спектр"), L("Monitor", "Монитор"), L("Sensors", "Датчики") };
-  static const char* const descs[G_NUM] = { L("band + waterfall", "диапазон и водопад"), L("catch remotes", "ловить пульты"), L("thermometers, bells", "термометры, звонки") };
+  const char* const names[G_NUM] = { L("Spectrum", "Спектр"), L("Monitor", "Монитор"), L("Sensors", "Датчики") };
+  const char* const descs[G_NUM] = { L("band + waterfall", "диапазон и водопад"), L("catch remotes", "ловить пульты"), L("thermometers, bells", "термометры, звонки") };
   it.name = names[i]; it.desc = descs[i];
   if (!g_ccOk && g_ccTried) { strcpy(it.value, L("no chip", "нет чипа")); return; }
   if (i == G_SPECTRUM) strcpy(it.value, BANDS[g_band].name);

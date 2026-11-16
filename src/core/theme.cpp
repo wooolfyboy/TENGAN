@@ -7,12 +7,10 @@
 #include "core/display.h"
 #include "core/fonts/STM14.h"
 #include "core/lang.h"
-#if LANG_RU
 #include "core/fonts/PLY10.h"
-#include "core/fonts/PLY13.h"   // русская сборка: Play с кириллицей вместо STM14 / RAJ24 / RAJ44
+#include "core/fonts/PLY13.h"   // Play с кириллицей: для русских строк вместо STM14 / RAJ24 / RAJ44
 #include "core/fonts/PLB20.h"
 #include "core/fonts/PLB36.h"
-#endif
 #include "core/fonts/RAJ24.h"
 #include "core/fonts/RAJ44.h"
 #include "core/fonts/JBM14.h"   // с кириллицей — для текстов «снаружи» (названия треков)
@@ -99,11 +97,10 @@ uint16_t scale565(uint16_t c, int pct) {
   return tft.color565(r * pct / 100, g * pct / 100, b * pct / 100);
 }
 
-// русская сборка: если в строке есть не-ASCII (кириллица), а у шрифта её нет — берём Play того же размера.
+// если в строке есть не-ASCII (кириллица), а у шрифта её нет — берём Play того же размера.
 // Латиница и цифры остаются в фирменных шрифтах (Share Tech Mono, Rajdhani).
 static const GFXfont* fontForText(const char* s, int size) {
   const GFXfont* f = fontFor(size);
-#if LANG_RU
   bool hi = false; for (const char* p = s; *p; p++) if ((uint8_t)*p == 0xD0 || (uint8_t)*p == 0xD1) { hi = true; break; }   // кириллица
   if (hi) {
     if (size == 1) return &PLY10;                      // мелкий встроенный 6x8 — без кириллицы
@@ -111,7 +108,6 @@ static const GFXfont* fontForText(const char* s, int size) {
     if (size == 4) return &PLB20;
     if (size == 6) return &PLB36;
   }
-#endif
   return f;
 }
 

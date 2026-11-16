@@ -1,19 +1,20 @@
-// ---- язык страницы: EN / RU (выбирается при сборке: build.py --lang en|ru) ----
-// Исходный текст интерфейса — английский. В русской сборке build.py вставляет словарь
-// tools/webapp/i18n/ru.json (T.DICT), а перевод делается в одном месте — при выводе текста:
+// ---- язык страницы: EN / RU — как на устройстве (st.lang), переключается на лету ----
+// Исходный текст интерфейса — английский. Словарь tools/webapp/i18n/ru.json встроен всегда (T.DICT);
+// перевод делается в одном месте — при выводе текста:
 //  • на холстах — в fillText / strokeText / measureText (поэтому разметка меряет уже русский текст);
 //  • в DOM — через T.tr(...) там, где строка вставляется (вкладки, настройки, панели).
+// Язык меняет T.setLang(): кадры холстов переводятся сами, DOM-подписи перерисовываются (T.onLang).
 // Правила словаря: точное совпадение строки → перевод; иначе — замена известных фраз внутри строки
 // (по границам слов, длинные фразы первыми). Регистр сохраняется: «DEVICES» → «УСТРОЙСТВА».
 // Результаты кэшируются, так что на кадр это несколько обращений к Map.
 (() => {
-  T.LANG = /*@LANG*/'en';
   const DICT = /*@DICT*/null;
+  let lang0 = /*@LANG*/'en';                                           // для отдельной HTML-сборки (--lang)
+  try { lang0 = new URLSearchParams(location.search).get('lang') || localStorage.getItem('lang') || lang0; } catch (e) {}
+  T.LANG = lang0 === 'ru' && DICT ? 'ru' : 'en';
   T.L = (en, ru) => T.LANG === 'ru' && ru != null ? ru : en;          // явный выбор по месту
-  if (!DICT || T.LANG === 'en') { T.tr = s => s; return; }
-  document.documentElement.lang = 'ru';
   const low = new Map();                                               // ключ в нижнем регистре -> перевод
-  for (const k in DICT) { low.set(k.toLowerCase(), DICT[k]); const t = k.trim(); if (t !== k && !low.has(t.toLowerCase())) low.set(t.toLowerCase(), DICT[k].trim()); }
+  if (DICT) for (const k in DICT) { low.set(k.toLowerCase(), DICT[k]); const t = k.trim(); if (t !== k && !low.has(t.toLowerCase())) low.set(t.toLowerCase(), DICT[k].trim()); }
   const keys = [...low.keys()].filter(k => k.length >= 3).sort((a, b) => b.length - a.length);
   const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const RX = keys.length ? new RegExp('(?<![A-Za-z0-9])(' + keys.map(esc).join('|') + ')(?![A-Za-z0-9])', 'gi') : null;
@@ -21,7 +22,7 @@
   const isCap = s => s[0] === s[0].toUpperCase() && s.slice(1) === s.slice(1).toLowerCase() && s !== s.toLowerCase();
   const fit = (src, dst) => isUp(src) ? dst.toUpperCase() : isCap(src) ? dst[0].toUpperCase() + dst.slice(1) : dst;
   const cache = new Map();
-  T.tr = s => {
+  const ru = s => {
     if (typeof s !== 'string' || !s || !/[A-Za-z]/.test(s)) return s;
     let r = cache.get(s);
     if (r !== undefined) return r;
@@ -32,9 +33,22 @@
     cache.set(s, r);
     return r;
   };
-  // холсты: перевод при выводе и измерении текста
+  T.tr = s => T.LANG === 'ru' ? ru(s) : s;
+  // кто перерисовывает свои DOM-подписи при смене языка (app.js: меню, вкладки; виды — свои панели)
+  T.onLang = [];
+  T.setLang = code => {
+    code = code === 'ru' && DICT ? 'ru' : 'en';
+    if (code === T.LANG) return;
+    T.LANG = code;
+    document.documentElement.lang = code;
+    try { localStorage.setItem('lang', code); } catch (e) {}
+    if (T._fitC) T._fitC.clear();
+    for (const f of T.onLang) { try { f(code); } catch (e) {} }
+  };
+  document.documentElement.lang = T.LANG;
+  // холсты: перевод при выводе и измерении текста (в английском — без лишней работы)
   const P = CanvasRenderingContext2D.prototype, F = P.fillText, Sx = P.strokeText, M = P.measureText;
-  P.fillText = function (s, ...a) { return F.call(this, T.tr(String(s)), ...a); };
-  P.strokeText = function (s, ...a) { return Sx.call(this, T.tr(String(s)), ...a); };
-  P.measureText = function (s) { return M.call(this, T.tr(String(s))); };
+  P.fillText = function (s, ...a) { return F.call(this, T.LANG === 'ru' ? ru(String(s)) : s, ...a); };
+  P.strokeText = function (s, ...a) { return Sx.call(this, T.LANG === 'ru' ? ru(String(s)) : s, ...a); };
+  P.measureText = function (s) { return M.call(this, T.LANG === 'ru' ? ru(String(s)) : s); };
 })();

@@ -28,6 +28,8 @@ int g_theme = THEME_DENKO;                // оформление: пока од
 int g_micEn = 1;
 int g_auSrc = 0;
 int g_city = 0;
+int g_lang = 0;                          // язык интерфейса: 0 English, 1 Русский (lang.h)
+bool g_langAsk = false;                  // язык ещё не выбран — при старте спросить (core/langpick)
 int g_tzOff = 10800;
 int g_auLeds = 0;
 int g_bleTicks = 1;
@@ -46,7 +48,7 @@ static Preferences g_prefs;
 // все пункты настроек; page — на какой странице показывать.
 // Одна таблица на всё: экран палки (колесо) и планшет (/api/settings, /api/set) читают и меняют
 // настройки через одни и те же getVal / setVal — логика не дублируется.
-enum { S_THEME, S_SCREEN, S_DIM, S_LEDBR, S_VOLUME, S_CLICKS, S_CITY, S_BATTERY, S_VERSION,
+enum { S_THEME, S_LANG, S_SCREEN, S_DIM, S_LEDBR, S_VOLUME, S_CLICKS, S_CITY, S_BATTERY, S_VERSION,
        S_RANGE, S_LEDEV, S_BLETICK,
        S_WRANGE, S_WTICK,
        S_BAND,
@@ -57,43 +59,44 @@ enum { P_GENERAL, P_BLE, P_WIFI, P_SUBGHZ, P_SOUND, P_ALERT, P_NUM };
 enum { K_ENUM, K_RANGE, K_BOOL, K_INFO };                 // вид пункта (для планшета)
 struct SetDef { const char* name; const char* hint; uint8_t page; const char* key; uint8_t kind; int16_t mn, mx, step; const char* unit; };
 static const SetDef DEFS[S_NUM] = {
-  { L("Theme", "Тема"), L("look: denko neon / kurenai red", "оформление: denko / kurenai"),   P_GENERAL, "theme",      K_ENUM },
-  { L("Screen", "Экран"), L("screen backlight", "яркость подсветки"),            P_GENERAL, "screen",     K_RANGE, 20, 100, 10, "%" },
-  { L("Auto dim", "Затемнение"), L("dim screen when idle", "гасить экран без действий"),        P_GENERAL, "dim",        K_ENUM },
-  { L("LED brightness", "Подсветка"), L("LED strip brightness", "яркость светодиодов"),        P_GENERAL, "ledbr",      K_RANGE, 10, 100, 10, "%" },
-  { L("Volume", "Звук"), L("all sounds: off / quiet / loud", "все звуки: выкл / тихо / громко"),  P_GENERAL, "volume",     K_ENUM },
-  { L("Wheel clicks", "Щелчки колеса"), L("click on every wheel step", "щелчок на каждый шаг колеса"),   P_GENERAL, "clicks",     K_BOOL },
-  { L("City", "Город"), L("for the sky map and satellites", "для карты неба и спутников"),  P_GENERAL, "city",       K_ENUM },
-  { L("Battery", "Батарея"), "",                            P_GENERAL, "battery",    K_INFO },
-  { L("Version", "Версия"), L("TENGAN firmware", "прошивка TENGAN"),             P_GENERAL, "version",    K_INFO },
-  { L("Range", "Дальность"), L("ignore weaker devices", "не считать слабые устройства"),       P_BLE,     "ble_range",  K_ENUM },
-  { L("LED events", "Вспышки"), L("LEDs flash when the count jumps", "светодиоды мигают при скачке"),    P_BLE,     "ble_ledev",  K_RANGE, 0, 30, 1, "" },
-  { L("Finder ticks", "Тики поиска"), L("ticks on the nearest screen", "тики на экране «ближайшее»"),     P_BLE,     "ble_ticks",  K_BOOL },
-  { L("Range", "Дальность"), L("hide weaker networks", "скрывать слабые сети"),        P_WIFI,    "wifi_range", K_ENUM },
-  { L("Finder ticks", "Тики поиска"), L("ticks on the finder screen", "тики на экране поиска"),        P_WIFI,    "wifi_ticks", K_BOOL },
-  { L("Start band", "Начальный диапазон"), L("band when the section opens", "диапазон при открытии раздела"),     P_SUBGHZ,  "sub_band",   K_ENUM },
-  { L("Microphone", "Микрофон"), L("microphone for the Sound section", "микрофон для раздела «Звук»"),       P_SOUND,   "mic",        K_BOOL },
-  { L("LED meter", "Индикатор"), L("LEDs show loudness", "светодиоды показывают громкость"),          P_SOUND,   "au_leds",    K_BOOL },
-  { L("Source", "Источник"), L("auto / microphone / computer audio", "авто / микрофон / звук ПК"),   P_SOUND,   "au_src",     K_ENUM },
-  { L("Near", "Рядом"), L("stronger than this counts as near", "сильнее этого - «рядом»"),   P_ALERT,   "al_near",    K_RANGE, -90, -40, 5, "dBm" },
-  { L("New device", "Новое устройство"), L("alert: off / near / any", "тревога: выкл / рядом / все"),   P_ALERT,   "al_new",     K_ENUM },
-  { L("Tracker", "Трекер"), L("tracker alert: off / near / any", "трекеры: выкл / рядом / все"), P_ALERT,   "al_trk",     K_ENUM },
-  { L("New for", "Новое в течение"), L("how long a device counts as new", "сколько устройство считается новым"),    P_ALERT,   "al_newfor",  K_RANGE, 10, 300, 10, "s" },
-  { L("Warm-up", "Разогрев"), L("right after connecting nothing is new", "после подключения новых нет"),P_ALERT,   "al_warm",    K_RANGE, 0, 120, 5, "s" },
-  { L("Sensitivity", "Чувствительность"), L("activity level gain", "усиление шкалы активности"),         P_ALERT,   "al_sens",    K_RANGE, 1, 10, 1, "" },
-  { L("Attention at", "Внимание с"), L("activity level for attention", "уровень активности «внимание»"),   P_ALERT,   "al_warn",    K_RANGE, 20, 95, 5, "%" },
-  { L("Alarm at", "Тревога с"), L("activity level for alarm", "уровень активности «тревога»"),       P_ALERT,   "al_alarm",   K_RANGE, 30, 100, 5, "%" },
-  { L("Count Bluetooth", "Учитывать BLE"), L("new devices raise activity", "новые устройства"),  P_ALERT,   "al_cble",    K_BOOL },
-  { L("Count 433 MHz", "Учитывать 433"), L("433 MHz packets raise activity", "посылки 433 МГц"),  P_ALERT,   "al_crf",     K_BOOL },
-  { L("Count sound", "Учитывать звук"), L("loudness raises activity", "громкость звука"),    P_ALERT,   "al_csnd",    K_BOOL },
-  { L("Count IR/NFC", "Учитывать ИК/NFC"), L("remotes and cards raise activity", "пульты и карты"),P_ALERT,   "al_cprb",    K_BOOL },
-  { L("Blinking", "Мигание"), L("blink on alerts", "мигать при тревоге"),             P_ALERT,   "al_blink",   K_BOOL },
-  { L("Alert banner", "Плашка тревоги"), L("show the proximity warning", "показывать плашку тревоги"),      P_ALERT,   "al_plate",   K_BOOL },
+  { LP("Theme", "Тема"), LP("look: denko neon / kurenai red", "оформление: denko / kurenai"),   P_GENERAL, "theme",      K_ENUM },
+  { LP("Language", "Язык"), LP("interface: English / Русский", "интерфейс: English / Русский"), P_GENERAL, "lang",   K_ENUM },
+  { LP("Screen", "Экран"), LP("screen backlight", "яркость подсветки"),            P_GENERAL, "screen",     K_RANGE, 20, 100, 10, "%" },
+  { LP("Auto dim", "Затемнение"), LP("dim screen when idle", "гасить экран без действий"),        P_GENERAL, "dim",        K_ENUM },
+  { LP("LED brightness", "Подсветка"), LP("LED strip brightness", "яркость светодиодов"),        P_GENERAL, "ledbr",      K_RANGE, 10, 100, 10, "%" },
+  { LP("Volume", "Звук"), LP("all sounds: off / quiet / loud", "все звуки: выкл / тихо / громко"),  P_GENERAL, "volume",     K_ENUM },
+  { LP("Wheel clicks", "Щелчки колеса"), LP("click on every wheel step", "щелчок на каждый шаг колеса"),   P_GENERAL, "clicks",     K_BOOL },
+  { LP("City", "Город"), LP("for the sky map and satellites", "для карты неба и спутников"),  P_GENERAL, "city",       K_ENUM },
+  { LP("Battery", "Батарея"), "",                            P_GENERAL, "battery",    K_INFO },
+  { LP("Version", "Версия"), LP("TENGAN firmware", "прошивка TENGAN"),             P_GENERAL, "version",    K_INFO },
+  { LP("Range", "Дальность"), LP("ignore weaker devices", "не считать слабые устройства"),       P_BLE,     "ble_range",  K_ENUM },
+  { LP("LED events", "Вспышки"), LP("LEDs flash when the count jumps", "светодиоды мигают при скачке"),    P_BLE,     "ble_ledev",  K_RANGE, 0, 30, 1, "" },
+  { LP("Finder ticks", "Тики поиска"), LP("ticks on the nearest screen", "тики на экране «ближайшее»"),     P_BLE,     "ble_ticks",  K_BOOL },
+  { LP("Range", "Дальность"), LP("hide weaker networks", "скрывать слабые сети"),        P_WIFI,    "wifi_range", K_ENUM },
+  { LP("Finder ticks", "Тики поиска"), LP("ticks on the finder screen", "тики на экране поиска"),        P_WIFI,    "wifi_ticks", K_BOOL },
+  { LP("Start band", "Начальный диапазон"), LP("band when the section opens", "диапазон при открытии раздела"),     P_SUBGHZ,  "sub_band",   K_ENUM },
+  { LP("Microphone", "Микрофон"), LP("microphone for the Sound section", "микрофон для раздела «Звук»"),       P_SOUND,   "mic",        K_BOOL },
+  { LP("LED meter", "Индикатор"), LP("LEDs show loudness", "светодиоды показывают громкость"),          P_SOUND,   "au_leds",    K_BOOL },
+  { LP("Source", "Источник"), LP("auto / microphone / computer audio", "авто / микрофон / звук ПК"),   P_SOUND,   "au_src",     K_ENUM },
+  { LP("Near", "Рядом"), LP("stronger than this counts as near", "сильнее этого - «рядом»"),   P_ALERT,   "al_near",    K_RANGE, -90, -40, 5, "dBm" },
+  { LP("New device", "Новое устройство"), LP("alert: off / near / any", "тревога: выкл / рядом / все"),   P_ALERT,   "al_new",     K_ENUM },
+  { LP("Tracker", "Трекер"), LP("tracker alert: off / near / any", "трекеры: выкл / рядом / все"), P_ALERT,   "al_trk",     K_ENUM },
+  { LP("New for", "Новое в течение"), LP("how long a device counts as new", "сколько устройство считается новым"),    P_ALERT,   "al_newfor",  K_RANGE, 10, 300, 10, "s" },
+  { LP("Warm-up", "Разогрев"), LP("right after connecting nothing is new", "после подключения новых нет"),P_ALERT,   "al_warm",    K_RANGE, 0, 120, 5, "s" },
+  { LP("Sensitivity", "Чувствительность"), LP("activity level gain", "усиление шкалы активности"),         P_ALERT,   "al_sens",    K_RANGE, 1, 10, 1, "" },
+  { LP("Attention at", "Внимание с"), LP("activity level for attention", "уровень активности «внимание»"),   P_ALERT,   "al_warn",    K_RANGE, 20, 95, 5, "%" },
+  { LP("Alarm at", "Тревога с"), LP("activity level for alarm", "уровень активности «тревога»"),       P_ALERT,   "al_alarm",   K_RANGE, 30, 100, 5, "%" },
+  { LP("Count Bluetooth", "Учитывать BLE"), LP("new devices raise activity", "новые устройства"),  P_ALERT,   "al_cble",    K_BOOL },
+  { LP("Count 433 MHz", "Учитывать 433"), LP("433 MHz packets raise activity", "посылки 433 МГц"),  P_ALERT,   "al_crf",     K_BOOL },
+  { LP("Count sound", "Учитывать звук"), LP("loudness raises activity", "громкость звука"),    P_ALERT,   "al_csnd",    K_BOOL },
+  { LP("Count IR/NFC", "Учитывать ИК/NFC"), LP("remotes and cards raise activity", "пульты и карты"),P_ALERT,   "al_cprb",    K_BOOL },
+  { LP("Blinking", "Мигание"), LP("blink on alerts", "мигать при тревоге"),             P_ALERT,   "al_blink",   K_BOOL },
+  { LP("Alert banner", "Плашка тревоги"), LP("show the proximity warning", "показывать плашку тревоги"),      P_ALERT,   "al_plate",   K_BOOL },
 };
-static const char* const PAGE_NAMES[P_NUM] = { L("General", "Общие"), "Bluetooth", "Wi-Fi", "Sub-GHz", L("Sound", "Звук"), L("Alerts", "Тревоги") };
+static const char* const PAGE_NAMES[P_NUM] = { LP("General", "Общие"), "Bluetooth", "Wi-Fi", "Sub-GHz", LP("Sound", "Звук"), LP("Alerts", "Тревоги") };
 static const char* const PAGE_IDS[P_NUM]   = { "general", "ble", "wifi", "sub", "snd", "alert" };
-static const char* const PAGE_DESCS[P_NUM] = { L("theme, screen, LEDs, city", "тема, экран, город"), L("range, LEDs, ticks", "дальность, вспышки"),
-                                               L("range, ticks", "дальность, тики"), L("radio band", "диапазон"), L("source, mic, LEDs", "источник, микрофон"), L("near, new, levels", "рядом, новые, уровни") };
+static const char* const PAGE_DESCS[P_NUM] = { LP("theme, screen, LEDs, city", "тема, экран, город"), LP("range, LEDs, ticks", "дальность, вспышки"),
+                                               LP("range, ticks", "дальность, тики"), LP("radio band", "диапазон"), LP("source, mic, LEDs", "источник, микрофон"), LP("near, new, levels", "рядом, новые, уровни") };
 static const int SET_ROWS = 7;           // строк на экране (список прокручивается)
 
 // пункты текущей страницы
@@ -120,7 +123,8 @@ void loadSettings() {
   g_sndIdx    = g_prefs.getInt("snd", 1);
   g_micEn     = g_prefs.getInt("mic", 1) ? 1 : 0;
   g_clickEn   = g_prefs.getInt("click", 1) ? 1 : 0;
-  g_theme     = constrain(g_prefs.getInt("th2", THEME_DENKO), 0, THEME_N - 1);   // новый ключ: старое «theme»=1 было SUMI
+  g_theme     = constrain(g_prefs.getInt("th2", THEME_DENKO), 0, THEME_N - 1);
+  { int lg = g_prefs.getInt("lang", -1); g_langAsk = lg < 0; g_lang = lg == 1 ? 1 : 0; }   // нет ключа — первый запуск: экран выбора языка   // новый ключ: старое «theme»=1 было SUMI
   g_auLeds    = g_prefs.getInt("auled", 0) ? 1 : 0;
   g_auSrc     = constrain(g_prefs.getInt("ausrc", 0), 0, 2);
   g_gpsKnown  = g_prefs.getBool("gpsok", false);
@@ -168,6 +172,7 @@ void saveSettings() {
   g_prefs.putInt("mic", g_micEn);
   g_prefs.putInt("click", g_clickEn);
   g_prefs.putInt("th2", g_theme);
+  g_prefs.putInt("lang", g_lang);
   g_prefs.putInt("auled", g_auLeds);
   g_prefs.putInt("ausrc", g_auSrc);
   g_prefs.putInt("city", g_city);
@@ -187,6 +192,7 @@ void saveSettings() {
 }
 
 void settingsSaveNow() { if (g_setDirty) saveSettings(); }
+void settingsSetLang(int lang) { g_lang = lang ? 1 : 0; g_langAsk = false; saveSettings(); }
 void settingsAutosave(uint32_t now) { if (g_setDirty && msSince(now, g_setChangedMs) > 3000) saveSettings(); }
 void settingsBegin() { loadSettings(); applyBrightness(); }
 
@@ -203,6 +209,7 @@ static const char* const AL_NAMES[3]  = { "off", "near", "any" };
 static int optCount(int id) {                             // сколько вариантов у пункта-списка
   switch (id) {
     case S_THEME: return THEME_N;
+    case S_LANG: return 2;
     case S_DIM: return N_DIMS;
     case S_VOLUME: return 3;
     case S_CITY: return cityCount();
@@ -216,9 +223,10 @@ static int optCount(int id) {                             // сколько ва
 static void optName(int id, int i, char* out, size_t n) {   // имя варианта (как на планшете)
   switch (id) {
     case S_THEME:  snprintf(out, n, "%s", i == THEME_KURENAI ? "kurenai" : "denko"); break;
+    case S_LANG:   snprintf(out, n, "%s", i ? "ru" : "en"); break;
     case S_DIM:    if (DIM_SECS[i] == 0) snprintf(out, n, "off"); else if (DIM_SECS[i] < 60) snprintf(out, n, "%d s", DIM_SECS[i]); else snprintf(out, n, "%d min", DIM_SECS[i] / 60); break;
     case S_VOLUME: snprintf(out, n, "%s", VOL_NAMES[i]); break;
-    case S_CITY:   snprintf(out, n, "%s", i == N_CITIES ? g_gpsCity.name : CITIES[i].name); break;
+    case S_CITY:   snprintf(out, n, "%s", i == N_CITIES ? g_gpsCity.name : LEN(CITIES[i].name)); break;
     case S_RANGE: case S_WRANGE: snprintf(out, n, "%s", RANGES[i].name); break;
     case S_BAND:   snprintf(out, n, "%s", BANDS[i].name); break;
     case S_AUSRC:  snprintf(out, n, "%s", SRC_NAMES[i]); break;
@@ -229,21 +237,21 @@ static void optName(int id, int i, char* out, size_t n) {   // имя вариа
 // подпись варианта для человека (экран устройства, «labels» для планшета); optName — машинное имя для /api/set
 static void optLabel(int id, int i, char* out, size_t n) {
   optName(id, i, out, n);
-#if LANG_RU
-  static const char* const MAP[][2] = {
-    { "off", "выкл" }, { "quiet", "тихо" }, { "loud", "громко" }, { "auto", "авто" }, { "mic", "микрофон" },
-    { "laptop", "ПК" }, { "near", "рядом" }, { "any", "все" }, { "all", "все" }, { "far", "далеко" },
-    { "room", "комната" }, { "very near", "вплотную" },
-  };
-  for (auto& m : MAP) if (!strcmp(out, m[0])) { snprintf(out, n, "%s", m[1]); return; }
-  if (id == S_DIM) { char* p = strstr(out, " min"); if (p) strcpy(p, " мин"); else if ((p = strstr(out, " s"))) strcpy(p, " с"); }
-#else
-  if (id == S_AUSRC && !strcmp(out, "laptop")) snprintf(out, n, "computer");
-#endif
+  if (id == S_CITY) { snprintf(out, n, "%s", i == N_CITIES ? g_gpsCity.name : LT(CITIES[i].name)); return; }
+  if (id == S_LANG) { snprintf(out, n, "%s", i ? "Русский" : "English"); return; }
+  if (g_lang) {
+    static const char* const MAP[][2] = {                 // машинные имена -> подписи (сами строки не зависят от языка — можно static)
+      { "off", "выкл" }, { "quiet", "тихо" }, { "loud", "громко" }, { "auto", "авто" }, { "mic", "микрофон" },
+      { "laptop", "ПК" }, { "near", "рядом" }, { "any", "все" }, { "all", "все" }, { "far", "далеко" },
+      { "room", "комната" }, { "very near", "вплотную" },
+    };
+    for (auto& m : MAP) if (!strcmp(out, m[0])) { snprintf(out, n, "%s", m[1]); return; }
+    if (id == S_DIM) { char* p = strstr(out, " min"); if (p) strcpy(p, " мин"); else if ((p = strstr(out, " s"))) strcpy(p, " с"); }
+  } else if (id == S_AUSRC && !strcmp(out, "laptop")) snprintf(out, n, "computer");
 }
 static int getVal(int id) {                               // индекс варианта / число / 0-1
   switch (id) {
-    case S_THEME: return g_theme;          case S_SCREEN: return g_scrBright;   case S_DIM: return g_dimIdx;
+    case S_THEME: return g_theme;          case S_LANG: return g_lang;          case S_SCREEN: return g_scrBright;   case S_DIM: return g_dimIdx;
     case S_LEDBR: return g_ledBright;      case S_VOLUME: return g_sndIdx;      case S_CLICKS: return g_clickEn;
     case S_CITY: return g_city;            case S_RANGE: return g_range;        case S_LEDEV: return g_thresh;
     case S_BLETICK: return g_bleTicks;     case S_WRANGE: return g_wRange;      case S_WTICK: return g_wifiTicks;
@@ -266,6 +274,7 @@ static bool setVal(int id, int v) {
   if (d.kind == K_RANGE) v = constrain(v, d.mn, d.mx);
   switch (id) {
     case S_THEME:   g_theme = v; themeChanged(); break;
+    case S_LANG:    g_lang = v; g_langAsk = false; break;      // тексты берутся при каждой отрисовке — меняется сразу
     case S_SCREEN:  g_scrBright = v; break;
     case S_DIM:     g_dimIdx = v; break;
     case S_LEDBR:   g_ledBright = v; break;
@@ -322,10 +331,11 @@ void settingsAdjust(int dir) {
 static void itemJson(int id, String& o) {
   const SetDef& d = DEFS[id];
   char b[48];
-  o += "{\"k\":\""; o += d.key; o += "\",\"name\":"; jsonStr(o, d.name); o += ",\"hint\":";
+  o += "{\"k\":\""; o += d.key; o += "\",\"name\":"; jsonStr(o, LT(d.name)); o += ",\"hint\":";
   // тема с планшета не меняется (смена из веба роняла палку) — только показываем, менять колесом на палке
   if (id == S_THEME) { jsonStr(o, L("change it on the device: Settings › Theme", "меняется на устройстве: Настройки › Тема")); o += ",\"type\":\"info\",\"v\":"; optName(id, getVal(id), b, sizeof(b)); jsonStr(o, b); o += '}'; return; }
-  jsonStr(o, d.hint);
+  if (id == S_LANG)  { jsonStr(o, L("change it on the device: Settings › Language", "меняется на устройстве: Настройки › Язык")); o += ",\"type\":\"info\",\"v\":"; optLabel(id, getVal(id), b, sizeof(b)); jsonStr(o, b); o += '}'; return; }
+  jsonStr(o, LT(d.hint));
   switch (d.kind) {
     case K_ENUM:
       o += ",\"type\":\"enum\",\"v\":"; optName(id, getVal(id), b, sizeof(b)); jsonStr(o, b);
@@ -356,7 +366,7 @@ void settingsJson(String& o) {
   o = "{\"pages\":[";
   for (int p = 0; p < P_NUM; p++) {
     if (p) o += ',';
-    o += "{\"id\":\""; o += PAGE_IDS[p]; o += "\",\"name\":"; jsonStr(o, PAGE_NAMES[p]); o += ",\"items\":[";
+    o += "{\"id\":\""; o += PAGE_IDS[p]; o += "\",\"name\":"; jsonStr(o, LT(PAGE_NAMES[p])); o += ",\"items\":[";
     bool first = true;
     for (int i = 0; i < S_NUM; i++) if (DEFS[i].page == p) { if (!first) o += ','; first = false; itemJson(i, o); }
     o += "]}";
@@ -369,7 +379,7 @@ bool settingsSetKey(const char* key, const char* val, String& o) {
   for (int i = 0; i < S_NUM; i++) if (!strcmp(DEFS[i].key, key)) id = i;
   const char* err = nullptr;
   if (id < 0) err = "unknown key";
-  else if (DEFS[id].kind == K_INFO || id == S_THEME) err = "change it on the device";
+  else if (DEFS[id].kind == K_INFO || id == S_THEME || id == S_LANG) err = "change it on the device";
   else {
     int v = 0;
     if (DEFS[id].kind == K_ENUM) {                        // имя варианта (без учёта регистра) или его номер
@@ -394,10 +404,8 @@ bool settingsSetKey(const char* key, const char* val, String& o) {
 void settingsTouch() { g_setDirty = true; g_setChangedMs = millis(); }
 
 static const char* unitLabel(const char* u) {   // единицы для экрана
-#if LANG_RU
-  if (!strcmp(u, "dBm")) return "дБм";
-  if (!strcmp(u, "s")) return "с";
-#endif
+  if (g_lang && !strcmp(u, "dBm")) return "дБм";
+  if (g_lang && !strcmp(u, "s")) return "с";
   return u;
 }
 static const char* onOff(int v) { return v ? L("on", "вкл") : L("off", "выкл"); }
@@ -416,7 +424,7 @@ void drawSettings() {
   char batLine[64]; batSummary(batLine, sizeof(batLine));
   char rst[72] = "";
   if (cur == S_VERSION && crumbWasCrash()) snprintf(rst, sizeof(rst), L("last reset: %s @ %s", "сброс: %s @ %s"), crumbLastReason(), crumbLastStep());
-  uiHeader(PAGE_NAMES[g_setPage], cur == S_BATTERY ? batLine : rst[0] ? rst : DEFS[cur].hint, rst[0] != 0);
+  uiHeader(LT(PAGE_NAMES[g_setPage]), cur == S_BATTERY ? batLine : rst[0] ? rst : LT(DEFS[cur].hint), rst[0] != 0);
   const int rh = 18;
   int rows = min(n, SET_ROWS);
   int first = constrain(g_setItem - (rows - 1), 0, n - rows);
@@ -437,13 +445,14 @@ void drawSettings() {
       case S_VOLUME:  optLabel(id, g_sndIdx, val, sizeof val); break;
       case S_CLICKS:  strcpy(val, onOff(g_clickEn)); break;
       case S_THEME:   strcpy(val, g_theme == THEME_KURENAI ? "kurenai" : "denko"); break;
+      case S_LANG:    optLabel(id, g_lang, val, sizeof val); break;
       case S_BLETICK: strcpy(val, onOff(g_bleTicks)); break;
       case S_WTICK:   strcpy(val, onOff(g_wifiTicks)); break;
       case S_BAND:    strcpy(val, BANDS[g_band].name); break;
       case S_MIC:     strcpy(val, onOff(g_micEn)); break;
       case S_AULED:   strcpy(val, onOff(g_auLeds)); break;
       case S_AUSRC:   optLabel(id, g_auSrc, val, sizeof val); break;
-      case S_CITY:    snprintf(val, sizeof(val), "%s", curCity().name); break;
+      case S_CITY:    snprintf(val, sizeof(val), "%s", LT(curCity().name)); break;
       case S_VERSION: snprintf(val, sizeof(val), "v%s", FW_VERSION); break;
       case S_ALNEAR: case S_ALNEWFOR: case S_ALWARM: case S_ALSENS: case S_ALWARN: case S_ALALARM:
         snprintf(val, sizeof(val), "%d%s%s", getVal(id), DEFS[id].unit[0] && strcmp(DEFS[id].unit, "%") ? " " : "", unitLabel(DEFS[id].unit)); break;
@@ -456,7 +465,7 @@ void drawSettings() {
     }
     spr.setTextDatum(ML_DATUM);
     spr.setTextColor(sel ? C_HOT() : UI_LABEL());
-    txt(DEFS[id].name, UI_M + 8, cy, 2);
+    txt(LT(DEFS[id].name), UI_M + 8, cy, 2);
     spr.setTextDatum(MR_DATUM);
     spr.setTextColor(alert ? C_ALERT() : (sel ? C_ACC() : C_HOT()));
     txt(val, W - UI_M - 8, cy, 2);
@@ -475,7 +484,7 @@ static void setSubtitle(char* out, size_t n) { snprintf(out, n, "%s", L("general
 static void setEnter() { g_setPage = 0; g_setItem = 0; }
 static void setLeave() { settingsSaveNow(); }
 static void setInfo(int i, SubItem& it) {
-  it.name = PAGE_NAMES[i]; it.desc = PAGE_DESCS[i];
+  it.name = LT(PAGE_NAMES[i]); it.desc = LT(PAGE_DESCS[i]);
   int ids[S_NUM]; sprintf(it.value, "%d", pageItems(i, ids));
 }
 static int  setNow() { return g_setPage; }
@@ -488,7 +497,7 @@ static void setClick() {
 static void setDraw(uint32_t) { drawSettings(); }
 
 const Section settingsSection = {
-  L("Settings", "Настройки"), 200, 160, 90, iconGear, setSubtitle,
+  LP("Settings", "Настройки"), 200, 160, 90, iconGear, setSubtitle,
   setEnter, setLeave,
   P_NUM, setInfo, setNow, setOpen, setClose,
   setClick, settingsAdjust, nullptr, nullptr, setDraw,

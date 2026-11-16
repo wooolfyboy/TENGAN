@@ -9,6 +9,7 @@
 
   T.views.push({
     id: 'set', title: 'Settings', want: 'st',
+    onLang() { if (this.load) this.load(); else if (this.render) this.render(); },   // смена языка: подписи настроек приходят с устройства на его языке — перечитать
     mount(main) {
       this.root = T.el('div', 'view setv');
       this.root.innerHTML = `<div class="set-wrap"><aside class="set-tabs"></aside><section class="set-body"></section></div><div class="set-toast"></div>`;

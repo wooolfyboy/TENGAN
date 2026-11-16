@@ -348,13 +348,13 @@ static void galSubtitle(char* out, size_t n) { snprintf(out, n, L("%d scenes", "
 static void galEnter() { s_lastMs = 0; }
 static void galLeave() { if (s_wxOpen) { wxStop(); s_wxOpen = false; } }
 static void galInfo(int i, SubItem& it) {
-  static const char* const names[G_NUM] = { L("Tesseract", "Тессеракт"), L("Torus", "Тор"), L("Life", "Жизнь"), L("Pendulum", "Маятник"), L("Sky", "Небо"), L("Globe", "Глобус"), L("Weather", "Погода") };
-  static const char* const descs[G_NUM] = { L("4D hypercube", "4D-гиперкуб"), L("donut of points", "тор из точек"), L("game of life", "игра «Жизнь»"), L("double pendulum chaos", "двойной маятник"), L("stars over you now", "звёзды сейчас"), L("ISS and satellites", "МКС и спутники"), L("radio weather", "радиопогода") };
+  const char* const names[G_NUM] = { L("Tesseract", "Тессеракт"), L("Torus", "Тор"), L("Life", "Жизнь"), L("Pendulum", "Маятник"), L("Sky", "Небо"), L("Globe", "Глобус"), L("Weather", "Погода") };
+  const char* const descs[G_NUM] = { L("4D hypercube", "4D-гиперкуб"), L("donut of points", "тор из точек"), L("game of life", "игра «Жизнь»"), L("double pendulum chaos", "двойной маятник"), L("stars over you now", "звёзды сейчас"), L("ISS and satellites", "МКС и спутники"), L("radio weather", "радиопогода") };
   it.name = names[i]; it.desc = descs[i]; it.value[0] = 0;
   if (i == G_TESS)       strcpy(it.value, "4D");
   else if (i == G_TORUS) strcpy(it.value, "3D");
   else if (s_lfGen && i == G_LIFE) snprintf(it.value, sizeof(it.value), L("gen %lu", "пок. %lu"), (unsigned long)s_lfGen);
-  else if (i == G_SKY)   snprintf(it.value, sizeof(it.value), "%s", curCity().name);
+  else if (i == G_SKY)   snprintf(it.value, sizeof(it.value), "%s", LT(curCity().name));
   else if (i == G_GLOBE) snprintf(it.value, sizeof(it.value), L("%d sats", "%d спутн."), g_nSats);
   else if (i == G_WX && g_wx.ok) snprintf(it.value, sizeof(it.value), "%s", g_wx.cond);
 }
@@ -382,7 +382,7 @@ static void galDraw(uint32_t now) {
 }
 
 const Section gallerySection = {
-  L("Gallery", "Галерея"), 150, 120, 255, iconCube, galSubtitle,
+  LP("Gallery", "Галерея"), 150, 120, 255, iconCube, galSubtitle,
   galEnter, galLeave,
   G_NUM, galInfo, galNow, galOpen, galClose,
   galClick, galRotate, nullptr, galTick, galDraw,

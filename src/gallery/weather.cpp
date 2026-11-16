@@ -61,11 +61,11 @@ static int sumOf(const uint8_t* a) { int s = 0; for (int i = 0; i < 60; i++) s +
 
 // состояние для экрана (машинное имя остаётся в JSON)
 static const char* condLabel(const char* c) {
-#if LANG_RU
+  if (g_lang) {
   static const char* const M[][2] = { { "calm", "штиль" }, { "storm", "гроза" }, { "rain", "дождь" }, { "windy", "ветрено" },
                                       { "overcast", "пасмурно" }, { "cloudy", "облачно" }, { "clear", "ясно" } };
   for (auto& m : M) if (!strcmp(c, m[0])) return m[1];
-#endif
+  }
   return c;
 }
 static const char* condFor(const WxState& w) {

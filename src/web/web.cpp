@@ -23,11 +23,7 @@
 #include "core/board.h"
 #include "web/web_page.h"
 #include "core/lang.h"
-#if LANG_RU                        // приложение для планшета (gzip, собирает tools/webapp/build.py) — на языке прошивки
-#include "web/tablet_page_ru.h"
-#else
-#include "web/tablet_page_en.h"
-#endif
+#include "web/tablet_page.h"       // приложение для планшета (gzip, собирает tools/webapp/build.py): оба языка, язык берёт у устройства (st.lang)
 #include <lwip/sockets.h>
 #include "ble/ble.h"
 #include "wifi/wifi.h"
@@ -393,7 +389,7 @@ static void sseTick(uint32_t now) {
       o += ",\"usb\":"; o += g_bat.bus ? 1 : 0; o += ",\"chg\":"; o += g_bat.chg;
       o += ",\"cli\":"; o += WiFi.softAPgetStationNum(); o += ",\"heap\":"; o += ESP.getFreeHeap() / 1024;
       o += ",\"theme\":\""; o += g_theme == THEME_KURENAI ? "kurenai" : "denko"; o += '"';
-      o += ",\"ver\":\"" FW_VERSION "\",\"lang\":\"" LANG_CODE "\"";
+      o += ",\"ver\":\"" FW_VERSION "\",\"lang\":\""; o += LANG_CODE; o += '"';
       o += ",\"rst\":"; jsonStr(o, crumbLastReason()); o += ",\"rstStep\":"; jsonStr(o, crumbLastStep());
       o += ",\"radio\":\""; o += bleRadioActive() ? "b" : ""; o += s_scanMs && now - s_scanMs < 25000 ? "w" : "";
       o += s_subOn ? "s" : ""; o += s_sndOn ? "m" : ""; o += pcLive(now) ? "p" : ""; o += s_irOn ? "i" : ""; o += s_nfcOn ? "n" : ""; o += '"';
@@ -407,7 +403,7 @@ static void sseTick(uint32_t now) {
       if (!k.satSent) {                          // один раз: город и орбиты — небо и глобус считает планшет
         k.satSent = true;
         const City& c = curCity();
-        String a = "{\"city\":"; jsonStr(a, c.name);
+        String a = "{\"city\":"; jsonStr(a, LT(c.name));
         a += ",\"lat\":"; a += String(c.lat, 3); a += ",\"lon\":"; a += String(c.lon, 3);
         a += ",\"sats\":"; satJson(a); a += '}';
         sseEvent(k, "sat", a, false);
@@ -541,7 +537,7 @@ static bool apiHandle(const char* path, const ApiArgs& A, String& o) {
     o += ",\"nets\":"; o += s_netCount;
     o += ",\"build\":\"" __DATE__ " " __TIME__ "\"";
     o += ",\"theme\":\""; o += g_theme == THEME_KURENAI ? "kurenai" : "denko"; o += '"';
-    o += ",\"ver\":\"" FW_VERSION "\",\"lang\":\"" LANG_CODE "\"";
+    o += ",\"ver\":\"" FW_VERSION "\",\"lang\":\""; o += LANG_CODE; o += '"';
     o += ",\"rst\":"; jsonStr(o, crumbLastReason()); o += ",\"rstStep\":"; jsonStr(o, crumbLastStep());
     o += ",\"ssid\":\""; o += s_ssid; o += "\"}";
     return true;
@@ -580,7 +576,16 @@ static void webStart() {
   s_srv->on("/", [] { sendApp(); });
   s_srv->on("/full", [] { sendApp(); });
   s_srv->on("/tablet", [] { sendApp(); });
-  static auto sendLite = [] { s_reqs++; s_srv->send_P(200, "text/html", WEB_PAGE); };
+  // телефонная страница: язык — как на устройстве (<html lang> подставляется при отдаче)
+  static auto sendLite = [] {
+    s_reqs++;
+    size_t a = strlen_P(WEB_PAGE_HEAD), b = strlen_P(WEB_PAGE);
+    s_srv->setContentLength(a + 2 + b);
+    s_srv->send(200, "text/html", "");
+    s_srv->sendContent_P(WEB_PAGE_HEAD, a);
+    s_srv->sendContent(LANG_CODE);
+    s_srv->sendContent_P(WEB_PAGE, b);
+  };
   s_srv->on("/lite", [] { sendLite(); });
   s_srv->on("/phone", [] { sendLite(); });
   for (const char* path : API_PATHS) s_srv->on(path, [path] { HttpArgs a; String o; apiHandle(path, a, o); sendJson(o); });
@@ -783,7 +788,7 @@ static void webClick() { s_showInfo = !s_showInfo; s_infoMs = millis(); }
 static void webRotate(int) { s_showInfo = !s_showInfo; s_infoMs = millis(); }
 
 const Section webSection = {
-  L("Web", "Веб"), 90, 200, 230, iconPhone, webSubtitle,
+  LP("Web", "Веб"), 90, 200, 230, iconPhone, webSubtitle,
   webEnter, webLeave,
   0, nullptr, nullptr, nullptr, nullptr,
   webClick, webRotate, nullptr, webTick, webDraw,

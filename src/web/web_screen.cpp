@@ -41,13 +41,12 @@ void drawWebScreen(const WebView& v, const uint8_t* qr, int n) {
   txt(v.url, tx, y + 84, 2);
   spr.setTextColor(UI_DIM());
   if (v.tab && v.tab[0]) { char tb[32];
-#if LANG_RU
-                          static const char* const TM[][2] = { { "overview", "обзор" }, { "bluetooth", "bluetooth" }, { "wi-fi", "wi-fi" }, { "sub-ghz", "sub-ghz" }, { "sound", "звук" }, { "system", "система" }, { "update", "обновление" } };
-                          const char* tl = v.tab; for (auto& m : TM) if (!strcmp(v.tab, m[0])) tl = m[1];
+                          const char* tl = v.tab;
+                          if (g_lang) {
+                            static const char* const TM[][2] = { { "overview", "обзор" }, { "bluetooth", "bluetooth" }, { "wi-fi", "wi-fi" }, { "sub-ghz", "sub-ghz" }, { "sound", "звук" }, { "system", "система" }, { "update", "обновление" } };
+                            for (auto& m : TM) if (!strcmp(v.tab, m[0])) tl = m[1];
+                          }
                           utf8Upper(tl, tb, sizeof tb);
-#else
-                          utf8Upper(v.tab, tb, sizeof tb);
-#endif
                           snprintf(buf, sizeof(buf), L("VIEWING: %s", "ОТКРЫТО: %s"), tb); }
   else snprintf(buf, sizeof(buf), "%s", L("PHONE, TABLET OR COMPUTER", "ТЕЛЕФОН, ПЛАНШЕТ ИЛИ ПК"));
   txt(buf, tx, y + 106, 1);

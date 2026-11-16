@@ -383,8 +383,8 @@ static bool wifiCloseDetail() {
 
 
 static void wifiScreenInfo(int i, SubItem& it) {
-  static const char* const names[W_NUM] = { L("Networks", "Сети"), L("Channels", "Каналы"), L("Activity", "Активность"), L("Clients", "Клиенты"), L("Finder", "Поиск") };
-  static const char* const descs[W_NUM] = { L("list + details", "список и подробности"), L("who uses which channel", "кто на каком канале"), L("packets & noise", "пакеты и шум"),
+  const char* const names[W_NUM] = { L("Networks", "Сети"), L("Channels", "Каналы"), L("Activity", "Активность"), L("Clients", "Клиенты"), L("Finder", "Поиск") };
+  const char* const descs[W_NUM] = { L("list + details", "список и подробности"), L("who uses which channel", "кто на каком канале"), L("packets & noise", "пакеты и шум"),
     L("devices in networks", "устройства в сетях"), L("best signal spot", "где сигнал лучше") };
   it.name = names[i]; it.desc = descs[i]; strcpy(it.value, "-");
   switch (i) {

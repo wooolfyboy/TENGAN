@@ -48,6 +48,13 @@ App.rewant = () => {
   if (want !== T.Stream.want) T.Stream.connect(want);
 };
 T.views.forEach(v => { const b = T.el('button', '', T.tr(v.title)); b.dataset.id = v.id; b.onclick = () => App.go(v.id); nav.appendChild(b); });
+// смена языка (как на устройстве): меню, вкладки, подпись связи и открытый раздел перерисовывают свои надписи
+T.onLang.push(() => {
+  for (const b of nav.children) { const v = T.views.find(x => x.id === b.dataset.id); if (v) b.textContent = T.tr(v.title); }
+  if (App.cur) App.renderSubs();
+  if (T.Stream && T.Stream.mode) T.Stream.setLink(T.Stream.mode);
+  for (const v of T.views) if (v.root && v.onLang) v.onLang();
+});
 document.getElementById('upd').onclick = () => { const UP = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.TenganUpdate; if (UP) UP.check().catch(() => {}); };
 document.getElementById('fs').onclick = () => {
   const d = document.documentElement;

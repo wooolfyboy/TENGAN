@@ -96,7 +96,7 @@ static void irClick() { g_ir.histN = 0; g_ir.have = false; g_ir.rawN = 0; }   //
 static void irRotate(int) {}
 
 const Section irSection = {
-  L("IR", "ИК"), 230, 90, 120, iconRemote, irSubtitle,
+  LP("IR", "ИК"), 230, 90, 120, iconRemote, irSubtitle,
   irEnter, irLeave,
   0, nullptr, nullptr, nullptr, nullptr,
   irClick, irRotate, nullptr, irTick, drawIr,

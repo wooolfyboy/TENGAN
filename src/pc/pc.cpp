@@ -193,7 +193,7 @@ static void pcDraw(uint32_t now) {
 }
 
 const Section pcSection = {
-  L("PC", "ПК"), 120, 220, 200, iconLaptop, pcSubtitle,
+  LP("PC", "ПК"), 120, 220, 200, iconLaptop, pcSubtitle,
   pcEnter, pcLeave,
   0, nullptr, nullptr, nullptr, nullptr,
   pcClick, pcRotate, pcBack, nullptr, pcDraw,

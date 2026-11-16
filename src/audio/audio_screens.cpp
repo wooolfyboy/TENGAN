@@ -218,7 +218,7 @@ void drawMicMissing() {
     present();
     return;
   }
-  static const char* const stages[] = { L("not started", "не запущен"), L("no free channel", "нет канала"), L("config rejected", "отказ настроек"),
+  const char* const stages[] = { L("not started", "не запущен"), L("no free channel", "нет канала"), L("config rejected", "отказ настроек"),
                                          L("start failed", "не стартовал"), L("running", "работает") };
   uiHeader(L("Microphone", "Микрофон"), g_micDiag.stage == 4 ? L("no sound data", "нет данных") : L("driver error", "ошибка драйвера"), true);
   int x = UI_M + 8, y = UI_TOP + 4;

@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Сборка приложения для планшета в один файл -> src/web/tablet_page_en.h и tablet_page_ru.h
+"""Сборка приложения для планшета в один файл -> src/web/tablet_page.h
 
   исходники: tools/webapp/src (index.html с метками /*@INLINE путь*/)
   результат: всё внутри одного HTML (без интернета), сжато gzip -> массив байт в прошивке.
   TENGAN отдаёт его по /tablet с заголовком Content-Encoding: gzip.
-  Язык зашивается при сборке: английская и русская прошивки несут каждая свою страницу
-  (символы в обоих файлах одинаковые: TABLET_GZ, TABLET_GZ_LEN, TABLET_HTML_SHA).
+  Одна страница на оба языка: словарь i18n/ru.json встроен, язык берётся у устройства (st.lang)
+  и переключается на лету (core/i18n.js).
 
-    python3 tools/webapp/build.py                    # собрать обе: tablet_page_en.h и tablet_page_ru.h
-    python3 tools/webapp/build.py --check            # для CI: обе страницы совпадают с исходниками
-    python3 tools/webapp/build.py --lang ru --html out.html --only-html   # только HTML нужного языка
+    python3 tools/webapp/build.py                    # собрать src/web/tablet_page.h
+    python3 tools/webapp/build.py --check            # для CI: страница совпадает с исходниками
+    python3 tools/webapp/build.py --html out.html --only-html [--lang ru]   # только HTML (язык при старте — для проверки)
 """
 import gzip, hashlib, json, os, re, sys
 
@@ -20,8 +20,7 @@ LANGS = ("en", "ru")
 DICT_DIR = os.path.join(HERE, "i18n")
 
 
-def out_path(lang):
-    return os.path.join(WEB, "tablet_page_%s.h" % lang)
+OUT = os.path.join(WEB, "tablet_page.h")
 FW = os.path.join(HERE, "..", "..", "src")
 
 
@@ -73,13 +72,10 @@ def build(lang="en"):
     html = html.replace("/*@DATA*/", data_js())
     ver = open(os.path.join(HERE, "..", "..", "VERSION")).read().strip()
     html = html.replace("@@VERSION@@", ver)                      # версия TENGAN (файл VERSION)
-    # язык: core/i18n.js получает код языка и (для русского) словарь i18n/ru.json
+    # язык: словарь встроен всегда, стартовый язык — 'en' (страница сразу берёт язык устройства)
     assert "/*@LANG*/'en'" in html and "/*@DICT*/null" in html
-    d = "null"
-    if lang != "en":
-        d = json.dumps(json.load(open(os.path.join(DICT_DIR, lang + ".json"), encoding="utf-8")), ensure_ascii=False, separators=(",", ":"))
+    d = json.dumps(json.load(open(os.path.join(DICT_DIR, "ru.json"), encoding="utf-8")), ensure_ascii=False, separators=(",", ":"))
     html = html.replace("/*@LANG*/'en'", "'%s'" % lang).replace("/*@DICT*/null", d)
-    html = html.replace('<html lang="en">', '<html lang="%s">' % lang)
     assert "@INLINE" not in html
     assert not re.search(r'(src|href)="https?://', html), "внешние ссылки запрещены: страница должна работать без интернета"
     return html
@@ -113,26 +109,16 @@ def main():
         open(os.path.join(os.path.dirname(os.path.abspath(out)), "pagever.txt"), "w").write(hashlib.sha256(html.encode("utf-8")).hexdigest())
         if "--only-html" in sys.argv:                  # для разработки: прошивку не трогать
             print("tablet[%s]: %d КБ HTML" % (langs[0], len(html) // 1024)); return
-    bad = []
-    for lang in langs:
-        html = build(lang)
-        data, digest, gzlen = header(html)
-        outp = out_path(lang)
-        if "--check" in sys.argv:                      # для CI: исходники и прошивка не разъехались
-            # сравниваем сам HTML (по хэшу), а не сжатые байты: zlib разных версий жмёт чуть по-разному
-            cur = open(outp, encoding="utf-8").read() if os.path.exists(outp) else ""
-            m = re.search(r"html-sha256: ([0-9a-f]{64})", cur)
-            if not m or m.group(1) != digest: bad.append(os.path.basename(outp))
-            continue
-        open(outp, "w", encoding="utf-8").write(data)
-        print("tablet[%s]: %d КБ HTML -> %d КБ gzip -> %s" % (lang, len(html) // 1024, gzlen // 1024, os.path.relpath(outp)))
-        legacy = os.path.join(WEB, "tablet_page.h")   # старое имя (пока прошивка не перешла на _en/_ru) — английская
-        if lang == "en" and os.path.exists(legacy):
-            open(legacy, "w", encoding="utf-8").write(data)
-    if "--check" in sys.argv:
-        if bad: sys.exit("устарели %s: запусти python3 tools/webapp/build.py" % ", ".join(bad))
-        print("tablet_page_en.h / tablet_page_ru.h актуальны")
-
+    html = build("en")
+    data, digest, gzlen = header(html)
+    if "--check" in sys.argv:                          # для CI: исходники и прошивка не разъехались
+        # сравниваем сам HTML (по хэшу), а не сжатые байты: zlib разных версий жмёт чуть по-разному
+        cur = open(OUT, encoding="utf-8").read() if os.path.exists(OUT) else ""
+        m = re.search(r"html-sha256: ([0-9a-f]{64})", cur)
+        if not m or m.group(1) != digest: sys.exit("устарел tablet_page.h: запусти python3 tools/webapp/build.py")
+        print("tablet_page.h актуален"); return
+    open(OUT, "w", encoding="utf-8").write(data)
+    print("tablet: %d КБ HTML -> %d КБ gzip -> %s" % (len(html) // 1024, gzlen // 1024, os.path.relpath(OUT)))
 
 if __name__ == "__main__":
     main()

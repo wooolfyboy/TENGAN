@@ -74,6 +74,7 @@ T.views.push({
     const pan = T.el('div', 'hq-al'); back.appendChild(pan);
     this.root.appendChild(btn); this.root.appendChild(back);
     this.alBtn = btn; this.alBack = back;
+    this.onLang = () => { btn.innerHTML = '⚙ ' + T.tr('ALERTS') + ' · <b class="kj">警報設定</b>'; if (!back.hidden && this.alRender) this.alRender(); };
     const api = path => fetch(T.apiBase() + path, { cache: 'no-store' }).then(r => r.json());
     const row = it => {
       let ctl;
@@ -111,6 +112,7 @@ T.views.push({
           .catch(e => msg(T.tr('reset failed') + ' · ' + T.tr(e.message || 'no link')));
       };
     };
+    this.alRender = render;
     const open = () => { back.hidden = false; render(); T.loadCfg().then(() => { if (!back.hidden) render(); }); };
     const close = () => { back.hidden = true; };
     btn.onclick = () => (back.hidden ? open() : close());

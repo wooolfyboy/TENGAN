@@ -123,7 +123,7 @@ void drawSky(uint32_t now) {
     spr.fillCircle(x, y, 2, C_HOT());
     spr.drawCircle(x, y, 4, C_ACC());
     if (s_skyLabels == 0) {
-      static const char* const EN[PL_NUM] = { L("MER", "МЕР"), L("VEN", "ВЕН"), L("MAR", "МАР"), L("JUP", "ЮП"), L("SAT", "САТ") };
+      const char* const EN[PL_NUM] = { L("MER", "МЕР"), L("VEN", "ВЕН"), L("MAR", "МАР"), L("JUP", "ЮП"), L("SAT", "САТ") };
       spr.setTextColor(C_HOT());
       label(EN[p], x, y - 9);
     }
@@ -163,7 +163,7 @@ void drawSky(uint32_t now) {
     for (int k = 0; k < 8; k++) { float a = k * 45 * D2R; spr.drawLine(x + cosf(a) * 7, y + sinf(a) * 7, x + cosf(a) * 10, y + sinf(a) * 10, C_HOT()); }
   }
   // стороны света (поворачиваются вместе с куполом)
-  static const char* const SIDES[4] = { L("N", "С"), L("E", "В"), L("S", "Ю"), L("W", "З") };
+  const char* const SIDES[4] = { L("N", "С"), L("E", "В"), L("S", "Ю"), L("W", "З") };
   spr.setTextColor(C_ACC());
   for (int k = 0; k < 4; k++) {
     float a = (k * 90 - v.rot) * D2R;
@@ -187,14 +187,14 @@ void drawSky(uint32_t now) {
   spr.setTextColor(UI_LABEL());
   txt(nVis ? L("PLANETS UP, DEG", "ПЛАНЕТЫ НАД ГОРИЗОНТОМ") : L("NO PLANETS UP", "ПЛАНЕТ НЕ ВИДНО"), px, yy, 1);
   for (int i = 0; i < nVis && i < 3; i++) {                // по-русски, шрифтом с кириллицей
-    snprintf(buf, sizeof(buf), "%s  %d", PLANET_RU[visPl[i]], (int)lroundf(visAlt[i]));
+    snprintf(buf, sizeof(buf), "%s  %d", LT(PLANET_RU[visPl[i]]), (int)lroundf(visAlt[i]));
     spr.setTextColor(C_HOT());
     txt(buf, px, yy + 11 + i * 15, 3);
   }
   if (nVis > 3) { snprintf(buf, sizeof(buf), "+%d", nVis - 3); spr.setTextColor(UI_DIM()); spr.setTextDatum(TR_DATUM); txt(buf, spr.width() - UI_M - 4, yy, 1); spr.setTextDatum(TL_DATUM); }
-  snprintf(buf, sizeof(buf), "%s", c.name);
+  snprintf(buf, sizeof(buf), "%s", LT(c.name));
   uiHeader(L("Sky", "Небо"), buf);
-  static const char* const LBL[3] = { L("wheel: turn  ·  click: stars", "колесо: поворот · нажать: звёзды"), L("wheel: turn  ·  click: no labels", "колесо: поворот · нажать: чисто"), L("wheel: turn  ·  click: constellations", "колесо: поворот · нажать: созвездия") };
+  const char* const LBL[3] = { L("wheel: turn  ·  click: stars", "колесо: поворот · нажать: звёзды"), L("wheel: turn  ·  click: no labels", "колесо: поворот · нажать: чисто"), L("wheel: turn  ·  click: constellations", "колесо: поворот · нажать: созвездия") };
   uiFooter(LBL[s_skyLabels], L("side: back", "кнопка: назад"));
   present();
   (void)now; (void)W;
@@ -359,7 +359,7 @@ void drawGlobe(uint32_t now) {
       s_passAt = t; lastSi = si; lastCity = g_city;
     }
     float el, az; satLook(p, c.lat, c.lon, el, az);
-    static const char* const DIR8[8] = { L("N", "С"), L("NE", "СВ"), L("E", "В"), L("SE", "ЮВ"), L("S", "Ю"), L("SW", "ЮЗ"), L("W", "З"), L("NW", "СЗ") };
+    const char* const DIR8[8] = { L("N", "С"), L("NE", "СВ"), L("E", "В"), L("SE", "ЮВ"), L("S", "Ю"), L("SW", "ЮЗ"), L("W", "З"), L("NW", "СЗ") };
     if (el >= 10) {
       spr.setTextColor(C_HOT()); txt(L("OVERHEAD NOW", "НАД ВАМИ"), px, UI_TOP + 58, 2);
       snprintf(buf, sizeof(buf), L("LOOK %s, %d DEG UP", "СМОТРИТЕ %s, %d° ВВЕРХ"), DIR8[((int)(az + 22.5f) / 45) % 8], (int)el);
