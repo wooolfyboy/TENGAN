@@ -242,7 +242,7 @@ T.views.push({
     if (S.devInit) for (const e of S.dev.values()) {
       if (!e.alive || this.seenAt.has(e.id)) continue;
       this.seenAt.set(e.id, now);
-      if (!e.first && (e.r > -58 || e.type === 'tracker')) { this.alertT = t; this.alertTxt = { n: e.label || e.name || e.type || 'device', r: e.r, tr: e.type === 'tracker' }; }
+      if (!e.first && (e.r > -58 || (e.type === 'tracker' && e.r > -70))) { this.alertT = t; this.alertTxt = { n: e.label || e.name || e.type || 'device', r: e.r, tr: e.type === 'tracker' }; }
     }
     if (this.seenAt.size > 400) this.seenAt.clear();
   },
@@ -268,7 +268,7 @@ T.views.push({
     const sx = cx, sw = kx - u - cx;
     if (sw > u * 18) {
       g.strokeStyle = E.or; g.lineWidth = u * 0.07; g.strokeRect(sx, y, sw, h);
-      const live = T.Stream.mode === 'live', poll = T.Stream.mode === 'poll', s = S.st || {};
+      const live = T.Stream.mode === 'live' || T.Stream.mode === 'usb', poll = T.Stream.mode === 'poll' || T.Stream.mode === 'usbwait', s = S.st || {};
       const r = s.radio || '', srcs = ['b', 'w', 's', 'm', 'p', 'i', 'n'].filter(k => r.includes(k)).length;
       const cols = [
         ['STATUS 状態', live ? '受信中' : poll ? '低速' : '断線', live ? E.grn : poll ? E.or2 : E.red, true],
@@ -307,8 +307,8 @@ T.views.push({
       for (let k = 0; k < 6; k++) { const a = Math.PI / 3 * k + Math.PI / 6; g.lineTo(cx + s * Math.cos(a), cy + s * Math.sin(a)); }
       g.closePath();
       if (e) {
-        const p = T.pct(e.rs), nw = !e.first && now - e.born < 30000;
-        g.fillStyle = nw || e.type === 'tracker' ? (blink(t, 2) || !nw ? E.red : E.dk) : p > 0.55 ? E.or : p > 0.25 ? '#b35f10' : E.dim;
+        const p = T.pct(e.rs), nw = !e.first && now - e.born < 30000 && e.rs > -70, trk = e.type === 'tracker' && e.rs > -70;
+        g.fillStyle = nw || trk ? (blink(t, 2) || !nw ? E.red : E.dk) : p > 0.55 ? E.or : p > 0.25 ? '#b35f10' : E.dim;
         g.globalAlpha = 0.35 + 0.65 * e.h; g.fill(); g.globalAlpha = 1;
       }
       g.strokeStyle = 'rgba(255,140,26,.3)'; g.lineWidth = 1; g.stroke();
@@ -353,6 +353,7 @@ T.views.push({
     const nB = [...S.dev.values()].filter(e => e.alive).length, nA = [...S.aps.values()].filter(a => a.alive).length, nR = ((S.sens && S.sens.sensors) || []).length;
     const y0 = panel(g, x, y, w, h, u, 'RADIO HORIZON · 電波地平', '', 'RANGE ≈ RSSI · ' + nB + ' BLE · ' + nA + ' AP · ' + nR + ' RF');
     const cx = x + w / 2, cy = y0 + (y + h - y0) / 2, R = Math.min(w * 0.46, (y + h - y0) * 0.44);
+    if (!(R > 8)) return;                                // окно ещё не разложилось (поворот/ресайз)
     const gr = g.createRadialGradient(cx, cy, 0, cx, cy, R * 1.25); gr.addColorStop(0, 'rgba(255,140,26,.10)'); gr.addColorStop(1, 'rgba(255,140,26,0)');
     g.fillStyle = gr; g.fillRect(x + 1, y0, w - 2, y + h - y0 - 1);
     jp(g, '索敵', x + u * 0.8, y0 + u * 3.2, u * 2.8, E.or, 'left', 0.05);
@@ -394,8 +395,8 @@ T.views.push({
     }
     for (const e of S.dev.values()) {
       if (e.h < 0.05) continue;
-      const [q, px, py] = pos(e.id, e.rs), nw = !e.first && now - e.born < 30000, k = 0.4 + 0.6 * lit(q);
-      const col = e.label ? E.grn : nw || e.type === 'tracker' ? E.red : E.or2, r = u * (nw ? 0.42 : 0.3);
+      const [q, px, py] = pos(e.id, e.rs), nw = !e.first && now - e.born < 30000 && e.rs > -70, k = 0.4 + 0.6 * lit(q);
+      const col = e.label ? E.grn : nw || (e.type === 'tracker' && e.rs > -70) ? E.red : E.or2, r = u * (nw ? 0.42 : 0.3);
       g.globalAlpha = e.h * (nw ? 1 : k); g.fillStyle = col; g.beginPath(); g.arc(px, py, r, 0, T.TAU); g.fill();
       if (nw) {
         g.globalAlpha = blink(t, 2) ? 1 : 0.3; g.strokeStyle = col; g.lineWidth = u * 0.1; g.beginPath(); g.arc(px, py, u * 1.1, 0, T.TAU); g.stroke();
@@ -644,7 +645,7 @@ T.views.push({
     }
     const d = new Date(), s = S.st || {};
     tx(g, pad2(d.getHours()) + ':' + pad2(d.getMinutes()), w - u * 1.2, H * 0.68, H * 0.62, D.paper, FT(), 'right', '600 ');
-    const live = T.Stream.mode === 'live';
+    const live = T.Stream.mode === 'live' || T.Stream.mode === 'usb';
     tx(g, (live ? '受信中' : '断線') + ' · ' + (s.bat >= 0 ? 'BAT ' + s.bat + '%' : 'BAT —') + ' · 月齢 ' + moonAge().toFixed(0), w - u * 1.2, H * 0.92, u * 0.72, live ? D.glow : D.red, FC(), 'right');
   },
   // центр: глаз-шейдер + кольца-печати + присутствия
