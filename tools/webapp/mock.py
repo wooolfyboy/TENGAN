@@ -21,6 +21,44 @@ VEND = ["Apple", "Apple", "Samsung", "Apple", "Lenovo", "private", "Samsung", "X
 BASE = [-44 - i * 2.6 for i in range(22)]
 
 
+# пульт управления (как в прошивке: /api/settings, /api/set, /api/label, /api/act) — состояние в памяти
+SETTINGS = json.loads('{"pages":[{"id":"general","name":"General","items":[{"k":"theme","name":"Theme","hint":"look: denko light / sumi ink","type":"enum","v":"denko","opts":["denko","sumi"]},{"k":"screen","name":"Screen","hint":"screen backlight","type":"range","v":100,"min":20,"max":100,"step":10,"unit":"%"},{"k":"dim","name":"Auto dim","hint":"dim screen when idle","type":"enum","v":"off","opts":["off","30 s","1 min","5 min"]},{"k":"ledbr","name":"LED brightness","hint":"led strip brightness","type":"range","v":50,"min":10,"max":100,"step":10,"unit":"%"},{"k":"volume","name":"Volume","hint":"all sounds: off/quiet/loud","type":"enum","v":"quiet","opts":["off","quiet","loud"]},{"k":"clicks","name":"Wheel clicks","hint":"click on every wheel step","type":"bool","v":1},{"k":"city","name":"City","hint":"for sky map and satellites","type":"enum","v":"Moscow","opts":["Moscow","Saint Petersburg","Novosibirsk","Yekaterinburg","Kazan","Nizhny Novgorod","Samara","Krasnodar","Rostov-on-Don","Vladivostok","Irkutsk","Minsk","Kyiv","Almaty","Tbilisi","Yerevan","Berlin","London","New York","Tokyo"]},{"k":"battery","name":"Battery","hint":"","type":"info","v":"87%  3.98 V"},{"k":"version","name":"Version","hint":"TENGAN firmware","type":"info","v":"v1.7-test3"}]},{"id":"ble","name":"Bluetooth","items":[{"k":"ble_range","name":"Range","hint":"ignore weaker devices","type":"enum","v":"all","opts":["all","far","room","near","very near"]},{"k":"ble_ledev","name":"LED events","hint":"leds flash on count jump","type":"range","v":7,"min":0,"max":30,"step":1,"unit":""},{"k":"ble_ticks","name":"Find ticks","hint":"ticks on nearest screen","type":"bool","v":1}]},{"id":"wifi","name":"Wi-Fi","items":[{"k":"wifi_range","name":"Range","hint":"hide weaker networks","type":"enum","v":"all","opts":["all","far","room","near","very near"]},{"k":"wifi_ticks","name":"Find ticks","hint":"ticks on find screen","type":"bool","v":1}]},{"id":"sub","name":"Sub-GHz","items":[{"k":"sub_band","name":"Start band","hint":"band when section opens","type":"enum","v":"433 MHz","opts":["315 MHz","433 MHz","868 MHz","915 MHz"]}]},{"id":"snd","name":"Sound","items":[{"k":"mic","name":"Microphone","hint":"mic for sound section","type":"bool","v":1},{"k":"au_leds","name":"LED meter","hint":"leds show loudness","type":"bool","v":0},{"k":"au_src","name":"Source","hint":"auto / mic / laptop audio","type":"enum","v":"auto","opts":["auto","mic","laptop"]}]}]}')
+LABELS = {}
+for _pg in SETTINGS["pages"]:                              # тема — та, с которой запущен мок
+    for _it in _pg["items"]:
+        if _it["k"] == "theme":
+            _it["v"] = THEME
+
+
+def set_item(k, v):
+    for pg in SETTINGS["pages"]:
+        for it in pg["items"]:
+            if it["k"] != k:
+                continue
+            if it["type"] == "info":
+                return {"ok": False, "err": "read-only"}
+            if it["type"] == "enum":
+                opts = it["opts"]
+                m = [o for o in opts if o.lower() == v.lower()]
+                if not m and v.isdigit() and int(v) < len(opts):
+                    m = [opts[int(v)]]
+                if not m:
+                    return {"ok": False, "err": "bad option"}
+                it["v"] = m[0]
+            elif it["type"] == "bool":
+                it["v"] = 1 if v.lower() in ("1", "true", "on") else 0
+            else:
+                try:
+                    it["v"] = max(it["min"], min(it["max"], int(v)))
+                except ValueError:
+                    return {"ok": False, "err": "bad number"}
+            if k == "theme":
+                global THEME
+                THEME = it["v"]
+            return {"ok": True, "item": it}
+    return {"ok": False, "err": "unknown key"}
+
+
 def ble():
     t = time.time()
     d = []
@@ -29,7 +67,7 @@ def ble():
             continue
         drift = 6 * math.sin(t * 0.05 + i)        # медленный уход
         r = int(BASE[i] + drift + random.uniform(-3, 3))   # сырой шум ±3 dB — пусть сглаживание работает
-        d.append([1000 + i, r, TYPES[i % 10], VEND[i % 10], NAMES[i % 10], 30 + i * 41, 1 + i % 3])
+        d.append([1000 + i, r, TYPES[i % 10], VEND[i % 10], NAMES[i % 10], 30 + i * 41, 1 + i % 3, LABELS.get(1000 + i, "")])
     return {"on": 1, "n": len(d), "m": len(d) + 7, "d": d}
 
 
@@ -146,6 +184,20 @@ class Api(http.server.BaseHTTPRequestHandler):
         elif u.path == "/api/pagever":             # версия страницы — для самообновления приложения
             import hashlib
             body, ct = json.dumps({"sha": hashlib.sha256(HTML).hexdigest(), "gz": 0}).encode(), "application/json"
+        elif u.path == "/api/settings":
+            body, ct = json.dumps(SETTINGS, ensure_ascii=False).encode(), "application/json"
+        elif u.path == "/api/set":
+            body, ct = json.dumps(set_item(q.get("k", [""])[0], q.get("v", [""])[0]), ensure_ascii=False).encode(), "application/json"
+        elif u.path == "/api/label":
+            i, n = int(q.get("id", ["0"])[0] or 0), q.get("n", [""])[0]
+            if n:
+                LABELS[i] = n[:20]
+            else:
+                LABELS.pop(i, None)
+            body, ct = json.dumps({"ok": True, "stable": i % 2 == 0}).encode(), "application/json"
+        elif u.path == "/api/act":
+            print("act", q.get("a"), q.get("v"), flush=True)
+            body, ct = b'{"ok":true}', "application/json"
         elif u.path == "/api/pckey":               # пульт музыки
             print("key", q.get("k"), flush=True)
             body, ct = b'{"ok":true}', "application/json"

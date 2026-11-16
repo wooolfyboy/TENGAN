@@ -1,3 +1,4 @@
+#include <string>
 // ============================================================
 //  sim.cpp — симулятор экрана палки на компьютере.
 //
@@ -278,6 +279,12 @@ int main(int argc, char** argv) {
   if (getenv("SIM_THEME")) g_theme = atoi(getenv("SIM_THEME"));   // 0 — DENKO, 1 — SUMI (тушь)
   g_bat.ok = true; g_bat.soc = 87; g_bat.mv = 3980; g_bat.ma = -132; g_bat.tte = 250; g_bat.chgOk = true;
   fillBle(); fillWifi(); fillSub();
+  { String j; settingsJson(j);                            // то же, что палка отдаёт планшету по /api/settings
+    FILE* f = fopen((std::string(getenv("SIM_OUT") ? getenv("SIM_OUT") : "tools/sim/out") + "/settings.json").c_str(), "w");
+    if (f) { fputs(j.c_str(), f); fclose(f); }
+    String r; settingsSetKey("ledbr", "70", r); printf("set ledbr: %s\n", r.c_str());
+    settingsSetKey("theme", "sumi", r); printf("set theme: %s\n", r.c_str()); settingsSetKey("theme", "denko", r);
+    settingsSetKey("nope", "1", r); printf("set nope: %s\n", r.c_str()); }
 
   { const uint32_t ts[] = { 250, 600, 1000, 1300, 1680, 1950, 2200 };
     for (int i = 0; i < 7; i++) { char nm[32]; snprintf(nm, sizeof nm, "00_boot_%04u", (unsigned)ts[i]); bootFrame(ts[i]); snap(nm); } }

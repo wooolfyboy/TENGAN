@@ -10,6 +10,7 @@ void bleUpdate(uint32_t now);    // каждый кадр: свести адре
 void bleSample(uint32_t now);    // раз в секунду: история TIMELINE и события для ленты
 void bleRadioOn();               // Wi-Fi и Bluetooth делят антенну —
 void bleRadioOff();              // работает что-то одно
+bool bleLabelSet(uint32_t id, const char* name, bool& stable);   // подпись с планшета ("" — убрать); stable — адрес не меняется
 bool bleRadioActive();           // сканирует ли сейчас (для строки состояния планшета)
 int  bleEntityIds(uint32_t* out, int max);   // id устройств в эфире сейчас (радиопогода)
 

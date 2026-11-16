@@ -17,6 +17,7 @@
 #include "core/menu.h"
 #include "core/settings.h"
 #include "wifi/wifi.h"
+#include <Preferences.h>
 
 // ---------- сырые данные (пишет колбэк сканера, под мьютексом) ----------
 static std::map<uint64_t, Dev>    g_seen;     // по MAC-адресам
@@ -261,8 +262,68 @@ static int steadyRssi(uint32_t id, int rs, uint32_t now, float k) {
   return (int)lroundf(s.shown);
 }
 
+// ---------- подписи устройств (дал пользователь с планшета) ----------
+// Хранятся по MAC-адресу в памяти настроек: до LABEL_MAX штук. У телефонов адрес «гуляет»
+// (rotating): подпись держится, пока устройство не сменит адрес, — честно сообщаем это (stable=false).
+#define LABEL_MAX 32
+struct Label { uint8_t mac[6]; char name[21]; };
+static Label g_labels[LABEL_MAX];
+static int   g_nLabels = -1;                              // -1 — ещё не загружены
+
+static void labelsLoad() {
+  if (g_nLabels >= 0) return;
+  Preferences p; p.begin("labels", true);
+  size_t n = p.getBytes("l", g_labels, sizeof(g_labels));
+  p.end();
+  g_nLabels = (int)(n / sizeof(Label));
+}
+static void labelsSave() {
+  Preferences p; p.begin("labels", false);
+  if (g_nLabels > 0) p.putBytes("l", g_labels, g_nLabels * sizeof(Label)); else p.remove("l");
+  p.end();
+}
+static const char* labelFor(const uint8_t* mac) {
+  for (int i = 0; i < g_nLabels; i++) if (!memcmp(g_labels[i].mac, mac, 6)) return g_labels[i].name;
+  return nullptr;
+}
+
+// /api/label: подписать устройство (id из потока) или убрать подпись (пустое имя)
+bool bleLabelSet(uint32_t id, const char* name, bool& stable) {
+  labelsLoad();
+  auto it = g_ents.find(id);
+  if (it == g_ents.end()) return false;
+  uint8_t mac[6]; uint8_t akind = A_ROTATING;
+  if (xSemaphoreTake(g_lock, pdMS_TO_TICKS(100)) != pdTRUE) return false;
+  auto d = g_seen.find(it->second.key);
+  bool ok = d != g_seen.end();
+  if (ok) { memcpy(mac, d->second.mac, 6); akind = d->second.akind; }
+  xSemaphoreGive(g_lock);
+  if (!ok) return false;
+  stable = akind == A_PUBLIC || akind == A_STATIC;
+  int k = 0;
+  while (k < g_nLabels && memcmp(g_labels[k].mac, mac, 6)) k++;
+  if (!name || !name[0]) {                                  // убрать
+    if (k < g_nLabels) { g_labels[k] = g_labels[g_nLabels - 1]; g_nLabels--; }
+  } else {
+    if (k == g_nLabels) {
+      if (g_nLabels >= LABEL_MAX) { memmove(g_labels, g_labels + 1, sizeof(Label) * (LABEL_MAX - 1)); k = LABEL_MAX - 1; }   // места нет — вытесняем самую старую
+      else g_nLabels++;
+      memcpy(g_labels[k].mac, mac, 6);
+    }
+    size_t n = strlen(name);
+    if (n > 20) {                                           // не резать посреди буквы UTF-8
+      n = 20;
+      while (n > 0 && (name[n] & 0xC0) == 0x80) n--;
+    }
+    memcpy(g_labels[k].name, name, n); g_labels[k].name[n] = 0;
+  }
+  labelsSave();
+  return true;
+}
+
 // ---------- каждый кадр: адреса -> физические устройства ----------
 void bleUpdate(uint32_t now) {
+  labelsLoad();
   // узлы карты не пересоздаём каждый кадр (меньше работы куче): обнуляем, а кого не нашли — убираем ниже
   for (auto& kv : g_ents) memset(&kv.second, 0, sizeof(Ent));
   g_sensSnap.clear();
@@ -288,6 +349,7 @@ void bleUpdate(uint32_t now) {
       if (d.type != T_UNKNOWN) e.type = d.type;
       if (d.vscore > e.vscore) { e.cat = d.cat; e.vkind = d.vkind; e.vcode = d.vcode; e.vscore = d.vscore; }
       if (d.name[0] && !e.name[0]) memcpy(e.name, d.name, sizeof(e.name));
+      if (g_nLabels > 0 && !e.label[0]) { const char* l = labelFor(d.mac); if (l) strlcpy(e.label, l, sizeof(e.label)); }
       if (wantDetail && d.ent == g_sel && d.t >= detT) { g_detDev = d; detT = d.t; g_detValid = true; }
       ++it;
     }
@@ -323,7 +385,7 @@ void bleUpdate(uint32_t now) {
     if (e.rssi > g_bestRssi) { g_bestRssi = e.rssi; g_bestEnt = e; g_bestId = kv.first; g_have = true; }
     g_typeCnt[e.type < T_NUM ? (int)e.type : (int)T_UNKNOWN]++;
     // угол блипа — от id физического устройства: не прыгает при смене MAC
-    if (wantScope) g_snap.push_back({ e.rssi, kv.first * 2654435761u, e.cat, e.type });
+    if (wantScope) { Blip b = { e.rssi, kv.first * 2654435761u, e.cat, e.type, {0} }; strlcpy(b.label, e.label, sizeof(b.label)); g_snap.push_back(b); }
   }
   if (g_have) g_bestRssi = g_bestEnt.rssi;            // убрать фору гистерезиса
   g_lastCount = (int)g_ents.size();
@@ -536,6 +598,7 @@ void bleDevJson(uint32_t id, String& o) {
     if (best) {
       const Dev& d = *best;
       o += ",\"n\":"; jsonStr(o, d.name);
+      { auto ei = g_ents.find(id); o += ",\"label\":"; jsonStr(o, ei != g_ents.end() ? ei->second.label : ""); }
       o += ",\"t\":"; jsonStr(o, typeName(d.type));
       o += ",\"v\":"; jsonStr(o, vendorLabel(d.cat, d.vkind, d.vcode));
       o += ",\"r\":"; o += d.rssi;
@@ -571,7 +634,7 @@ void bleLowDuty(bool low) {
 }
 
 // для планшета (поток SSE): компактно — массивы вместо объектов, до 80 устройств
-// {"n":число,"m":адресов,"d":[[id,rssi,"тип","производитель","имя",возраст_с,адресов],...]}
+// {"n":число,"m":адресов,"d":[[id,rssi,"тип","производитель","имя",возраст_с,адресов,"подпись"],...]}
 void bleStreamJson(String& o) {
   uint32_t now = millis();
   std::vector<std::pair<uint32_t, const Ent*>> v;
@@ -587,7 +650,7 @@ void bleStreamJson(String& o) {
     if (i) o += ',';
     o += '['; o += v[i].first; o += ','; o += e->rssi; o += ',';   // «спокойное» значение
     jsonStr(o, typeName(e->type)); o += ','; jsonStr(o, vendorLabel(e->cat, e->vkind, e->vcode)); o += ',';
-    jsonStr(o, e->name); o += ','; o += msSince(now, e->first) / 1000; o += ','; o += e->nMacs; o += ']';
+    jsonStr(o, e->name); o += ','; o += msSince(now, e->first) / 1000; o += ','; o += e->nMacs; o += ','; jsonStr(o, e->label); o += ']';
   }
   o += "]}";
 }

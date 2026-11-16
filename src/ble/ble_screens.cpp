@@ -16,6 +16,10 @@
 
 static int g_sweep = 0;                  // угол луча на SCOPE
 
+// подпись пользователя важнее имени из эфира; кириллица — шрифтом с русскими буквами
+static bool isUtf8(const char* s) { for (; *s; s++) if ((uint8_t)*s >= 0x80) return true; return false; }
+static int  fontFor(const char* s, int latin) { return isUtf8(s) ? (latin >= 4 ? 5 : 3) : latin; }
+
 float estDistance(int rssi) {
   const float MEASURED = -59.0f;         // ожидаемый RSSI на 1 м
   const float N = 2.5f;                  // показатель затухания (помещение)
@@ -231,10 +235,12 @@ void drawNearest(bool have, int rssi, const Ent& best, int count) {
   // кто это
   char tn[16]; upperCopy(typeName(best.type), tn, sizeof(tn));
   char who[40]; snprintf(who, sizeof(who), "%s  %s", tn, vendorLabel(best.cat, best.vkind, best.vcode));
-  char fit[40]; fitText(best.name[0] ? best.name : who, fit, sizeof(fit), 230, 2);
+  const char* nm = best.label[0] ? best.label : best.name[0] ? best.name : who;
+  int nf = fontFor(nm, 2);
+  char fit[48]; fitText(nm, fit, sizeof(fit), 230, nf);
   spr.setTextColor(tracker ? C_ALERT() : C_HOT());
-  txt(fit, cx, cy + 22, 2);
-  if (best.name[0]) {
+  txt(fit, cx, cy + 22, nf);
+  if (best.label[0] || best.name[0]) {
     char w2[40]; upperCopy(who, w2, sizeof(w2));
     spr.setTextColor(UI_DIM());
     txt(w2, cx, cy + 36, 1);
@@ -276,10 +282,12 @@ void drawList(const std::map<uint32_t, Ent>& ents) {
     const Ent& e = it->second;
     bool alert = (e.type == T_TRACKER);
     drawGlyph(UI_M + 8, cy, typeGlyph(e.type), alert ? C_ALERT() : UI_LABEL(), alert);
-    fitText(e.name[0] ? e.name : typeName(e.type), buf, sizeof(buf), 124, 2);
+    const char* nm = e.label[0] ? e.label : e.name[0] ? e.name : typeName(e.type);
+    int nf = fontFor(nm, 2);
+    fitText(nm, buf, sizeof(buf), 124, nf);
     spr.setTextDatum(ML_DATUM);
-    spr.setTextColor(alert ? C_ALERT() : (e.name[0] ? C_HOT() : UI_LABEL()));
-    txt(buf, UI_M + 18, cy, 2);
+    spr.setTextColor(alert ? C_ALERT() : (e.label[0] || e.name[0] ? C_HOT() : UI_LABEL()));
+    txt(buf, UI_M + 18, cy, nf);
     char vb[16];
     fitText(vendorLabel(e.cat, e.vkind, e.vcode), vb, sizeof(vb), 78, 2);
     spr.setTextColor(UI_DIM());
@@ -313,11 +321,13 @@ void drawDetail(const Dev& d, const Ent& e, bool inMap, uint32_t now) {
 
   // имя и «кто это»
   bool alert = (e.type == T_TRACKER);
-  fitText(d.name[0] ? d.name : typeName(e.type), tmp, sizeof(tmp), W - 2 * UI_M - 24, 4);
+  const char* nm = e.label[0] ? e.label : d.name[0] ? d.name : typeName(e.type);
+  int nf = fontFor(nm, 4);
+  fitText(nm, tmp, sizeof(tmp), W - 2 * UI_M - 24, nf);
   drawGlyph(UI_M + 8, UI_TOP + 11, typeGlyph(e.type), alert ? C_ALERT() : UI_LABEL(), alert);
   spr.setTextDatum(TL_DATUM);
   spr.setTextColor(alert ? C_ALERT() : C_HOT());
-  txt(tmp, UI_M + 20, UI_TOP, 4);
+  txt(tmp, UI_M + 20, UI_TOP, nf);
   char tn[16]; upperCopy(typeName(e.type), tn, sizeof(tn));
   if (e.vkind) snprintf(buf, sizeof(buf), "%s  %s  %s%04X", tn, vendorLabel(e.cat, e.vkind, e.vcode), e.vkind == 1 ? "0x" : "svc ", e.vcode);
   else         snprintf(buf, sizeof(buf), "%s  maker unknown", tn);

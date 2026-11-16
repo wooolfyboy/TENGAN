@@ -419,6 +419,23 @@ static void webStart() {
     String o = "{\"sha\":\""; o += TABLET_HTML_SHA; o += "\",\"gz\":"; o += TABLET_GZ_LEN; o += '}';
     sendJson(o);
   });
+  // планшет как пульт управления: настройки палки, подписи устройств, действия
+  s_srv->on("/api/settings", [] { String o; settingsJson(o); sendJson(o); });
+  s_srv->on("/api/set", [] {
+    String o; settingsSetKey(s_srv->arg("k").c_str(), s_srv->arg("v").c_str(), o); sendJson(o);
+  });
+  s_srv->on("/api/label", [] {
+    bool stable = false;
+    bool ok = bleLabelSet((uint32_t)strtoul(s_srv->arg("id").c_str(), nullptr, 10), s_srv->arg("n").c_str(), stable);
+    sendJson(ok ? (stable ? "{\"ok\":true,\"stable\":true}" : "{\"ok\":true,\"stable\":false}") : "{\"ok\":false,\"err\":\"device not found\"}");
+  });
+  s_srv->on("/api/act", [] {
+    String a = s_srv->arg("a"); int v = s_srv->arg("v").toInt(); bool ok = true;
+    if (a == "screen") { g_screenOff = !v; applyBrightness(); }   // экран палки погасить / включить (работа идёт дальше)
+    else if (a == "leds" && !v) ledsOff();
+    else ok = false;
+    sendJson(ok ? "{\"ok\":true}" : "{\"ok\":false,\"err\":\"unknown action\"}");
+  });
   // пульт музыки с планшета: палка передаёт медиа-клавишу ноутбуку по USB
   s_srv->on("/api/pckey", [] {
     bool ok = pcKey(s_srv->arg("k").c_str());
