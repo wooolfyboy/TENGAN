@@ -245,7 +245,10 @@ void settingsAdjust(int dir) {
 static void itemJson(int id, String& o) {
   const SetDef& d = DEFS[id];
   char b[48];
-  o += "{\"k\":\""; o += d.key; o += "\",\"name\":"; jsonStr(o, d.name); o += ",\"hint\":"; jsonStr(o, d.hint);
+  o += "{\"k\":\""; o += d.key; o += "\",\"name\":"; jsonStr(o, d.name); o += ",\"hint\":";
+  // тема с планшета не меняется (смена из веба роняла палку) — только показываем, менять колесом на палке
+  if (id == S_THEME) { jsonStr(o, "change on the stick: Settings > Theme"); o += ",\"type\":\"info\",\"v\":"; optName(id, getVal(id), b, sizeof(b)); jsonStr(o, b); o += '}'; return; }
+  jsonStr(o, d.hint);
   switch (d.kind) {
     case K_ENUM:
       o += ",\"type\":\"enum\",\"v\":"; optName(id, getVal(id), b, sizeof(b)); jsonStr(o, b);
@@ -287,7 +290,7 @@ bool settingsSetKey(const char* key, const char* val, String& o) {
   for (int i = 0; i < S_NUM; i++) if (!strcmp(DEFS[i].key, key)) id = i;
   const char* err = nullptr;
   if (id < 0) err = "unknown key";
-  else if (DEFS[id].kind == K_INFO) err = "read-only";
+  else if (DEFS[id].kind == K_INFO || id == S_THEME) err = "change it on the stick";
   else {
     int v = 0;
     if (DEFS[id].kind == K_ENUM) {                        // имя варианта (без учёта регистра) или его номер
