@@ -27,6 +27,8 @@
 #include "wifi/wifi.h"
 #include "wifi/wifi_model.h"
 #include "subghz/subghz.h"
+#include "subghz/subghz_model.h"
+#include "subghz/sensors.h"
 #include "audio/audio.h"
 #include "pc/pc.h"
 #include "gallery/astro.h"
@@ -266,6 +268,7 @@ static void otaDone() {
 //    event: snd   ~25 раз в с  (полосы, уровень, волна) — только если просили
 //    event: sub   ~7 раз в с   (спектр CC1101; режим и полоса — &sm= &sb=)
 //    event: pc    раз в 1 с    (ноутбук: нагрузка, трек, город процессов)
+//    event: sens  на каждую новую посылку 433 МГц и раз в 1 с (датчики, анализатор; want=sens)
 //    event: sat   при подключении (орбиты спутников и город — небо считает планшет)
 //    event: ir    на каждую ИК-пачку (протокол, адрес, команда, импульсы)
 //    event: nfc   на каждое прикладывание карты (тип, начало UID, записи метки)
@@ -278,6 +281,8 @@ struct SseCli {
   NetworkClient c;
   bool on = false, ble = false, wifi = false, snd = false, sub = false, pc = false, wx = false, ir = false, nfc = false, satSent = false;
   int8_t sm = 0, sb = 1;                         // режим и полоса Sub-GHz
+  bool sens = false;                             // датчики 433 МГц (sensors.h)
+  uint32_t tSens = 0, sensSeen = 0;
   String pend;                                   // не отправленный хвост (докидываем без ожидания)
   uint32_t tSt = 0, tBle = 0, tSnd = 0, tSub = 0, tPc = 0, tWx = 0, wifiSeen = 0, irSeen = 0, nfcSeen = 0;
 };
@@ -329,6 +334,7 @@ static void sseAccept() {
   k.ir = want.indexOf("ir") >= 0; k.nfc = want.indexOf("nfc") >= 0;
   k.irSeen = g_ir.gen; k.nfcSeen = g_nfc.gen;     // старое не повторяем — только новые нажатия и карты
   auto qInt = [&](const char* key, int def) { int p = req.indexOf(key); return p >= 0 ? req.substring(p + strlen(key)).toInt() : def; };
+  k.sens = want.indexOf("sens") >= 0;
   k.sm = (int8_t)qInt("sm=", 0); k.sb = (int8_t)qInt("sb=", 1);
   k.pend = "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\n"
            "Connection: keep-alive\r\nAccess-Control-Allow-Origin: *\r\n\r\nretry: 1500\n\n";
@@ -379,6 +385,9 @@ static void sseTick(uint32_t now) {
     if (k.sub && s_subOn && now - k.tSub >= 140) { k.tSub = now; String o; subJson(o); sseEvent(k, "sub", o, true); }
     if (k.pc && now - k.tPc >= 1000) { k.tPc = now; String o; pcStreamJson(o); sseEvent(k, "pc", o, false); }
     if (k.wx && now - k.tWx >= 1000) { k.tWx = now; String o; wxJson(o); sseEvent(k, "wx", o, false); }
+    if (k.sens && now - k.tSens >= 150 && (k.sensSeen != g_sensGen || now - k.tSens >= 1000)) {
+      k.tSens = now; k.sensSeen = g_sensGen; String o; sensJson(o, now); sseEvent(k, "sens", o, false);
+    }
     if (k.ir && k.irSeen != g_ir.gen) { k.irSeen = g_ir.gen; String o; irJson(o); sseEvent(k, "ir", o, false); }
     if (k.nfc && k.nfcSeen != g_nfc.gen) { k.nfcSeen = g_nfc.gen; String o; nfcJson(o); sseEvent(k, "nfc", o, false); }
   }
@@ -419,6 +428,11 @@ static void webStart() {
     s_subMs = millis();
     s_subOn = subWebUse(s_srv->arg("m").toInt(), s_srv->hasArg("b") ? s_srv->arg("b").toInt() : 1);
     String o; subJson(o); sendJson(o);
+  });
+  s_srv->on("/api/sens", [] {                      // датчики 433 (опрос): включает разбор посылок, как /api/sub?m=2
+    s_subMs = millis();
+    s_subOn = subWebUse(G_SENSORS, s_srv->hasArg("b") ? s_srv->arg("b").toInt() : 1);
+    String o; sensJson(o, millis()); sendJson(o);
   });
   s_srv->on("/api/snd", [] {
     s_sndMs = millis();
@@ -531,6 +545,10 @@ static void webTick(uint32_t now) {
     sBle = true; sSnd = true;
     if (subM < 0) { subM = 1; subB = 1; }             // Sub-GHz никто не смотрит отдельно — монитор (режим 1) на 433.92 (полоса 1)
   }
+  // датчики 433: CC1101 в режиме разбора посылок (монитор тоже разбирает — его не трогаем)
+  bool sSens = false;
+  for (auto& k : s_sse) if (k.on) sSens |= k.sens;
+  if (nSse && sSens && subM != G_MONITOR && subM != G_SENSORS) { if (subM < 0) subB = 1; subM = G_SENSORS; }
   if (nSse && sSnd) { s_sndMs = millis(); if (!s_sndOn) s_sndOn = audioWebUse(); }   // планшет смотрит звук
   if (nSse && subM >= 0) { s_subMs = millis(); s_subOn = subWebUse(subM, subB); }    // планшет смотрит Sub-GHz
   // работает только то, что нужно открытой вкладке, остальное молчит:

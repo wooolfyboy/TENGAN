@@ -25,8 +25,7 @@ void iconCard(int x, int y, uint16_t c, uint16_t bg) {
 static void card(int x, int y, int w, int h, uint16_t edge, uint16_t fill, bool chip, bool bank) {
   spr.fillSmoothRoundRect(x, y, w, h, 6, fill, C_BG());
   spr.drawSmoothRoundRect(x, y, 6, 5, w, h, edge, C_BG());
-  int s = h / 9;
-  for (int i = 0; i < 3; i++) spr.drawArc(x + w - 14, y + 14, 4 + i * s, 3 + i * s, 225, 315, edge, fill, true);   // знак бесконтактной
+  for (int i = 0; i < 3; i++) spr.drawArc(x + w - 22, y + 16, 3 + i * 4, 2 + i * 4, 225, 315, edge, fill, true);   // знак бесконтактной
   if (chip) {
     int cx = x + 12, cy = y + h / 2 - 9;
     spr.fillRoundRect(cx, cy, 20, 15, 3, sumi() ? C_SEAL() : C_ACC());
@@ -121,7 +120,7 @@ void drawNfc(uint32_t now) {
   int y = 88;
   if (c.bank) {
     spr.setTextColor(UI_DIM());
-    txt("NUMBER AND NAME NOT READ - BY DESIGN", tx, y + 4, 1);
+    txt("NUMBER, NAME: NOT READ", tx, y + 4, 1);
   } else if (c.nNdef) {
     spr.setTextColor(UI_DIM());
     txt("TAG SAYS", tx, y, 1);

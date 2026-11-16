@@ -1,8 +1,10 @@
 // ============================================================
-//  subghz_screens.cpp — экраны раздела Sub-GHz: SPECTRUM · MONITOR
+//  subghz_screens.cpp — экраны раздела Sub-GHz: SPECTRUM · MONITOR · SENSORS
 //  Все экраны собраны из компонентов core/ui.h по общей сетке.
 // ============================================================
 #include "subghz/subghz_model.h"
+#include "subghz/sensors.h"
+#include "core/timeutil.h"
 #include "core/display.h"
 #include "core/theme.h"
 #include "core/ui.h"
@@ -136,5 +138,150 @@ void drawCcMissing() {
   snprintf(buf, sizeof(buf), "chip answered 0x%02X", g_ccVersion);
   uiEmpty("CC1101 not found", buf);
   uiFooter("wheel: screens", "side: back");
+  present();
+}
+
+// ============================================================
+//  SENSORS — кто передаёт на частоте: уличные термометры, звонки, пульты
+//  сверху таблица, снизу — форма последней посылки (анализатор)
+// ============================================================
+static void agoStr(char* b, size_t n, uint32_t ms) {
+  uint32_t s = ms / 1000;
+  if (s < 60) snprintf(b, n, "%lus", (unsigned long)s);
+  else if (s < 3600) snprintf(b, n, "%lum", (unsigned long)(s / 60));
+  else snprintf(b, n, "%luh", (unsigned long)(s / 3600));
+}
+
+// короткое имя протокола для таблицы
+static void shortName(const SensRec& r, char* b, size_t n) {
+  const char* p = r.proto;
+  if (!strncmp(p, "LaCrosse-", 9)) p = "LaCrosse";
+  else if (!strncmp(p, "FineOffset-", 11)) p = "FineOffset";
+  else if (!strncmp(p, "Acurite-", 8)) p = "Acurite";
+  if (r.kind == OOK_REMOTE) snprintf(b, n, "%s %04lX", strcmp(r.proto, "Rolling") ? "BELL/REMOTE" : "ROLLING", (unsigned long)(r.id & 0xFFFF));
+  else if (r.ch) snprintf(b, n, "%s CH%d", p, r.ch);
+  else snprintf(b, n, "%s %02lX", p, (unsigned long)(r.id & 0xFF));
+  for (char* c = b; *c; c++) *c = toupper((unsigned char)*c);
+}
+
+static void degree(int x, int y, uint16_t col) { spr.drawCircle(x, y, 2, col); }
+
+static void drawPulseTrain(int x0, int y0, int w, int h) {
+  const SensLast& L = g_sensLast;
+  uiFrame(x0, y0, w, h, UI_LINE());
+  char buf[64];
+  spr.setTextDatum(TL_DATUM);
+  if (!L.valid) {
+    spr.setTextColor(UI_DIM());
+    txt("NO SIGNAL YET", x0 + 6, y0 + 4, 1);
+    for (int x = x0 + 6; x < x0 + w - 6; x += 3) spr.drawPixel(x, y0 + h - 8, UI_LINE());
+    return;
+  }
+  const OokInfo& I = L.info;
+  bool sensor = strcmp(I.cls, "sensor") == 0;
+  // подпись: модуляция, биты, длительности; у датчика — протокол, у пульта — только отпечаток
+  if (sensor) snprintf(buf, sizeof buf, "%s %db  P%u/%u G%u/%u", I.mod, I.bits, I.shortW, I.longW, I.shortG, I.longG ? I.longG : I.syncG);
+  else snprintf(buf, sizeof buf, "%s %db  P%u/%u  #%04X", I.mod, I.bits, I.shortW, I.longW, I.hash);
+  spr.setTextColor(UI_LABEL());
+  txt(buf, x0 + 6, y0 + 4, 1);
+  char cls[24];
+  snprintf(cls, sizeof cls, "%s", sensor ? I.proto : I.cls);
+  for (char* c = cls; *c; c++) *c = toupper((unsigned char)*c);
+  spr.setTextDatum(TR_DATUM);
+  spr.setTextColor(sensor ? C_ACC() : C_HOT());
+  txt(cls, x0 + w - 6, y0 + 4, 1);
+  // сама посылка: «меандр» — вверху несущая, внизу тишина
+  uint32_t tot = 0;
+  for (int i = 0; i < L.ptN * 2; i++) tot += L.pt[i];
+  if (!tot) return;
+  int px0 = x0 + 6, pw = w - 12 - (sensor ? 0 : 18);
+  int hiY = y0 + 16, loY = y0 + h - 5;
+  uint32_t acc = 0; int prevX = px0, prevY = loY;
+  uint16_t col = sensor ? C_ACC() : heat(L.rssi + 10);
+  for (int i = 0; i < L.ptN * 2; i++) {
+    acc += L.pt[i];
+    int x = px0 + (int)((uint64_t)acc * pw / tot);
+    int y = (i & 1) ? loY : hiY;
+    spr.drawFastVLine(prevX, min(prevY, y), abs(y - prevY) + 1, col);
+    spr.drawFastHLine(prevX, y, x - prevX + 1, col);
+    if (!(i & 1)) for (int yy = hiY + 2; yy < loY; yy += 2) spr.drawFastHLine(prevX, yy, max(1, x - prevX), scale565(col, 18));
+    prevX = x; prevY = y;
+  }
+  if (!sensor) {                                 // дальше не рисуем: по рисунку пульт не повторить
+    spr.setTextColor(UI_DIM()); spr.setTextDatum(TL_DATUM);
+    txt("...", px0 + pw + 3, loY - 7, 1);
+  }
+}
+
+void drawSensors(uint32_t now) {
+  int W = spr.width();
+  char buf[48];
+  spr.fillSprite(C_BG());
+  char title[24]; snprintf(title, sizeof(title), "Sensors %.2f", BANDS[g_band].mon);
+  bool fresh = g_sensLast.valid && msSince(now, g_sensLast.ms) < 1500;
+  if (g_sensN) snprintf(buf, sizeof buf, "%d heard%s", g_sensN, fresh ? "  rx!" : "");
+  else snprintf(buf, sizeof buf, "%s", fresh ? "rx!" : "listening");
+  uiHeader(title, buf, fresh);
+
+  uint8_t idx[SENS_MAX];
+  int n = sensSorted(idx, SENS_MAX, now);
+  const int rowH = 16, top = UI_TOP + 1, rows = 5;
+  if (!n) {
+    spr.setTextDatum(MC_DATUM);
+    spr.setTextColor(UI_LABEL());
+    txt("LISTENING...", W / 2, top + 26, 4);
+    spr.setTextColor(UI_DIM());
+    txt("OUTDOOR THERMOMETERS, DOORBELLS, REMOTES", W / 2, top + 52, 1);
+    snprintf(buf, sizeof buf, "%lu PACKETS  %lu NOISE", (unsigned long)g_sensPackets, (unsigned long)g_sensNoise);
+    txt(buf, W / 2, top + 66, 1);
+  }
+  int shown = n > rows ? rows - 1 : n;             // не влезли — последняя строка «+N»
+  for (int k = 0; k < shown; k++) {
+    const SensRec& r = g_sens[idx[k]];
+    int y = top + k * rowH;
+    bool old = msSince(now, r.lastMs) > 10 * 60 * 1000UL;
+    bool rx = msSince(now, r.lastMs) < 1500;
+    if (rx) uiRowHighlight(y, rowH - 1);
+    spr.setTextDatum(TL_DATUM);
+    shortName(r, buf, sizeof buf);
+    spr.setTextColor(old ? UI_DIM() : UI_LABEL());
+    txt(buf, UI_M + 4, y + 4, 1);
+    // температура / кнопка
+    spr.setTextDatum(TR_DATUM);
+    if (r.kind == OOK_REMOTE) {
+      spr.setTextColor(old ? UI_DIM() : C_HOT());
+      if (r.btn) snprintf(buf, sizeof buf, "BTN %d", r.btn); else strcpy(buf, "PRESS");
+      txt(buf, 172, y + 4, 1);
+    } else {
+      snprintf(buf, sizeof buf, "%.1f", r.t);
+      uint16_t c = old ? UI_DIM() : C_HOT();
+      spr.setTextColor(c);
+      txt(buf, 160, y, 2);
+      degree(164, y + 3, c);
+      spr.setTextDatum(TL_DATUM); txt("C", 168, y + 4, 1);
+      if (r.h >= 0) { snprintf(buf, sizeof buf, "%d%%", r.h); spr.setTextDatum(TR_DATUM); spr.setTextColor(old ? UI_DIM() : C_ACC()); txt(buf, 212, y, 2); }
+    }
+    // батарейка: контур, внутри заливка (разряжена — тревожный цвет)
+    if (r.bat >= 0) {
+      int bx = 220, by = y + 4;
+      uint16_t bc = r.bat ? UI_DIM() : C_ALERT();
+      spr.drawRect(bx, by, 11, 7, bc); spr.drawFastVLine(bx + 11, by + 2, 3, bc);
+      spr.fillRect(bx + 2, by + 2, r.bat ? 7 : 2, 3, bc);
+    }
+    // сила сигнала — полоска
+    int len = constrain((r.rssi + 110) * 30 / 70, 1, 30);
+    spr.fillRect(238, y + 5, 30, 5, UI_LINE());
+    spr.fillRect(238, y + 5, len, 5, old ? UI_DIM() : heat(r.rssi + 10));
+    agoStr(buf, sizeof buf, msSince(now, r.lastMs));
+    spr.setTextDatum(TR_DATUM); spr.setTextColor(rx ? C_ACC() : UI_DIM());
+    txt(buf, W - UI_M - 2, y + 4, 1);
+  }
+  if (n > rows) {
+    snprintf(buf, sizeof buf, "+%d MORE ON TABLET", n - shown);
+    spr.setTextDatum(TL_DATUM); spr.setTextColor(UI_DIM());
+    txt(buf, UI_M + 4, top + shown * rowH + 4, 1);
+  }
+  drawPulseTrain(UI_M, 108, W - 2 * UI_M, UI_BOTTOM - 108);
+  uiFooter("wheel: screens  click: band", "side: back");
   present();
 }

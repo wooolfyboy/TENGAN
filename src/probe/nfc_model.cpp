@@ -14,7 +14,7 @@ static void put(NfcCard& c, const char* fam, const char* hint) {
 
 void nfcClassify(NfcCard& c, int ulVer) {
   if (c.felica) { put(c, "FeliCa", "Japan transit / e-money - likely"); return; }
-  if (c.bank)   { put(c, "Bank card (EMV)", "contactless payment card or phone"); return; }
+  if (c.bank)   { put(c, "Bank card (EMV)", "tap-to-pay card or phone"); return; }
   uint8_t sak = c.sak & 0x7F;                    // бит 7 (0x80) у некоторых — «каскад», не тип
   switch (c.sak) {
     case 0x09: put(c, "MIFARE Mini", "old transit / access card"); return;

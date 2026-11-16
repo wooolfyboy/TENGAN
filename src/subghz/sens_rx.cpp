@@ -70,6 +70,7 @@ static void finish(uint32_t now) {
     else sensFeed(s_train, s_rssi, now);
   }
   s_train.n = 0; s_havePulse = false; s_full = false;
+  s_rssi = -120;
 }
 
 static void segment(bool high, uint32_t us, uint32_t now) {
@@ -85,10 +86,12 @@ static void segment(bool high, uint32_t us, uint32_t now) {
 void sensRxStart() {
   if (s_on) return;
   pinMode(CC_GDO0, INPUT);
+  ccStrobe(0x36);                            // SIDLE — настройки меняем вне приёма
   ccWrite(0x02, 0x0D);                       // IOCFG0: GDO0 = асинхронные данные (демодулированный OOK)
   ccWrite(0x08, 0x32);                       // PKTCTRL0: асинхронный последовательный режим, без пакетов
   ccWrite(0x12, 0x30);                       // MDMCFG2: ASK/OOK, без синхрослова
   ccWrite(0x1B, 0x07); ccWrite(0x1C, 0x00); ccWrite(0x1D, 0x91);   // AGC под OOK (порог 42 дБ, без заморозки)
+  ccStrobe(0x34);                            // SRX — снова приём
   s_train.n = 0; s_havePulse = false; s_full = false;
   s_r = s_w; s_over = false;
   s_lastEdge = micros();
@@ -123,7 +126,6 @@ void sensRxTick(uint32_t now, int rssi) {
     if (low && quiet > TRAIN_END_US) {
       if (s_havePulse) segment(false, 65535, now);
       else finish(now);
-      s_rssi = -120;
     }
   }
 }

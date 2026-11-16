@@ -242,7 +242,7 @@ void nfcJson(String& o) {
 static void nfcSubtitle(char* out, size_t n) {
   if (g_nfc.state == NFC_NOREADER) snprintf(out, n, "no chip");
   else if (g_nfc.taps) snprintf(out, n, "%lu cards", (unsigned long)g_nfc.taps);
-  else snprintf(out, n, "what card?");
+  else snprintf(out, n, "13.56 MHz");
 }
 static void nfcEnter() { nfcStart(); }
 static void nfcLeave() { nfcStop(); }

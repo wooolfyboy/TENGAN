@@ -162,7 +162,7 @@ const Section soundSection = { "Sound", 120, 200, 255, iconMic, sndSub, noop, no
   A_NUM, sndInfo, zero, noopI, noop, noop, noopI, noBack, noopT, noopT };
 const Section subghzSection = { "Sub-GHz", 240, 120, 90, iconAntenna, subSub, noop, noop,
   G_NUM, subInfo, zero, noopI, noop, noop, noopI, noBack, noopT, noopT };
-static void irSub(char* o, size_t n) { snprintf(o, n, g_ir.have ? "%s" : "whose remote?", g_ir.last.proto); }
+static void irSub(char* o, size_t n) { if (g_ir.have) snprintf(o, n, "last: %s", g_ir.last.proto); else snprintf(o, n, "38 kHz"); }
 static void nfcSub(char* o, size_t n) { snprintf(o, n, "%lu cards", (unsigned long)g_nfc.taps); }
 const Section irSection = { "IR", 230, 90, 120, iconRemote, irSub, noop, noop,
   0, nullptr, nullptr, nullptr, nullptr, noop, noopI, noBack, noopT, drawIr };

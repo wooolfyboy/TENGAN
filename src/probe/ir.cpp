@@ -86,8 +86,8 @@ void irJson(String& o) {
 
 // ---------- раздел ----------
 static void irSubtitle(char* out, size_t n) {
-  if (g_ir.have) snprintf(out, n, "%s", g_ir.last.proto);
-  else           snprintf(out, n, "whose remote?");
+  if (g_ir.have) snprintf(out, n, "last: %s", g_ir.last.proto);
+  else           snprintf(out, n, "38 kHz");
 }
 static void irEnter() { irStart(); }
 static void irLeave() { irStop(); }

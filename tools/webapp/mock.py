@@ -146,6 +146,30 @@ def sat():
 WX = {"hist": [], "histT": 0}
 
 
+IR_FAKE = [("NEC", 0x04, 0x08, 32, "LG TV"), ("SAMSUNG", 0x07, 0x02, 32, "Samsung TV"), ("SONY12", 1, 0x15, 12, "Sony TV"),
+           ("RC5", 0, 0x0C, 13, "Philips TV"), ("NEC-EXT", 0xEF00, 0x05, 32, "RGB LED strip / lamp"), ("RAW", 0, 0x76D1A5F3, 71, "long frame: air conditioner?")]
+
+
+def ir_ev():
+    """ИК: случайный пульт (как событие "ir" палки)."""
+    p, a, c, b, br = random.choice(IR_FAKE)
+    raw = [9000, 4500] + [x for _ in range(31) for x in (560, random.choice((560, 1690)))]
+    return {"p": p, "addr": a, "cmd": c, "bits": b, "brand": br, "rep": int(random.random() < 0.3), "raw": raw[:64],
+            "t": int(time.time() * 1000) & 0x7FFFFFFF}
+
+
+NFC_FAKE = [{"fam": "MIFARE Classic 1K", "hint": "transit pass / door key - likely", "uid": "3A91\u2022\u2022", "atqa": "0004", "sak": "08", "ndef": []},
+            {"fam": "NTAG213", "hint": "sticker / tag - 144 bytes", "uid": "04A2\u2022\u2022", "atqa": "0044", "sak": "00",
+             "ndef": ["https://tengan.dev/hello", "Привет, палка"]},
+            {"fam": "Bank card (EMV)", "hint": "tap-to-pay card or phone", "uid": "084F\u2022\u2022", "atqa": "0004", "sak": "20", "ndef": []}]
+
+
+def nfc_ev():
+    """NFC: случайная карта (как событие "nfc" палки)."""
+    d = dict(random.choice(NFC_FAKE)); d["present"] = 1; d["t"] = int(time.time() * 1000) & 0x7FFFFFFF
+    return d
+
+
 def wx():
     # радиопогода: медленно плывущие значения + цикл «ясно → облака → дождь → гроза» (~2 минуты)
     t = time.time()
@@ -225,6 +249,7 @@ class Sse(http.server.BaseHTTPRequestHandler):
 
         def ev(name, d): self.wfile.write(("event: %s\ndata: %s\n\n" % (name, json.dumps(d, ensure_ascii=False))).encode()); self.wfile.flush()
         tb = tw = ts = tsub = tpc = twx = 0
+        tir, tnfc = time.time(), time.time()
         sent_sat = False
         try:
             while True:
@@ -238,6 +263,8 @@ class Sse(http.server.BaseHTTPRequestHandler):
                 if "sub" in want and now - tsub > 0.14: tsub = now; ev("sub", sub(sm, sb))
                 if "pc" in want and now - tpc > 1: tpc = now; ev("pc", pc())
                 if "wx" in want and now - twx > 1: twx = now; ev("wx", wx())
+                if "ir" in want.split(",") and now - tir > 2.5: tir = now; ev("ir", ir_ev())
+                if "nfc" in want.split(",") and now - tnfc > 6: tnfc = now; ev("nfc", nfc_ev())
                 time.sleep(0.04)
         except Exception:
             pass

@@ -5,7 +5,7 @@
 #pragma once
 #include <Arduino.h>
 
-enum { G_SPECTRUM = 0, G_MONITOR, G_NUM };
+enum { G_SPECTRUM = 0, G_MONITOR, G_SENSORS, G_NUM };   // SENSORS — монитор + разбор посылок (sensors.h)
 
 struct Band { const char* name; float lo, hi, mon; };   // полоса развёртки и частота монитора
 static const Band BANDS[] = {
@@ -45,3 +45,4 @@ static const int BURST_ON_DB = 12, BURST_OFF_DB = 7;
 void drawSpectrum();
 void drawMonitor(uint32_t now);
 void drawCcMissing();
+void drawSensors(uint32_t now);
