@@ -127,7 +127,7 @@ T.views.push({
     const RG = 48, O = T.glOrbit;
     if (!this.glP) {
       this.glP = O.prog(`
-uniform vec3 cBg, cAcc, cHot, cLine, cAlert; uniform float flash, rows, sumi;
+uniform vec3 cBg, cAcc, cHot, cLine, cAlert; uniform float flash, rows;
 varying vec3 wp; varying float vd; varying float vh; varying vec2 vg;
 void main(){
   float v=clamp(vh/.75,0.,1.);
@@ -144,15 +144,9 @@ void main(){
   float dc=abs(fract(vg.x/8.+.5)-.5)*8., lc=(1.-smoothstep(ax*.6,ax*1.6,dc))*.35;
   vec3 heat=v<.5?mix(cLine,cAcc,v*2.):mix(cAcc,cHot,(v-.5)*2.);
   vec3 col; float a=.94;
-  if(sumi<.5){
-    col=cBg*.7+cAcc*.05*shade+cAcc*.07*v;
-    col+=heat*((lr*(.35+.75*v)+lc*v)*fog+v*v*.35*fog);
-    col+=cHot*pow(v,5.)*(1.2+flash)*fog;
-  }else{
-    col=mix(cBg,cAcc,(.05+.18*(1.-shade)+.25*v)*fog);
-    col=mix(col,cAcc,clamp((lr*(.2+.75*v)+lc*.3*v)*fog,0.,1.));
-    col=mix(col,cAlert,smoothstep(.75,.95,v)*.8*fog);
-  }
+  col=cBg*.7+cAcc*.05*shade+cAcc*.07*v;
+  col+=heat*((lr*(.35+.75*v)+lc*v)*fog+v*v*.35*fog);
+  col+=cHot*pow(v,5.)*(1.2+flash)*fog;
   gl_FragColor=vec4(col*a,a);
 }`);
       this.glH = new Float32Array(n * RG);
@@ -168,10 +162,10 @@ void main(){
     }
     T.floorGrid(g, cam, 1.8, 0.2);
     T.GL.begin(w, h);
-    const C = T.C, sumi = T.theme === 'sumi';
+    const C = T.C;
     G.draw(this.glP, cam, [w, h], [X(0), X(1) - X(0), Z(0), Z(1) - Z(0)], {
-      cBg: O.rgb(C.bg), cAcc: O.rgb(C.acc), cHot: O.rgb(C.hot), cLine: O.rgb(sumi ? C.dim : C.line), cAlert: O.rgb(C.alert),
-      flash: this.flash, rows: Math.min(RG, rows.length || 1), sumi: sumi ? 1 : 0,
+      cBg: O.rgb(C.bg), cAcc: O.rgb(C.acc), cHot: O.rgb(C.hot), cLine: O.rgb(C.line), cAlert: O.rgb(C.alert),
+      flash: this.flash, rows: Math.min(RG, rows.length || 1),
     });
     T.GL.draw(g, 0, 0, w, h);
   },

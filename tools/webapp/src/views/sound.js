@@ -63,7 +63,7 @@
       else if (this.sub === 2) this.reactor(g, area, u, dt, t);
       else if (this.sub === 3) this.scope(g, area, u, dt);
       else this.xy(g, area, u, dt);
-      if (!(T.theme === 'sumi' && this.sub === 1)) T.bloom(o, this.sub === 1 ? 0.6 : 0.85);   // рельеф тушью уже «растёкся»
+      T.bloom(o, this.sub === 1 ? 0.6 : 0.85);
       // HUD поверх
       const hz = S.hz >= 1000 ? (S.hz / 1000).toFixed(1) + ' kHz' : S.hz + ' Hz';
       const word = this.lvS < -55 ? 'quiet' : this.lvS < -40 ? 'normal' : this.lvS < -15 ? 'loud' : 'very loud';
@@ -131,7 +131,6 @@
         this.rows.unshift(row); if (this.rows.length > this.ROWS) this.rows.pop();
       }
       if (T.glOrbit && T.GL.ok && this.COLS === 128) return this.terrainGL(g, w, h, u, top);
-      if (T.theme === 'sumi') return this.terrainInk(g, w, h, u, top);
       const hy = top + (h - top) * (0.16 - this.tilt * 0.12), camH = 1.25 + this.tilt * 0.6, cx = w / 2;
       const F = Math.max(Math.min(w, h * 1.6) * 0.62, (h * 0.97 - hy) * 1.5 / camH);
       // солнце-резонатор на горизонте
@@ -155,17 +154,16 @@
     },
 
     // WebGL: полёт над рельефом звука. Новый хребет рождается у горизонта и плывёт к камере;
-    // свет по нормалям, сетка-«трон» (DENKO) или тушь и туман-сансуй (SUMI), солнце на горизонте.
+    // свет по нормалям, сетка-«трон», солнце на горизонте.
     terrainGL(g, w, h, u, top) {
-      const O = T.glOrbit, C = this.COLS, R = this.ROWS, sumi = T.theme === 'sumi';
+      const O = T.glOrbit, C = this.COLS, R = this.ROWS;
       if (!this.tgP) {
         this.tgSky = T.GL.prog(T.GL.NOISE + `
-uniform vec2 res; uniform float t, hy, sumi, lv; uniform vec3 sun, cBg, cAcc, cHot, cAlert;
+uniform vec2 res; uniform float t, hy, lv; uniform vec3 sun, cBg, cAcc, cHot, cAlert;
 void main(){
   vec2 p=gl_FragCoord.xy; float y=(p.y-hy)/res.y;
   vec3 col;
   float d=length(p-sun.xy)/sun.z;
-  if(sumi<.5){
     col=mix(cBg+cAcc*.10,cBg*.9,smoothstep(0.,.45,y));
     vec2 q=floor(p/3.); float st=step(.9975,hash(q))*smoothstep(.02,.2,y)*(.5+.5*sin(t*2.+hash(q+7.)*40.));
     col+=vec3(st)*.8;
@@ -175,19 +173,10 @@ void main(){
     if(below>0.){ float band=fract(below*6.); disk*=step(below*.55,band); }
     col=mix(col,sc,disk*step(hy,p.y));
     col+=cAcc*exp(-d*1.6)*(.35+lv*.5);
-  }else{
-    float paper=.96+.04*fbm(p/80.);
-    col=cBg*paper;
-    col=mix(col,cBg*.86,smoothstep(.0,.6,y)*.35);
-    float edge=.03*fbm(p/18.+3.);
-    float disk=smoothstep(1.+edge,.9+edge,d);
-    col=mix(col,cAlert,disk*.85);
-    col=mix(col,cAlert,exp(-d*2.5)*.12);
-  }
   gl_FragColor=vec4(col,1.);
 }`);
         this.tgP = O.prog(T.GL.NOISE + `
-uniform vec3 cBg, cAcc, cHot, cLine, cAlert; uniform float sumi, lv, t;
+uniform vec3 cBg, cAcc, cHot, cLine, cAlert; uniform float lv, t;
 varying vec3 wp; varying float vd; varying float vh; varying vec2 vg;
 void main(){
   float v=clamp(vh,0.,1.);
@@ -201,7 +190,6 @@ void main(){
 #endif
   float fog=exp(-max(0.,vd-1.)*.13);
   vec3 col;
-  if(sumi<.5){
     float dr=abs(fract(vg.y+.5)-.5), dc=abs(fract(vg.x/4.+.5)-.5)*4.;
     float lr=1.-smoothstep(ay*.5,ay*1.5,dr), lc=1.-smoothstep(ax*.5,ax*1.5,dc);
     vec3 heat=v<.5?mix(cLine,cAcc,v*2.):mix(cAcc,cHot,(v-.5)*2.);
@@ -209,21 +197,6 @@ void main(){
     col+=heat*(lr*.9+lc*.22*fog)*(.25+.9*v);
     col+=cHot*pow(v,4.)*.9;
     col=mix(cBg+cAcc*.10,col,fog);
-  }else{
-    // тушь: темнее к гребням и на склонах, «морщины» кисти (цунь) по высоте, грани почти не видны
-    float ink=.06+.16*(1.-shade)+.55*smoothstep(.15,.9,v);
-    ink*=.7+.6*fbm(vec2(wp.x*6.,vh*14.+wp.z*.5));
-    col=mix(cBg,cAcc,clamp(ink,0.,1.)*.75);
-    float ct=abs(fract(vh*9.+.5)-.5);
-#ifndef NODERIV
-    float aw=fwidth(vh*9.);
-#else
-    float aw=.05;
-#endif
-    col=mix(col,cAcc,(1.-smoothstep(aw*.5,aw*1.8,ct))*.45);
-    float mist=fog*(.75+.25*fbm(vec2(wp.x*.4+t*.05,vd*.3)));
-    col=mix(cBg,col,clamp(mist,0.,1.));
-  }
   gl_FragColor=vec4(col,1.);
 }`);
         this.tgH = new Float32Array(C * R); this.tgN = -1;
@@ -245,45 +218,15 @@ void main(){
       T.GL.begin(w, h);
       const k = T.GL.w / w, lv = this.rows[0] ? this.rows[0].max : 0;
       const Cc = T.C, col = O.rgb;
-      const sunX = w * 0.66, sunR = u * (sumi ? 3.2 + lv * 1.5 : 3.6 + S.energy * 2.5);
-      T.GL.quad(this.tgSky, { t: performance.now() / 1000, hy: (h - hyCss) * k, sumi: sumi ? 1 : 0, lv,
+      const sunX = w * 0.66, sunR = u * (3.6 + S.energy * 2.5);
+      T.GL.quad(this.tgSky, { t: performance.now() / 1000, hy: (h - hyCss) * k, lv,
         sun: [sunX * k, (h - hyCss + sunR * 0.45) * k, sunR * k], cBg: col(Cc.bg), cAcc: col(Cc.acc), cHot: col(Cc.hot), cAlert: col(Cc.alert) });
       const zFar = -2.2 + (R - 1) * 0.13;
       G.draw(this.tgP, cam, [w, h], [-1, 2 / (C - 1), zFar, -0.13], {
-        zoff: this.rowT / 0.025, hs: 0.75, fitw: (w / 2) / F * 1.04, sumi: sumi ? 1 : 0, lv, t: performance.now() / 1000,
-        cBg: col(Cc.bg), cAcc: col(Cc.acc), cHot: col(Cc.hot), cLine: col(sumi ? Cc.dim : Cc.line), cAlert: col(Cc.alert),
+        zoff: this.rowT / 0.025, hs: 0.75, fitw: (w / 2) / F * 1.04, lv, t: performance.now() / 1000,
+        cBg: col(Cc.bg), cAcc: col(Cc.acc), cHot: col(Cc.hot), cLine: col(Cc.line), cAlert: col(Cc.alert),
       });
       T.GL.draw(g, 0, 0, w, h);
-      if (sumi) T.ink.hanko(g, w - u * 6.5, h - u * 7.5, u * 2.2, ['音'], { seed: 12, rot: -0.04 });
-    },
-    // SUMI: история спектра — гряды гор (сансуй): ближние тёмные, дальние тают в тумане, красное солнце
-    terrainInk(g, w, h, u, top) {
-      // «фейк»: кистью рисуем в слой ~15 раз в секунду, в остальные кадры кладём готовую картинку
-      const cv = this.cv.cv, now = performance.now();
-      if (!this.inkL) { this.inkL = document.createElement('canvas'); this.inkG = this.inkL.getContext('2d'); }
-      if (this.inkL.width !== cv.width || this.inkL.height !== cv.height) { this.inkL.width = cv.width; this.inkL.height = cv.height; this.inkT = 0; }
-      if (now - (this.inkT || 0) > 66) {
-        this.inkT = now; const lg = this.inkG; lg.setTransform(1, 0, 0, 1, 0, 0); lg.clearRect(0, 0, cv.width, cv.height); lg.setTransform(this.cv.dpr, 0, 0, this.cv.dpr, 0, 0);
-        this.terrainInkDraw(lg, w, h, u, top);
-      }
-      g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(this.inkL, 0, 0); g.restore();
-    },
-    terrainInkDraw(g, w, h, u, top) {
-      const I = T.ink, hz = top + (h - top) * 0.22, N = 14, step = Math.max(1, Math.floor(this.rows.length / N));
-      const lv = this.rows[0] ? this.rows[0].max : 0, sr = u * (2.6 + lv * 2.4);
-      I.raw(g, 'fillStyle', I.shu(0.85)); g.beginPath(); g.arc(w * 0.7, hz + u * 1.5, sr, 0, T.TAU); g.fill();
-      const idx = []; for (let k = 0; k < N && k * step < this.rows.length; k++) idx.push(k * step);
-      for (let j = idx.length - 1; j >= 0; j--) {
-        const row = this.rows[idx[j]], t = j / Math.max(1, N - 1), y0 = hz + u * 2 + Math.pow(1 - t, 1.6) * (h - hz) * 0.82;
-        const amp = u * (5 + 13 * (1 - t)), al = 0.1 + 0.75 * Math.pow(1 - t, 1.6), C = this.COLS, pts = [];
-        for (let c = 0; c < C; c += 2) pts.push([-u * 2 + (w + u * 4) * c / (C - 1), y0 - amp * row[c] * 1.4]);
-        I.raw(g, 'fillStyle', '#ece4d4'); g.beginPath(); g.moveTo(-u * 2, h); for (const p of pts) g.lineTo(p[0], p[1]); g.lineTo(w + u * 2, h); g.closePath(); g.fill();
-        let mn = 1e9; for (const p of pts) mn = Math.min(mn, p[1]);
-        const gr = g.createLinearGradient(0, mn, 0, y0 + u * 6), tt = T.theme; T.theme = 'raw'; gr.addColorStop(0, I.ink(al * 0.55)); gr.addColorStop(1, I.ink(0)); g.fillStyle = gr; T.theme = tt; g.fill();
-        I.stroke(g, pts, u * (0.18 + 0.7 * (1 - t)), { seed: idx[j] * 31 + 7, taper: [0.02, 0.08], dry: 0.9, alpha: al });
-        I.mist(g, y0 + u * 1.2, u * 2.2, w, 0.35 * (t + 0.2));
-      }
-      I.hanko(g, w - u * 6.5, h - u * 7.5, u * 2.2, ['音'], { seed: 12, rot: -0.04 });
     },
     // реактор: ядро пульсирует уровнем, круговой спектр, частицы вылетают на басах
     reactor(g, a, u, dt, t) {

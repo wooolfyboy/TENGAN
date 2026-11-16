@@ -4,12 +4,9 @@
 // (T.astro: та же математика, что в прошивке; город и орбиты присылает палка).
 // ---- WebGL-версии сцен галереи (core/gl.js). Нет WebGL — рисуется прежняя 2D-версия ----
 // Каждая сцена: шейдер рисует «тяжёлое» (сфера, небо, свечение), HUD и подписи — 2D поверх.
-// SUMI: шейдеры сами рисуют тушь и бумагу (перекраска холста на картинку из GL не действует).
 T.galGL = (() => {
   const G = {}, GL = T.GL;
   G.on = () => GL && GL.ok;
-  const ink = () => (T.theme === 'sumi' ? 1 : 0);
-  const PAPER = 'vec3(.925,.894,.831)', INK = 'vec3(.106,.094,.078)';
   const progs = {};
   const prog = (k, fs) => (k in progs ? progs[k] : (progs[k] = GL.prog(fs)));
   // кадр: область (x, y, w, h) в CSS-px вида; rendered → на 2D-холст
@@ -49,8 +46,8 @@ T.galGL = (() => {
   ];
   G.land = () => {
     if (G._land) return G._land;
-    const W = 1024, H = 512, c = document.createElement('canvas'); c.width = W; c.height = H; c.__raw = 1;
-    const g = c.getContext('2d'), tt = T.theme; T.theme = 'raw';
+    const W = 1024, H = 512, c = document.createElement('canvas'); c.width = W; c.height = H;
+    const g = c.getContext('2d');
     g.fillStyle = '#000'; g.fillRect(0, 0, W, H); g.fillStyle = '#fff';
     const polys = T.astro.data().land.filter(l => l.length >= 3).concat(EXTRA);
     for (const l of polys) {
@@ -63,21 +60,19 @@ T.galGL = (() => {
     }
     // мягкий берег: шейдер берёт порог по размытой маске + шум — берег «живой», без ломаной
     const b = document.createElement('canvas'); b.width = W; b.height = H; const bg = b.getContext('2d');
-    bg.filter = 'blur(3px)'; bg.drawImage(c, 0, 0); T.theme = tt;
+    bg.filter = 'blur(3px)'; bg.drawImage(c, 0, 0);
     return (G._land = b);
   };
 
   // ---------- ЗЕМЛЯ ----------
   const GLOBE = FRAG + T.GL.NOISE + `
-  uniform float t, ink, l0, b0; uniform vec3 sun; uniform sampler2D land;
+  uniform float t, l0, b0; uniform vec3 sun; uniform sampler2D land;
   const float PI=3.14159265;
   void main(){
     vec2 q=(gl_FragCoord.xy/res*2.-1.)*1.22; float r=length(q);
-    vec3 P=${PAPER}, K=${INK};
     if(r>1.){
       float d=r-1., s=dot(normalize(q),normalize(sun.xy+1e-4));
       float day=smoothstep(-.6,.6,s+sun.z*.4);
-      if(ink>.5){ float a=exp(-d*28.)*(.22+.08*noise(q*30.))*(.4+.6*day)*smoothstep(.22,.12,d); gl_FragColor=vec4(K*a,a); return; }
       float a=(exp(-d*16.)*(.25+.75*day)+exp(-d*60.)*.5*day)*smoothstep(.22,.12,d);
       vec3 c=mix(vec3(.10,.45,.75),vec3(.25,.9,1.),day)*a; gl_FragColor=vec4(c,clamp(a,0.,1.)); return;
     }
@@ -95,17 +90,6 @@ T.galGL = (() => {
     float limb=.55+.45*n.z;
     float cl=smoothstep(.55,.85,fbm(uv*vec2(14.,9.)+vec2(t*.004,0.))+.08*sin(lat*3.));   // облака
     vec3 col; float al=smoothstep(1.,.992,r);
-    if(ink>.5){
-      float gran=noise(gl_FragCoord.xy*.35)*.12;
-      float w=.05+m*(.20+.22*det)+gran*m;                 // суша — размывка тушью, океан — чистая бумага
-      w+= (1.-day)*(.20+.12*m);                             // ночь — общая заливка
-      w+= smoothstep(.40,.50,m0+(det-.5)*.32)*smoothstep(.62,.50,m0+(det-.5)*.32)*.35;   // берег — линия кистью
-      w+= term*.18*(1.+det);                                // терминатор — мазок
-      w+= pow(1.-n.z,2.5)*.35;                              // край диска темнее
-      w-= cl*day*.12;
-      col=mix(P,K,clamp(w,0.,.85));
-      gl_FragColor=vec4(col*al,al); return;
-    }
     vec3 ocean=mix(vec3(.01,.05,.09),vec3(.02,.14,.22),day);
     vec3 grd=mix(vec3(.03,.10,.12),mix(vec3(.08,.32,.36),vec3(.30,.70,.72),det),day);
     col=mix(ocean,grd,m)*limb;
@@ -124,12 +108,12 @@ T.galGL = (() => {
   G.globe = (g, cx, cy, R, l0, b0, sun, t) => {
     if (!G.on()) return false;
     const S2 = R * 1.22, land = GL.tex('gB_land', G._landUp ? null : G.land()); G._landUp = 1;
-    return run(g, cx - S2, cy - S2, S2 * 2, S2 * 2, 0.8, 'globe', GLOBE, { t, ink: ink(), l0, b0, sun, land }, [0, 0, 0, 0]);
+    return run(g, cx - S2, cy - S2, S2 * 2, S2 * 2, 0.8, 'globe', GLOBE, { t, l0, b0, sun, land }, [0, 0, 0, 0]);
   };
 
   // ---------- НЕБО: купол со звёздным полем и Млечным Путём (настоящие звёзды и планеты — 2D поверх) ----------
   const SKY = FRAG + T.GL.NOISE + `
-  uniform float t, ink, rot, lat, lst, sunAlt, sunAz, night, day;
+  uniform float t, rot, lat, lst, sunAlt, sunAz, night, day;
   const float PI=3.14159265, D2R=.0174533;
   void main(){
     vec2 p=gl_FragCoord.xy/res*2.-1.; float r=length(p);
@@ -155,13 +139,6 @@ T.galGL = (() => {
     float star=step(.82,h)*smoothstep(.09,.0,sd2)*(.5+.5*sin(t*(1.5+h2*3.)+h*30.))*(h-.82)*5.;
     float ext=smoothstep(0.,.25,alt);                       // у горизонта гаснет
     float tw=smoothstep(.2,.9,1.-r*r);
-    if(ink>.5){
-      vec3 P=${PAPER}, K=${INK};
-      float w=.03+(1.-day)*.10+(1.-r)*.04;
-      w+=band*.30*night*ext + star*.55*night*ext;
-      w+=noise(gl_FragCoord.xy*.4)*.03;
-      gl_FragColor=vec4(mix(P,K,clamp(w,0.,.9)),1.); return;
-    }
     vec3 sky0=mix(mix(vec3(.04,.12,.17),vec3(.06,.20,.28),day),vec3(.02,.05,.09),night);
     vec3 sky1=mix(mix(vec3(.02,.07,.11),vec3(.03,.10,.15),day),vec3(.01,.03,.06),night);
     vec3 col=mix(sky1,sky0,r*r);
@@ -175,28 +152,21 @@ T.galGL = (() => {
   }`;
   G.sky = (g, cx, cy, R, o) => {
     if (!G.on()) return false;
-    return run(g, cx - R, cy - R, R * 2, R * 2, 0.7, 'sky', SKY, Object.assign({ ink: ink() }, o), [0, 0, 0, 0]);
+    return run(g, cx - R, cy - R, R * 2, R * 2, 0.7, 'sky', SKY, Object.assign({}, o), [0, 0, 0, 0]);
   };
 
   // ---------- ТЕССЕРАКТ: 32 ребра как светящиеся трубки (расстояние до отрезков — в шейдере) ----------
   const TESS = FRAG + T.GL.NOISE + `
-  uniform float ink, u; uniform vec4 A[32]; uniform vec4 B[32];
+  uniform float u; uniform vec4 A[32]; uniform vec4 B[32];
   float seg(vec2 p, vec2 a, vec2 b){ vec2 pa=p-a, ba=b-a; float h=clamp(dot(pa,ba)/max(dot(ba,ba),1e-3),0.,1.); return length(pa-ba*h); }
   void main(){
-    vec2 p=fragCss(); vec3 col=vec3(0.); float ia=0.;
-    float jit=(noise(p*.12)-.5)*u*.18;
+    vec2 p=fragCss(); vec3 col=vec3(0.);
     for(int i=0;i<32;i++){
       float d=seg(p,A[i].xy,B[i].xy), v=A[i].z;
       float wc=u*(.08+.10*v);
-      if(ink>.5){
-        float s=smoothstep(wc*1.4,wc*.3,d+jit)*(.35+.65*v);
-        ia=max(ia,s); ia+=exp(-d/(u*.7))*.03*v;
-      } else {
-        vec3 c=mix(vec3(.10,.45,.60),vec3(.75,.97,1.),v);
-        col+=c*(smoothstep(wc,0.,d)*1.2 + exp(-d/(u*.9))*.10*(.4+v) + .9/(1.+pow(d/(u*.35),2.))*.05);
-      }
+      vec3 c=mix(vec3(.10,.45,.60),vec3(.75,.97,1.),v);
+      col+=c*(smoothstep(wc,0.,d)*1.2 + exp(-d/(u*.9))*.10*(.4+v) + .9/(1.+pow(d/(u*.35),2.))*.05);
     }
-    if(ink>.5){ ia=clamp(ia,0.,.95); gl_FragColor=vec4(${INK}*ia,ia); return; }
     col=1.-exp(-col*1.3); float a=max(col.r,max(col.g,col.b));
     gl_FragColor=vec4(col,a);
   }`;
@@ -209,12 +179,12 @@ T.galGL = (() => {
       const v = T.clamp(0.45 + (P[i][2] + P[j][2]) / 2 * 0.35);
       tA.set([P[i][0], P[i][1], v, 0], k * 4); tB.set([P[j][0], P[j][1], v, 0], k * 4); k++;
     }
-    return run(g, 0, 0, w, h, 0.6, 'tess', TESS, { ink: ink(), u, A: tA, B: tB }, [0, 0, 0, 0]);
+    return run(g, 0, 0, w, h, 0.6, 'tess', TESS, { u, A: tA, B: tB }, [0, 0, 0, 0]);
   };
 
   // ---------- ТОР: трассировка лучей, сетка «точек» по поверхности, френель и отражение ----------
   const TORUS = FRAG + T.GL.NOISE + `
-  uniform float ink, Aa, Bb, K1, K2; uniform vec2 cen; uniform float t;
+  uniform float Aa, Bb, K1, K2; uniform vec2 cen; uniform float t;
   float sdT(vec3 p){ vec2 q=vec2(length(p.xz)-2.1,p.y); return length(q)-1.; }
   mat3 rx(float a){float c=cos(a),s=sin(a);return mat3(1,0,0,0,c,s,0,-s,c);}
   mat3 rz(float a){float c=cos(a),s=sin(a);return mat3(c,s,0,-s,c,0,0,0,1);}
@@ -232,7 +202,6 @@ T.galGL = (() => {
       tt+=d*.9; if(tt>K2+3.6)break;
     }
     if(!hit){
-      if(ink>.5){ gl_FragColor=vec4(0.); return; }
       float g=exp(-md*5.)*.22; vec3 c=vec3(.15,.6,.75)*g; gl_FragColor=vec4(c,g); return;
     }
     vec2 e=vec2(.002,0.);
@@ -244,10 +213,6 @@ T.galGL = (() => {
     vec2 g=vec2(ph*120./6.2832+th*.95, th*30./6.2832);   // те же 120×30 «точек»
     vec2 f=fract(g)-.5; float dot0=smoothstep(.36,.14,length(f));
     float depth=clamp((K2+3.2-tt)/6.4,0.,1.);
-    if(ink>.5){
-      float w=.10+(1.-lam)*.45+fres*.35+dot0*(.15+.45*lam)*depth+(noise(p*.3)-.5)*.06;
-      w=clamp(w,0.,.95); gl_FragColor=vec4(${INK}*w,w); return;
-    }
     vec3 base=mix(vec3(.02,.08,.11),vec3(.05,.22,.28),lam);
     vec3 r=reflect(rd,nw); float env=smoothstep(.0,.08,r.y)*.25+exp(-abs(r.y)*18.)*.6;   // «горизонт» в отражении
     vec3 hot=mix(vec3(.15,.55,.7),vec3(.85,1.,1.),lam*lam);
@@ -256,7 +221,7 @@ T.galGL = (() => {
   }`;
   G.torus = (g, w, h, o) => {
     if (!G.on()) return false;
-    return run(g, 0, 0, w, h, 0.7, 'torus', TORUS, Object.assign({ ink: ink() }, o), [0, 0, 0, 0]);
+    return run(g, 0, 0, w, h, 0.7, 'torus', TORUS, Object.assign({}, o), [0, 0, 0, 0]);
   };
   return G;
 })();
@@ -317,7 +282,7 @@ T.views.push({
     else if (this.sub === 4) st = this.sky(g, w, h, L, dt, t);
     else if (this.sub === 5) st = this.globe(g, w, h, L, dt, t);
     else st = this.weather(g, w, h, L, dt, t);                 // views/weather.js
-    T.bloom(o, this.sub === 2 ? 0.7 : this.sub === 6 ? (T.theme === 'sumi' ? 0.35 : 0.8) : this.sub >= 4 ? 0.6 : 0.85);
+    T.bloom(o, this.sub === 2 ? 0.7 : this.sub === 6 ? 0.8 : this.sub >= 4 ? 0.6 : 0.85);
     // HUD поверх — плоский и чёткий
     T.header(g, m, y0, w - 2 * m, u, this.subs[this.sub], st.status);
     T.dots(g, m, y0 + u * 2.75, u, this.subs.length, this.sub);
@@ -469,10 +434,10 @@ T.views.push({
     if (Lf.t > 4) Lf.t = 0;
     const D = Lf.img.data, fade = Math.pow(0.05, dt);
     for (let i = 0; i < W * H; i++) {
-      const a = Lf.a[i], ink = T.theme === 'sumi';          // тушь: бумага, живые клетки — тушь, «призраки» — размывка
-      let r = ink ? 236 : 5, gg = ink ? 228 : 8, bb = ink ? 212 : 13;
-      if (a) { const c = a === 1 ? (ink ? [27, 24, 20] : [235, 250, 255]) : T.heatRGB(Math.max(0.42, 0.95 - a * 0.025)); r = c[0]; gg = c[1]; bb = c[2]; }
-      else if (Lf.glow[i] > 0.01) { const k = Lf.glow[i] * 0.5; if (ink) { r = 236 - 70 * k; gg = 228 - 70 * k; bb = 212 - 66 * k; } else { r = 5 + 35 * k; gg = 8 + 87 * k; bb = 13 + 117 * k; } Lf.glow[i] *= fade; }
+      const a = Lf.a[i];
+      let r = 5, gg = 8, bb = 13;
+      if (a) { const c = a === 1 ? [235, 250, 255] : T.heatRGB(Math.max(0.42, 0.95 - a * 0.025)); r = c[0]; gg = c[1]; bb = c[2]; }
+      else if (Lf.glow[i] > 0.01) { const k = Lf.glow[i] * 0.5; r = 5 + 35 * k; gg = 8 + 87 * k; bb = 13 + 117 * k; Lf.glow[i] *= fade; }
       D[i * 4] = r; D[i * 4 + 1] = gg; D[i * 4 + 2] = bb; D[i * 4 + 3] = 255;
     }
     Lf.off.getContext('2d').putImageData(Lf.img, 0, 0);
@@ -757,10 +722,7 @@ T.views.push({
         const nz = Math.sqrt(1 - rr), lit = nx * sv[0] + ny * sv[1] + nz * sv[2];
         const k = T.clamp((lit + 0.08) / 0.2), limb = 0.55 + 0.45 * nz;
         const tw = Math.max(0, 1 - Math.abs(lit) / 0.025) * 0.55;                    // полоса терминатора
-        if (T.theme === 'sumi') {                          // тушь: день — бумага, ночь — размывка тушью, терминатор — мазок
-          const v = 1 - (0.55 * (1 - k) + 0.12 * (1 - limb)) - 0.5 * tw;
-          Dd[q] = 27 + 209 * v; Dd[q + 1] = 24 + 204 * v; Dd[q + 2] = 20 + 192 * v; Dd[q + 3] = 255;
-        } else { Dd[q] = (6 + 14 * k) * limb + 40 * tw; Dd[q + 1] = (12 + 46 * k) * limb + 120 * tw; Dd[q + 2] = (18 + 58 * k) * limb + 140 * tw; Dd[q + 3] = 255; }
+        Dd[q] = (6 + 14 * k) * limb + 40 * tw; Dd[q + 1] = (12 + 46 * k) * limb + 120 * tw; Dd[q + 2] = (18 + 58 * k) * limb + 140 * tw; Dd[q + 3] = 255;
       }
     }
     this.gOff.getContext('2d').putImageData(this.gImg, 0, 0);
