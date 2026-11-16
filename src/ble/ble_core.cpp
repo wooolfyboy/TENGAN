@@ -6,6 +6,7 @@
 //  ни к чему не подключается.
 // ============================================================
 #include <NimBLEDevice.h>
+#include "core/lang.h"
 #include <algorithm>
 #include "core/jsonutil.h"
 #include "core/timeutil.h"
@@ -458,16 +459,16 @@ static void drawListOrDetail(uint32_t now) {
 
 // ---------- раздел для меню ----------
 static void bleSubtitle(char* out, size_t n) {
-  if (g_bleActive) snprintf(out, n, "%d devices", g_lastCount);
-  else             snprintf(out, n, "off");
+  if (g_bleActive) snprintf(out, n, L("%d devices", "%d в эфире"), g_lastCount);
+  else             snprintf(out, n, "%s", L("off", "выкл"));
 }
 static void bleEnter() { wifiRadioOff(); bleRadioOn(); }
 static void bleLeave() { bleRadioOff(); ledsOff(); }   // вышли — радио и лента выключены
 
 static void bleScreenInfo(int i, SubItem& it) {
-  static const char* const names[NUM_MODES] = { "Overview", "Scope", "City", "Nearest", "Devices", "Weather" };
-  static const char* const descs[NUM_MODES] = { "count, trend, types", "radar picture", "3D: devices as towers", "closest device",
-    "list + details", "BLE thermometers" };
+  static const char* const names[NUM_MODES] = { L("Overview", "Обзор"), L("Scope", "Радар"), L("City", "Город"), L("Nearest", "Ближайшее"), L("Devices", "Устройства"), L("Weather", "Погода") };
+  static const char* const descs[NUM_MODES] = { L("count, trend, types", "число, тренд, типы"), L("radar picture", "картина вокруг"), L("3D: devices as towers", "3D: башни-устройства"), L("closest device", "самое близкое"),
+    L("list + details", "список и подробности"), L("BLE thermometers", "BLE-термометры") };
   it.name = names[i]; it.desc = descs[i]; it.value[0] = 0;
   switch (i) {
     case M_OVERVIEW: case M_LIST: case M_CITY: sprintf(it.value, "%d", g_lastCount); break;
@@ -478,7 +479,7 @@ static void bleScreenInfo(int i, SubItem& it) {
       break;
     }
     case M_NEAREST:
-      if (g_have) sprintf(it.value, "%d dBm", g_bestRssi); else strcpy(it.value, "-");
+      if (g_have) sprintf(it.value, L("%d dBm", "%d дБм"), g_bestRssi); else strcpy(it.value, "-");
       break;
     case M_WEATHER:
       if (g_sensCount) sprintf(it.value, "%d", g_sensCount); else strcpy(it.value, "-");

@@ -3,6 +3,7 @@
 //  Вынесен из ble_screens.cpp: свой код 3D, своя анимация.
 // ============================================================
 #include <algorithm>
+#include "core/lang.h"
 #include "core/timeutil.h"
 #include "ble/ble_model.h"
 #include "ble/vendors.h"
@@ -161,8 +162,8 @@ void drawCity(const std::vector<Blip>& bl, uint32_t now) {
     txt(buf, x, y, lf);
   }
 
-  snprintf(buf, sizeof(buf), "%d devices", (int)bl.size());
-  uiHeader("City", buf);
-  uiFooter("wheel: turn camera", "side: back");
+  snprintf(buf, sizeof(buf), "%d %s", (int)bl.size(), PL((int)bl.size(), "device", "devices", "устройство", "устройства", "устройств"));
+  uiHeader(L("City", "Город"), buf);
+  uiFooter(L("wheel: turn camera", "колесо: повернуть камеру"), L("side: back", "кнопка: назад"));
   present();
 }
