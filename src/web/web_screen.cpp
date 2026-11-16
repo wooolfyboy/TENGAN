@@ -81,8 +81,7 @@ void drawWebOta(const WebView& v, int pct, const char* err) {
 
 // ============================================================
 //  Планшет подключён — вместо пароля живая картинка по теме:
-//   DENKO 電光 — «небесный глаз» (天眼): оглядывается, кольца радужки вращаются, моргает;
-//   SUMI 墨    — пруд: два карпа кои тушью плывут восьмёркой, круги на воде, листья лотоса.
+//   «небесный глаз» (天眼): оглядывается, кольца радужки вращаются, моргает.
 //  Колесо или нажатие — снова QR и пароль (web.cpp).
 // ============================================================
 #include "core/settings.h"
@@ -140,61 +139,12 @@ static void drawEye(uint32_t now, int cx, int cy) {
   spr.drawLine(cx + Wh + 2, cy, cx + Wh + 10, cy, C_HOT());
 }
 
-// путь карпа: восьмёрка по пруду
-static void koiPath(float t, int cx, int cy, float& x, float& y) { x = cx + 108 * sinf(t); y = cy + 34 * sinf(2 * t); }
-
-static void drawKoi(uint32_t now, float phase, int cx, int cy, bool spotted) {
-  const int N = 16;
-  float t = now * 0.00042f + phase, xs[N], ys[N];
-  for (int i = 0; i < N; i++) koiPath(t - i * 0.034f, cx, cy, xs[i], ys[i]);
-  uint16_t ink = C_ACC(), red = C_SEAL();
-  // плавники у головы
-  float hx = xs[1] - xs[0], hy = ys[1] - ys[0], hl = sqrtf(hx * hx + hy * hy) + 1e-3f; hx /= hl; hy /= hl;
-  float nx = -hy, ny = hx, fl = 7 + 2 * sinf(now * 0.012f);
-  spr.fillTriangle(xs[2], ys[2], xs[2] + nx * fl - hx * 4, ys[2] + ny * fl - hy * 4, xs[3], ys[3], scale565(ink, 55));
-  spr.fillTriangle(xs[2], ys[2], xs[2] - nx * fl - hx * 4, ys[2] - ny * fl - hy * 4, xs[3], ys[3], scale565(ink, 55));
-  // тело: толще в первой трети, к хвосту тоньше
-  for (int i = N - 1; i >= 0; i--) {
-    float k = (float)i / (N - 1), r = 5.5f * powf(sinf(PI * (0.1f + 0.9f * (1 - k))), 0.8f) * (1 - 0.55f * k) + 1;
-    spr.fillCircle(xs[i], ys[i], (int)r, ink);
-  }
-  if (spotted) {                                         // красные пятна у второй рыбы
-    spr.fillCircle(xs[2], ys[2], 3, red); spr.fillCircle(xs[6], ys[6], 3, red); spr.fillCircle(xs[10], ys[10], 2, red);
-  }
-  // хвост — веер, бьёт в такт
-  float tx = xs[N - 1] - xs[N - 2], ty = ys[N - 1] - ys[N - 2], tl = sqrtf(tx * tx + ty * ty) + 1e-3f; tx /= tl; ty /= tl;
-  float sw = sinf(now * 0.016f + phase * 3) * 0.6f, ca = cosf(sw), sa = sinf(sw), dx = tx * ca - ty * sa, dy = tx * sa + ty * ca;
-  float ex = xs[N - 1] + dx * 13, ey = ys[N - 1] + dy * 13;
-  spr.fillTriangle(xs[N - 1], ys[N - 1], ex - dy * 8, ey + dx * 8, ex + dy * 8, ey - dx * 8, scale565(ink, 70));
-  spr.fillCircle(xs[0] + hx * -1 + nx * 2, ys[0] + ny * 2, 1, C_BG());   // глазик
-}
-
-static void drawPond(uint32_t now, int cx, int cy) {
-  // листья лотоса — с вырезом
-  static const int16_t PADS[][3] = { { -120, -36, 13 }, { 128, 30, 15 }, { 40, -44, 9 }, { -60, 44, 10 } };
-  for (auto& p : PADS) {
-    int x = cx + p[0], y = cy + p[1], r = p[2];
-    spr.fillEllipse(x, y, r, r * 2 / 3, UI_PANEL());
-    spr.drawEllipse(x, y, r, r * 2 / 3, UI_LINE());
-    spr.fillTriangle(x, y, x + r, y - 3, x + r, y + 3, C_BG());
-  }
-  // круги на воде: от головы каждой рыбы, раз в ~1.6 с
-  for (int f = 0; f < 2; f++) {
-    float ph = fmodf(now / 1600.0f + f * 0.5f, 1.0f), x, y;
-    koiPath((now - ph * 1600) * 0.00042f + f * PI, cx, cy, x, y);
-    int r = 4 + (int)(ph * 26);
-    spr.drawEllipse(x, y, r, r / 2 + 1, scale565(C_ACC(), (int)(55 * (1 - ph))));
-  }
-  drawKoi(now, 0, cx, cy, false);
-  drawKoi(now, PI, cx, cy, true);
-}
-
 #include "core/crumb.h"
 void drawWebLink(const WebLink& l, uint32_t now) {
-  crumb(g_theme == THEME_SUMI ? "draw link sumi" : "draw link denko");
+  crumb("draw link");
   const int W = spr.width(), H = spr.height(), cx = W / 2, cy = H / 2 - 6;
   spr.fillSprite(C_BG());
-  if (g_theme == THEME_SUMI) drawPond(now, cx, cy); else drawEye(now, cx, cy);
+  drawEye(now, cx, cy);
   // подпись — мелко, чтобы не мешать картинке
   char buf[48];
   float kb = l.bps / 1024.0f;

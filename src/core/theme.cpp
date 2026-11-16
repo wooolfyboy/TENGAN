@@ -33,35 +33,23 @@ static const Stop HEAT[] = {
   { 0.00f,  14,  30,  46 }, { 0.35f,  40,  95, 130 }, { 0.75f,  62, 230, 255 }, { 1.00f, 235, 250, 255 },
 };
 
-// ---- тема SUMI (тушь на бумаге): светлый фон, тёмное — главное ----
-// яркость исходного цвета -> оттенок туши: тёмное почти исчезает в бумаге, яркое — чёрная тушь
-static const Stop COOL_SUMI[] = {
-  { 0.00f, 236, 228, 212 }, { 0.50f, 170, 160, 145 }, { 0.86f, 60, 54, 47 }, { 1.00f, 27, 24, 20 },
-};
-static const Stop HEAT_SUMI[] = {
-  { 0.00f, 222, 212, 194 }, { 0.35f, 160, 150, 135 }, { 0.75f, 74, 67, 59 }, { 1.00f, 27, 24, 20 },
-};
-static bool sumi() { return g_theme == THEME_SUMI; }
-
 static uint16_t s_lut[256];
-static int      s_lutTheme = -1;                      // для какой темы построена таблица
+static bool     s_lutOk = false;
 
 uint16_t C(uint8_t r, uint8_t g, uint8_t b) {
-  if (s_lutTheme != g_theme) {
-    for (int i = 0; i < 256; i++) s_lut[i] = sumi() ? ramp(COOL_SUMI, 4, i / 255.0f) : ramp(COOL, 6, i / 255.0f);
-    s_lutTheme = g_theme;
-  }
+  if (!s_lutOk) { for (int i = 0; i < 256; i++) s_lut[i] = ramp(COOL, 6, i / 255.0f); s_lutOk = true; }
   return s_lut[(77 * r + 150 * g + 29 * b) >> 8];    // яркость по восприятию глаза
 }
-// TC — «буквальный» цвет: в DENKO как есть, в SUMI — оттенок туши по яркости
-uint16_t TC(uint8_t r, uint8_t g, uint8_t b) { return sumi() ? C(r, g, b) : tft.color565(r, g, b); }
-uint16_t C_BG()    { return sumi() ? tft.color565(236, 228, 212) : tft.color565(5, 8, 13); }
-uint16_t C_HOT()   { return sumi() ? tft.color565(27, 24, 20) : tft.color565(235, 250, 255); }
-uint16_t C_ALERT() { return sumi() ? tft.color565(194, 58, 43) : tft.color565(255, 122, 26); }
-uint16_t C_ACC()   { return sumi() ? tft.color565(27, 24, 20) : tft.color565(62, 230, 255); }
-uint16_t C_SEAL()  { return sumi() ? tft.color565(194, 58, 43) : C_ACC(); }   // печать 天眼: киноварь в SUMI
+// TC — «буквальный» цвет и C_SEAL — цвет печати 天眼: точки, через которые новая тема сможет
+// перекрасить экраны (сейчас тема одна — DENKO, и это просто цвет как есть / акцент)
+uint16_t TC(uint8_t r, uint8_t g, uint8_t b) { return tft.color565(r, g, b); }
+uint16_t C_BG()    { return tft.color565(5, 8, 13); }
+uint16_t C_HOT()   { return tft.color565(235, 250, 255); }
+uint16_t C_ALERT() { return tft.color565(255, 122, 26); }
+uint16_t C_ACC()   { return tft.color565(62, 230, 255); }
+uint16_t C_SEAL()  { return C_ACC(); }
 
-uint16_t heatV(float x) { return sumi() ? ramp(HEAT_SUMI, 4, x) : ramp(HEAT, 4, x); }
+uint16_t heatV(float x) { return ramp(HEAT, 4, x); }
 uint16_t heat(int rssi) { return heatV((rssi + 100) / 60.0f); }
 
 // ---------- текст ----------
@@ -76,13 +64,11 @@ static const GFXfont* fontFor(int size) {
   }
 }
 
-// «тусклее»: смешать с фоном (в DENKO фон почти чёрный — то же, что затемнить; в SUMI — к бумаге)
+// «тусклее»: затемнить (фон почти чёрный)
 uint16_t scale565(uint16_t c, int pct) {
   pct = constrain(pct, 0, 100);
   uint8_t r = ((c >> 11) & 0x1F) << 3, g = ((c >> 5) & 0x3F) << 2, b = (c & 0x1F) << 3;
-  if (!sumi()) return tft.color565(r * pct / 100, g * pct / 100, b * pct / 100);
-  const int br = 236, bgc = 228, bb = 212;
-  return tft.color565(br + (r - br) * pct / 100, bgc + (g - bgc) * pct / 100, bb + (b - bb) * pct / 100);
+  return tft.color565(r * pct / 100, g * pct / 100, b * pct / 100);
 }
 
 void txt(const char* s, int x, int y, int size) {

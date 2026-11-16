@@ -6,11 +6,10 @@
 #include "core/theme.h"
 #include "core/settings.h"
 
-static bool sumi() { return g_theme == THEME_SUMI; }
-uint16_t UI_LABEL() { return sumi() ? tft.color565(74, 67, 59)    : tft.color565(150, 175, 192); }
-uint16_t UI_DIM()   { return sumi() ? tft.color565(138, 129, 116) : tft.color565(90, 112, 128); }
-uint16_t UI_LINE()  { return sumi() ? tft.color565(201, 191, 174) : tft.color565(32, 50, 64); }
-uint16_t UI_PANEL() { return sumi() ? tft.color565(222, 212, 194) : tft.color565(14, 42, 52); }
+uint16_t UI_LABEL() { return tft.color565(150, 175, 192); }
+uint16_t UI_DIM()   { return tft.color565(90, 112, 128); }
+uint16_t UI_LINE()  { return tft.color565(32, 50, 64); }
+uint16_t UI_PANEL() { return tft.color565(14, 42, 52); }
 
 static void upper(const char* s, char* out, size_t n) {
   size_t i = 0;

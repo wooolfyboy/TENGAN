@@ -73,18 +73,6 @@ void shutFrame(uint32_t t) {
       spr.setTextColor(UI_LABEL());
       txt(DEVICE_NAME, cx, cy - 42, 1);
     }
-  } else if (g_theme == THEME_SUMI) {                  // SUMI: вместо CRT — капля туши растекается и заливает бумагу
-    float k = min(1.0f, (t - 650) / 700.0f), e = k * k * (3 - 2 * k);
-    int R = (int)(e * 200);
-    uint16_t ink = C_ACC();
-    if (R > 0) {
-      spr.fillCircle(cx, cy, R, ink);
-      for (int i = 0; i < 9; i++) {                    // неровный край: «подтёки» по кругу
-        float a = i * 0.698f + 0.4f, rr = R * (0.18f + 0.07f * ((i * 37) % 5));
-        spr.fillCircle(cx + (int)(cosf(a) * R * 0.92f), cy + (int)(sinf(a) * R * 0.92f), (int)rr, ink);
-      }
-    }
-    if (k < 0.5f) spr.fillCircle(cx, cy, 3, C_SEAL());   // красная точка-печать в центре, пока не утонула
   } else if (t < 900) {                                // 2. экран сжимается в светящуюся полосу
     float k = (t - 650) / 250.0f;
     int h = max(2, (int)(H * (1 - k) * (1 - k)));

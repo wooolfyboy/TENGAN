@@ -23,7 +23,7 @@ int g_scrBright = 100;
 int g_dimIdx = 0;                        // по умолчанию экран не гаснет
 int g_sndIdx = 1;                        // тихие звуки интерфейса
 int g_clickEn = 1;
-int g_theme = THEME_DENKO;                // оформление: DENKO 電光 (свет, HUD) / SUMI 墨 (тушь)
+int g_theme = THEME_DENKO;                // оформление: пока одна тема — DENKO 電光 (свет, HUD)
 int g_micEn = 1;
 int g_auSrc = 0;
 int g_city = 0;
@@ -56,7 +56,7 @@ enum { P_GENERAL, P_BLE, P_WIFI, P_SUBGHZ, P_SOUND, P_ALERT, P_NUM };
 enum { K_ENUM, K_RANGE, K_BOOL, K_INFO };                 // вид пункта (для планшета)
 struct SetDef { const char* name; const char* hint; uint8_t page; const char* key; uint8_t kind; int16_t mn, mx, step; const char* unit; };
 static const SetDef DEFS[S_NUM] = {
-  { "Theme",          "look: denko light / sumi ink", P_GENERAL, "theme",      K_ENUM },
+  { "Theme",          "look (more themes later)",   P_GENERAL, "theme",      K_ENUM },
   { "Screen",         "screen backlight",            P_GENERAL, "screen",     K_RANGE, 20, 100, 10, "%" },
   { "Auto dim",       "dim screen when idle",        P_GENERAL, "dim",        K_ENUM },
   { "LED brightness", "led strip brightness",        P_GENERAL, "ledbr",      K_RANGE, 10, 100, 10, "%" },
@@ -119,7 +119,7 @@ void loadSettings() {
   g_sndIdx    = g_prefs.getInt("snd", 1);
   g_micEn     = g_prefs.getInt("mic", 1) ? 1 : 0;
   g_clickEn   = g_prefs.getInt("click", 1) ? 1 : 0;
-  g_theme     = g_prefs.getInt("theme", THEME_DENKO) == THEME_SUMI ? THEME_SUMI : THEME_DENKO;
+  g_theme     = THEME_DENKO;                       // тема SUMI убрана: старое сохранённое значение не важно
   g_auLeds    = g_prefs.getInt("auled", 0) ? 1 : 0;
   g_auSrc     = constrain(g_prefs.getInt("ausrc", 0), 0, 2);
   g_gpsKnown  = g_prefs.getBool("gpsok", false);
@@ -201,7 +201,7 @@ static const char* const AL_NAMES[3]  = { "off", "near", "any" };
 
 static int optCount(int id) {                             // сколько вариантов у пункта-списка
   switch (id) {
-    case S_THEME: return 2;
+    case S_THEME: return 1;
     case S_DIM: return N_DIMS;
     case S_VOLUME: return 3;
     case S_CITY: return cityCount();
@@ -214,7 +214,7 @@ static int optCount(int id) {                             // сколько ва
 }
 static void optName(int id, int i, char* out, size_t n) {   // имя варианта (как на планшете)
   switch (id) {
-    case S_THEME:  snprintf(out, n, "%s", i == THEME_SUMI ? "sumi" : "denko"); break;
+    case S_THEME:  snprintf(out, n, "%s", "denko"); break;
     case S_DIM:    if (DIM_SECS[i] == 0) snprintf(out, n, "off"); else if (DIM_SECS[i] < 60) snprintf(out, n, "%d s", DIM_SECS[i]); else snprintf(out, n, "%d min", DIM_SECS[i] / 60); break;
     case S_VOLUME: snprintf(out, n, "%s", VOL_NAMES[i]); break;
     case S_CITY:   snprintf(out, n, "%s", i == N_CITIES ? g_gpsCity.name : CITIES[i].name); break;
@@ -249,7 +249,7 @@ static bool setVal(int id, int v) {
   if (d.kind == K_BOOL)  v = v ? 1 : 0;
   if (d.kind == K_RANGE) v = constrain(v, d.mn, d.mx);
   switch (id) {
-    case S_THEME:   g_theme = v ? THEME_SUMI : THEME_DENKO; break;
+    case S_THEME:   g_theme = THEME_DENKO; break;
     case S_SCREEN:  g_scrBright = v; break;
     case S_DIM:     g_dimIdx = v; break;
     case S_LEDBR:   g_ledBright = v; break;
@@ -414,7 +414,7 @@ void drawSettings() {
         break;
       case S_VOLUME:  sprintf(val, "%s", g_sndIdx == 0 ? "off" : g_sndIdx == 1 ? "quiet" : "loud"); break;
       case S_CLICKS:  strcpy(val, onOff(g_clickEn)); break;
-      case S_THEME:   strcpy(val, g_theme == THEME_SUMI ? "sumi" : "denko"); break;
+      case S_THEME:   strcpy(val, "denko"); break;
       case S_BLETICK: strcpy(val, onOff(g_bleTicks)); break;
       case S_WTICK:   strcpy(val, onOff(g_wifiTicks)); break;
       case S_BAND:    strcpy(val, BANDS[g_band].name); break;

@@ -387,7 +387,7 @@ static void sseTick(uint32_t now) {
       o += ",\"bat\":"; o += g_bat.ok ? g_bat.soc : -1; o += ",\"mv\":"; o += g_bat.mv;
       o += ",\"usb\":"; o += g_bat.bus ? 1 : 0; o += ",\"chg\":"; o += g_bat.chg;
       o += ",\"cli\":"; o += WiFi.softAPgetStationNum(); o += ",\"heap\":"; o += ESP.getFreeHeap() / 1024;
-      o += ",\"theme\":\""; o += g_theme == THEME_SUMI ? "sumi" : "denko"; o += '"';
+      o += ",\"theme\":\""; o += "denko"; o += '"';
       o += ",\"ver\":\"" FW_VERSION "\"";
       o += ",\"rst\":"; jsonStr(o, crumbLastReason()); o += ",\"rstStep\":"; jsonStr(o, crumbLastStep());
       o += ",\"radio\":\""; o += bleRadioActive() ? "b" : ""; o += s_scanMs && now - s_scanMs < 25000 ? "w" : "";
@@ -535,7 +535,7 @@ static bool apiHandle(const char* path, const ApiArgs& A, String& o) {
     o += ",\"cli\":"; o += s_on && s_ok ? (int)WiFi.softAPgetStationNum() : 0;
     o += ",\"nets\":"; o += s_netCount;
     o += ",\"build\":\"" __DATE__ " " __TIME__ "\"";
-    o += ",\"theme\":\""; o += g_theme == THEME_SUMI ? "sumi" : "denko"; o += '"';
+    o += ",\"theme\":\""; o += "denko"; o += '"';
     o += ",\"ver\":\"" FW_VERSION "\"";
     o += ",\"rst\":"; jsonStr(o, crumbLastReason()); o += ",\"rstStep\":"; jsonStr(o, crumbLastStep());
     o += ",\"ssid\":\""; o += s_ssid; o += "\"}";

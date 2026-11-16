@@ -15,7 +15,7 @@ static const int N_RANGES = sizeof(RANGES) / sizeof(RANGES[0]);
 static const int RANGE_HYST_DB = 5;
 static const uint32_t MIN_PKTS = 2;        // одиночный случайный пакет не считается
 
-enum { THEME_DENKO = 0, THEME_SUMI = 1 };   // темы: DENKŌ 電光 (электрический свет, HUD) / SUMI 墨 (тушь); TENGAN — имя прошивки
+enum { THEME_DENKO = 0 };                  // темы: DENKŌ 電光 (электрический свет, HUD); TENGAN — имя прошивки. Новые — потом
 extern bool g_screenOff;                   // экран погашен с планшета (палка работает); любое касание палки включает
 extern int g_theme;                        // оформление (THEME_*), меняется в General
 extern int g_range;                        // индекс в RANGES

@@ -9,7 +9,6 @@
 #include "core/settings.h"
 #include "core/timeutil.h"
 
-static bool sumi() { return g_theme == THEME_SUMI; }
 
 // карта с волнами (значок меню)
 void iconCard(int x, int y, uint16_t c, uint16_t bg) {
@@ -28,7 +27,7 @@ static void card(int x, int y, int w, int h, uint16_t edge, uint16_t fill, bool 
   for (int i = 0; i < 3; i++) spr.drawArc(x + w - 22, y + 16, 3 + i * 4, 2 + i * 4, 225, 315, edge, fill, true);   // знак бесконтактной
   if (chip) {
     int cx = x + 12, cy = y + h / 2 - 9;
-    spr.fillRoundRect(cx, cy, 20, 15, 3, sumi() ? C_SEAL() : C_ACC());
+    spr.fillRoundRect(cx, cy, 20, 15, 3, C_ACC());
     spr.drawFastHLine(cx, cy + 7, 20, fill); spr.drawFastVLine(cx + 10, cy, 15, fill);
   }
   if (bank) for (int g = 0; g < 4; g++) for (int k = 0; k < 4; k++)
@@ -52,7 +51,7 @@ static void drawIdle(uint32_t now) {
   slide = 1 - (1 - slide) * (1 - slide);
   int cx = W / 2 + 40, cy = 74;
   if (t >= 0.5f) rings(cx, cy, (t - 0.5f) * 2, acc);
-  spr.fillSmoothCircle(cx, cy, 6, sumi() ? C_SEAL() : C_HOT(), C_BG());
+  spr.fillSmoothCircle(cx, cy, 6, C_HOT(), C_BG());
   int x = (int)(20 + slide * (cx - 44 - 20));
   card(x, cy - 26, 88, 54, scale565(UI_LABEL(), 50 + (int)(slide * 50)), UI_PANEL(), true, false);
   spr.setTextDatum(MC_DATUM);

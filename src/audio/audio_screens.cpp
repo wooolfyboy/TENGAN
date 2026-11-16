@@ -308,8 +308,8 @@ void drawTerrain(uint32_t now) {
   };
   // небо: «солнце» на горизонте светится от громкости
   int sunR = 12 + (int)(g_au.energy * 8);
-  // в DENKO — светящийся диск цветом акцента; в SUMI — красное солнце киноварью, как на картинах тушью
-  uint16_t sunC = g_theme == THEME_SUMI ? scale565(C_SEAL(), 70 + (int)(g_au.energy * 30)) : scale565(C_ACC(), 20 + (int)(g_au.energy * 35));
+  // светящийся диск цветом акцента
+  uint16_t sunC = scale565(C_ACC(), 20 + (int)(g_au.energy * 35));
   spr.fillCircle(cx + 60, (int)hy - 2, sunR, sunC);
   spr.drawFastHLine(0, (int)hy, W, UI_LINE());
 
