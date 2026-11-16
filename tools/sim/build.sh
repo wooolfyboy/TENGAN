@@ -6,7 +6,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SIM="$ROOT/tools/sim"
 WORK="${SIM_WORK:-$SIM/.build}"
-OUT="$SIM/out"
+OUT="${SIM_OUTDIR:-$SIM/out}"
 LIB="$ROOT/.pio/libdeps/t-embed-cc1101/TFT_eSPI"
 mkdir -p "$WORK" "$OUT"
 

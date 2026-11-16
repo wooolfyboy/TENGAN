@@ -172,23 +172,23 @@ static void drawMainMenuHud() {
     const Section* s = SECTIONS[i];
     bool sel = (i == s_menuSel);
     int x = x0 + (i - first) * (cw + gap), cx = x + cw / 2;
-    uint16_t pbg = sel ? UI_PANEL() : bg;
+    uint16_t pbg = sel ? C_SELBG() : bg;
     if (sel) hudPanel(x, y0, cw, ch, 12, pbg, true, bg);
-    hudPanel(x, y0, cw, ch, 12, sel ? acc : C(45, 60, 72), false, bg);
-    s->icon(cx, y0 + 30, sel ? acc : C(110, 110, 125), pbg);
+    hudPanel(x, y0, cw, ch, 12, sel ? acc : UI_LINE(), false, bg);
+    s->icon(cx, y0 + 30, sel ? (themeKurenai() ? C_SELFG() : acc) : C(110, 110, 125), pbg);
     char title[16]; size_t k = 0;
     for (; s->title[k] && k < sizeof(title) - 1; k++) title[k] = (char)toupper((unsigned char)s->title[k]);
     title[k] = 0;
     spr.setTextDatum(TC_DATUM);
-    spr.setTextColor(sel ? C_HOT() : steel);
+    spr.setTextColor(sel ? C_SELFG() : steel);
     txt(title, cx, y0 + 62, txtW(title, 2) > cw - 4 ? 1 : 2);   // длинное название — мельче
     char sub[24], big[16], small[16];
     s->subtitle(sub, sizeof(sub));
     splitSubtitle(sub, big, small, sizeof(big));
     bool alertish = (strcmp(small, "NO CHIP") == 0);
-    spr.setTextColor(alertish ? C_ALERT() : (sel ? acc : steel));
+    spr.setTextColor(alertish ? C_ALERT() : (sel ? C_SELACC() : steel));
     txt(big, cx, y0 + 82, 4);
-    spr.setTextColor(dim);
+    spr.setTextColor(sel && themeKurenai() ? UI_LINE() : dim);
     char sm[16]; snprintf(sm, sizeof(sm), "%.*s", cw / 6, small);   // сколько влезает
     txt(sm, cx, y0 + 110, 1);
   }

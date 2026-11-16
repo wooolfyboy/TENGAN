@@ -76,7 +76,7 @@
         const aa = a0 + (a1 - a0) * k / n, ab = a0 + (a1 - a0) * (k + 0.7) / n;
         g.strokeStyle = alert ? T.C.alert : T.heat(0.3 + 0.7 * k / n); g.beginPath(); g.arc(cx, cy, R, aa, ab); g.stroke();
       }
-      g.strokeStyle = 'rgba(62,230,255,.35)'; g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, R + lw * 0.9, a0, a1); g.stroke();
+      g.strokeStyle = `rgba(${T.RGB.acc},.35)`; g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, R + lw * 0.9, a0, a1); g.stroke();
       for (let k = 0; k <= 10; k++) { const a = a0 + (a1 - a0) * k / 10; g.beginPath(); g.moveTo(cx + Math.cos(a) * (R - lw * 0.9), cy + Math.sin(a) * (R - lw * 0.9)); g.lineTo(cx + Math.cos(a) * (R - lw * 1.3), cy + Math.sin(a) * (R - lw * 1.3)); g.strokeStyle = k % 5 ? T.C.dim : T.C.acc; g.stroke(); }
       const bs = String(Math.round(big)), bw = T.tw(g, bs, R * 0.62, 't');
       T.txt(g, bs, cx, cy + R * 0.2, R * 0.62, alert ? T.C.alert : T.C.hot, 't', 'center');
@@ -96,7 +96,7 @@
       const cyy = port ? a.y + ringsH + u : a.y + a.h - chartH, cw = lw;
       T.txt(g, 'CPU · 2 MIN', a.x, cyy + u * 0.7, u * 0.75, T.C.dim);
       const gy = cyy + u * 1.2, gh = chartH - u * 1.4;
-      g.strokeStyle = 'rgba(32,50,64,.6)'; g.lineWidth = 1;
+      g.strokeStyle = `rgba(${T.RGB.line},.6)`; g.lineWidth = 1;
       for (let k = 0; k <= 4; k++) { const y = gy + gh * k / 4; g.beginPath(); g.moveTo(a.x, y); g.lineTo(a.x + cw, y); g.stroke(); }
       const hist = S.pcHist.slice(-120);
       if (hist.length > 1) T.spark(g, a.x, gy, cw * (hist.length / 120), gh, hist, 0, 100, T.C.acc);
@@ -211,7 +211,7 @@
         const bx = T.clamp(tx + u * 3, a.x, a.x + a.w - bw), by = T.clamp(ty - u * 8, a.y + u, a.y + a.h - bh);
         T.diamond(g, tx, ty, u * 0.7, T.C.hot, false);
         g.strokeStyle = T.C.hot; g.lineWidth = 1; g.beginPath(); g.moveTo(tx, ty); g.lineTo(bx, by + bh * 0.5); g.stroke();
-        T.panel(g, bx, by, bw, bh, u, 'rgba(5,8,13,.78)', T.C.acc);
+        T.panel(g, bx, by, bw, bh, u, `rgba(${T.RGB.bg},.78)`, T.C.acc);
         g.font = `500 ${u * 1.2}px ${T.FC}`; T.txt(g, T.fit(g, e.name, bw - u * 2), bx + u, by + u * 1.7, u * 1.2, T.C.hot, 'c');
         T.txt(g, (e.fg ? 'active window' : 'background').toUpperCase(), bx + u, by + u * 2.8, u * 0.72, e.fg ? T.C.acc : T.C.label);
         T.bigNum(g, Math.round(e.cpu), bx + u, by + u * 5.6, u * 2.6, e.cpu > 50 ? T.C.alert : T.C.hot, '% CPU');
@@ -229,27 +229,27 @@
       this.angle += this.spinV * dt;
       // свечение вокруг
       const gl = g.createRadialGradient(cx, cy, R * 0.9, cx, cy, R * 1.3);
-      gl.addColorStop(0, `rgba(62,230,255,${play ? 0.25 : 0.08})`); gl.addColorStop(1, 'rgba(62,230,255,0)');
+      gl.addColorStop(0, `rgba(${T.RGB.acc},${play ? 0.25 : 0.08})`); gl.addColorStop(1, `rgba(${T.RGB.acc},0)`);
       g.fillStyle = gl; g.beginPath(); g.arc(cx, cy, R * 1.3, 0, T.TAU); g.fill();
       // диск и бороздки
       g.fillStyle = '#07090d'; g.beginPath(); g.arc(cx, cy, R, 0, T.TAU); g.fill();
       g.lineWidth = 1;
-      for (let r = R * 0.38; r < R * 0.98; r += Math.max(1.6, R / 70)) { g.strokeStyle = `rgba(150,175,192,${0.05 + 0.04 * ((r * 7) % 3 > 1.5)})`; g.beginPath(); g.arc(cx, cy, r, 0, T.TAU); g.stroke(); }
+      for (let r = R * 0.38; r < R * 0.98; r += Math.max(1.6, R / 70)) { g.strokeStyle = `rgba(${T.RGB.label},${0.05 + 0.04 * ((r * 7) % 3 > 1.5)})`; g.beginPath(); g.arc(cx, cy, r, 0, T.TAU); g.stroke(); }
       // блик: свет неподвижен, бороздки блестят в двух секторах
       if (g.createConicGradient) {
         const cg = g.createConicGradient(-0.6, cx, cy);
-        cg.addColorStop(0, 'rgba(235,250,255,0)'); cg.addColorStop(0.06, 'rgba(235,250,255,.13)'); cg.addColorStop(0.12, 'rgba(235,250,255,0)');
-        cg.addColorStop(0.5, 'rgba(235,250,255,0)'); cg.addColorStop(0.56, 'rgba(235,250,255,.1)'); cg.addColorStop(0.62, 'rgba(235,250,255,0)'); cg.addColorStop(1, 'rgba(235,250,255,0)');
+        cg.addColorStop(0, `rgba(${T.RGB.hot},0)`); cg.addColorStop(0.06, `rgba(${T.RGB.hot},.13)`); cg.addColorStop(0.12, `rgba(${T.RGB.hot},0)`);
+        cg.addColorStop(0.5, `rgba(${T.RGB.hot},0)`); cg.addColorStop(0.56, `rgba(${T.RGB.hot},.1)`); cg.addColorStop(0.62, `rgba(${T.RGB.hot},0)`); cg.addColorStop(1, `rgba(${T.RGB.hot},0)`);
         g.fillStyle = cg; g.beginPath(); g.arc(cx, cy, R * 0.98, 0, T.TAU); g.arc(cx, cy, R * 0.38, 0, T.TAU, true); g.fill();
       }
       g.strokeStyle = T.C.acc; g.lineWidth = 1.5; g.beginPath(); g.arc(cx, cy, R, 0, T.TAU); g.stroke();
       // наклейка вращается
       g.save(); g.translate(cx, cy); g.rotate(this.angle);
-      const lg = g.createRadialGradient(0, 0, 0, 0, 0, R * 0.34); lg.addColorStop(0, '#0e2a34'); lg.addColorStop(1, '#123a48');
+      const lg = g.createRadialGradient(0, 0, 0, 0, 0, R * 0.34); lg.addColorStop(0, T.C.panel); lg.addColorStop(1, '#123a48');
       g.fillStyle = lg; g.beginPath(); g.arc(0, 0, R * 0.34, 0, T.TAU); g.fill();
       g.strokeStyle = T.C.acc; g.lineWidth = 1; g.beginPath(); g.arc(0, 0, R * 0.34, 0, T.TAU); g.stroke();
       T.txt(g, 'TENGAN', 0, -R * 0.12, R * 0.09, T.C.acc, 't', 'center');
-      for (let k = 0; k < 3; k++) { g.rotate(T.TAU / 3); g.fillStyle = 'rgba(62,230,255,.5)'; g.fillRect(R * 0.2, -1, R * 0.1, 2); }
+      for (let k = 0; k < 3; k++) { g.rotate(T.TAU / 3); g.fillStyle = `rgba(${T.RGB.acc},.5)`; g.fillRect(R * 0.2, -1, R * 0.1, 2); }
       g.restore();
       g.fillStyle = T.C.hot; g.beginPath(); g.arc(cx, cy, Math.max(2, R * 0.025), 0, T.TAU); g.fill();
       // тонарм
@@ -290,7 +290,7 @@
       for (const k of keys) {
         if (!k) { bx += bs * 0.5; continue; }
         const [key, ic] = k, hot = this.pressK === key && t - this.pressT < 0.25, big = key === 'PLAY';
-        T.panel(g, bx, y, bs, bs, u * 0.5, hot ? 'rgba(62,230,255,.35)' : big ? 'rgba(62,230,255,.12)' : 'rgba(14,42,52,.35)', hot || big ? T.C.acc : 'rgba(62,230,255,.3)');
+        T.panel(g, bx, y, bs, bs, u * 0.5, hot ? `rgba(${T.RGB.acc},.35)` : big ? `rgba(${T.RGB.acc},.12)` : `rgba(${T.RGB.panel},.35)`, hot || big ? T.C.acc : `rgba(${T.RGB.acc},.3)`);
         const cx = bx + bs / 2, cy = y + bs / 2, s = bs * 0.2, col = hot ? T.C.hot : big ? T.C.hot : T.C.acc;
         g.fillStyle = col; g.strokeStyle = col; g.lineWidth = Math.max(1.5, bs * 0.06);
         const tri = (x0, dir) => { g.beginPath(); g.moveTo(x0, cy - s); g.lineTo(x0 + dir * s * 1.3, cy); g.lineTo(x0, cy + s); g.closePath(); g.fill(); };

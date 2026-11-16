@@ -63,7 +63,7 @@
       else if (this.sub === 2) this.reactor(g, area, u, dt, t);
       else if (this.sub === 3) this.scope(g, area, u, dt);
       else this.xy(g, area, u, dt);
-      if (!(T.theme === 'sumi' && this.sub === 1)) T.bloom(o, this.sub === 1 ? 0.6 : 0.85);   // рельеф тушью уже «растёкся»
+      T.bloom(o, this.sub === 1 ? 0.6 : 0.85);
       // HUD поверх
       const hz = S.hz >= 1000 ? (S.hz / 1000).toFixed(1) + ' kHz' : S.hz + ' Hz';
       const word = this.lvS < -55 ? 'quiet' : this.lvS < -40 ? 'normal' : this.lvS < -15 ? 'loud' : 'very loud';
@@ -91,9 +91,9 @@
       const n = 32, L = a.x + u * 1.6, bw = (a.w - u * 1.6) / n, base = a.y + a.h * 0.7, H = base - a.y - u, seg = Math.max(4, u * 0.55);
       // пол
       const fl = g.createLinearGradient(0, base, 0, a.y + a.h);
-      fl.addColorStop(0, 'rgba(62,230,255,.10)'); fl.addColorStop(1, 'rgba(62,230,255,0)');
+      fl.addColorStop(0, `rgba(${T.RGB.acc},.10)`); fl.addColorStop(1, `rgba(${T.RGB.acc},0)`);
       g.fillStyle = fl; g.fillRect(L, base, bw * n, a.y + a.h - base);
-      g.strokeStyle = 'rgba(32,50,64,.5)'; g.lineWidth = 1;
+      g.strokeStyle = `rgba(${T.RGB.line},.5)`; g.lineWidth = 1;
       for (let k = 1; k <= 4; k++) { const y = base - H * k / 4; g.beginPath(); g.moveTo(L, y); g.lineTo(L + bw * n, y); g.stroke(); }
       for (let i = 0; i < n; i++) {
         const v = S.bands[i], x = L + i * bw, segs = Math.floor(v * H / seg);
@@ -131,15 +131,14 @@
         this.rows.unshift(row); if (this.rows.length > this.ROWS) this.rows.pop();
       }
       if (T.glOrbit && T.GL.ok && this.COLS === 128) return this.terrainGL(g, w, h, u, top);
-      if (T.theme === 'sumi') return this.terrainInk(g, w, h, u, top);
       const hy = top + (h - top) * (0.16 - this.tilt * 0.12), camH = 1.25 + this.tilt * 0.6, cx = w / 2;
       const F = Math.max(Math.min(w, h * 1.6) * 0.62, (h * 0.97 - hy) * 1.5 / camH);
       // солнце-резонатор на горизонте
       const sx = w * 0.68, sunR = u * (1.8 + S.energy * 2.2);
       const sg = g.createRadialGradient(sx, hy, 0, sx, hy, sunR * 2.4);
-      sg.addColorStop(0, 'rgba(235,250,255,.75)'); sg.addColorStop(0.25, 'rgba(62,230,255,.45)'); sg.addColorStop(1, 'rgba(62,230,255,0)');
+      sg.addColorStop(0, `rgba(${T.RGB.hot},.75)`); sg.addColorStop(0.25, `rgba(${T.RGB.acc},.45)`); sg.addColorStop(1, `rgba(${T.RGB.acc},0)`);
       g.fillStyle = sg; g.beginPath(); g.arc(sx, hy, sunR * 2.4, 0, T.TAU); g.fill();
-      for (let k = 1; k < 6; k++) { g.fillStyle = 'rgba(5,8,13,.85)'; g.fillRect(sx - sunR * 2.4, hy - k * sunR * 0.28, sunR * 4.8, Math.max(1, k * 0.6)); }
+      for (let k = 1; k < 6; k++) { g.fillStyle = `rgba(${T.RGB.bg},.85)`; g.fillRect(sx - sunR * 2.4, hy - k * sunR * 0.28, sunR * 4.8, Math.max(1, k * 0.6)); }
       g.fillStyle = T.C.line; g.fillRect(0, hy, w, 1);
       const sh = T.heatRGB(0.4);
       for (let r = this.rows.length - 1; r >= 0; r--) {
@@ -155,17 +154,16 @@
     },
 
     // WebGL: полёт над рельефом звука. Новый хребет рождается у горизонта и плывёт к камере;
-    // свет по нормалям, сетка-«трон» (DENKO) или тушь и туман-сансуй (SUMI), солнце на горизонте.
+    // свет по нормалям, сетка-«трон», солнце на горизонте.
     terrainGL(g, w, h, u, top) {
-      const O = T.glOrbit, C = this.COLS, R = this.ROWS, sumi = T.theme === 'sumi';
+      const O = T.glOrbit, C = this.COLS, R = this.ROWS;
       if (!this.tgP) {
         this.tgSky = T.GL.prog(T.GL.NOISE + `
-uniform vec2 res; uniform float t, hy, sumi, lv; uniform vec3 sun, cBg, cAcc, cHot, cAlert;
+uniform vec2 res; uniform float t, hy, lv; uniform vec3 sun, cBg, cAcc, cHot, cAlert;
 void main(){
   vec2 p=gl_FragCoord.xy; float y=(p.y-hy)/res.y;
   vec3 col;
   float d=length(p-sun.xy)/sun.z;
-  if(sumi<.5){
     col=mix(cBg+cAcc*.10,cBg*.9,smoothstep(0.,.45,y));
     vec2 q=floor(p/3.); float st=step(.9975,hash(q))*smoothstep(.02,.2,y)*(.5+.5*sin(t*2.+hash(q+7.)*40.));
     col+=vec3(st)*.8;
@@ -175,19 +173,10 @@ void main(){
     if(below>0.){ float band=fract(below*6.); disk*=step(below*.55,band); }
     col=mix(col,sc,disk*step(hy,p.y));
     col+=cAcc*exp(-d*1.6)*(.35+lv*.5);
-  }else{
-    float paper=.96+.04*fbm(p/80.);
-    col=cBg*paper;
-    col=mix(col,cBg*.86,smoothstep(.0,.6,y)*.35);
-    float edge=.03*fbm(p/18.+3.);
-    float disk=smoothstep(1.+edge,.9+edge,d);
-    col=mix(col,cAlert,disk*.85);
-    col=mix(col,cAlert,exp(-d*2.5)*.12);
-  }
   gl_FragColor=vec4(col,1.);
 }`);
         this.tgP = O.prog(T.GL.NOISE + `
-uniform vec3 cBg, cAcc, cHot, cLine, cAlert; uniform float sumi, lv, t;
+uniform vec3 cBg, cAcc, cHot, cLine, cAlert; uniform float lv, t;
 varying vec3 wp; varying float vd; varying float vh; varying vec2 vg;
 void main(){
   float v=clamp(vh,0.,1.);
@@ -201,7 +190,6 @@ void main(){
 #endif
   float fog=exp(-max(0.,vd-1.)*.13);
   vec3 col;
-  if(sumi<.5){
     float dr=abs(fract(vg.y+.5)-.5), dc=abs(fract(vg.x/4.+.5)-.5)*4.;
     float lr=1.-smoothstep(ay*.5,ay*1.5,dr), lc=1.-smoothstep(ax*.5,ax*1.5,dc);
     vec3 heat=v<.5?mix(cLine,cAcc,v*2.):mix(cAcc,cHot,(v-.5)*2.);
@@ -209,21 +197,6 @@ void main(){
     col+=heat*(lr*.9+lc*.22*fog)*(.25+.9*v);
     col+=cHot*pow(v,4.)*.9;
     col=mix(cBg+cAcc*.10,col,fog);
-  }else{
-    // тушь: темнее к гребням и на склонах, «морщины» кисти (цунь) по высоте, грани почти не видны
-    float ink=.06+.16*(1.-shade)+.55*smoothstep(.15,.9,v);
-    ink*=.7+.6*fbm(vec2(wp.x*6.,vh*14.+wp.z*.5));
-    col=mix(cBg,cAcc,clamp(ink,0.,1.)*.75);
-    float ct=abs(fract(vh*9.+.5)-.5);
-#ifndef NODERIV
-    float aw=fwidth(vh*9.);
-#else
-    float aw=.05;
-#endif
-    col=mix(col,cAcc,(1.-smoothstep(aw*.5,aw*1.8,ct))*.45);
-    float mist=fog*(.75+.25*fbm(vec2(wp.x*.4+t*.05,vd*.3)));
-    col=mix(cBg,col,clamp(mist,0.,1.));
-  }
   gl_FragColor=vec4(col,1.);
 }`);
         this.tgH = new Float32Array(C * R); this.tgN = -1;
@@ -245,45 +218,15 @@ void main(){
       T.GL.begin(w, h);
       const k = T.GL.w / w, lv = this.rows[0] ? this.rows[0].max : 0;
       const Cc = T.C, col = O.rgb;
-      const sunX = w * 0.66, sunR = u * (sumi ? 3.2 + lv * 1.5 : 3.6 + S.energy * 2.5);
-      T.GL.quad(this.tgSky, { t: performance.now() / 1000, hy: (h - hyCss) * k, sumi: sumi ? 1 : 0, lv,
+      const sunX = w * 0.66, sunR = u * (3.6 + S.energy * 2.5);
+      T.GL.quad(this.tgSky, { t: performance.now() / 1000, hy: (h - hyCss) * k, lv,
         sun: [sunX * k, (h - hyCss + sunR * 0.45) * k, sunR * k], cBg: col(Cc.bg), cAcc: col(Cc.acc), cHot: col(Cc.hot), cAlert: col(Cc.alert) });
       const zFar = -2.2 + (R - 1) * 0.13;
       G.draw(this.tgP, cam, [w, h], [-1, 2 / (C - 1), zFar, -0.13], {
-        zoff: this.rowT / 0.025, hs: 0.75, fitw: (w / 2) / F * 1.04, sumi: sumi ? 1 : 0, lv, t: performance.now() / 1000,
-        cBg: col(Cc.bg), cAcc: col(Cc.acc), cHot: col(Cc.hot), cLine: col(sumi ? Cc.dim : Cc.line), cAlert: col(Cc.alert),
+        zoff: this.rowT / 0.025, hs: 0.75, fitw: (w / 2) / F * 1.04, lv, t: performance.now() / 1000,
+        cBg: col(Cc.bg), cAcc: col(Cc.acc), cHot: col(Cc.hot), cLine: col(Cc.line), cAlert: col(Cc.alert),
       });
       T.GL.draw(g, 0, 0, w, h);
-      if (sumi) T.ink.hanko(g, w - u * 6.5, h - u * 7.5, u * 2.2, ['音'], { seed: 12, rot: -0.04 });
-    },
-    // SUMI: история спектра — гряды гор (сансуй): ближние тёмные, дальние тают в тумане, красное солнце
-    terrainInk(g, w, h, u, top) {
-      // «фейк»: кистью рисуем в слой ~15 раз в секунду, в остальные кадры кладём готовую картинку
-      const cv = this.cv.cv, now = performance.now();
-      if (!this.inkL) { this.inkL = document.createElement('canvas'); this.inkG = this.inkL.getContext('2d'); }
-      if (this.inkL.width !== cv.width || this.inkL.height !== cv.height) { this.inkL.width = cv.width; this.inkL.height = cv.height; this.inkT = 0; }
-      if (now - (this.inkT || 0) > 66) {
-        this.inkT = now; const lg = this.inkG; lg.setTransform(1, 0, 0, 1, 0, 0); lg.clearRect(0, 0, cv.width, cv.height); lg.setTransform(this.cv.dpr, 0, 0, this.cv.dpr, 0, 0);
-        this.terrainInkDraw(lg, w, h, u, top);
-      }
-      g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(this.inkL, 0, 0); g.restore();
-    },
-    terrainInkDraw(g, w, h, u, top) {
-      const I = T.ink, hz = top + (h - top) * 0.22, N = 14, step = Math.max(1, Math.floor(this.rows.length / N));
-      const lv = this.rows[0] ? this.rows[0].max : 0, sr = u * (2.6 + lv * 2.4);
-      I.raw(g, 'fillStyle', I.shu(0.85)); g.beginPath(); g.arc(w * 0.7, hz + u * 1.5, sr, 0, T.TAU); g.fill();
-      const idx = []; for (let k = 0; k < N && k * step < this.rows.length; k++) idx.push(k * step);
-      for (let j = idx.length - 1; j >= 0; j--) {
-        const row = this.rows[idx[j]], t = j / Math.max(1, N - 1), y0 = hz + u * 2 + Math.pow(1 - t, 1.6) * (h - hz) * 0.82;
-        const amp = u * (5 + 13 * (1 - t)), al = 0.1 + 0.75 * Math.pow(1 - t, 1.6), C = this.COLS, pts = [];
-        for (let c = 0; c < C; c += 2) pts.push([-u * 2 + (w + u * 4) * c / (C - 1), y0 - amp * row[c] * 1.4]);
-        I.raw(g, 'fillStyle', '#ece4d4'); g.beginPath(); g.moveTo(-u * 2, h); for (const p of pts) g.lineTo(p[0], p[1]); g.lineTo(w + u * 2, h); g.closePath(); g.fill();
-        let mn = 1e9; for (const p of pts) mn = Math.min(mn, p[1]);
-        const gr = g.createLinearGradient(0, mn, 0, y0 + u * 6), tt = T.theme; T.theme = 'raw'; gr.addColorStop(0, I.ink(al * 0.55)); gr.addColorStop(1, I.ink(0)); g.fillStyle = gr; T.theme = tt; g.fill();
-        I.stroke(g, pts, u * (0.18 + 0.7 * (1 - t)), { seed: idx[j] * 31 + 7, taper: [0.02, 0.08], dry: 0.9, alpha: al });
-        I.mist(g, y0 + u * 1.2, u * 2.2, w, 0.35 * (t + 0.2));
-      }
-      I.hanko(g, w - u * 6.5, h - u * 7.5, u * 2.2, ['音'], { seed: 12, rot: -0.04 });
     },
     // реактор: ядро пульсирует уровнем, круговой спектр, частицы вылетают на басах
     reactor(g, a, u, dt, t) {
@@ -301,7 +244,7 @@ void main(){
       for (let k = 0; k < 3; k++) {
         const rr = Rm * (0.55 + k * 0.17), tilt = 0.32 + k * 0.12, rot = this.spin * (k % 2 ? -0.4 : 0.3) + k;
         g.save(); g.translate(cx, cy); g.rotate(rot); g.scale(1, tilt);
-        g.strokeStyle = k === 2 ? 'rgba(62,230,255,.55)' : 'rgba(90,112,128,.45)'; g.lineWidth = 1.2 / Math.sqrt(tilt);
+        g.strokeStyle = k === 2 ? `rgba(${T.RGB.acc},.55)` : `rgba(${T.RGB.dim},.45)`; g.lineWidth = 1.2 / Math.sqrt(tilt);
         g.beginPath(); g.arc(0, 0, rr, 0, T.TAU); g.stroke();
         g.restore();
         const pa = t * (0.6 + k * 0.3) * (k % 2 ? -1 : 1), ex = Math.cos(pa) * rr, ey = Math.sin(pa) * rr * tilt;   // «спутник» — без растяжения
@@ -317,7 +260,7 @@ void main(){
       }
       // ядро
       const cg = g.createRadialGradient(cx, cy, 0, cx, cy, R0 * 1.25);
-      cg.addColorStop(0, 'rgba(235,250,255,1)'); cg.addColorStop(0.45, this.lvS >= -15 ? 'rgba(255,122,26,.9)' : 'rgba(62,230,255,.9)'); cg.addColorStop(1, 'rgba(62,230,255,0)');
+      cg.addColorStop(0, `rgba(${T.RGB.hot},1)`); cg.addColorStop(0.45, this.lvS >= -15 ? `rgba(${T.RGB.alert},.9)` : `rgba(${T.RGB.acc},.9)`); cg.addColorStop(1, `rgba(${T.RGB.acc},0)`);
       g.fillStyle = cg; g.beginPath(); g.arc(cx, cy, R0 * 1.25, 0, T.TAU); g.fill();
       g.strokeStyle = T.C.acc; g.lineWidth = 2; g.beginPath(); g.arc(cx, cy, R0 * 1.25, this.spin, this.spin + Math.PI * 1.4); g.stroke();
       // частицы
@@ -336,19 +279,19 @@ void main(){
       const tr = this.trW; tr.fit(); tr.fade(Math.min(1, dt * 11));
       const x = tr.x, mid = a.y + a.h / 2, amp = a.h * 0.42, gain = 1 / Math.max(0.15, Math.min(1, Math.max(...this.wave.map(Math.abs)) * 1.1));
       // сетка (на основном холсте — не размазывается)
-      g.strokeStyle = 'rgba(32,50,64,.6)'; g.lineWidth = 1;
+      g.strokeStyle = `rgba(${T.RGB.line},.6)`; g.lineWidth = 1;
       for (let k = 0; k <= 10; k++) { const gx = a.x + a.w * k / 10; g.beginPath(); g.moveTo(gx, a.y); g.lineTo(gx, a.y + a.h); g.stroke(); }
       for (let k = 0; k <= 8; k++) { const gy = a.y + a.h * k / 8; g.beginPath(); g.moveTo(a.x, gy); g.lineTo(a.x + a.w, gy); g.stroke(); }
-      g.strokeStyle = 'rgba(90,112,128,.6)'; g.beginPath(); g.moveTo(a.x, mid); g.lineTo(a.x + a.w, mid); g.stroke();
+      g.strokeStyle = `rgba(${T.RGB.dim},.6)`; g.beginPath(); g.moveTo(a.x, mid); g.lineTo(a.x + a.w, mid); g.stroke();
       x.beginPath();
       const P = i => [a.x + i / 63 * a.w, mid - T.clamp(this.wave[i] * gain, -1, 1) * amp];
       let p0 = P(0); x.moveTo(p0[0], p0[1]);
       for (let i = 1; i < 64; i++) { const p = P(i), mx = (p0[0] + p[0]) / 2, my = (p0[1] + p[1]) / 2; x.quadraticCurveTo(p0[0], p0[1], mx, my); p0 = p; }
       x.lineTo(p0[0], p0[1]);
-      x.strokeStyle = 'rgba(62,230,255,.9)'; x.lineWidth = Math.max(2, u * 0.16); x.stroke();
-      x.strokeStyle = 'rgba(235,250,255,.9)'; x.lineWidth = Math.max(1, u * 0.06); x.stroke();
+      x.strokeStyle = `rgba(${T.RGB.acc},.9)`; x.lineWidth = Math.max(2, u * 0.16); x.stroke();
+      x.strokeStyle = `rgba(${T.RGB.hot},.9)`; x.lineWidth = Math.max(1, u * 0.06); x.stroke();
       tr.draw(g);
-      T.brackets(g, a.x, a.y, a.w, a.h, u * 1.2, 'rgba(62,230,255,.6)');
+      T.brackets(g, a.x, a.y, a.w, a.h, u * 1.2, `rgba(${T.RGB.acc},.6)`);
       T.txt(g, `×${gain.toFixed(1)}`, a.x + u * 0.6, a.y + u * 1.4, u * 0.8, T.C.label);
     },
     // XY: фигура из волны и её сдвинутой копии, с послесвечением
@@ -356,7 +299,7 @@ void main(){
       const tr = this.trX; tr.fit(); tr.fade(Math.min(1, dt * 4));
       const x = tr.x, s = Math.min(a.w, a.h) * 0.46, cx = a.x + a.w / 2, cy = a.y + a.h / 2, k = 16;
       const mx = Math.max(0.15, Math.max(...this.wave.map(Math.abs)));
-      g.strokeStyle = 'rgba(32,50,64,.6)'; g.lineWidth = 1;
+      g.strokeStyle = `rgba(${T.RGB.line},.6)`; g.lineWidth = 1;
       g.strokeRect(cx - s, cy - s, s * 2, s * 2);
       g.beginPath(); g.moveTo(cx - s, cy); g.lineTo(cx + s, cy); g.moveTo(cx, cy - s); g.lineTo(cx, cy + s); g.stroke();
       g.beginPath(); g.arc(cx, cy, s, 0, T.TAU); g.stroke();
@@ -365,10 +308,10 @@ void main(){
         const j = i % 64, px = cx + this.wave[j] / mx * s * 0.92, py = cy - this.wave[(j + k) % 64] / mx * s * 0.92;
         i ? x.lineTo(px, py) : x.moveTo(px, py);
       }
-      x.strokeStyle = 'rgba(62,230,255,.85)'; x.lineWidth = Math.max(1.5, u * 0.13); x.lineJoin = 'round'; x.stroke();
-      x.strokeStyle = 'rgba(235,250,255,.8)'; x.lineWidth = Math.max(0.8, u * 0.05); x.stroke();
+      x.strokeStyle = `rgba(${T.RGB.acc},.85)`; x.lineWidth = Math.max(1.5, u * 0.13); x.lineJoin = 'round'; x.stroke();
+      x.strokeStyle = `rgba(${T.RGB.hot},.8)`; x.lineWidth = Math.max(0.8, u * 0.05); x.stroke();
       tr.draw(g);
-      T.brackets(g, cx - s, cy - s, s * 2, s * 2, u * 1.2, 'rgba(62,230,255,.6)');
+      T.brackets(g, cx - s, cy - s, s * 2, s * 2, u * 1.2, `rgba(${T.RGB.acc},.6)`);
       T.txt(g, 'X: t   Y: t + 90°', cx - s + u * 0.6, cy - s + u * 1.4, u * 0.8, T.C.label);
     },
   });

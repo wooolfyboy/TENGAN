@@ -2,7 +2,7 @@
 """Пробная «палка» для разработки приложения планшета без железа.
 
     python3 tools/webapp/build.py --html /tmp/tablet.html
-    python3 tools/webapp/mock.py /tmp/tablet.html [8090] [tengan|sumi]
+    python3 tools/webapp/mock.py /tmp/tablet.html [8090]
     открыть http://127.0.0.1:8090/tablet?host=127.0.0.1:8090&sse=8091
 
 :8090 — /tablet и /api/*, :8091 — поток SSE /stream (как «вторая дверь» на порту 81).
@@ -13,7 +13,7 @@ from urllib.parse import urlparse, parse_qs
 
 HTML = open(sys.argv[1] if len(sys.argv) > 1 else "tablet.html", "rb").read()
 PORT = int(sys.argv[2]) if len(sys.argv) > 2 else 8090          # API; поток SSE — на PORT+1
-THEME = sys.argv[3] if len(sys.argv) > 3 else "denko"         # тема, которую «выбрали на палке»: denko / sumi
+THEME = sys.argv[3] if len(sys.argv) > 3 and sys.argv[3] in ("denko", "kurenai") else "denko"   # тема на палке: denko | kurenai
 T0 = time.time()
 TYPES = ["phone", "audio", "watch", "tracker", "computer", "unknown", "TV", "sensor", "band", "phone"]
 NAMES = ["iPhone", "AirPods Pro", "Galaxy Watch5", "AirTag", "ThinkPad X1", "", "[TV] Samsung Q7", "LYWSD03MMC", "Mi Band 7", "Pixel 7"]
@@ -22,12 +22,23 @@ BASE = [-44 - i * 2.6 for i in range(22)]
 
 
 # пульт управления (как в прошивке: /api/settings, /api/set, /api/label, /api/act) — состояние в памяти
-SETTINGS = json.loads('{"pages":[{"id":"general","name":"General","items":[{"k":"theme","name":"Theme","hint":"look: denko light / sumi ink","type":"enum","v":"denko","opts":["denko","sumi"]},{"k":"screen","name":"Screen","hint":"screen backlight","type":"range","v":100,"min":20,"max":100,"step":10,"unit":"%"},{"k":"dim","name":"Auto dim","hint":"dim screen when idle","type":"enum","v":"off","opts":["off","30 s","1 min","5 min"]},{"k":"ledbr","name":"LED brightness","hint":"led strip brightness","type":"range","v":50,"min":10,"max":100,"step":10,"unit":"%"},{"k":"volume","name":"Volume","hint":"all sounds: off/quiet/loud","type":"enum","v":"quiet","opts":["off","quiet","loud"]},{"k":"clicks","name":"Wheel clicks","hint":"click on every wheel step","type":"bool","v":1},{"k":"city","name":"City","hint":"for sky map and satellites","type":"enum","v":"Moscow","opts":["Moscow","Saint Petersburg","Novosibirsk","Yekaterinburg","Kazan","Nizhny Novgorod","Samara","Krasnodar","Rostov-on-Don","Vladivostok","Irkutsk","Minsk","Kyiv","Almaty","Tbilisi","Yerevan","Berlin","London","New York","Tokyo"]},{"k":"battery","name":"Battery","hint":"","type":"info","v":"87%  3.98 V"},{"k":"version","name":"Version","hint":"TENGAN firmware","type":"info","v":"v1.7-test3"}]},{"id":"ble","name":"Bluetooth","items":[{"k":"ble_range","name":"Range","hint":"ignore weaker devices","type":"enum","v":"all","opts":["all","far","room","near","very near"]},{"k":"ble_ledev","name":"LED events","hint":"leds flash on count jump","type":"range","v":7,"min":0,"max":30,"step":1,"unit":""},{"k":"ble_ticks","name":"Find ticks","hint":"ticks on nearest screen","type":"bool","v":1}]},{"id":"wifi","name":"Wi-Fi","items":[{"k":"wifi_range","name":"Range","hint":"hide weaker networks","type":"enum","v":"all","opts":["all","far","room","near","very near"]},{"k":"wifi_ticks","name":"Find ticks","hint":"ticks on find screen","type":"bool","v":1}]},{"id":"sub","name":"Sub-GHz","items":[{"k":"sub_band","name":"Start band","hint":"band when section opens","type":"enum","v":"433 MHz","opts":["315 MHz","433 MHz","868 MHz","915 MHz"]}]},{"id":"snd","name":"Sound","items":[{"k":"mic","name":"Microphone","hint":"mic for sound section","type":"bool","v":1},{"k":"au_leds","name":"LED meter","hint":"leds show loudness","type":"bool","v":0},{"k":"au_src","name":"Source","hint":"auto / mic / laptop audio","type":"enum","v":"auto","opts":["auto","mic","laptop"]}]}]}')
+SETTINGS = json.loads(('{"pages":[{"id":"general","name":"General","items":[{"k":"theme","name":"Theme","hint":"change on the stick: Settings > Theme","type":"info","v":"__THEME__"},{"k":"screen","name":"Screen","hint":"screen backlight","type":"range","v":100,"min":20,"max":100,"step":10,"unit":"%"},{"k":"dim","name":"Auto dim","hint":"dim screen when idle","type":"enum","v":"off","opts":["off","30 s","1 min","5 min"]},{"k":"ledbr","name":"LED brightness","hint":"led strip brightness","type":"range","v":50,"min":10,"max":100,"step":10,"unit":"%"},{"k":"volume","name":"Volume","hint":"all sounds: off/quiet/loud","type":"enum","v":"quiet","opts":["off","quiet","loud"]},{"k":"clicks","name":"Wheel clicks","hint":"click on every wheel step","type":"bool","v":1},{"k":"city","name":"City","hint":"for sky map and satellites","type":"enum","v":"Moscow","opts":["Moscow","Saint Petersburg","Novosibirsk","Yekaterinburg","Kazan","Nizhny Novgorod","Samara","Krasnodar","Rostov-on-Don","Vladivostok","Irkutsk","Minsk","Kyiv","Almaty","Tbilisi","Yerevan","Berlin","London","New York","Tokyo"]},{"k":"battery","name":"Battery","hint":"","type":"info","v":"87%  3.98 V"},{"k":"version","name":"Version","hint":"TENGAN firmware","type":"info","v":"v1.7-test3"}]},{"id":"ble","name":"Bluetooth","items":[{"k":"ble_range","name":"Range","hint":"ignore weaker devices","type":"enum","v":"all","opts":["all","far","room","near","very near"]},{"k":"ble_ledev","name":"LED events","hint":"leds flash on count jump","type":"range","v":7,"min":0,"max":30,"step":1,"unit":""},{"k":"ble_ticks","name":"Find ticks","hint":"ticks on nearest screen","type":"bool","v":1}]},{"id":"wifi","name":"Wi-Fi","items":[{"k":"wifi_range","name":"Range","hint":"hide weaker networks","type":"enum","v":"all","opts":["all","far","room","near","very near"]},{"k":"wifi_ticks","name":"Find ticks","hint":"ticks on find screen","type":"bool","v":1}]},{"id":"sub","name":"Sub-GHz","items":[{"k":"sub_band","name":"Start band","hint":"band when section opens","type":"enum","v":"433 MHz","opts":["315 MHz","433 MHz","868 MHz","915 MHz"]}]},{"id":"snd","name":"Sound","items":[{"k":"mic","name":"Microphone","hint":"mic for sound section","type":"bool","v":1},{"k":"au_leds","name":"LED meter","hint":"leds show loudness","type":"bool","v":0},{"k":"au_src","name":"Source","hint":"auto / mic / laptop audio","type":"enum","v":"auto","opts":["auto","mic","laptop"]}]}]}').replace('__THEME__', THEME))
+SETTINGS["pages"].append({"id": "alert", "name": "Alerts", "items": [   # как Settings › Alerts в прошивке
+    {"k": "al_near", "name": "Near", "hint": "stronger than this = near", "type": "range", "v": -65, "min": -90, "max": -40, "step": 5, "unit": "dBm"},
+    {"k": "al_new", "name": "New device", "hint": "red + alert: off/near/any", "type": "enum", "v": "near", "opts": ["off", "near", "any"]},
+    {"k": "al_trk", "name": "Tracker", "hint": "tracker alert: off/near/any", "type": "enum", "v": "near", "opts": ["off", "near", "any"]},
+    {"k": "al_newfor", "name": "New for", "hint": "how long a device is new", "type": "range", "v": 30, "min": 10, "max": 300, "step": 10, "unit": "s"},
+    {"k": "al_warm", "name": "Warm-up", "hint": "after connect nothing is new", "type": "range", "v": 20, "min": 0, "max": 120, "step": 5, "unit": "s"},
+    {"k": "al_sens", "name": "Sensitivity", "hint": "activity level gain", "type": "range", "v": 5, "min": 1, "max": 10, "step": 1, "unit": ""},
+    {"k": "al_warn", "name": "Attention at", "hint": "activity level: attention", "type": "range", "v": 60, "min": 20, "max": 95, "step": 5, "unit": "%"},
+    {"k": "al_alarm", "name": "Alarm at", "hint": "activity level: alarm", "type": "range", "v": 80, "min": 30, "max": 100, "step": 5, "unit": "%"},
+    {"k": "al_cble", "name": "Count BLE", "hint": "new devices raise activity", "type": "bool", "v": 1},
+    {"k": "al_crf", "name": "Count 433", "hint": "433 packets raise activity", "type": "bool", "v": 1},
+    {"k": "al_csnd", "name": "Count sound", "hint": "loudness raises activity", "type": "bool", "v": 1},
+    {"k": "al_cprb", "name": "Count IR/NFC", "hint": "remotes/cards raise activity", "type": "bool", "v": 1},
+    {"k": "al_blink", "name": "Blinking", "hint": "blink on alerts", "type": "bool", "v": 1},
+    {"k": "al_plate", "name": "Alert plate", "hint": "show proximity warning", "type": "bool", "v": 1}]})
 LABELS = {}
-for _pg in SETTINGS["pages"]:                              # тема — та, с которой запущен мок
-    for _it in _pg["items"]:
-        if _it["k"] == "theme":
-            _it["v"] = THEME
 
 
 def set_item(k, v):
@@ -52,9 +63,12 @@ def set_item(k, v):
                     it["v"] = max(it["min"], min(it["max"], int(v)))
                 except ValueError:
                     return {"ok": False, "err": "bad number"}
-            if k == "theme":
-                global THEME
-                THEME = it["v"]
+            if k in ("al_warn", "al_alarm"):                  # «тревога» всегда выше «внимания» (как в прошивке)
+                its = {x["k"]: x for x in pg["items"]}
+                if k == "al_warn" and its["al_alarm"]["v"] <= it["v"]:
+                    its["al_alarm"]["v"] = min(100, it["v"] + 5)
+                if k == "al_alarm" and its["al_warn"]["v"] >= it["v"]:
+                    its["al_warn"]["v"] = max(20, it["v"] - 5)
             return {"ok": True, "item": it}
     return {"ok": False, "err": "unknown key"}
 
@@ -68,6 +82,9 @@ def ble():
         drift = 6 * math.sin(t * 0.05 + i)        # медленный уход
         r = int(BASE[i] + drift + random.uniform(-3, 3))   # сырой шум ±3 dB — пусть сглаживание работает
         d.append([1000 + i, r, TYPES[i % 10], VEND[i % 10], NAMES[i % 10], 30 + i * 41, 1 + i % 3, LABELS.get(1000 + i, "")])
+    k = int(t / 25)                                # «гости»: каждые 25 с — новые устройства (близкие и далёкие)
+    for j in range(3):
+        d.append([5000 + k * 3 + j, [-52, -68, -84][j], ["phone", "tracker", "watch"][j], "private", "", 5, 1, ""])
     return {"on": 1, "n": len(d), "m": len(d) + 7, "d": d}
 
 

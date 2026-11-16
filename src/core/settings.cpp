@@ -23,7 +23,7 @@ int g_scrBright = 100;
 int g_dimIdx = 0;                        // по умолчанию экран не гаснет
 int g_sndIdx = 1;                        // тихие звуки интерфейса
 int g_clickEn = 1;
-int g_theme = THEME_DENKO;                // оформление: DENKO 電光 (свет, HUD) / SUMI 墨 (тушь)
+int g_theme = THEME_DENKO;                // оформление: пока одна тема — DENKO 電光 (свет, HUD)
 int g_micEn = 1;
 int g_auSrc = 0;
 int g_city = 0;
@@ -32,6 +32,9 @@ int g_auLeds = 0;
 int g_bleTicks = 1;
 int g_wifiTicks = 1;
 int g_wRange = 0;
+// тревоги (штаб на планшете / компе): что считать «близко», «новым», тревогой и как считать активность эфира
+int g_alNear = -65, g_alNew = 1, g_alTrk = 1, g_alNewFor = 30, g_alWarm = 20, g_alSens = 5,
+    g_alWarn = 60, g_alAlarm = 80, g_alCBle = 1, g_alCRf = 1, g_alCSnd = 1, g_alCPrb = 1, g_alBlink = 1, g_alPlate = 1;
 
 static int      g_setPage = 0;           // страница: общие / раздел
 static int      g_setItem = 0;           // выбранный пункт на странице
@@ -46,12 +49,14 @@ enum { S_THEME, S_SCREEN, S_DIM, S_LEDBR, S_VOLUME, S_CLICKS, S_CITY, S_BATTERY,
        S_RANGE, S_LEDEV, S_BLETICK,
        S_WRANGE, S_WTICK,
        S_BAND,
-       S_MIC, S_AULED, S_AUSRC, S_NUM };
-enum { P_GENERAL, P_BLE, P_WIFI, P_SUBGHZ, P_SOUND, P_NUM };
+       S_MIC, S_AULED, S_AUSRC,
+       S_ALNEAR, S_ALNEW, S_ALTRK, S_ALNEWFOR, S_ALWARM, S_ALSENS, S_ALWARN, S_ALALARM,
+       S_ALCBLE, S_ALCRF, S_ALCSND, S_ALCPRB, S_ALBLINK, S_ALPLATE, S_NUM };
+enum { P_GENERAL, P_BLE, P_WIFI, P_SUBGHZ, P_SOUND, P_ALERT, P_NUM };
 enum { K_ENUM, K_RANGE, K_BOOL, K_INFO };                 // вид пункта (для планшета)
 struct SetDef { const char* name; const char* hint; uint8_t page; const char* key; uint8_t kind; int16_t mn, mx, step; const char* unit; };
 static const SetDef DEFS[S_NUM] = {
-  { "Theme",          "look: denko light / sumi ink", P_GENERAL, "theme",      K_ENUM },
+  { "Theme",          "look: denko neon / kurenai red",   P_GENERAL, "theme",      K_ENUM },
   { "Screen",         "screen backlight",            P_GENERAL, "screen",     K_RANGE, 20, 100, 10, "%" },
   { "Auto dim",       "dim screen when idle",        P_GENERAL, "dim",        K_ENUM },
   { "LED brightness", "led strip brightness",        P_GENERAL, "ledbr",      K_RANGE, 10, 100, 10, "%" },
@@ -69,11 +74,25 @@ static const SetDef DEFS[S_NUM] = {
   { "Microphone",     "mic for sound section",       P_SOUND,   "mic",        K_BOOL },
   { "LED meter",      "leds show loudness",          P_SOUND,   "au_leds",    K_BOOL },
   { "Source",         "auto / mic / laptop audio",   P_SOUND,   "au_src",     K_ENUM },
+  { "Near",           "stronger than this = near",   P_ALERT,   "al_near",    K_RANGE, -90, -40, 5, "dBm" },
+  { "New device",     "red + alert: off/near/any",   P_ALERT,   "al_new",     K_ENUM },
+  { "Tracker",        "tracker alert: off/near/any", P_ALERT,   "al_trk",     K_ENUM },
+  { "New for",        "how long a device is new",    P_ALERT,   "al_newfor",  K_RANGE, 10, 300, 10, "s" },
+  { "Warm-up",        "after connect nothing is new",P_ALERT,   "al_warm",    K_RANGE, 0, 120, 5, "s" },
+  { "Sensitivity",    "activity level gain",         P_ALERT,   "al_sens",    K_RANGE, 1, 10, 1, "" },
+  { "Attention at",   "activity level: attention",   P_ALERT,   "al_warn",    K_RANGE, 20, 95, 5, "%" },
+  { "Alarm at",       "activity level: alarm",       P_ALERT,   "al_alarm",   K_RANGE, 30, 100, 5, "%" },
+  { "Count BLE",      "new devices raise activity",  P_ALERT,   "al_cble",    K_BOOL },
+  { "Count 433",      "433 packets raise activity",  P_ALERT,   "al_crf",     K_BOOL },
+  { "Count sound",    "loudness raises activity",    P_ALERT,   "al_csnd",    K_BOOL },
+  { "Count IR/NFC",   "remotes/cards raise activity",P_ALERT,   "al_cprb",    K_BOOL },
+  { "Blinking",       "blink on alerts",             P_ALERT,   "al_blink",   K_BOOL },
+  { "Alert plate",    "show proximity warning",      P_ALERT,   "al_plate",   K_BOOL },
 };
-static const char* const PAGE_NAMES[P_NUM] = { "General", "Bluetooth", "Wi-Fi", "Sub-GHz", "Sound" };
-static const char* const PAGE_IDS[P_NUM]   = { "general", "ble", "wifi", "sub", "snd" };
+static const char* const PAGE_NAMES[P_NUM] = { "General", "Bluetooth", "Wi-Fi", "Sub-GHz", "Sound", "Alerts" };
+static const char* const PAGE_IDS[P_NUM]   = { "general", "ble", "wifi", "sub", "snd", "alert" };
 static const char* const PAGE_DESCS[P_NUM] = { "theme, screen, leds, city", "range, leds, ticks",
-                                               "range, ticks", "radio band", "source, mic, leds" };
+                                               "range, ticks", "radio band", "source, mic, leds", "hq: near, new, levels" };
 static const int SET_ROWS = 7;           // строк на экране (список прокручивается)
 
 // пункты текущей страницы
@@ -100,7 +119,7 @@ void loadSettings() {
   g_sndIdx    = g_prefs.getInt("snd", 1);
   g_micEn     = g_prefs.getInt("mic", 1) ? 1 : 0;
   g_clickEn   = g_prefs.getInt("click", 1) ? 1 : 0;
-  g_theme     = g_prefs.getInt("theme", THEME_DENKO) == THEME_SUMI ? THEME_SUMI : THEME_DENKO;
+  g_theme     = constrain(g_prefs.getInt("th2", THEME_DENKO), 0, THEME_N - 1);   // новый ключ: старое «theme»=1 было SUMI
   g_auLeds    = g_prefs.getInt("auled", 0) ? 1 : 0;
   g_auSrc     = constrain(g_prefs.getInt("ausrc", 0), 0, 2);
   g_gpsKnown  = g_prefs.getBool("gpsok", false);
@@ -111,6 +130,21 @@ void loadSettings() {
   g_wifiTicks = g_prefs.getInt("wftick", 1) ? 1 : 0;
   g_wRange    = g_prefs.getInt("wrange", 0);
   g_band      = g_prefs.getInt("band", 1);
+  g_alNear  = constrain(g_prefs.getInt("alnear", -65), -90, -40);
+  g_alNew   = constrain(g_prefs.getInt("alnew", 1), 0, 2);
+  g_alTrk   = constrain(g_prefs.getInt("altrk", 1), 0, 2);
+  g_alNewFor= constrain(g_prefs.getInt("alnewf", 30), 10, 300);
+  g_alWarm  = constrain(g_prefs.getInt("alwarm", 20), 0, 120);
+  g_alSens  = constrain(g_prefs.getInt("alsens", 5), 1, 10);
+  g_alWarn  = constrain(g_prefs.getInt("alwarn", 60), 20, 95);
+  g_alAlarm = constrain(g_prefs.getInt("alalarm", 80), 30, 100);
+  if (g_alAlarm <= g_alWarn) g_alAlarm = min(100, g_alWarn + 5);
+  g_alCBle  = g_prefs.getInt("alcble", 1) ? 1 : 0;
+  g_alCRf   = g_prefs.getInt("alcrf", 1) ? 1 : 0;
+  g_alCSnd  = g_prefs.getInt("alcsnd", 1) ? 1 : 0;
+  g_alCPrb  = g_prefs.getInt("alcprb", 1) ? 1 : 0;
+  g_alBlink = g_prefs.getInt("alblink", 1) ? 1 : 0;
+  g_alPlate = g_prefs.getInt("alplate", 1) ? 1 : 0;
   g_prefs.end();
   if (g_range < 0 || g_range >= N_RANGES) g_range = 0;
   if (g_thresh < 0 || g_thresh > 30) g_thresh = 7;
@@ -132,7 +166,7 @@ void saveSettings() {
   g_prefs.putInt("snd", g_sndIdx);
   g_prefs.putInt("mic", g_micEn);
   g_prefs.putInt("click", g_clickEn);
-  g_prefs.putInt("theme", g_theme);
+  g_prefs.putInt("th2", g_theme);
   g_prefs.putInt("auled", g_auLeds);
   g_prefs.putInt("ausrc", g_auSrc);
   g_prefs.putInt("city", g_city);
@@ -142,6 +176,11 @@ void saveSettings() {
   g_prefs.putInt("wftick", g_wifiTicks);
   g_prefs.putInt("wrange", g_wRange);
   g_prefs.putInt("band", g_band);
+  g_prefs.putInt("alnear", g_alNear);   g_prefs.putInt("alnew", g_alNew);     g_prefs.putInt("altrk", g_alTrk);
+  g_prefs.putInt("alnewf", g_alNewFor); g_prefs.putInt("alwarm", g_alWarm);   g_prefs.putInt("alsens", g_alSens);
+  g_prefs.putInt("alwarn", g_alWarn);   g_prefs.putInt("alalarm", g_alAlarm);
+  g_prefs.putInt("alcble", g_alCBle);   g_prefs.putInt("alcrf", g_alCRf);     g_prefs.putInt("alcsnd", g_alCSnd);
+  g_prefs.putInt("alcprb", g_alCPrb);   g_prefs.putInt("alblink", g_alBlink); g_prefs.putInt("alplate", g_alPlate);
   g_prefs.end();
   g_setDirty = false;
 }
@@ -158,28 +197,31 @@ static int curItem() {
 // ---------- значения пунктов: одна логика для колеса и для планшета ----------
 static const char* const VOL_NAMES[3] = { "off", "quiet", "loud" };
 static const char* const SRC_NAMES[3] = { "auto", "mic", "laptop" };
+static const char* const AL_NAMES[3]  = { "off", "near", "any" };
 
 static int optCount(int id) {                             // сколько вариантов у пункта-списка
   switch (id) {
-    case S_THEME: return 2;
+    case S_THEME: return THEME_N;
     case S_DIM: return N_DIMS;
     case S_VOLUME: return 3;
     case S_CITY: return cityCount();
     case S_RANGE: case S_WRANGE: return N_RANGES;
     case S_BAND: return N_BANDS;
     case S_AUSRC: return 3;
+    case S_ALNEW: case S_ALTRK: return 3;
   }
   return 0;
 }
 static void optName(int id, int i, char* out, size_t n) {   // имя варианта (как на планшете)
   switch (id) {
-    case S_THEME:  snprintf(out, n, "%s", i == THEME_SUMI ? "sumi" : "denko"); break;
+    case S_THEME:  snprintf(out, n, "%s", i == THEME_KURENAI ? "kurenai" : "denko"); break;
     case S_DIM:    if (DIM_SECS[i] == 0) snprintf(out, n, "off"); else if (DIM_SECS[i] < 60) snprintf(out, n, "%d s", DIM_SECS[i]); else snprintf(out, n, "%d min", DIM_SECS[i] / 60); break;
     case S_VOLUME: snprintf(out, n, "%s", VOL_NAMES[i]); break;
     case S_CITY:   snprintf(out, n, "%s", i == N_CITIES ? g_gpsCity.name : CITIES[i].name); break;
     case S_RANGE: case S_WRANGE: snprintf(out, n, "%s", RANGES[i].name); break;
     case S_BAND:   snprintf(out, n, "%s", BANDS[i].name); break;
     case S_AUSRC:  snprintf(out, n, "%s", SRC_NAMES[i]); break;
+    case S_ALNEW: case S_ALTRK: snprintf(out, n, "%s", AL_NAMES[constrain(i, 0, 2)]); break;
     default: out[0] = 0;
   }
 }
@@ -191,6 +233,11 @@ static int getVal(int id) {                               // индекс вар
     case S_BLETICK: return g_bleTicks;     case S_WRANGE: return g_wRange;      case S_WTICK: return g_wifiTicks;
     case S_BAND: return g_band;            case S_MIC: return g_micEn;          case S_AULED: return g_auLeds;
     case S_AUSRC: return g_auSrc;
+    case S_ALNEAR: return g_alNear;        case S_ALNEW: return g_alNew;        case S_ALTRK: return g_alTrk;
+    case S_ALNEWFOR: return g_alNewFor;    case S_ALWARM: return g_alWarm;      case S_ALSENS: return g_alSens;
+    case S_ALWARN: return g_alWarn;        case S_ALALARM: return g_alAlarm;
+    case S_ALCBLE: return g_alCBle;        case S_ALCRF: return g_alCRf;        case S_ALCSND: return g_alCSnd;
+    case S_ALCPRB: return g_alCPrb;        case S_ALBLINK: return g_alBlink;    case S_ALPLATE: return g_alPlate;
   }
   return 0;
 }
@@ -202,7 +249,7 @@ static bool setVal(int id, int v) {
   if (d.kind == K_BOOL)  v = v ? 1 : 0;
   if (d.kind == K_RANGE) v = constrain(v, d.mn, d.mx);
   switch (id) {
-    case S_THEME:   g_theme = v ? THEME_SUMI : THEME_DENKO; break;
+    case S_THEME:   g_theme = v; themeChanged(); break;
     case S_SCREEN:  g_scrBright = v; break;
     case S_DIM:     g_dimIdx = v; break;
     case S_LEDBR:   g_ledBright = v; break;
@@ -218,6 +265,20 @@ static bool setVal(int id, int v) {
     case S_MIC:     g_micEn = v; break;
     case S_AULED:   g_auLeds = v; if (!g_auLeds) ledsOff(); break;
     case S_AUSRC:   g_auSrc = v; break;
+    case S_ALNEAR:  g_alNear = v; break;
+    case S_ALNEW:   g_alNew = v; break;
+    case S_ALTRK:   g_alTrk = v; break;
+    case S_ALNEWFOR:g_alNewFor = v; break;
+    case S_ALWARM:  g_alWarm = v; break;
+    case S_ALSENS:  g_alSens = v; break;
+    case S_ALWARN:  g_alWarn = v; if (g_alAlarm <= v) g_alAlarm = min(100, v + 5); break;          // «тревога» всегда выше «внимания»
+    case S_ALALARM: g_alAlarm = v; if (g_alWarn >= v) g_alWarn = max(20, v - 5); break;
+    case S_ALCBLE:  g_alCBle = v; break;
+    case S_ALCRF:   g_alCRf = v; break;
+    case S_ALCSND:  g_alCSnd = v; break;
+    case S_ALCPRB:  g_alCPrb = v; break;
+    case S_ALBLINK: g_alBlink = v; break;
+    case S_ALPLATE: g_alPlate = v; break;
     default: return false;
   }
   applyBrightness();
@@ -273,7 +334,7 @@ static void itemJson(int id, String& o) {
 }
 
 void settingsJson(String& o) {
-  o.reserve(2600);
+  o.reserve(4800);
   o = "{\"pages\":[";
   for (int p = 0; p < P_NUM; p++) {
     if (p) o += ',';
@@ -353,7 +414,7 @@ void drawSettings() {
         break;
       case S_VOLUME:  sprintf(val, "%s", g_sndIdx == 0 ? "off" : g_sndIdx == 1 ? "quiet" : "loud"); break;
       case S_CLICKS:  strcpy(val, onOff(g_clickEn)); break;
-      case S_THEME:   strcpy(val, g_theme == THEME_SUMI ? "sumi" : "denko"); break;
+      case S_THEME:   strcpy(val, g_theme == THEME_KURENAI ? "kurenai" : "denko"); break;
       case S_BLETICK: strcpy(val, onOff(g_bleTicks)); break;
       case S_WTICK:   strcpy(val, onOff(g_wifiTicks)); break;
       case S_BAND:    strcpy(val, BANDS[g_band].name); break;
@@ -362,6 +423,10 @@ void drawSettings() {
       case S_AUSRC:   strcpy(val, g_auSrc == 0 ? "auto" : g_auSrc == 1 ? "mic" : "laptop"); break;
       case S_CITY:    snprintf(val, sizeof(val), "%s", curCity().name); break;
       case S_VERSION: snprintf(val, sizeof(val), "v%s", FW_VERSION); break;
+      case S_ALNEAR: case S_ALNEWFOR: case S_ALWARM: case S_ALSENS: case S_ALWARN: case S_ALALARM:
+        snprintf(val, sizeof(val), "%d%s%s", getVal(id), DEFS[id].unit[0] && strcmp(DEFS[id].unit, "%") ? " " : "", DEFS[id].unit); break;
+      case S_ALNEW: case S_ALTRK: optName(id, getVal(id), val, sizeof(val)); break;
+      case S_ALCBLE: case S_ALCRF: case S_ALCSND: case S_ALCPRB: case S_ALBLINK: case S_ALPLATE: strcpy(val, onOff(getVal(id))); break;
       default:
         if (g_bat.ok) { sprintf(val, "%d%%  %.2f V", g_bat.soc, g_bat.mv / 1000.0f); alert = g_bat.soc <= 20; }
         else          sprintf(val, "n/a");

@@ -86,16 +86,16 @@ T.views.push({
       g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); g.stroke();
       T.txt(g, c, p[0], p[1] + u * 1.25, u * (c === 1 || c === 6 || c === 11 ? 1.0 : 0.8), c === 1 || c === 6 || c === 11 ? T.C.hot : T.C.label, 't', 'center');
     }
-    { const a = cam.p(X(1) - 0.5, 0, zF), b = cam.p(X(13) + 0.5, 0, zF); g.strokeStyle = 'rgba(62,230,255,.35)'; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); }
+    { const a = cam.p(X(1) - 0.5, 0, zF), b = cam.p(X(13) + 0.5, 0, zF); g.strokeStyle = `rgba(${T.RGB.acc},.35)`; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); }
     // лучший канал — ромб на полу
     const best = WF.bestCh(nets);
     { const p = cam.p(X(best), 0, zF - 0.18); T.diamond(g, p[0], p[1], u * 0.55, T.C.acc, true); T.txt(g, 'BEST', p[0] + u * 0.9, p[1] + u * 0.3, u * 0.72, T.C.acc); }
     // проходящий «луч скана»: тихое мерцание между сканами
     {
       const sx = -1.6 + ((tt * 0.28) % 1) * 3.2, a = cam.p(sx, 0, zF), b = cam.p(sx, 0, 1.5), c2 = cam.p(sx, 0.9, 1.5), d = cam.p(sx, 0.9, zF);
-      const gr = g.createLinearGradient(a[0], a[1], d[0], d[1]); gr.addColorStop(0, 'rgba(62,230,255,.10)'); gr.addColorStop(1, 'rgba(62,230,255,0)');
+      const gr = g.createLinearGradient(a[0], a[1], d[0], d[1]); gr.addColorStop(0, `rgba(${T.RGB.acc},.10)`); gr.addColorStop(1, `rgba(${T.RGB.acc},0)`);
       g.fillStyle = gr; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.lineTo(c2[0], c2[1]); g.lineTo(d[0], d[1]); g.closePath(); g.fill();
-      g.strokeStyle = 'rgba(62,230,255,.25)'; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke();
+      g.strokeStyle = `rgba(${T.RGB.acc},.25)`; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke();
     }
     // хребты: дальние первыми
     const draw = sorted.map(n => ({ n, z: this.z[n.k], d: cam.p(X(n.c), 0, this.z[n.k])[3] })).sort((a, b) => b.d - a.d);
@@ -109,7 +109,7 @@ T.views.push({
       const b0 = cam.p(cx - hw, 0, z), b1 = cam.p(cx + hw, 0, z), top = cam.p(cx, H, z);
       // занавес: заливка (перекрывает дальние) + градиент цвета
       g.beginPath(); g.moveTo(b0[0], b0[1]); for (const p of pts) g.lineTo(p[0], p[1]); g.lineTo(b1[0], b1[1]); g.closePath();
-      g.fillStyle = 'rgba(5,10,16,.82)'; g.fill();
+      g.fillStyle = `rgba(${T.RGB.bg2},.82)`; g.fill();
       const gr = g.createLinearGradient(0, top[1], 0, b0[1]);
       gr.addColorStop(0, T.rgb(col, (sel ? 0.42 : 0.26) * fog * breath)); gr.addColorStop(1, T.rgb(col, 0));
       g.fillStyle = gr; g.fill();
@@ -134,7 +134,7 @@ T.views.push({
         if (!hit) break; fy = hit[1] - u * 2.3;
       }
       placed.push([p[0], fy]);
-      g.strokeStyle = open ? T.C.alert : 'rgba(235,250,255,.7)'; g.lineWidth = 1;
+      g.strokeStyle = open ? T.C.alert : `rgba(${T.RGB.hot},.7)`; g.lineWidth = 1;
       g.beginPath(); g.moveTo(p[0], p[1] - 2); g.lineTo(p[0], fy); g.lineTo(p[0] + u * 0.7, fy); g.stroke();
       T.diamond(g, p[0], p[1], u * 0.3, open ? T.C.alert : T.C.hot, true);
       g.font = `500 ${u * 0.8}px ${T.FC}`;
@@ -172,7 +172,7 @@ T.views.push({
     const open = WF.open(n), col = open ? T.C.alert : T.heat(0.4 + 0.6 * WF.sig(n.rs));
     g.strokeStyle = T.C.hot; g.lineWidth = 1;
     g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(bx < p[0] ? bx + bw : bx, by + bh * 0.5); g.stroke();
-    T.panel(g, bx, by, bw, bh, u, 'rgba(5,8,13,.78)', T.C.acc);
+    T.panel(g, bx, by, bw, bh, u, `rgba(${T.RGB.bg},.78)`, T.C.acc);
     g.font = `500 ${u * 1.15}px ${T.FC}`;
     T.txt(g, T.fit(g, WF.ssid(n), bw - u * 2), bx + u, by + u * 1.7, u * 1.15, T.C.hot, 'c');
     T.txt(g, `${(n.v || 'unknown vendor')} · ${n.e}`.toUpperCase(), bx + u, by + u * 2.8, u * 0.7, open ? T.C.alert : T.C.label);
@@ -229,7 +229,7 @@ T.views.push({
       const n = S.aps.get(k); if (!n) continue;
       const on = this.sel === k, open = WF.open(n), s = WF.sig(n.rs);
       g.globalAlpha = 0.35 + 0.65 * n.h;
-      if (on) { g.fillStyle = 'rgba(62,230,255,.08)'; g.fillRect(x + 2, cy, w - 4, rowH); T.brackets(g, x + 2, cy, w - 4, rowH, u * 0.45, T.C.acc, 1); }
+      if (on) { g.fillStyle = `rgba(${T.RGB.acc},.08)`; g.fillRect(x + 2, cy, w - 4, rowH); T.brackets(g, x + 2, cy, w - 4, rowH, u * 0.45, T.C.acc, 1); }
       const gs = rowH * 0.6, gc = open ? T.C.alert : on ? T.C.hot : T.C.acc;
       T.glyph(g, cols.g, cy + (rowH - gs) / 2, gs, WF.encG(n), gc);
       g.font = `500 ${rowH * 0.36}px ${T.FC}`;

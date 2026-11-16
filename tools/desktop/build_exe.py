@@ -11,6 +11,7 @@ ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 args = [
     sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "--onefile", "--windowed",
     "--name", "tengan_desktop",
+    "--icon", os.path.join(HERE, "tengan.ico"),          # значок TENGAN 天眼 (файл, панель задач, окно)
     "--distpath", os.path.join(ROOT, "dist"),
     "--workpath", os.path.join(ROOT, "build", "pyi"),
     "--specpath", os.path.join(ROOT, "build", "pyi"),

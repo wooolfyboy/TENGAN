@@ -13,6 +13,64 @@ const S = T.S = {
   pcHist: [], cores: [],                               // CPU по секундам; ядра (сглаженные)
   events: [],                                          // лента событий: {t, tag, text, alert}
 };
+// ---- тревоги штаба: настройки живут на палке (Settings › Alerts, /api/settings), здесь — копия ----
+// Значения по умолчанию — те же, что в прошивке (на старой прошивке без этой страницы работают они).
+S.CFG_DEF = { al_near: -65, al_new: 1, al_trk: 1, al_newfor: 30, al_warm: 20, al_sens: 5, al_warn: 60, al_alarm: 80,
+  al_cble: 1, al_crf: 1, al_csnd: 1, al_cprb: 1, al_blink: 1, al_plate: 1 };
+S.cfg = Object.assign({}, S.CFG_DEF);
+S.cfgItems = null;                                     // пункты страницы Alerts как их отдала палка (для панели в штабе)
+S.cfgFromItem = it => {                                 // пункт из /api/settings → число в S.cfg
+  if (!it || !(it.k in S.CFG_DEF)) return;
+  let v = it.v;
+  if (it.type === 'enum') { const i = (it.opts || []).findIndex(o => String(o).toLowerCase() === String(v).toLowerCase()); v = i >= 0 ? i : typeof v === 'number' ? v : S.CFG_DEF[it.k]; }
+  else if (it.type === 'bool') v = v === true || v === 1 || v === '1' || v === 'on' ? 1 : 0;
+  else v = +v;
+  if (!isNaN(v)) S.cfg[it.k] = v;
+  if (S.cfgItems) { const j = S.cfgItems.findIndex(x => x.k === it.k); if (j >= 0) S.cfgItems[j] = it; }
+};
+S.cfgFromSettings = d => {
+  const pg = d && d.pages && d.pages.find(p => p.id === 'alert');
+  if (!pg) return false;
+  S.cfgItems = pg.items.map(x => Object.assign({}, x));
+  pg.items.forEach(S.cfgFromItem);
+  return true;
+};
+T.loadCfg = () => {
+  if (document.hidden) return Promise.resolve();
+  return fetch(T.apiBase() + '/api/settings', { cache: 'no-store' }).then(r => r.json()).then(S.cfgFromSettings).catch(() => {});
+};
+setTimeout(T.loadCfg, 1500); setInterval(T.loadCfg, 15000);
+// «новое» и «трекер» по настройкам: штаб и лента событий судят одинаково
+S.isNew = (e, now) => {
+  const c = S.cfg; if (e.first || !c.al_new) return false;
+  if (now - e.born > c.al_newfor * 1000) return false;
+  return c.al_new === 2 || (e.rs != null ? e.rs : e.r) > c.al_near;
+};
+S.isTrk = e => {
+  const c = S.cfg; if (e.type !== 'tracker' || !c.al_trk) return false;
+  return c.al_trk === 2 || (e.rs != null ? e.rs : e.r) > c.al_near;
+};
+// активность эфира — прозрачно, по источникам (каждый 0..1), только включённые в настройках:
+//   BLE — новые устройства за минуту (5/мин = максимум), 433 — посылки за минуту (20/мин),
+//   звук — громкость −60…−20 dB, IR/NFC — нажатия и карты за минуту (3/мин).
+//   Итог = среднее включённых × чувствительность/5.
+S.act = { ble: [], rf: [], prb: [] };
+const actPush = (k, now, n = 1) => { const a = S.act[k]; for (let i = 0; i < Math.min(n, 30); i++) a.push(now); while (a.length && now - a[0] > 60000) a.shift(); };
+S.activity = () => {
+  const now = performance.now(), c = S.cfg, cnt = k => { const a = S.act[k]; while (a.length && now - a[0] > 60000) a.shift(); return a.length; };
+  const parts = {
+    ble: T.clamp(cnt('ble') / 5), rf: T.clamp(cnt('rf') / 20),
+    snd: S.snd && S.snd.ok ? T.clamp((S.level + 60) / 40) : 0, prb: T.clamp(cnt('prb') / 3),
+  };
+  const en = { ble: !!c.al_cble, rf: !!c.al_crf, snd: !!c.al_csnd, prb: !!c.al_cprb };
+  let sum = 0, n = 0; for (const k in parts) if (en[k]) { sum += parts[k]; n++; }
+  return { v: n ? T.clamp(sum / n * c.al_sens / 5) : 0, parts, en };
+};
+// подпись уровня по порогам из настроек
+S.actState = v => {
+  const c = S.cfg, warn = c.al_warn / 100, alarm = c.al_alarm / 100;
+  return v >= alarm ? 3 : v >= warn ? 2 : v >= warn / 2 ? 1 : 0;   // 0 тихо · 1 активно · 2 внимание · 3 тревога
+};
 S.event = (tag, text, alert) => { S.events.unshift({ t: Date.now(), tag, text, alert: !!alert }); if (S.events.length > 40) S.events.pop(); };
 
 // подписи устройств («мои AirPods»): палка хранит их и шлёт 8-м полем; планшет держит свою копию,
@@ -38,11 +96,11 @@ S.onBle = d => {
       // (палка шлёт не всех сразу, телефоны то слышны, то нет), новым не считается. Первые 20 с после
       // подключения — разогрев: список палки заполняется, все считаются «уже были».
       const seenBefore = S.ever.has(id); S.ever.set(id, now);
-      if (!S.warmT) S.warmT = now + 20000;
+      if (!S.warmT) S.warmT = now + S.cfg.al_warm * 1000 + 1;
       const fresh = !seenBefore && now > S.warmT;
-      e = { id, st: T.steady(4, 0.8), h: 0, born: now, hist: [], first: !fresh };
+      e = { id, st: T.steady(4, 0.8), h: 0, born: now, hist: [], first: !fresh, type, r };
       S.dev.set(id, e);
-      if (fresh) S.event('BLE', '+ ' + (label || name || type || 'device') + '  ' + r + ' dBm', type === 'tracker' && r > -70);
+      if (fresh) { actPush('ble', now); S.event('BLE', '+ ' + (label || name || type || 'device') + '  ' + r + ' dBm', S.isTrk(e) || S.isNew(e, now)); }
     }
     e.st.set(r);
     Object.assign(e, { r, type, vend, name, label, age, macs, alive: true, seen: now });
@@ -97,7 +155,7 @@ S.onIr = d => {
   if (d.rep && prev && prev.p === d.p && prev.addr === d.addr && prev.cmd === d.cmd) { prev.x++; prev.at = now; }
   else {
     I.hist.unshift(Object.assign({ at: now, x: 1 }, d)); if (I.hist.length > 12) I.hist.pop();
-    S.event('IR', (d.brand ? d.brand + ' · ' : '') + d.p + ' ' + T.hexs(d.cmd));
+    S.event('IR', (d.brand ? d.brand + ' · ' : '') + d.p + ' ' + T.hexs(d.cmd)); actPush('prb', now);
   }
   I.last = d; I.t = now;
 };
@@ -110,7 +168,7 @@ S.onNfc = d => {
   const prev = N.hist[0];
   if (!(prev && prev.uid === d.uid && now - prev.at < 3000)) {
     N.hist.unshift(Object.assign({ at: now }, d)); if (N.hist.length > 8) N.hist.pop();
-    S.event('NFC', d.fam || 'card');
+    S.event('NFC', d.fam || 'card'); actPush('prb', now);
   } else prev.at = now;
 };
 // датчики 433 (событие sens): таблица и последняя посылка; новая посылка = pk вырос
@@ -118,6 +176,7 @@ S.sens = null; S.sensPkT = 0;
 S.onSens = d => {
   const prev = S.sens; S.sens = d; S.sensT = performance.now();
   if (!prev || d.pk !== prev.pk) S.sensPkT = S.sensT;
+  if (prev && d.pk > prev.pk) actPush('rf', S.sensT, d.pk - prev.pk);
   if (prev) {
     const known = new Set((prev.sensors || []).map(x => x.id));
     for (const x of d.sensors || []) if (!known.has(x.id)) S.event('433', x.kind === 'remote' ? 'remote / bell #' + String(x.id).split('-').pop() : x.p + ' ch' + x.ch + (x.t != null ? '  ' + x.t + '°' : ''));

@@ -38,15 +38,15 @@ T.boot = (first) => {
   // экран выбора: две панели с силуэтами устройств
   const device = (x, y, w, h, r, col) => {
     T.cutPath(g, x, y, w, h, r); g.strokeStyle = col; g.lineWidth = 2; g.stroke();
-    g.fillStyle = 'rgba(62,230,255,.06)'; g.fill();
+    g.fillStyle = `rgba(${T.RGB.acc},.06)`; g.fill();
     g.strokeStyle = T.rgba(col, 0.5); g.lineWidth = 1; g.strokeRect(x + w * 0.08, y + h * 0.08, w * 0.84, h * 0.84);
   };
   const choiceFrame = (now, W, H, u) => {
     const k = T.clamp((now - pickT) / 450), eo = 1 - Math.pow(1 - k, 3);
     g.clearRect(0, 0, W, H);
-    g.fillStyle = `rgba(5,8,13,${0.94 - 0.12 * eo})`; g.fillRect(0, 0, W, H);  // сквозь шторку чуть видно живой город
+    g.fillStyle = `rgba(${T.RGB.bg},${0.94 - 0.12 * eo})`; g.fillRect(0, 0, W, H);  // сквозь шторку чуть видно живой город
     const cx = W / 2, cy = H / 2, portrait = H > W;
-    T.txt(g, T.theme === 'sumi' ? '選  Select device' : '// SELECT DEVICE', cx, cy - u * (portrait ? 17 : 11), u * 1.9, T.C.acc, 't', 'center');
+    T.txt(g, '// SELECT DEVICE', cx, cy - u * (portrait ? 17 : 11), u * 1.9, T.C.acc, 't', 'center');
     T.txt(g, 'CITY IS WARMING UP · ' + T.S.dev.size + ' DEVICES', cx, cy - u * (portrait ? 15 : 9), u * 0.9, T.C.label, 'm', 'center');
     const pw = portrait ? Math.min(W * 0.7, u * 22) : Math.min(W * 0.3, u * 20), ph = portrait ? u * 11 : u * 14, gap = u * 2.5;
     const items = [{ id: 'phone', t: 'LITE', s: 'light page · phone' }, { id: 'tablet', t: 'FULL', s: 'full scene · tablet' }];
@@ -91,7 +91,7 @@ T.boot = (first) => {
     if (L.mounted) L.warm++;
     const target = Math.min(1, (L.step + (L.step < 5 ? 0.6 * Math.min(1, (now - L.stepT) / 1500) : 0)) / 5);
     L.bar += (target - L.bar) * 0.12;
-    if (T.theme === 'sumi') T.backdrop(g, W, H); else { g.fillStyle = T.C.bg; g.fillRect(0, 0, W, H); }
+    g.fillStyle = T.C.bg; g.fillRect(0, 0, W, H);
     // композиция: шапка · проценты · [天] шкала [眼] · шаги. 眼 «открывается», когда всё готово
     const bw = Math.min(W * 0.66, u * 46), x = cx - bw / 2, sz = u * 3.4, gap = u * 1.1;
     const barX = x + sz + gap, barW = bw - 2 * (sz + gap), barY = cy - u * 0.55, ready = L.bar > 0.97;
@@ -99,20 +99,9 @@ T.boot = (first) => {
     T.txt(g, 'v' + T.VERSION + (T.native ? ' · app' : ''), W - u, H - u, u * 0.7, T.C.dim, 'm', 'right');
     T.txt(g, 'INITIALIZING', barX, cy - u * 1.6, u * 0.8, T.C.dim);
     T.txt(g, Math.round(L.bar * 100) + '%', barX + barW, cy - u * 1.35, u * 1.9, T.C.hot, 't', 'right');
-    if (T.theme === 'sumi') {                          // тушь: 天 и 眼 — печати, шкала — мазок, который пишется кистью
-      const I = T.ink;
-      I.hanko(g, x, cy - sz / 2, sz, ['天'], { seed: 21, rot: -0.03 });
-      if (ready) { if (!L.stampT) L.stampT = now; const k = T.clamp((now - L.stampT) / 260); g.save(); g.globalAlpha = k; I.hanko(g, x + bw - sz, cy - sz / 2, sz, ['眼'], { seed: 22, rot: 0.04 }); g.restore();
-        if (k < 1) { I.raw(g, 'strokeStyle', I.shu(0.5 * (1 - k))); g.lineWidth = 2; const e = u * (0.4 + k * 2); g.strokeRect(x + bw - sz - e, cy - sz / 2 - e, sz + 2 * e, sz + 2 * e); } }
-      else I.hanko(g, x + bw - sz, cy - sz / 2, sz, ['眼'], { filled: false, col: 'rgba(27,24,20,.25)', seed: 22 });
-      I.pen(g, [[barX, barY + u * 1.4], [barX + barW, barY + u * 1.4]], 1, I.ink(0.15));
-      if (L.bar > 0.01) { const n = Math.max(2, Math.round(40 * L.bar)), pts = []; for (let i = 0; i <= n; i++) { const tt = i / n; pts.push([barX + barW * L.bar * tt, barY + u * 0.55 + Math.sin(tt * 5) * u * 0.15]); }
-        I.stroke(g, pts, u * 1.5, { seed: 5, taper: [0.04, 0.12], dry: 0.9, alpha: 0.88 }); }
-    } else {
-      T.drawSealChar(g, x, cy - sz / 2, sz, '天', T.C.acc, true);
-      T.drawSealChar(g, x + bw - sz, cy - sz / 2, sz, '眼', ready ? T.C.acc : T.C.dim, ready);
-      T.segBar(g, barX, barY, barW, u * 1.1, L.bar, 32, true);
-    }
+    T.drawSealChar(g, x, cy - sz / 2, sz, '天', T.C.acc, true);
+    T.drawSealChar(g, x + bw - sz, cy - sz / 2, sz, '眼', ready ? T.C.acc : T.C.dim, ready);
+    T.segBar(g, barX, barY, barW, u * 1.1, L.bar, 32, true);
     const horiz = bw > u * 36, sy0 = cy + u * 4.2;
     L.steps.forEach((s, i) => {
       const done = i < L.step, cur = i === L.step, bad = done && s.ok === false;
@@ -124,7 +113,7 @@ T.boot = (first) => {
         T.txt(g, s[0], sx, sy0 + u * 1.6, u * 0.85, done || cur ? T.C.hot : T.C.dim, 'm', 'center');
         T.txt(g, s[1], sx, sy0 + u * 2.7, u * 0.72, done ? T.C.label : cur ? T.C.hot : T.C.dim, 'c', 'center');
         T.txt(g, note, sx, sy0 + u * 3.7, u * 0.7, bad ? T.C.alert : T.C.dim, 'm', 'center');
-        if (i < L.steps.length - 1) { g.fillStyle = done ? 'rgba(62,230,255,.4)' : T.C.line; g.fillRect(sx + u * 0.7, sy0 - 0.5, cw - u * 1.4, 1); }
+        if (i < L.steps.length - 1) { g.fillStyle = done ? `rgba(${T.RGB.acc},.4)` : T.C.line; g.fillRect(sx + u * 0.7, sy0 - 0.5, cw - u * 1.4, 1); }
       } else {                                             // узко (телефон): списком
         const y = sy0 + i * u * 1.5;
         T.diamond(g, x + u * 0.4, y - u * 0.3, u * 0.32, col, done || cur);
@@ -134,25 +123,6 @@ T.boot = (first) => {
     });
     if (L.step >= 5 && L.bar > 0.985) { if (T.reduce) { afterAnim(now); return false; } phase = 'anim'; t0 = now; T.app.hold = true; return false; }   // всё поднято — сцену на паузу, заставка
     return true;
-  };
-  // SUMI-заставка: энсо рисуется одним движением, проявляется TENGAN, ставится печать 天眼, бумага «вытирает» экран
-  const inkAnim = (t, W, H) => {
-    const I = T.ink, u = T.unit(W, H), cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.36;
-    T.backdrop(g, W, H);
-    const k = eo(seg(t, 100, 1300));
-    if (k > 0) { const pts = [], N = Math.max(2, Math.round(110 * k)); for (let i = 0; i <= N; i++) { const a = -2.3 + T.TAU * 0.93 * k * i / N, rr = R * (1 + 0.012 * Math.sin(i * 0.4)); pts.push([cx + Math.cos(a) * rr, cy + Math.sin(a) * rr]); }
-      I.stroke(g, pts, u * 2.2, { seed: 8, taper: [0.06, 0.25], dry: 0.9, alpha: 0.92 }); }
-    const ta = T.clamp(seg(t, 1000, 1500));
-    const px = u * 4.4, tw = T.tw(g, 'TENGAN', px, 't'), sh = px * 1.3, sw2 = sh * 0.56, bx = cx - (tw + u * 2 + sw2) / 2;
-    if (ta > 0) { g.save(); g.globalAlpha = ta; T.txt(g, 'TENGAN', bx, cy + px * 0.32, px, T.C.acc, 't'); g.restore(); }
-    if (t >= 1600) {                                   // печать ставится с ударом
-      const kk = seg(t, 1600, 1800), sx = bx + tw + u * 2, sy = cy - sh / 2 - px * 0.05;
-      T.drawSeal(g, sx, sy, sh);
-      if (kk < 1) { I.raw(g, 'strokeStyle', I.shu(0.5 * (1 - kk))); g.lineWidth = 2; const e = u * (0.3 + kk * 2); g.strokeRect(sx - e, sy - e, sw2 + 2 * e, sh + 2 * e); }
-    }
-    if (t >= 1750) { const n = Math.min(SUB.length, (t - 1750) / 14 | 0); T.txt(g, SUB.slice(0, n), cx, cy + R * 0.42, u * 1, T.C.label, 'm', 'center'); }
-    const wp = seg(t, 2350, MS);
-    if (wp > 0) { g.save(); g.globalAlpha = eo(wp); T.backdrop(g, W, H); g.restore(); }
   };
   let lastDraw = 0;
   const frame = now => {
@@ -167,7 +137,6 @@ T.boot = (first) => {
     if (phase === 'choice') { choiceFrame(now, W, H, T.unit(W, H)); return; }
     if (now - t0 > MS) { afterAnim(now); return; }
     const t = now - t0;
-    if (T.theme === 'sumi') { inkAnim(t, W, H); return; }
     const cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.36, u = T.unit(W, H);
     g.fillStyle = T.C.bg; g.fillRect(0, 0, W, H);
     // прицел
@@ -181,8 +150,8 @@ T.boot = (first) => {
     // луч с хвостом и цели
     if (t > 300 && t < 2400) {
       const sw = (t - 300) * 0.48 * Math.PI / 180, fade = 1 - seg(t, 2050, 2400);
-      if (g.createConicGradient) { const c = g.createConicGradient(sw - 1.3, cx, cy), f = 1.3 / T.TAU; c.addColorStop(0, 'rgba(40,95,130,0)'); c.addColorStop(f * 0.985, `rgba(62,230,255,${0.4 * fade})`); c.addColorStop(f, 'rgba(62,230,255,0)'); c.addColorStop(1, 'rgba(62,230,255,0)'); g.fillStyle = c; g.beginPath(); g.moveTo(cx, cy); g.arc(cx, cy, R, sw - 1.3, sw); g.closePath(); g.fill(); }
-      g.strokeStyle = `rgba(235,250,255,${fade})`; g.lineWidth = 2; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + Math.cos(sw) * R, cy + Math.sin(sw) * R); g.stroke();
+      if (g.createConicGradient) { const c = g.createConicGradient(sw - 1.3, cx, cy), f = 1.3 / T.TAU; c.addColorStop(0, `rgba(${T.RGB.mid},0)`); c.addColorStop(f * 0.985, `rgba(${T.RGB.acc},${0.4 * fade})`); c.addColorStop(f, `rgba(${T.RGB.acc},0)`); c.addColorStop(1, `rgba(${T.RGB.acc},0)`); g.fillStyle = c; g.beginPath(); g.moveTo(cx, cy); g.arc(cx, cy, R, sw - 1.3, sw); g.closePath(); g.fill(); }
+      g.strokeStyle = `rgba(${T.RGB.hot},${fade})`; g.lineWidth = 2; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + Math.cos(sw) * R, cy + Math.sin(sw) * R); g.stroke();
       const swd = (t - 300) * 0.48;
       for (const [deg, rr] of BL) {
         if (swd < deg) continue;
@@ -214,7 +183,7 @@ T.boot = (first) => {
     if (t >= 1640 && seal) {
       const k = seg(t, 1640, 1820), sx = bx + tw + u * 2, sy = cy - sealH / 2 - px * 0.06;
       T.drawSeal(g, sx, sy, sealH, sealCol);
-      if (k < 1) { const gg = u * (0.3 + k * 2); g.strokeStyle = `rgba(235,250,255,${0.6 * (1 - k)})`; g.strokeRect(sx - gg, sy - gg, sw2 + 2 * gg, sealH + 2 * gg); }
+      if (k < 1) { const gg = u * (0.3 + k * 2); g.strokeStyle = `rgba(${T.RGB.hot},${0.6 * (1 - k)})`; g.strokeRect(sx - gg, sy - gg, sw2 + 2 * gg, sealH + 2 * gg); }
     }
     if (t >= 1700) { const k = Math.min(SUB.length, (t - 1700) / 14 | 0); T.txt(g, SUB.slice(0, k) + ((t / 120 | 0) & 1 && k < SUB.length ? '_' : ''), cx, cy + bh / 2 - u * 1.2, u * 1.05, T.C.label, 'm', 'center'); }
     // развёртка стирает

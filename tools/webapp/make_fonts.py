@@ -22,8 +22,8 @@ IPA = "/usr/share/fonts/opentype/ipafont-gothic/ipag.ttf"
 
 ASCII = "".join(chr(c) for c in range(0x20, 0x7F))
 EXTRA = "°·—–…‹›«»×←→↑↓▲▼◆◇●○■□♪⚡±≈≤≥µ№™✓✕▸◂"
-# печать и знаки разделов темы SUMI (IPAGothic)
-SEAL_TEXT = "設動電光墨天眼観藍網波音機画街始結棒数記近良選山水走査概並遠空星球命振時間解析受信司令室中低速断線状態系統距離器感知地平索敵接警告外気嵐雨風曇静探針赤滝活度注意報発穏録月齢自既新一三二力呪域封展札源無特窮級閃開領黒"
+# знаки, которые рисует страница: печать 天眼, штаб HQ (NERV/DOMAIN), погода (IPAGothic)
+SEAL_TEXT = "中令低信光動受司告器地報外天定室嵐平度意感態探接敵断新既晴曇月析棒機気波注活滝状発眼知穏系紅索統網線自解記設警赤距近速針録離雨雷電静音風齢"
 CYR = "".join(chr(c) for c in range(0x410, 0x450)) + "ЁёІіЇїЄєҐґ"
 
 
@@ -53,6 +53,10 @@ def main():
         face("Rajdhani", 600, woff2(os.path.join(FONTS, "Rajdhani-SemiBold.ttf"), ASCII + EXTRA)),
         face("Share Tech Mono", 400, woff2(os.path.join(FONTS, "ShareTechMono-Regular.ttf"), ASCII + EXTRA)),
         face("JetBrains Mono", 500, woff2(os.path.join(FONTS, "JetBrainsMono-Medium.ttf"), ASCII + EXTRA + CYR)),
+        # тема KURENAI 紅: рубленые цифры и заголовки (Anton), моноширинный текст (Space Mono)
+        face("Anton", 400, woff2(os.path.join(FONTS, "Anton-Regular.ttf"), ASCII + EXTRA)),
+        face("Space Mono", 400, woff2(os.path.join(FONTS, "SpaceMono-Regular.ttf"), ASCII + EXTRA)),
+        face("Space Mono", 700, woff2(os.path.join(FONTS, "SpaceMono-Bold.ttf"), ASCII + EXTRA)),
     ]
     if os.path.exists(IPA):
         parts.append(face("Tengan Seal", 400, woff2(IPA, SEAL_TEXT)))

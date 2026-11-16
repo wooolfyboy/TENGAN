@@ -31,9 +31,20 @@ const sh = (type, src) => {
   if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { console.error('GL shader:', gl.getShaderInfoLog(s), src.slice(0, 300)); return null; }
   return s;
 };
+// перекраска под тему одной функцией в конце любого фрагментного шейдера: шейдеры пишут цвета DENKO,
+// а в KURENAI (T.GLK = 1) бирюзовое и оранжевое становится красным, остальное — серым той же яркости
+const THEMED = fs => fs.replace(/\bgl_FragColor\b/g, 'tg_FC').replace(/\bvoid\s+main\s*\(/, 'void tg_main(') + `
+uniform float tg_k;
+vec3 tg_map(vec3 c){ float l=dot(c,vec3(.299,.587,.114));
+ float k=max(smoothstep(.12,.42,min(c.g,c.b)-c.r), smoothstep(.15,.45,c.r-max(c.g,c.b)));
+ return mix(vec3(l)*vec3(1.,.988,.96), vec3(.898,.149,.184)*min(1.6,l*1.5+.15), k); }
+void main(){ tg_FC=vec4(0.); tg_main(); gl_FragColor = tg_k > .5 ? vec4(tg_map(tg_FC.rgb), tg_FC.a) : tg_FC; }`;
 // программа с автоматическим поиском uniform/attribute по имени
 GL.prog = (fs, vs = VS) => {
-  const p = gl.createProgram(), a = sh(gl.VERTEX_SHADER, vs), b = sh(gl.FRAGMENT_SHADER, (fs.includes('precision') ? '' : HEAD) + fs);
+  fs = (fs.includes('precision') ? '' : HEAD) + fs;
+  // объявление tg_FC — сразу после precision (и #extension), чтобы шейдер мог писать его до main
+  fs = THEMED(fs).replace(/(precision\s+\w+\s+float\s*;)/, '$1\nvec4 tg_FC;');
+  const p = gl.createProgram(), a = sh(gl.VERTEX_SHADER, vs), b = sh(gl.FRAGMENT_SHADER, fs);
   if (!a || !b) return null;
   gl.attachShader(p, a); gl.attachShader(p, b); gl.linkProgram(p);
   if (!gl.getProgramParameter(p, gl.LINK_STATUS)) { console.error('GL link:', gl.getProgramInfoLog(p)); return null; }
@@ -48,6 +59,7 @@ GL.prog = (fs, vs = VS) => {
 let unit = 0;
 GL.set = (P, vals) => {
   unit = 0;
+  if (P.u.tg_k) gl.uniform1f(P.u.tg_k.loc, T.GLK || 0);   // тема для перекраски (THEMED)
   for (const k in vals) {
     const U = P.u[k]; if (!U) continue; const v = vals[k], l = U.loc;
     switch (U.type) {

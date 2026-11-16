@@ -35,7 +35,7 @@ T.views.push({
     if (!d) { this.irIdle(g, w, h, u, top, bot); T.bloom(this.cv, 0.7); T.footer(g, m, h - u * 2.2, w - 2 * m, u, 'point any remote at the stick and press a button', 'receive only · nothing is sent'); return; }
     const lw = portrait ? w - 2 * m : (w - 2 * m) * 0.64, lh = portrait ? (bot - top) * 0.62 : bot - top;
     T.panel(g, m, top, lw, lh, u);
-    if (fresh > 0) { T.cutPath(g, m, top, lw, lh, u * 0.8); g.strokeStyle = `rgba(62,230,255,${0.7 * fresh})`; g.lineWidth = 2; g.stroke(); }
+    if (fresh > 0) { T.cutPath(g, m, top, lw, lh, u * 0.8); g.strokeStyle = `rgba(${T.RGB.acc},${0.7 * fresh})`; g.lineWidth = 2; g.stroke(); }
     const x0 = m + u * 1.4;
     T.txt(g, '// LAST CODE', x0, top + u * 1.8, u * 1.0, T.C.acc, 't');
     // протокол крупно + HOLD
@@ -43,7 +43,7 @@ T.views.push({
     T.txt(g, d.p, x0, top + u * 2.4 + px, px, T.C.hot, 't');
     if (hold) {
       const hx = x0 + T.tw(g, d.p, px, 't') + u * 1.2, hy = top + u * 2.4 + px * 0.35, pulse = 0.6 + 0.4 * Math.sin(this.t * 9);
-      T.cutPath(g, hx, hy, u * 5, u * 2, u * 0.5); g.fillStyle = `rgba(255,122,26,${0.25 * pulse})`; g.fill(); g.strokeStyle = T.C.alert; g.lineWidth = 1.2; g.stroke();
+      T.cutPath(g, hx, hy, u * 5, u * 2, u * 0.5); g.fillStyle = `rgba(${T.RGB.alert},${0.25 * pulse})`; g.fill(); g.strokeStyle = T.C.alert; g.lineWidth = 1.2; g.stroke();
       T.txt(g, 'HOLD', hx + u * 2.5, hy + u * 1.45, u * 1.1, T.C.alert, 't', 'center');
     }
     let y = top + u * 3.6 + px;
@@ -94,17 +94,17 @@ T.views.push({
     g.fillStyle = T.C.alert; g.fillRect(rx - u * 0.3, ry - u * 3.1, u * 0.6, u * 0.4);
     for (let k = 0; k < 5; k++) {
       const p = ((t * 0.6 + k / 5) % 1), x = rx + u * 3 + p * u * 18, a = Math.sin(p * Math.PI);
-      g.strokeStyle = `rgba(62,230,255,${0.8 * a})`; g.lineWidth = 2; g.beginPath(); g.arc(x, ry, u * 1.4, -0.7, 0.7); g.stroke();
+      g.strokeStyle = `rgba(${T.RGB.acc},${0.8 * a})`; g.lineWidth = 2; g.beginPath(); g.arc(x, ry, u * 1.4, -0.7, 0.7); g.stroke();
     }
     const sx = cx + u * 12;
-    for (let k = 0; k < 3; k++) { const p = (t * 0.5 + k / 3) % 1; g.strokeStyle = `rgba(62,230,255,${0.5 * (1 - p)})`; g.lineWidth = 1.2; g.beginPath(); g.arc(sx, ry, u * (1.2 + p * 3), 0, T.TAU); g.stroke(); }
+    for (let k = 0; k < 3; k++) { const p = (t * 0.5 + k / 3) % 1; g.strokeStyle = `rgba(${T.RGB.acc},${0.5 * (1 - p)})`; g.lineWidth = 1.2; g.beginPath(); g.arc(sx, ry, u * (1.2 + p * 3), 0, T.TAU); g.stroke(); }
     g.fillStyle = T.C.hot; g.beginPath(); g.arc(sx, ry, u * 0.9, 0, T.TAU); g.fill();
     T.txt(g, 'POINT ANY REMOTE AT THE STICK', cx, cy + u * 6.5, u * 1.6, T.C.hot, 't', 'center');
     T.txt(g, 'PRESS A BUTTON — WE GUESS WHOSE REMOTE IT IS', cx, cy + u * 8.2, u * 0.85, T.C.label, 'm', 'center');
   },
   // меандр из длительностей [метка, пауза, ...] (мкс)
   wave(g, raw, x, y, w, h, u, rev, col) {
-    g.fillStyle = 'rgba(5,10,16,.5)'; g.fillRect(x, y, w, h);
+    g.fillStyle = `rgba(${T.RGB.bg2},.5)`; g.fillRect(x, y, w, h);
     g.strokeStyle = T.C.line; g.lineWidth = 1;
     for (let k = 1; k < 8; k++) { g.beginPath(); g.moveTo(x + w * k / 8, y); g.lineTo(x + w * k / 8, y + h); g.stroke(); }
     if (!raw.length) return;
@@ -143,13 +143,13 @@ T.views.push({
     // кольца поля от считывателя
     for (let k = 0; k < 4; k++) {
       const p = (t * 0.45 + k / 4) % 1, r = cw * (0.3 + p * 0.7);
-      g.strokeStyle = `rgba(62,230,255,${(on ? 0.35 : 0.18) * (1 - p)})`; g.lineWidth = 1.2;
+      g.strokeStyle = `rgba(${T.RGB.acc},${(on ? 0.35 : 0.18) * (1 - p)})`; g.lineWidth = 1.2;
       g.beginPath(); g.ellipse(rx, ry, r, r * 0.32, 0, 0, T.TAU); g.stroke();
     }
     // вспышка касания
     if (this.tap < 1) {
       const p = this.tap, r = cw * (0.2 + p * 1.1);
-      g.strokeStyle = `rgba(235,250,255,${0.9 * (1 - p)})`; g.lineWidth = 3 * (1 - p) + 1;
+      g.strokeStyle = `rgba(${T.RGB.hot},${0.9 * (1 - p)})`; g.lineWidth = 3 * (1 - p) + 1;
       g.beginPath(); g.ellipse(rx, ry, r, r * 0.32, 0, 0, T.TAU); g.stroke();
     }
     g.fillStyle = T.C.line; g.beginPath(); g.ellipse(rx, ry, cw * 0.28, cw * 0.09, 0, 0, T.TAU); g.fill();
@@ -158,7 +158,7 @@ T.views.push({
     const lift = on ? (1 - T.clamp(this.tap * 2.5)) * ch * 0.6 : ch * 0.55 + Math.sin(t * 1.6) * u * 0.6;
     const kx = cx - cw / 2, ky = cy - ch / 2 - lift;
     T.cutPath(g, kx, ky, cw, ch, u * 0.9);
-    g.fillStyle = on ? 'rgba(18,58,72,.85)' : 'rgba(5,10,16,.6)'; g.fill();
+    g.fillStyle = on ? 'rgba(18,58,72,.85)' : `rgba(${T.RGB.bg2},.6)`; g.fill();
     if (!on) g.setLineDash([u * 0.6, u * 0.5]);
     g.strokeStyle = on ? T.C.acc : T.C.label; g.lineWidth = on ? 2 : 1.2; g.stroke(); g.setLineDash([]);
     g.fillStyle = on ? T.C.acc : T.C.dim; g.fillRect(kx + cw * 0.09, ky + ch * 0.3, cw * 0.14, ch * 0.22);

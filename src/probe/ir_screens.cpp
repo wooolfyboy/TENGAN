@@ -9,7 +9,6 @@
 #include "core/settings.h"
 #include "core/timeutil.h"
 
-static bool sumi() { return g_theme == THEME_SUMI; }
 
 // пульт с ИК-волнами (значок меню)
 void iconRemote(int x, int y, uint16_t c, uint16_t bg) {
@@ -45,16 +44,11 @@ static void drawPulses(int x, int y, int w, int h, uint32_t now) {
     if (x1 > x + w) x1 = x + w;
     int yy = mark ? yH : yL;
     uint16_t c = x0 < sx ? (mark ? hot : acc) : scale565(acc, 35);
-    if (sumi()) {                                            // тушь: вспышки — мазки кисти от земли
-      if (mark) spr.fillRect(x0, yH, max(1, x1 - x0), yL - yH + 1, x0 < sx ? hot : scale565(hot, 30));
-      else      spr.drawFastHLine(x0, yL, x1 - x0, c);
-    } else {
-      spr.drawFastVLine(x0, min(prevY, yy), abs(prevY - yy) + 1, c);
-      spr.drawFastHLine(x0, yy, x1 - x0 + 1, c);
-    }
+    spr.drawFastVLine(x0, min(prevY, yy), abs(prevY - yy) + 1, c);
+    spr.drawFastHLine(x0, yy, x1 - x0 + 1, c);
     prevY = yy;
   }
-  if (sweep < 1) spr.drawFastVLine(sx, y, h, sumi() ? C_SEAL() : hot);   // курсор развёртки
+  if (sweep < 1) spr.drawFastVLine(sx, y, h, hot);   // курсор развёртки
 }
 
 // ожидание: пульт слева шлёт волны в «глаз» приёмника
@@ -74,7 +68,7 @@ static void drawIdle(uint32_t now) {
   float pulse = fmodf(now / 900.0f, 0.25f) * 4;
   spr.fillSmoothCircle(rx, cy, 13, scale565(acc, 25 + (int)(pulse * 25)), C_BG());
   spr.drawSmoothCircle(rx, cy, 13, acc, C_BG());
-  spr.fillSmoothCircle(rx, cy, 5, sumi() ? C_SEAL() : C_HOT(), C_BG());
+  spr.fillSmoothCircle(rx, cy, 5, C_HOT(), C_BG());
   spr.setTextDatum(MC_DATUM);
   spr.setTextColor(UI_LABEL());
   txt("POINT ANY REMOTE AT THE STICK", W / 2, 118, 1);
