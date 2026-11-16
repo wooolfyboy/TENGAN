@@ -180,7 +180,7 @@ static void drawMainMenuHud() {
     char title[40]; utf8Upper(LT(s->title), title, sizeof title);
     spr.setTextDatum(TC_DATUM);
     spr.setTextColor(sel ? C_SELFG() : steel);
-    txt(title, cx, y0 + 62, txtW(title, 2) > cw - 4 ? 1 : 2);   // длинное название — мельче
+    txt(title, cx, y0 + 62, txtW(title, 2) <= cw - 4 ? 2 : txtW(title, 1) <= cw - 4 ? 1 : 8);   // длинное название — мельче
     char sub[48], big[40], small[40];
     s->subtitle(sub, sizeof(sub));
     splitSubtitle(sub, big, small, sizeof(big));
@@ -188,8 +188,8 @@ static void drawMainMenuHud() {
     spr.setTextColor(alertish ? C_ALERT() : (sel ? C_SELACC() : steel));
     { char bf[40]; fitText(big, bf, sizeof bf, cw - 4, 4); txt(bf, cx, y0 + 82, 4); }
     spr.setTextColor(sel && themeKurenai() ? UI_LINE() : dim);
-    char sm[40]; fitText(small, sm, sizeof sm, cw - 4, 1);   // сколько влезает (с учётом UTF-8)
-    txt(sm, cx, y0 + 110, 1);
+    char sm[40]; fitText(small, sm, sizeof sm, cw - 4, 8);   // сколько влезает (с учётом UTF-8)
+    txt(sm, cx, y0 + 108, 8);
   }
 
   // телеметрия: время работы
@@ -197,7 +197,7 @@ static void drawMainMenuHud() {
   snprintf(buf, sizeof(buf), "T+%02lu:%02lu:%02lu", (unsigned long)(t / 3600), (unsigned long)(t / 60 % 60), (unsigned long)(t % 60));
   spr.setTextDatum(BL_DATUM);
   spr.setTextColor(dim);
-  txt(L("CLICK: OPEN  ·  HOLD SIDE: POWER", "НАЖАТЬ: ОТКРЫТЬ  ·  БОК: ПИТАНИЕ"), 8, H - 4, 1);
+  txt(L("CLICK: OPEN · SIDE: POWER", "НАЖАТЬ: ОТКРЫТЬ · БОК: ПИТАНИЕ"), 8, H - 4, 1);
   spr.setTextDatum(BR_DATUM);
   spr.setTextColor(acc);
   txt(buf, W - 8, H - 4, 1);

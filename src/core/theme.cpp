@@ -7,6 +7,7 @@
 #include "core/display.h"
 // Шрифты интерфейса: одна семья рисует и латиницу, и кириллицу — при смене языка ничего не «прыгает».
 //   текст (обе темы): JetBrains Mono · заголовки и крупные цифры: DENKO — Exo 2, KURENAI — Oswald
+#include "core/fonts/JBM10.h"
 #include "core/fonts/JBM11.h"
 #include "core/fonts/JBM12.h"
 #include "core/fonts/JBM14.h"
@@ -87,6 +88,7 @@ static const GFXfont* fontFor(int size) {
     case 5: return &JBM19;
     case 4: return themeKurenai() ? &OSW20 : &EXO20; // заголовки
     case 6: return themeKurenai() ? &OSW36 : &EXO37; // крупные цифры
+    case 8: return &JBM10;                           // совсем мелкий (подписи карточек, если не влезает)
     default: return nullptr;                         // 7 — «семисегментный» встроенный
   }
 }

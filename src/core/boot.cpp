@@ -129,7 +129,7 @@ void bootFrame(uint32_t t) {
     }
   }
   if (t >= 1700) {                                         // подпись печатается
-    const char* SUB = L("// RADIO ENVIRONMENT ANALYZER", "// АНАЛИЗАТОР ЭФИРА");
+    const char* SUB = L("// AIRWAVE ANALYZER", "// АНАЛИЗАТОР ЭФИРА");
     const int SUBN = (int)strlen(SUB);
     int k = min(SUBN, (int)((t - 1700) / 14));
     while (k > 0 && k < SUBN && ((uint8_t)SUB[k] & 0xC0) == 0x80) k--;   // не резать букву UTF-8
