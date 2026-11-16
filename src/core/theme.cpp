@@ -2,6 +2,7 @@
 //  theme.cpp — дизайн-система «Tactical HUD»
 // ============================================================
 #include "core/theme.h"
+#include "core/perf.h"
 #include "core/ui.h"
 #include "core/display.h"
 #include "core/fonts/STM14.h"
@@ -148,6 +149,50 @@ static void corners() {
 
 int g_uiPages = 0, g_uiPage = 0;
 
+// Вывод на экран только изменившихся строк. Кадр целиком — 320×170×2 = 108 КБ, по шине SPI
+// это ~22 мс; на спокойных экранах (меню, настройки, списки) меняются часы, цифры, пара полосок —
+// отправляем только эти полосы строк. Строку узнаём по «отпечатку» (хэш FNV по 32-битным словам,
+// ~1 мс на кадр), раз в 2 с — полный кадр на всякий случай.
+static uint32_t s_rowHash[400];
+static uint32_t s_fullMs = 0;
+static bool     s_rowsValid = false;
+static void pushChanged() {
+  const int W = spr.width(), H = spr.height();
+  uint16_t* buf = (uint16_t*)spr.getPointer();
+  uint32_t now = millis();
+  if (!buf || spr.getColorDepth() != 16 || H > 400 || (W & 1) || !s_rowsValid || now - s_fullMs > 2000) {
+    if (buf && spr.getColorDepth() == 16 && H <= 400 && !(W & 1)) {     // запомнить отпечатки для следующего кадра
+      for (int y = 0; y < H; y++) {
+        const uint32_t* p = (const uint32_t*)(buf + y * W); uint32_t h = 2166136261u;
+        for (int i = 0; i < W / 2; i++) h = (h ^ p[i]) * 16777619u;
+        s_rowHash[y] = h;
+      }
+      s_rowsValid = true;
+    }
+    s_fullMs = now;
+    spr.pushSprite(0, 0);
+    perfRows(H, H);
+    return;
+  }
+  static bool ch[400];
+  for (int y = 0; y < H; y++) {
+    const uint32_t* p = (const uint32_t*)(buf + y * W); uint32_t h = 2166136261u;
+    for (int i = 0; i < W / 2; i++) h = (h ^ p[i]) * 16777619u;
+    ch[y] = h != s_rowHash[y]; s_rowHash[y] = h;
+  }
+  // полосы изменившихся строк; разрывы до 6 строк склеиваем (меньше команд экрану)
+  int pushed = 0;
+  for (int y = 0; y < H; ) {
+    if (!ch[y]) { y++; continue; }
+    int y1 = y, gap = 0, end = y;
+    while (y1 < H && gap <= 6) { if (ch[y1]) { end = y1; gap = 0; } else gap++; y1++; }
+    spr.pushSprite(0, y, 0, y, W, end - y + 1);
+    pushed += end - y + 1;
+    y = end + 1;
+  }
+  perfRows(pushed, H);
+}
+
 void present() {
   corners();
   if (g_uiPages > 1) {                                // точки-страницы: под линией шапки справа (там всегда свободно)
@@ -155,5 +200,5 @@ void present() {
     for (int p = 0; p < g_uiPages; p++)
       spr.fillRect(x0 + p * 8, 21, 5, 2, p == g_uiPage ? C_ACC() : UI_LINE());
   }
-  spr.pushSprite(0, 0);
+  pushChanged();
 }

@@ -124,7 +124,7 @@ T.galGL = (() => {
   G.globe = (g, cx, cy, R, l0, b0, sun, t) => {
     if (!G.on()) return false;
     const S2 = R * 1.22, land = GL.tex('gB_land', G._landUp ? null : G.land()); G._landUp = 1;
-    return run(g, cx - S2, cy - S2, S2 * 2, S2 * 2, 1, 'globe', GLOBE, { t, ink: ink(), l0, b0, sun, land }, [0, 0, 0, 0]);
+    return run(g, cx - S2, cy - S2, S2 * 2, S2 * 2, 0.8, 'globe', GLOBE, { t, ink: ink(), l0, b0, sun, land }, [0, 0, 0, 0]);
   };
 
   // ---------- НЕБО: купол со звёздным полем и Млечным Путём (настоящие звёзды и планеты — 2D поверх) ----------
@@ -175,7 +175,7 @@ T.galGL = (() => {
   }`;
   G.sky = (g, cx, cy, R, o) => {
     if (!G.on()) return false;
-    return run(g, cx - R, cy - R, R * 2, R * 2, 1, 'sky', SKY, Object.assign({ ink: ink() }, o), [0, 0, 0, 0]);
+    return run(g, cx - R, cy - R, R * 2, R * 2, 0.7, 'sky', SKY, Object.assign({ ink: ink() }, o), [0, 0, 0, 0]);
   };
 
   // ---------- ТЕССЕРАКТ: 32 ребра как светящиеся трубки (расстояние до отрезков — в шейдере) ----------

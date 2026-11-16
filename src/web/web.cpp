@@ -19,6 +19,7 @@
 #include "core/jsonutil.h"
 #include "core/timeutil.h"
 #include "web/web.h"
+#include "core/perf.h"
 #include "core/board.h"
 #include "web/web_page.h"
 #include "web/tablet_page.h"    // приложение для планшета (gzip, собирается tools/webapp/build.py)
@@ -328,6 +329,7 @@ static void sseAccept() {
   if (k.on) k.c.stop();
   k = SseCli();
   k.c = nc; k.c.setNoDelay(true); k.on = true;
+  k.pend.reserve(4096);                          // хвост неотправленного: один буфер на всё время, без перевыделений
   int q = req.indexOf("want="); String want = q >= 0 ? req.substring(q + 5, req.indexOf(' ', q)) : String("ble,wifi");
   k.ble = want.indexOf("ble") >= 0; k.wifi = want.indexOf("wifi") >= 0; k.snd = want.indexOf("snd") >= 0;
   k.sub = want.indexOf("sub") >= 0; k.pc = want.indexOf("pc") >= 0; k.wx = want.indexOf("wx") >= 0;
@@ -359,7 +361,7 @@ static void sseTick(uint32_t now) {
     if (k.pend.length()) sseFlush(k);
     if (!k.tSt || now - k.tSt >= 2000) {
       k.tSt = now;
-      String o = "{\"name\":\"" DEVICE_NAME "\",\"up\":"; o += millis() / 1000;
+      String o; o.reserve(384); o = "{\"name\":\"" DEVICE_NAME "\",\"up\":"; o += millis() / 1000;
       o += ",\"bat\":"; o += g_bat.ok ? g_bat.soc : -1; o += ",\"mv\":"; o += g_bat.mv;
       o += ",\"usb\":"; o += g_bat.bus ? 1 : 0; o += ",\"chg\":"; o += g_bat.chg;
       o += ",\"cli\":"; o += WiFi.softAPgetStationNum(); o += ",\"heap\":"; o += ESP.getFreeHeap() / 1024;
@@ -368,6 +370,11 @@ static void sseTick(uint32_t now) {
       o += ",\"rst\":"; jsonStr(o, crumbLastReason()); o += ",\"rstStep\":"; jsonStr(o, crumbLastStep());
       o += ",\"radio\":\""; o += bleRadioActive() ? "b" : ""; o += s_scanMs && now - s_scanMs < 25000 ? "w" : "";
       o += s_subOn ? "s" : ""; o += s_sndOn ? "m" : ""; o += pcLive(now) ? "p" : ""; o += s_irOn ? "i" : ""; o += s_nfcOn ? "n" : ""; o += '"';
+      { // скорость палки: средний/худший проход цикла и кадр экрана (мс), кадров/с, доля отправленных строк экрана (%)
+        char lp[64]; snprintf(lp, sizeof lp, ",\"lp\":[%.1f,%.1f,%.1f,%.1f,%u,%u]", g_perf.loopAvgUs / 1000.0f, g_perf.loopMaxUs / 1000.0f,
+                              g_perf.drawAvgUs / 1000.0f, g_perf.drawMaxUs / 1000.0f, g_perf.fps, g_perf.pushPct);
+        o += lp;
+      }
       o += '}';
       sseEvent(k, "st", o, false);
       if (!k.satSent) {                          // один раз: город и орбиты — небо и глобус считает планшет
@@ -379,17 +386,17 @@ static void sseTick(uint32_t now) {
         sseEvent(k, "sat", a, false);
       }
     }
-    if (k.ble && (!k.tBle || now - k.tBle >= 1000)) { k.tBle = now; String o; bleStreamJson(o); sseEvent(k, "ble", o, false); }
+    if (k.ble && (!k.tBle || now - k.tBle >= 1000)) { k.tBle = now; String o; o.reserve(2048); bleStreamJson(o); sseEvent(k, "ble", o, false); }
     if (k.wifi && k.wifiSeen != s_wifiGen) { k.wifiSeen = s_wifiGen; sseEvent(k, "wifi", s_wifiJson, false); }
-    if (k.snd && now - k.tSnd >= 40) { k.tSnd = now; String o; audioStreamJson(o); sseEvent(k, "snd", o, true); }
-    if (k.sub && s_subOn && now - k.tSub >= 140) { k.tSub = now; String o; subJson(o); sseEvent(k, "sub", o, true); }
-    if (k.pc && now - k.tPc >= 1000) { k.tPc = now; String o; pcStreamJson(o); sseEvent(k, "pc", o, false); }
-    if (k.wx && now - k.tWx >= 1000) { k.tWx = now; String o; wxJson(o); sseEvent(k, "wx", o, false); }
+    if (k.snd && now - k.tSnd >= 40) { k.tSnd = now; String o; o.reserve(320); audioStreamJson(o); sseEvent(k, "snd", o, true); }
+    if (k.sub && s_subOn && now - k.tSub >= 140) { k.tSub = now; String o; o.reserve(1024); subJson(o); sseEvent(k, "sub", o, true); }
+    if (k.pc && now - k.tPc >= 1000) { k.tPc = now; String o; o.reserve(1024); pcStreamJson(o); sseEvent(k, "pc", o, false); }
+    if (k.wx && now - k.tWx >= 1000) { k.tWx = now; String o; o.reserve(512); wxJson(o); sseEvent(k, "wx", o, false); }
     if (k.sens && now - k.tSens >= 150 && (k.sensSeen != g_sensGen || now - k.tSens >= 1000)) {
-      k.tSens = now; k.sensSeen = g_sensGen; String o; sensJson(o, now); sseEvent(k, "sens", o, false);
+      k.tSens = now; k.sensSeen = g_sensGen; String o; o.reserve(1536); sensJson(o, now); sseEvent(k, "sens", o, false);
     }
-    if (k.ir && k.irSeen != g_ir.gen) { k.irSeen = g_ir.gen; String o; irJson(o); sseEvent(k, "ir", o, false); }
-    if (k.nfc && k.nfcSeen != g_nfc.gen) { k.nfcSeen = g_nfc.gen; String o; nfcJson(o); sseEvent(k, "nfc", o, false); }
+    if (k.ir && k.irSeen != g_ir.gen) { k.irSeen = g_ir.gen; String o; o.reserve(512); irJson(o); sseEvent(k, "ir", o, false); }
+    if (k.nfc && k.nfcSeen != g_nfc.gen) { k.nfcSeen = g_nfc.gen; String o; o.reserve(384); nfcJson(o); sseEvent(k, "nfc", o, false); }
   }
 }
 

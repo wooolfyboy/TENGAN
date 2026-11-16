@@ -196,11 +196,13 @@
     if (!pat) { pat = g.createPattern(paperTex(), 'repeat'); paperPats.set(g, pat); }
     const t = T.theme; T.theme = 'raw'; g.fillStyle = pat; T.theme = t; g.fillRect(0, 0, W, H);
   };
+  const paintPaper = (x, W, H) => {
+    const v = x.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.5, W / 2, H / 2, Math.max(W, H) * 0.8);
+    v.addColorStop(0, 'rgba(150,120,80,0)'); v.addColorStop(1, 'rgba(150,120,80,.18)'); x.fillStyle = v; x.fillRect(0, 0, W, H);
+  };
   T.finish = (g, W, H) => {
     if (T.theme !== 'sumi') return oFinish(g, W, H);
-    if (!T.Q.scan) return;
-    const v = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.5, W / 2, H / 2, Math.max(W, H) * 0.8);
-    const t = T.theme; T.theme = 'raw'; v.addColorStop(0, 'rgba(150,120,80,0)'); v.addColorStop(1, 'rgba(150,120,80,.18)'); g.fillStyle = v; T.theme = t; g.fillRect(0, 0, W, H);
+    const t = T.theme; T.theme = 'raw'; try { oFinish(g, W, H, paintPaper); } finally { T.theme = t; }
   };
   // «растекание туши» вместо свечения: размытая копия кадра ложится через multiply, слабо
   T.bloom = (o, strength = 0.85) => {

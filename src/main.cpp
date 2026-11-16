@@ -29,6 +29,8 @@
 #include <driver/gpio.h>
 #include <esp_ota_ops.h>
 #include "audio/audio.h"
+#include "core/perf.h"
+
 
 // Самый ранний момент, где можно что-то сделать (ещё до setup): гасим подсветку,
 // чтобы не было видно «мусора» на экране, пока он не инициализирован.
@@ -82,6 +84,7 @@ void setup() {
 
 void loop() {
   static uint32_t lastDraw = 0;
+  uint32_t tLoop = micros();
   crumbFeed();
   crumb("input");   inputPoll();
   uint32_t now = millis();
@@ -99,9 +102,13 @@ void loop() {
     lastDraw = now;
     crumb("ble update"); bleUpdate(now);                   // нужно всегда: меню показывает число устройств, лента — события
     g_fastFrame = false;              // экран сам попросит снова, если ему нужно
+    uint32_t tDraw = micros();
     if (g_powerHold) drawPowerHold();
     else             { crumb("draw"); navDraw(now); }
+    perfDraw(micros() - tDraw);
     crumb("autosave"); settingsAutosave(now);
   }
+  perfLoop(micros() - tLoop);
+  perfTick(now);
   delay(5);
 }

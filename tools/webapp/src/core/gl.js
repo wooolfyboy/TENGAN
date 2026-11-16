@@ -93,7 +93,7 @@ GL.buf = (name, data, index = false, dynamic = false) => {
 const quadB = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, quadB); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
 // начало кадра: размер в CSS-px × доля разрешения (как у 2D-холстов: не больше T.RES по длинной стороне)
 GL.begin = (w, h, scale = 1, clear = [0, 0, 0, 0]) => {
-  const d = Math.min(window.devicePixelRatio || 1, 3, T.RES / Math.max(1, w, h)) * scale;
+  const d = Math.min(window.devicePixelRatio || 1, 3, T.RES / Math.max(1, w, h)) * scale * (T.RS || 1);
   const W = Math.max(1, Math.round(w * d)), H = Math.max(1, Math.round(h * d));
   if (GL.cv.width !== W || GL.cv.height !== H) { GL.cv.width = W; GL.cv.height = H; }
   GL.w = W; GL.h = H;

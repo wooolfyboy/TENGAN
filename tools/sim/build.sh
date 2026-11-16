@@ -21,7 +21,7 @@ DEFS="-DUSER_SETUP_LOADED=1 -DST7789_DRIVER=1 -DTFT_WIDTH=170 -DTFT_HEIGHT=320 -
  -DLOAD_FONT6=1 -DLOAD_FONT7=1 -DLOAD_FONT8=1 -DLOAD_GFXFF=1 -DSPI_FREQUENCY=40000000 -DDISABLE_ALL_LIBRARY_WARNINGS"
 SRC=(
   "$SIM/sim.cpp" "$WORK/tftlib/TFT_eSPI.cpp"
-  "$ROOT/src/core/display.cpp" "$ROOT/src/core/theme.cpp" "$ROOT/src/core/menu.cpp" "$ROOT/src/core/settings.cpp"
+  "$ROOT/src/core/display.cpp" "$ROOT/src/core/perf.cpp" "$ROOT/src/core/theme.cpp" "$ROOT/src/core/menu.cpp" "$ROOT/src/core/settings.cpp"
   "$ROOT/src/core/battery.cpp" "$ROOT/src/core/ui.cpp" "$ROOT/src/core/leds.cpp" "$ROOT/src/core/boot.cpp" "$ROOT/src/core/power_screens.cpp"
   "$ROOT/src/ble/ble_screens.cpp" "$ROOT/src/ble/ble_city.cpp" "$ROOT/src/ble/vendors.cpp"
   "$ROOT/src/wifi/wifi_model.cpp" "$ROOT/src/wifi/wifi_screens.cpp"
