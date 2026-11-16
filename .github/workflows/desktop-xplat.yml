@@ -113,6 +113,7 @@ jobs:
           sed -i 's/^          //' $A/tengan-desktop.desktop
           printf '#!/bin/sh\nexec "$(dirname "$(readlink -f "$0")")/usr/bin/tengan_desktop/tengan_desktop" "$@"\n' > $A/AppRun
           chmod +x $A/AppRun
+          chmod -R a+rX $A   # PySide6 ships some dirs as 0700; others would get "Permission denied"
           curl -fsSL -o appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
           chmod +x appimagetool
           ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 ./appimagetool $A dist/TENGAN-Desktop-linux-x86_64.AppImage
