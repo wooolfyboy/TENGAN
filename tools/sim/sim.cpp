@@ -415,6 +415,13 @@ int main(int argc, char** argv) {
   { WebLink l = { 1, "BLE  WX  ", 3400, 0 };              // планшет подключён: живая картинка по теме
     char nm[32];
     for (int f = 0; f < 48; f++) { drawWebLink(l, 2000 + f * 70); snprintf(nm, sizeof nm, "anim_link_%03d", f); snap(nm); } }
+  { // тема с планшета: SUMI -> DENKO посреди анимации связи (воспроизведение падения)
+    WebLink l = { 1, "BLE  ", 3000, 0 }; String o;
+    settingsSetKey("theme", "sumi", o); printf("set sumi: %s\n", o.c_str());
+    for (int f = 0; f < 5; f++) drawWebLink(l, 9000 + f * 70);
+    settingsSetKey("theme", "denko", o); printf("set denko: %s\n", o.c_str());
+    for (int f = 0; f < 5; f++) drawWebLink(l, 9500 + f * 70);
+    snap("zz_theme_flip"); printf("theme flip ok\n"); }
   drawPcWaiting(s_now);      snap("70_pc_waiting");
   for (int i = 0; i < 60; i++) {                        // минута «настоящих» строк с ноутбука
     char ln[300];
