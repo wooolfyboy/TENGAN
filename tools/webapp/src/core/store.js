@@ -15,23 +15,33 @@ const S = T.S = {
 };
 S.event = (tag, text, alert) => { S.events.unshift({ t: Date.now(), tag, text, alert: !!alert }); if (S.events.length > 40) S.events.pop(); };
 
+// подписи устройств («мои AirPods»): палка хранит их и шлёт 8-м полем; планшет держит свою копию,
+// чтобы новое имя было видно сразу, ещё до ответа палки
+S.labels = new Map();                                  // id -> {n, t}
+S.setLabel = (id, n) => { S.labels.set(id, { n, t: performance.now() }); const e = S.dev.get(id); if (e) e.label = n; };
+const pickLabel = (id, fromStick) => {
+  const loc = S.labels.get(id);
+  if (loc && (fromStick === undefined || performance.now() - loc.t < 6000)) return loc.n;   // своё свежее — главнее
+  return fromStick || '';
+};
 S.onBle = d => {
   S.ble = d; S.bleT = performance.now();
   S.bleHist.push(d.n); if (S.bleHist.length > 180) S.bleHist.shift();
   const seen = new Set(), now = performance.now();
   for (const a of d.d) {
     const [id, r, type, vend, name, age, macs] = a; seen.add(id);
+    const label = pickLabel(id, a.length > 7 ? a[7] : undefined);
     let e = S.dev.get(id);
     if (!e) {
       e = { id, st: T.steady(4, 0.8), h: 0, born: now, hist: [], first: !S.devInit };
       S.dev.set(id, e);
-      if (S.devInit) S.event('BLE', '+ ' + (name || type || 'device') + '  ' + r + ' dBm', type === 'tracker');
+      if (S.devInit) S.event('BLE', '+ ' + (label || name || type || 'device') + '  ' + r + ' dBm', type === 'tracker');
     }
     e.st.set(r);
-    Object.assign(e, { r, type, vend, name, age, macs, alive: true, seen: now });
+    Object.assign(e, { r, type, vend, name, label, age, macs, alive: true, seen: now });
     e.hist.push(r); if (e.hist.length > 120) e.hist.shift();
   }
-  for (const [id, e] of S.dev) if (!seen.has(id) && e.alive) { e.alive = false; if (now - e.born > 5000) S.event('BLE', '- ' + (e.name || e.type || 'device') + '  lost'); }
+  for (const [id, e] of S.dev) if (!seen.has(id) && e.alive) { e.alive = false; if (now - e.born > 5000) S.event('BLE', '- ' + (e.label || e.name || e.type || 'device') + '  lost'); }
   S.devInit = true;
 };
 S.onWifi = d => {

@@ -23,7 +23,7 @@ IPA = "/usr/share/fonts/opentype/ipafont-gothic/ipag.ttf"
 ASCII = "".join(chr(c) for c in range(0x20, 0x7F))
 EXTRA = "°·—–…‹›«»×←→↑↓▲▼◆◇●○■□♪⚡±≈≤≥µ№™✓✕▸◂"
 # печать и знаки разделов темы SUMI (IPAGothic)
-SEAL_TEXT = "電光墨天眼観藍網波音機画街始動結棒数記近良選山水走査概並遠空星球命振時間解析受信"
+SEAL_TEXT = "設動電光墨天眼観藍網波音機画街始動結棒数記近良選山水走査概並遠空星球命振時間解析受信"
 CYR = "".join(chr(c) for c in range(0x410, 0x450)) + "ЁёІіЇїЄєҐґ"
 
 

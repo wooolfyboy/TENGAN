@@ -41,7 +41,7 @@ T.el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.c
 T.VERSION = '@@VERSION@@';                               // версия TENGAN (build.py подставляет из файла VERSION)
 T.native = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 T.STICK = '192.168.4.1';
-T.stickHost = () => new URLSearchParams(location.search).get('host') || (T.native ? T.STICK : location.hostname || T.STICK);
+T.stickHost = () => (new URLSearchParams(location.search).get('host') || (T.native ? T.STICK : location.hostname || T.STICK)).replace(/:\d+$/, '');   // имя без порта: поток SSE идёт на свой порт
 T.apiBase = () => { const h = new URLSearchParams(location.search).get('host'); return h ? `http://${h}` : T.native ? `http://${T.STICK}` : ''; };
 T.reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 // ---- качество: фиксированное (стабильный режим). Холст ~1920 px по длинной стороне,

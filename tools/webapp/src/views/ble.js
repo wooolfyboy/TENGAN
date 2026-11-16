@@ -6,7 +6,7 @@ BU.glyph = e => BU.G[e.type] || (e.type ? String(e.type)[0].toUpperCase() : '?')
 BU.ang = id => (T.hash(id) % 360) * Math.PI / 180;
 BU.rad = rs => 0.08 + 0.88 * (1 - T.pct(rs));          // сильный — ближе к центру
 BU.list = () => [...S.dev.values()].filter(e => e.h > 0.02 && e.rs != null);
-BU.label = e => e.name || (e.type && e.type !== 'unknown' ? e.type : 'device');
+BU.label = e => e.label || e.name || (e.type && e.type !== 'unknown' ? e.type : 'device');   // своя подпись — главнее
 BU.tr = e => e.type === 'tracker';
 BU.rgb = (e, v) => BU.tr(e) ? T.ALERT : T.heatRGB(v);
 BU.crossed = (a, b, x) => b >= a ? (x > a && x <= b) : (x > a || x <= b);
@@ -203,6 +203,7 @@ T.views.push({
     if (!h) { if (this.sub !== 2) this.sel = null; return; }
     if (h.k === 'dev') { this.sel = (this.sel === h.id && this.sub !== 2) ? null : h.id; this.info = null; this.infoT = 0; }
     else if (h.k === 'back') this.sel = null;
+    else if (h.k === 'name') { const e = S.dev.get(this.sel); if (e && T.nameDevice) T.nameDevice(e, e.label || (this.info && this.info.label) || ''); }
   },
   // подробности выбранного с палки: адреса, Company ID, сервисы
   fetchInfo(now) {
@@ -410,6 +411,11 @@ T.views.push({
     T.txt(g, '// DEVICE', x + p, cy + u * 0.9, u * 1.05, T.C.acc, 't');
     T.txt(g, '‹ ALL', x + w - p, cy + u * 0.9, u * 0.9, T.C.label, 'm', 'right');
     T.hits.rect(x + w - p - u * 4.5, cy - u * 0.4, u * 5, u * 2, { k: 'back' });
+    // кнопка «назвать»: своя подпись для устройства (хранится на палке)
+    { const bw = u * 5.4, bx = x + w - p - u * 5 - bw - u * 0.8, by = cy - u * 0.35;
+      T.panel(g, bx, by, bw, u * 1.7, u * 0.4, 'rgba(62,230,255,.1)', T.C.acc);
+      T.txt(g, e.label ? 'RENAME' : 'NAME', bx + bw / 2, by + u * 1.15, u * 0.8, T.C.hot, 'm', 'center');
+      T.hits.rect(bx - u * 0.3, by - u * 0.3, bw + u * 0.6, u * 2.3, { k: 'name' }); }
     cy += u * 2.6;
     g.font = `500 ${u * 1.7}px ${T.FC}`; T.txt(g, T.fit(g, BU.label(e).toUpperCase(), w - 2 * p), x + p, cy + u * 1.3, u * 1.7, T.C.hot, 'c'); cy += u * 2.1;
     g.font = `${u * 0.85}px ${T.FM}`; T.txt(g, T.fit(g, ((e.vend || '—') + ' · ' + (e.type || '') + (tr ? ' · TRACKER' : '')).toUpperCase(), w - 2 * p), x + p, cy + u * 0.6, u * 0.85, tr ? T.C.alert : T.C.label); cy += u * 1.5;
