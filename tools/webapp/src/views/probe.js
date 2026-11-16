@@ -139,6 +139,7 @@ T.views.push({
     // сцена: считыватель (палка) и карта
     const cx = m + lw / 2, cy = top + lh * 0.55, t = this.t;
     const cw = Math.min(lw * 0.62, lh * 0.75), ch = cw * 0.63;
+    if (!(cw > 4)) return;                               // окно ещё не разложилось (поворот/ресайз)
     const rx = cx, ry = cy + ch * 0.55;
     // кольца поля от считывателя
     for (let k = 0; k < 4; k++) {
