@@ -378,6 +378,7 @@ int main(int argc, char** argv) {
   spr.createSprite(320, 170);
   settingsBegin();
   if (getenv("SIM_THEME") && !strcmp(getenv("SIM_THEME"), "kurenai")) { g_theme = THEME_KURENAI; themeChanged(); }   // SIM_THEME=kurenai bash build.sh
+  g_langAsk = false; g_lang = (getenv("SIM_LANG") && !strcmp(getenv("SIM_LANG"), "ru")) ? 1 : 0;   // SIM_LANG=ru — язык интерфейса
   g_bat.ok = true; g_bat.soc = 87; g_bat.mv = 3980; g_bat.ma = -132; g_bat.tte = 250; g_bat.chgOk = true;
   fillBle(); fillWifi(); fillSub();
   { String j; settingsJson(j);                            // то же, что палка отдаёт планшету по /api/settings
@@ -388,7 +389,13 @@ int main(int argc, char** argv) {
 
   { const uint32_t ts[] = { 250, 600, 1000, 1300, 1680, 1950, 2200 };
     for (int i = 0; i < 7; i++) { char nm[32]; snprintf(nm, sizeof nm, "00_boot_%04u", (unsigned)ts[i]); bootFrame(ts[i]); snap(nm); } }
+  { int lg = g_lang;                            // первое включение: выбор языка
+    g_langAsk = true; g_lang = 0; navDraw(s_now); snap("00l_lang_pick_en");
+    navRotate(+1); navDraw(s_now + 400);           snap("00l_lang_pick_ru");
+    navClick(); g_langAsk = false; g_lang = lg; }
   navBegin(); navDraw(s_now);                    snap("01_menu");
+  g_lang ^= 1; navDraw(s_now);                   snap("01b_menu_other_lang");   // язык меняется на лету
+  g_lang ^= 1;
   g_powerHold = 1500; drawPowerHold();           snap("08_power_hold"); g_powerHold = 0;
   { const uint32_t ts[] = { 300, 760, 1000, 1250, 1400 };
     for (int i = 0; i < 5; i++) { char nm[32]; snprintf(nm, sizeof nm, "09_power_off_%04u", (unsigned)ts[i]); shutFrame(ts[i]); spr.pushSprite(0, 0); snap(nm); } }
@@ -404,6 +411,7 @@ int main(int argc, char** argv) {
   { const char* pg[] = { "06a_set_general", "06b_set_ble", "06c_set_wifi", "06d_set_subghz", "06e_set_sound" };
     for (int p = 0; p < 5; p++) {
       if (p) navRotate(+1);
+      if (p == 0) { navClick(); navClick(); navDraw(s_now); snap("06a0_set_language"); navBack(); }   // пункт «Язык»
       navClick(); if (p == 0) for (int k = 0; k < 5; k++) navClick(); navDraw(s_now); snap(pg[p]); navBack();
     } }
   navBack();

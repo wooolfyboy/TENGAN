@@ -12,6 +12,7 @@
 #include "core/battery.h"
 #include "core/settings.h"
 #include "core/ui.h"
+#include "core/langpick.h"
 #include "core/board.h"
 #include "gallery/gallery.h"
 #include "web/web.h"
@@ -66,6 +67,7 @@ void navOpen(const Section* target) {
 }
 
 void navClick() {
+  if (g_langAsk) { langPickClick(); return; }       // первое включение: сначала язык
   const Section* s = cur();
   if (!s)    { enterSection(s_menuSel); return; }
   if (s_sub) { s->open(s_subSel); s_sub = false; return; }
@@ -73,6 +75,7 @@ void navClick() {
 }
 
 void navRotate(int dir) {
+  if (g_langAsk) { langPickRotate(dir); return; }
   const Section* s = cur();
   if (!s)    { s_menuSel = (s_menuSel + dir + N_SECTIONS) % N_SECTIONS; return; }
   if (s_sub) { s_subSel = (s_subSel + dir + s->nScreens) % s->nScreens; return; }
@@ -88,6 +91,7 @@ void navToSub() {
 }
 
 void navBack() {
+  if (g_langAsk) return;
   const Section* s = cur();
   if (!s) return;
   if (!s_sub && s->nScreens > 0) {
@@ -203,6 +207,7 @@ static void drawMainMenuHud() {
 static void drawMainMenu() { drawMainMenuHud(); }
 
 void navDraw(uint32_t now) {
+  if (g_langAsk) { langPickDraw(now); return; }
   const Section* s = cur();
   if (!s)         drawMainMenu();
   else if (s_sub) drawSectionSub(s);
