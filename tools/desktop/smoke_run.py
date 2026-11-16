@@ -4,7 +4,7 @@
 
     python tools/desktop/smoke_run.py <путь к исполняемому файлу> [секунд]
 """
-import os, subprocess, sys, time
+import os, signal, subprocess, sys, tempfile, time
 
 exe, secs = sys.argv[1], float(sys.argv[2]) if len(sys.argv) > 2 else 25
 if sys.platform == "darwin":
@@ -14,14 +14,27 @@ else:
 log = os.path.join(logdir, "desktop.log")
 if os.path.exists(log):
     os.remove(log)
-p = subprocess.Popen([exe], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+# вывод — в файл, а не в трубу: упакованное приложение запускает дочерний процесс, и труба не закрывается,
+# пока жив хоть один из них (из-за этого CI висел час). Завершаем всю группу процессов.
+outf = tempfile.TemporaryFile()
+p = subprocess.Popen([exe], stdout=outf, stderr=subprocess.STDOUT, start_new_session=True)
 try:
-    out, _ = p.communicate(timeout=secs)
+    p.wait(timeout=secs)
     early = True
 except subprocess.TimeoutExpired:
-    p.kill()
-    out, _ = p.communicate()
     early = False
+    for sig in (signal.SIGTERM, signal.SIGKILL):
+        try:
+            os.killpg(p.pid, sig)
+        except ProcessLookupError:
+            break
+        try:
+            p.wait(timeout=5)
+            break
+        except subprocess.TimeoutExpired:
+            pass
+outf.seek(0)
+out = outf.read()
 text = (out or b"").decode("utf-8", "replace")
 if os.path.exists(log):
     text += "\n--- desktop.log ---\n" + open(log, encoding="utf-8", errors="replace").read()
