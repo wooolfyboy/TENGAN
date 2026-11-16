@@ -194,7 +194,7 @@ firmware and updates together with it.
 |---|---|
 | **Browser** (phone, tablet, computer) | open **Web** on TENGAN → scan the QR code or join `TENGAN-XXXX` → `192.168.4.1`. Choose **LITE** (a light page for phones) or **FULL** (the full scene) |
 | **TENGAN Tablet** (Android, `tengan_tablet.apk`) | the same scene full screen, plus **GPS**: sky and globe use your coordinates. Install: copy the APK to the tablet, open it, allow installation |
-| **TENGAN Desktop** (Windows, `tengan_desktop.exe`) | HQ and every section in a window **over the USB cable** (your computer keeps its internet) or over TENGAN's Wi-Fi. Includes the PC monitor: load, now playing, volume, PC audio for Sound, exact time and satellite orbits |
+| **TENGAN Desktop** (Windows `tengan_desktop.exe`; macOS / Linux — see below) | HQ and every section in a window **over the USB cable** (your computer keeps its internet) or over TENGAN's Wi-Fi. Includes the PC monitor: load, now playing, volume, PC audio for Sound, exact time and satellite orbits |
 
 <details>
 <summary><b>TENGAN Desktop details</b></summary>
@@ -205,6 +205,32 @@ firmware and updates together with it.
   window title (Spotify, a YouTube tab).
 - Log file: `%APPDATA%\TENGAN\desktop.log`.
 - The old console monitor `pc_monitor_windows.zip` is still in the releases but is no longer needed.
+
+</details>
+
+<details>
+<summary><b>macOS and Linux (community builds, untested on real hardware)</b></summary>
+
+The releases also carry **`TENGAN-Desktop-mac.zip`** (Apple Silicon) and
+**`TENGAN-Desktop-linux-x86_64.AppImage`**. They are built and smoke-tested automatically, but nobody has
+run them with a real TENGAN yet — reports are welcome.
+
+| | macOS | Linux |
+|---|---|---|
+| HQ window, USB and Wi-Fi modes | ✅ | ✅ (Qt WebEngine) |
+| Load, memory, network, battery | ✅ | ✅ |
+| Media keys (play/pause, tracks, volume) | ✅ Spotify / Music + system volume | ✅ via `playerctl` + `pactl`/`amixer` |
+| Track title | ✅ Spotify / Music | ✅ any MPRIS player or browser (`playerctl`) |
+| PC audio for Sound | ❌ (macOS has no system loopback) | ✅ PulseAudio / PipeWire monitor |
+| Popups, widget, tray | ✅ (notifications via the system) | ✅ (`notify-send`; tray needs AppIndicator or X11) |
+
+- **macOS:** unzip, move **TENGAN Desktop.app** to Applications. The app is not signed by Apple, so the
+  first time open it with **right-click → Open → Open**. The serial port is `/dev/cu.usbmodem…`.
+  Log: `~/Library/Application Support/TENGAN/desktop.log`.
+- **Linux:** `chmod +x TENGAN-Desktop-linux-x86_64.AppImage` and run it. Access to the USB port needs the
+  `dialout` group: `sudo usermod -aG dialout $USER`, then log out and back in (the app shows this hint if
+  the port is denied). Optional: `sudo apt install playerctl` (track title and media keys), `libfuse2`
+  (to run AppImages on newer distros), `libportaudio2` (PC audio). Log: `~/.config/TENGAN/desktop.log`.
 
 </details>
 
@@ -315,7 +341,7 @@ Without a device: `python3 tools/webapp/mock.py page.html 8090 [ru] [kurenai]`.
 <details>
 <summary><b>TENGAN Desktop and TENGAN Tablet</b></summary>
 
-- Desktop: `tools/desktop` (Python + pywebview), single-file build — `tools/desktop/build_exe.py` (PyInstaller, CI on Windows).
+- Desktop: `tools/desktop` (Python + pywebview), single-file build — `tools/desktop/build_exe.py` (PyInstaller, CI on Windows); macOS / Linux — `tools/desktop/build_xplat.py` (CI: `.github/workflows/desktop-xplat.yml`).
 - Tablet: `app/` (Capacitor, Android), the APK is built in CI.
 
 </details>

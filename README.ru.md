@@ -194,7 +194,7 @@ Bluetooth · Wi-Fi · Sub-GHz · ИК · NFC · звук · монитор ПК 
 |---|---|
 | **Браузер** (телефон, планшет, компьютер) | на TENGAN открой раздел **Web** → отсканируй QR или подключись к сети `TENGAN-XXXX` → `192.168.4.1`. Выбор: **LITE** (лёгкая страница для телефона) или **FULL** (полная сцена) |
 | **TENGAN Tablet** (Android, `tengan_tablet.apk`) | та же сцена во весь экран, плюс **GPS**: небо и глобус считаются по твоим координатам. Установка: скопируй APK на планшет, открой, разреши установку |
-| **TENGAN Desktop** (Windows, `tengan_desktop.exe`) | штаб и все разделы в окне **по USB-кабелю** (интернет на компьютере остаётся) или по Wi-Fi TENGAN. Внутри — монитор ПК: нагрузка, что играет, громкость, звук для раздела «Звук», точное время и орбиты спутников |
+| **TENGAN Desktop** (Windows `tengan_desktop.exe`; macOS / Linux — ниже) | штаб и все разделы в окне **по USB-кабелю** (интернет на компьютере остаётся) или по Wi-Fi TENGAN. Внутри — монитор ПК: нагрузка, что играет, громкость, звук для раздела «Звук», точное время и орбиты спутников |
 
 <details>
 <summary><b>TENGAN Desktop: подробности</b></summary>
@@ -205,6 +205,32 @@ Bluetooth · Wi-Fi · Sub-GHz · ИК · NFC · звук · монитор ПК 
   не сообщает — из заголовка окна (Spotify, вкладка YouTube).
 - Журнал программы: `%APPDATA%\TENGAN\desktop.log`.
 - Старый консольный монитор `pc_monitor_windows.zip` ещё лежит в релизах, но больше не нужен.
+
+</details>
+
+<details>
+<summary><b>macOS и Linux (сборки сообщества, не проверены на реальном устройстве)</b></summary>
+
+В релизах есть ещё **`TENGAN-Desktop-mac.zip`** (Apple Silicon) и
+**`TENGAN-Desktop-linux-x86_64.AppImage`**. Они собираются и проходят пробный запуск автоматически, но с
+настоящим TENGAN их ещё никто не запускал — отзывы приветствуются.
+
+| | macOS | Linux |
+|---|---|---|
+| Окно штаба, режимы USB и Wi-Fi | ✅ | ✅ (Qt WebEngine) |
+| Нагрузка, память, сеть, батарея | ✅ | ✅ |
+| Медиа-кнопки (пауза, треки, громкость) | ✅ Spotify / Music + громкость системы | ✅ через `playerctl` + `pactl`/`amixer` |
+| Название трека | ✅ Spotify / Music | ✅ любой MPRIS-плеер или браузер (`playerctl`) |
+| Звук компьютера для раздела «Звук» | ❌ (macOS не отдаёт звук колонок) | ✅ монитор PulseAudio / PipeWire |
+| Всплывашки, виджет, трей | ✅ (уведомления — системные) | ✅ (`notify-send`; трею нужен AppIndicator или X11) |
+
+- **macOS:** распакуй и перенеси **TENGAN Desktop.app** в «Программы». Приложение не подписано Apple,
+  поэтому первый раз открой его так: **правый клик → «Открыть» → «Открыть»**. Порт устройства —
+  `/dev/cu.usbmodem…`. Журнал: `~/Library/Application Support/TENGAN/desktop.log`.
+- **Linux:** `chmod +x TENGAN-Desktop-linux-x86_64.AppImage` и запусти. Для доступа к USB-порту нужна
+  группа `dialout`: `sudo usermod -aG dialout $USER`, затем перезайди в систему (программа сама подскажет,
+  если доступа нет). По желанию: `sudo apt install playerctl` (название трека и медиа-кнопки), `libfuse2`
+  (запуск AppImage на новых дистрибутивах), `libportaudio2` (звук компьютера). Журнал: `~/.config/TENGAN/desktop.log`.
 
 </details>
 
@@ -315,7 +341,7 @@ esptool --chip esp32s3 merge-bin -o tengan_full_0x0.bin 0x0 bootloader.bin 0x800
 <details>
 <summary><b>TENGAN Desktop и TENGAN Tablet</b></summary>
 
-- Desktop: `tools/desktop` (Python + pywebview), сборка в один файл — `tools/desktop/build_exe.py` (PyInstaller, CI на Windows).
+- Desktop: `tools/desktop` (Python + pywebview), сборка в один файл — `tools/desktop/build_exe.py` (PyInstaller, CI на Windows); macOS / Linux — `tools/desktop/build_xplat.py` (CI: `.github/workflows/desktop-xplat.yml`).
 - Tablet: `app/` (Capacitor, Android), APK собирается в CI.
 
 </details>

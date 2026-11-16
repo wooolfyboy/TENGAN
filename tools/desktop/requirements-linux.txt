@@ -1,0 +1,12 @@
+# TENGAN Desktop для Linux: окно на Qt WebEngine + монитор ПК
+pywebview>=5.0
+QtPy
+PyQt6
+PyQt6-WebEngine
+pyserial
+psutil
+pystray
+python-xlib
+Pillow
+numpy
+sounddevice

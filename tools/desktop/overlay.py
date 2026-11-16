@@ -13,6 +13,8 @@ TENGAN desktop — трей, всплывашки и виджет поверх �
 """
 import json
 import os
+import subprocess
+import sys
 import threading
 import time
 import urllib.request
@@ -20,6 +22,7 @@ import urllib.request
 from overlay_html import POPUP_HTML, WIDGET_HTML
 
 IS_WIN = os.name == "nt"
+IS_MAC = sys.platform == "darwin"
 HERE = os.path.dirname(os.path.abspath(__file__))
 POP_W = 380
 
@@ -235,6 +238,21 @@ class Widget:
             pass
 
 
+def os_notify(title, text):
+    """Системное уведомление на macOS (AppleScript) и Linux (notify-send)."""
+    try:
+        if IS_MAC:
+            esc = lambda x: (x or "").replace("\\", "\\\\").replace('"', '\\"')
+            subprocess.run(["osascript", "-e", 'display notification "%s" with title "%s"' % (esc(text) or " ", esc(title))],
+                           timeout=3, capture_output=True)
+            return True
+        r = subprocess.run(["notify-send", "-a", "TENGAN Desktop", title or "TENGAN", text or " "], timeout=3, capture_output=True)
+        return r.returncode == 0
+    except Exception as e:
+        log("notify:", e)
+        return False
+
+
 # ============================================================
 #  Трей
 # ============================================================
@@ -274,7 +292,11 @@ class Tray:
             M.SEPARATOR,
             I(T("tray_quit"), lambda: a.quit()),
         ))
-        threading.Thread(target=self.icon.run, daemon=True).start()
+        if IS_MAC:
+            # macOS: значок живёт в цикле Cocoa, который запускает окно (webview.start) — без своего потока
+            self.icon.run_detached()
+        else:
+            threading.Thread(target=self.icon.run, daemon=True).start()
 
     def refresh(self):
         if self.icon:
@@ -284,6 +306,8 @@ class Tray:
                 pass
 
     def notify(self, title, text):
+        if not IS_WIN:                                   # macOS / Linux: системные уведомления надёжнее, чем через трей
+            return os_notify(title, text)
         if self.icon:
             try:
                 self.icon.notify(text or " ", title)

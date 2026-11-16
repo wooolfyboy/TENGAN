@@ -35,30 +35,93 @@ except ImportError:
 
 ESP_VID = 0x303A          # «код производителя» USB у чипов Espressif (наша палка)
 
-# ---------- мультимедийные клавиши (только Windows) ----------
+# ---------- мультимедийные клавиши ----------
+# Windows — виртуальные клавиши; macOS — AppleScript (громкость системы, Spotify / Music);
+# Linux — playerctl (MPRIS: любой плеер и браузер) и pactl / amixer (громкость).
 IS_WIN = os.name == "nt"
+IS_MAC = sys.platform == "darwin"
+IS_LINUX = sys.platform.startswith("linux")
 VK = {"VOLUP": 0xAF, "VOLDN": 0xAE, "MUTE": 0xAD, "PLAY": 0xB3, "NEXT": 0xB0, "PREV": 0xB1}
 if IS_WIN:
     import ctypes
     _user32 = ctypes.windll.user32
 
 
+def run_cmd(args, timeout=2.0):
+    """Запустить системную команду (macOS / Linux). Вернуть вывод или None (нет программы, ошибка)."""
+    import subprocess
+    try:
+        r = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
+        return r.stdout if r.returncode == 0 else None
+    except Exception:
+        return None
+
+
+def osa(script, timeout=2.0):
+    return run_cmd(["osascript", "-e", script], timeout)
+
+
+# macOS: управляем тем плеером, который запущен (Spotify, затем Music)
+_MAC_PLAYER = ('if application "Spotify" is running then\n tell application "Spotify" to %s\n'
+               'else if application "Music" is running then\n tell application "Music" to %s\nend if')
+_MAC_CMD = {"PLAY": ("playpause", "playpause"), "NEXT": ("next track", "next track"), "PREV": ("previous track", "previous track")}
+
+
 def press(name):
     """Нажать мультимедийную клавишу, как на клавиатуре ноутбука."""
-    code = VK.get(name)
-    if code is None or not IS_WIN:
-        return
-    _user32.keybd_event(code, 0, 0, 0)        # нажали
-    _user32.keybd_event(code, 0, 2, 0)        # отпустили
+    if IS_WIN:
+        code = VK.get(name)
+        if code is None:
+            return
+        _user32.keybd_event(code, 0, 0, 0)        # нажали
+        _user32.keybd_event(code, 0, 2, 0)        # отпустили
+    elif IS_MAC:
+        if name in _MAC_CMD:
+            osa(_MAC_PLAYER % _MAC_CMD[name])
+        elif name == "VOLUP":
+            osa("set volume output volume ((output volume of (get volume settings)) + 6)")
+        elif name == "VOLDN":
+            osa("set volume output volume ((output volume of (get volume settings)) - 6)")
+        elif name == "MUTE":
+            osa("set volume output muted (not (output muted of (get volume settings)))")
+    elif IS_LINUX:
+        if name in ("PLAY", "NEXT", "PREV"):
+            run_cmd(["playerctl", {"PLAY": "play-pause", "NEXT": "next", "PREV": "previous"}[name]])
+        elif name in ("VOLUP", "VOLDN", "MUTE"):
+            pa = {"VOLUP": ["set-sink-volume", "@DEFAULT_SINK@", "+5%"], "VOLDN": ["set-sink-volume", "@DEFAULT_SINK@", "-5%"],
+                  "MUTE": ["set-sink-mute", "@DEFAULT_SINK@", "toggle"]}[name]
+            if run_cmd(["pactl"] + pa) is None:
+                run_cmd(["amixer", "-q", "sset", "Master", {"VOLUP": "5%+", "VOLDN": "5%-", "MUTE": "toggle"}[name]])
 
 
-# ---------- текущая громкость (если стоит библиотека pycaw; без неё палка просто не покажет %) ----------
+# ---------- текущая громкость (Windows: pycaw; macOS: AppleScript; Linux: pactl / amixer) ----------
 _vol_iface = None
 
 
 def read_volume():
     """Вернуть (громкость 0..100, без звука?) или None."""
     global _vol_iface
+    if IS_MAC:
+        out = osa('set s to get volume settings\nreturn ((output volume of s) as text) & "," & ((output muted of s) as text)')
+        try:
+            v, m = out.strip().split(",")
+            return int(float(v)), m.strip() == "true"
+        except Exception:
+            return None
+    if IS_LINUX:
+        import re
+        out = run_cmd(["pactl", "get-sink-volume", "@DEFAULT_SINK@"])
+        if out:
+            m = re.search(r"(\d+)%", out)
+            mute = run_cmd(["pactl", "get-sink-mute", "@DEFAULT_SINK@"]) or ""
+            if m:
+                return int(m.group(1)), "yes" in mute.lower()
+        out = run_cmd(["amixer", "get", "Master"])
+        if out:
+            m = re.search(r"\[(\d+)%\].*?\[(on|off)\]", out)
+            if m:
+                return int(m.group(1)), m.group(2) == "off"
+        return None
     if not IS_WIN:
         return None
     try:
@@ -94,6 +157,9 @@ def find_port(forced=None):
     for p in ports:                                   # запасной вариант — по названию
         d = (p.description or "").lower()
         if "jtag" in d or "esp32" in d:
+            return p.device
+    for p in ports:                                   # macOS / Linux: USB-CDC порт по имени
+        if p.device.startswith("/dev/cu.usbmodem") or p.device.startswith("/dev/ttyACM"):
             return p.device
     return None
 
@@ -339,11 +405,61 @@ def window_track():
     return "PM\t1\t-1\t-1\t%s\t%s\t%s\n" % (app, screen_text(song, 90), screen_text(artist, 70))
 
 
+def unix_track():
+    """macOS: AppleScript (Spotify / Music); Linux: playerctl (MPRIS — любой плеер и браузер).
+    Вернуть строку «PM ...» для TENGAN, «PM\\n» (ничего не играет) или None (способ недоступен)."""
+    def pm(playing, pos, dur, app, title, artist):
+        title, artist = screen_text(title, 90), screen_text(artist, 70)
+        if not title and not artist:
+            return "PM\n"
+        if dur <= 0:
+            pos = dur = -1
+        elif pos > dur:
+            pos = dur
+        return "PM\t%d\t%d\t%d\t%s\t%s\t%s\n" % (playing, pos, dur, app, title, artist)
+    if IS_MAC:
+        for app, dur_ms in (("Spotify", True), ("Music", False)):
+            script = ('if application "%s" is running then\n tell application "%s"\n'
+                      '  if player state is stopped then return ""\n'
+                      '  return (player state as text) & "\t" & (player position as text) & "\t" & '
+                      '((duration of current track) as text) & "\t" & (name of current track) & "\t" & (artist of current track)\n'
+                      ' end tell\nend if\nreturn ""') % (app, app)
+            out = osa(script)
+            if out is None:
+                continue
+            parts = out.rstrip("\n").split("\t")
+            if len(parts) < 5:
+                continue
+            try:
+                pos = int(float(parts[1].replace(",", ".")))
+                dur = float(parts[2].replace(",", "."))
+                dur = int(dur / 1000) if dur_ms else int(dur)
+            except Exception:
+                pos = dur = -1
+            return pm(1 if parts[0].strip() == "playing" else 0, pos, dur, app, parts[3], parts[4])
+        return "PM\n"
+    if IS_LINUX:
+        out = run_cmd(["playerctl", "metadata", "--format",
+                       "{{status}}\t{{position}}\t{{mpris:length}}\t{{playerName}}\t{{title}}\t{{artist}}"])
+        if out is None:
+            return None if run_cmd(["playerctl", "--version"]) is None else "PM\n"
+        parts = out.rstrip("\n").split("\t")
+        if len(parts) < 6 or parts[0] not in ("Playing", "Paused"):
+            return "PM\n"
+        try:
+            pos = int(int(parts[1] or 0) / 1000000)
+            dur = int(int(parts[2] or 0) / 1000000)
+        except Exception:
+            pos = dur = -1
+        return pm(1 if parts[0] == "Playing" else 0, pos, dur, screen_text((parts[3] or "player").capitalize(), 14), parts[4], parts[5])
+    return None
+
+
 class NowPlaying:
     """В отдельном потоке раз в секунду узнаёт, что играет, и пишет в окно, что нашёл."""
     def __init__(self):
         self.line = None                          # готовая строка для палки
-        self.ok = _media_mgr_cls is not None or IS_WIN
+        self.ok = _media_mgr_cls is not None or IS_WIN or IS_MAC or IS_LINUX
         self.err = None
         self.shown = None
         if self.ok:
@@ -359,7 +475,22 @@ class NowPlaying:
         mgr = None
         while True:
             line, how = None, ""
-            if _media_mgr_cls is not None:
+            if not IS_WIN:                                       # macOS / Linux — свои способы
+                try:
+                    line = unix_track()
+                    how = "AppleScript" if IS_MAC else "playerctl"
+                    if line is None:
+                        if self.err != "none":
+                            self.err = "none"
+                            self._note("[трек] не нашёл playerctl — название трека не покажу (sudo apt install playerctl)")
+                        time.sleep(5)
+                        continue
+                except Exception as e:
+                    line = None
+                    if str(e) != self.err:
+                        self.err = str(e)
+                        self._note("[трек] " + str(e)[:150])
+            elif _media_mgr_cls is not None:
                 try:
                     if mgr is None:
                         mgr = loop.run_until_complete(self._request())
@@ -465,6 +596,50 @@ def send(port, data):
 # ---------- звук ноутбука (то, что играет в колонках) ----------
 # Нужны numpy и PyAudioWPatch (их ставит start_pc_monitor.bat). Без них всё
 # остальное работает, а палка просто показывает звук со своего микрофона.
+class Analyzer:
+    """Кадр звука (int16 как float32, форма (N, каналы)) → строка «PA ...» для TENGAN:
+    громкость, 32 полосы спектра, форма волны и XY. Одинаково для Windows и Linux."""
+    def __init__(self, np, rate, ch, nfft):
+        self.np, self.rate, self.ch, self.NFFT = np, rate, ch, nfft
+        self.mono = np.zeros(nfft, dtype=np.float32)
+        self.win = np.hanning(nfft).astype(np.float32)
+        self.freqs = np.fft.rfftfreq(nfft, 1.0 / rate)
+        edges = np.geomspace(60, min(8000, rate / 2 - 1), 33)     # как у микрофона TENGAN — совпадают подписи частот
+        self.idx = [(max(1, int(np.searchsorted(self.freqs, edges[k]))), max(1, int(np.searchsorted(self.freqs, edges[k + 1])))) for k in range(32)]
+        self.top = -40.0
+        self.gain = 120.0 / 8000.0
+
+    def frame(self, data):
+        np, ch, NFFT = self.np, self.ch, self.NFFT
+        m = data.mean(axis=1)
+        self.mono = mono = np.concatenate((self.mono, m))[-NFFT:]
+        # громкость
+        rms = float(np.sqrt(np.mean(m * m))) / 32768.0
+        level = 20 * np.log10(rms + 1e-7)
+        # спектр: 32 полосы, автоусиление
+        spec = np.abs(np.fft.rfft(mono * self.win))
+        db = np.array([20 * np.log10(spec[a:max(b, a + 1)].max() / (NFFT * 8192.0) + 1e-9) for a, b in self.idx])
+        self.top = max(float(db.max()), self.top - 0.25, -60.0)
+        bands = np.clip((db - (self.top - 48)) / 48.0, 0, 1)
+        k = int(np.argmax(spec[2:])) + 2
+        hz = int(self.freqs[k]) if level > -60 else 0
+        # форма волны и XY: 64 точки, «автоусиление» чтобы фигура была во весь экран
+        pk = float(np.abs(data).max()) if data.size else 0.0
+        target = 120.0 / max(pk * 1.05, 400.0)
+        self.gain = target if target < self.gain else self.gain + (target - self.gain) * 0.2   # громче — сразу, тише — плавно
+        gain = self.gain
+        tail = mono[-512:][::8]
+        wave = np.clip(tail * gain, -127, 127).astype(np.int8)
+        st = data[-256:] if len(data) >= 256 else data
+        stp = st[::max(1, len(st) // 64)][:64]
+        if len(stp) < 64:
+            stp = np.vstack([stp, np.zeros((64 - len(stp), ch), dtype=np.float32)])
+        lr = stp if ch == 2 else np.repeat(stp, 2, axis=1)
+        xy = np.clip(lr * gain, -127, 127).astype(np.int8)
+        return "PA %d %d %s %s %s %d\n" % (int(level * 10), hz, (bands * 255).astype(np.uint8).tobytes().hex(),
+                                           wave.tobytes().hex(), xy.tobytes().hex(), 1 if ch == 2 else 0)
+
+
 class AudioTap:
     FPS = 30
     NFFT = 2048
@@ -493,6 +668,14 @@ class AudioTap:
         self.want_until = 0.0
 
     def _run(self):
+        if IS_LINUX:
+            return self._run_linux()
+        if IS_MAC:                                          # macOS не отдаёт звук колонок без доп. драйвера (BlackHole)
+            if not self.err_shown:
+                self.err_shown = True
+                say("")
+                say("     [звук] на macOS звук колонок недоступен — TENGAN покажет свой микрофон.")
+            return
         try:
             import numpy as np
             import pyaudiowpatch as pyaudio
@@ -535,13 +718,7 @@ class AudioTap:
         say("")
         say("     [звук] слушаю: %s (%d Гц, %s)" % (dev["name"][:60], rate, "стерео" if ch == 2 else "моно"))
         name = dev["name"]
-        mono = np.zeros(self.NFFT, dtype=np.float32)
-        win = np.hanning(self.NFFT).astype(np.float32)
-        freqs = np.fft.rfftfreq(self.NFFT, 1.0 / rate)
-        edges = np.geomspace(60, min(8000, rate / 2 - 1), 33)     # как у микрофона палки — совпадают подписи частот
-        idx = [(max(1, int(np.searchsorted(freqs, edges[k]))), max(1, int(np.searchsorted(freqs, edges[k + 1])))) for k in range(32)]
-        top = -40.0
-        gain = 120.0 / 8000.0
+        an = Analyzer(np, rate, ch, self.NFFT)
         silent_since = None
         try:
             while time.time() < self.want_until:
@@ -561,41 +738,56 @@ class AudioTap:
                     data = np.frombuffer(raw, dtype=np.int16).astype(np.float32).reshape(-1, ch)
                 if self._device_changed(pyaudio, pa, name):
                     return                                   # переключили колонки/наушники — откроем заново
-                m = data.mean(axis=1)
-                mono = np.concatenate((mono, m))[-self.NFFT:]
-                # громкость
-                rms = float(np.sqrt(np.mean(m * m))) / 32768.0
-                level = 20 * np.log10(rms + 1e-7)
-                # спектр: 32 полосы 40 Гц..16 кГц, автоусиление
-                spec = np.abs(np.fft.rfft(mono * win))
-                db = np.array([20 * np.log10(spec[a:max(b, a + 1)].max() / (self.NFFT * 8192.0) + 1e-9) for a, b in idx])
-                top = max(float(db.max()), top - 0.25, -60.0)
-                bands = np.clip((db - (top - 48)) / 48.0, 0, 1)
-                k = int(np.argmax(spec[2:])) + 2
-                hz = int(freqs[k]) if level > -60 else 0
-                # форма волны и XY: 64 точки, «автоусиление» чтобы фигура была во весь экран
-                pk = float(np.abs(data).max()) if data.size else 0.0
-                target = 120.0 / max(pk * 1.05, 400.0)
-                gain = target if target < gain else gain + (target - gain) * 0.2   # громче — сразу, тише — плавно
-                tail = mono[-512:][::8]
-                wave = np.clip(tail * gain, -127, 127).astype(np.int8)
-                st = data[-256:] if len(data) >= 256 else data
-                stp = st[::max(1, len(st) // 64)][:64]
-                if len(stp) < 64:
-                    stp = np.vstack([stp, np.zeros((64 - len(stp), ch), dtype=np.float32)])
-                lr = stp if ch == 2 else np.repeat(stp, 2, axis=1)
-                xy = np.clip(lr * gain, -127, 127).astype(np.int8)
-                line = "PA %d %d %s %s %s %d\n" % (int(level * 10), hz, (bands * 255).astype(np.uint8).tobytes().hex(),
-                                                    wave.tobytes().hex(), xy.tobytes().hex(), 1 if ch == 2 else 0)
-                port = self.port
-                if port is not None:
-                    try:
-                        send(port, line.encode())
-                    except Exception:
-                        pass
+                self._emit(an.frame(data))
         finally:
             stream.stop_stream()
             stream.close()
+
+    def _emit(self, line):
+        port = self.port
+        if port is not None:
+            try:
+                send(port, line.encode())
+            except Exception:
+                pass
+
+    # Linux: звук колонок — «монитор» выхода PulseAudio / PipeWire, через sounddevice
+    def _run_linux(self):
+        try:
+            import numpy as np
+            import sounddevice as sd
+        except Exception as e:
+            if not self.err_shown:
+                self.err_shown = True
+                say("")
+                say("     [звук] нет библиотек для звука компьютера (%s). TENGAN покажет свой микрофон." % e)
+            return
+        sink = (run_cmd(["pactl", "get-default-sink"]) or "").strip()
+        if sink:
+            os.environ["PULSE_SOURCE"] = sink + ".monitor"           # слушаем то, что играет в колонках
+        dev = None
+        try:
+            for i, d in enumerate(sd.query_devices()):
+                if d["name"] in ("pulse", "pipewire") and d["max_input_channels"] > 0:
+                    dev = i
+                    break
+        except Exception:
+            pass
+        rate, ch = 48000, 2
+        block = rate // self.FPS
+        while time.time() < self.want_until:
+            try:
+                with sd.InputStream(device=dev, channels=ch, samplerate=rate, blocksize=block, dtype="int16") as st:
+                    say("")
+                    say("     [звук] слушаю: %s" % (sink + ".monitor" if sink else "вход по умолчанию"))
+                    an = Analyzer(np, rate, ch, self.NFFT)
+                    while time.time() < self.want_until:
+                        raw, _ = st.read(block)
+                        self._emit(an.frame(np.asarray(raw, dtype=np.float32).reshape(-1, ch)))
+            except Exception as e:
+                say("")
+                say("     [звук] ошибка: %s — пробую снова" % str(e)[:120])
+                time.sleep(1)
 
     _dev_check_t = 0.0
 

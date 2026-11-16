@@ -40,7 +40,12 @@ PORT = 47321                       # постоянный адрес стран�
 STICK_URL = "http://192.168.4.1/full"
 
 # ---------- куда писать журнал (у окна без консоли нет stdout) ----------
-APPDIR = os.path.join(os.environ.get("APPDATA") or os.path.expanduser("~"), "TENGAN")
+if os.name == "nt":                                   # Windows: %APPDATA%\TENGAN
+    APPDIR = os.path.join(os.environ.get("APPDATA") or os.path.expanduser("~"), "TENGAN")
+elif sys.platform == "darwin":                        # macOS: ~/Library/Application Support/TENGAN
+    APPDIR = os.path.join(os.path.expanduser("~"), "Library", "Application Support", "TENGAN")
+else:                                                 # Linux: ~/.config/TENGAN
+    APPDIR = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.join(os.path.expanduser("~"), ".config"), "TENGAN")
 os.makedirs(APPDIR, exist_ok=True)
 if getattr(sys, "frozen", False) or sys.stdout is None:
     _log = open(os.path.join(APPDIR, "desktop.log"), "a", encoding="utf-8", buffering=1)
@@ -74,7 +79,8 @@ TX = {
         "pp_btn": "⚙ ALERTS & WIDGET", "pp_h": "ALERTS <b>警報</b> · WIDGET",
         "pp_hint": "Near / new / tracker thresholds are shared with TENGAN and the tablet (HQ → ⚙ ALERTS). Here: what to show on this computer and how.",
         "pp_test": "TEST POPUP", "pp_done": "DONE",
-        "tray_open": "Open HQ", "tray_widget": "Widget on top", "tray_popups": "Popup alerts", "tray_native": "Windows notifications instead of popups",
+        "tray_open": "Open HQ", "tray_widget": "Widget on top", "tray_popups": "Popup alerts", "tray_native": "System notifications instead of popups",
+        "usb_perm": "no access to {p} — Linux: run `sudo usermod -aG dialout $USER`, then log out and back in",
         "tray_click": "Click-through widget", "tray_style": "Style", "tray_corner": "Corner", "tray_mode": "Connection", "tray_prefs": "Alert settings…",
         "tray_quit": "Quit", "test_text": "this is how an alert looks",
     },
@@ -92,7 +98,8 @@ TX = {
         "pp_btn": "⚙ ОПОВЕЩЕНИЯ И ВИДЖЕТ", "pp_h": "ОПОВЕЩЕНИЯ <b>警報</b> · ВИДЖЕТ",
         "pp_hint": "Пороги «близко», «новое» и трекеры — общие с TENGAN и планшетом (штаб → ⚙ ALERTS). Здесь — что и как показывать на этом компьютере.",
         "pp_test": "ПРОВЕРИТЬ ПЛАШКУ", "pp_done": "ГОТОВО",
-        "tray_open": "Открыть штаб", "tray_widget": "Виджет поверх окон", "tray_popups": "Всплывающие оповещения", "tray_native": "Уведомления Windows вместо плашек",
+        "tray_open": "Открыть штаб", "tray_widget": "Виджет поверх окон", "tray_popups": "Всплывающие оповещения", "tray_native": "Системные уведомления вместо плашек",
+        "usb_perm": "нет доступа к {p} — Linux: выполни `sudo usermod -aG dialout $USER` и перезайди в систему",
         "tray_click": "Сквозные клики по виджету", "tray_style": "Стиль", "tray_corner": "Угол", "tray_mode": "Связь", "tray_prefs": "Настройки оповещений…",
         "tray_quit": "Выход", "test_text": "так будет выглядеть оповещение",
     },
@@ -156,13 +163,21 @@ def note_title(title, lang):
 
 
 def os_lang():
-    """Язык интерфейса Windows: русский → ru, остальное → en."""
-    try:
-        import ctypes
-        return "ru" if (ctypes.windll.kernel32.GetUserDefaultUILanguage() & 0x3FF) == 0x19 else "en"
-    except Exception:
-        import locale
-        return "ru" if (locale.getlocale()[0] or "").lower().startswith("ru") else "en"
+    """Язык интерфейса системы: русский → ru, остальное → en."""
+    if os.name == "nt":
+        try:
+            import ctypes
+            return "ru" if (ctypes.windll.kernel32.GetUserDefaultUILanguage() & 0x3FF) == 0x19 else "en"
+        except Exception:
+            pass
+    if sys.platform == "darwin":                      # приложение из Finder запускается без LANG
+        out = pm.run_cmd(["defaults", "read", "-g", "AppleLanguages"]) or ""
+        first = re.findall(r"[A-Za-z]{2}", out)
+        if first:
+            return "ru" if first[0].lower() == "ru" else "en"
+    import locale
+    loc = (locale.getlocale()[0] or os.environ.get("LANG") or "").lower()
+    return "ru" if loc.startswith("ru") else "en"
 
 
 class Msg(RuntimeError):
@@ -233,6 +248,7 @@ class Link:
                         p = self.open_port(name)
                         p.timeout = 0.2
                         self.port, self.port_name = p, name
+                        self.perm_err = ""
                         log("USB: TENGAN на", name)
                         threading.Thread(target=self._reader, args=(p,), daemon=True).start()
                         if self.on_port:
@@ -243,6 +259,9 @@ class Link:
                             self.on_event("_link", "true")
                     except Exception as e:
                         log("USB: не открылся", name, e)
+                        # Linux: порт есть, но нет прав (группа dialout) — покажем подсказку на экране запуска
+                        self.perm_err = name if (isinstance(e, PermissionError) or getattr(e, "errno", None) == 13
+                                                 or "permission" in str(e).lower()) else ""
                         time.sleep(2)
                         continue
                 else:
@@ -696,7 +715,8 @@ class App:
         try:
             t0 = time.time()
             while not self.link.connected():
-                self.msg = self.t("usb_find2")
+                perm = getattr(self.link, "perm_err", "")
+                self.msg = self.t("usb_perm", p=perm) if perm else self.t("usb_find2")
                 if time.time() - t0 > 30:
                     self.msg = self.t("usb_none")
                     return
@@ -986,7 +1006,9 @@ def main():
         except Exception:
             pass
     win.events.loaded += on_loaded
-    webview.start(private_mode=False, storage_path=os.path.join(APPDIR, "webview"))
+    # Linux: окно на Qt WebEngine (ставится из pip и надёжно упаковывается); Windows / macOS — системный движок
+    gui = "qt" if sys.platform.startswith("linux") else None
+    webview.start(private_mode=False, storage_path=os.path.join(APPDIR, "webview"), gui=gui)
 
 
 if __name__ == "__main__":
