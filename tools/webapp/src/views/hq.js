@@ -42,7 +42,8 @@ const panel = (g, x, y, w, h, u, en, kj, right, hot) => {
   g.beginPath(); g.moveTo(x + w, y + h - u); g.lineTo(x + w, y + h); g.lineTo(x + w - u, y + h); g.closePath(); g.fillStyle = col; g.fill();
   return y + hh;
 };
-const blink = (t, hz = 1) => (t * hz) % 1 < 0.6;
+// мигание можно выключить (Settings › Alerts › Blinking) — тогда всё горит ровно
+const blink = (t, hz = 1) => (S.cfg && !S.cfg.al_blink) || (t * hz) % 1 < 0.6;
 
 // ================== стиль DOMAIN 天眼領域 («магическая битва»: тушь, манга, талисманы) ==================
 const D = {
@@ -242,7 +243,7 @@ T.views.push({
     if (S.devInit) for (const e of S.dev.values()) {
       if (!e.alive || this.seenAt.has(e.id)) continue;
       this.seenAt.set(e.id, now);
-      if (!e.first && (e.r > -58 || (e.type === 'tracker' && e.r > -70))) { this.alertT = t; this.alertTxt = { n: e.label || e.name || e.type || 'device', r: e.r, tr: e.type === 'tracker' }; }
+      if (S.isNew(e, now) || S.isTrk(e)) { this.alertT = t; this.alertTxt = { n: e.label || e.name || e.type || 'device', r: e.r, tr: e.type === 'tracker' }; }
     }
     if (this.seenAt.size > 400) this.seenAt.clear();
   },
@@ -307,7 +308,7 @@ T.views.push({
       for (let k = 0; k < 6; k++) { const a = Math.PI / 3 * k + Math.PI / 6; g.lineTo(cx + s * Math.cos(a), cy + s * Math.sin(a)); }
       g.closePath();
       if (e) {
-        const p = T.pct(e.rs), nw = !e.first && now - e.born < 30000 && e.rs > -70, trk = e.type === 'tracker' && e.rs > -70;
+        const p = T.pct(e.rs), nw = S.isNew(e, now), trk = S.isTrk(e);
         g.fillStyle = nw || trk ? (blink(t, 2) || !nw ? E.red : E.dk) : p > 0.55 ? E.or : p > 0.25 ? '#b35f10' : E.dim;
         g.globalAlpha = 0.35 + 0.65 * e.h; g.fill(); g.globalAlpha = 1;
       }
@@ -395,8 +396,8 @@ T.views.push({
     }
     for (const e of S.dev.values()) {
       if (e.h < 0.05) continue;
-      const [q, px, py] = pos(e.id, e.rs), nw = !e.first && now - e.born < 30000 && e.rs > -70, k = 0.4 + 0.6 * lit(q);
-      const col = e.label ? E.grn : nw || (e.type === 'tracker' && e.rs > -70) ? E.red : E.or2, r = u * (nw ? 0.42 : 0.3);
+      const [q, px, py] = pos(e.id, e.rs), nw = S.isNew(e, now), k = 0.4 + 0.6 * lit(q);
+      const col = e.label ? E.grn : nw || S.isTrk(e) ? E.red : E.or2, r = u * (nw ? 0.42 : 0.3);
       g.globalAlpha = e.h * (nw ? 1 : k); g.fillStyle = col; g.beginPath(); g.arc(px, py, r, 0, T.TAU); g.fill();
       if (nw) {
         g.globalAlpha = blink(t, 2) ? 1 : 0.3; g.strokeStyle = col; g.lineWidth = u * 0.1; g.beginPath(); g.arc(px, py, u * 1.1, 0, T.TAU); g.stroke();
@@ -427,7 +428,7 @@ T.views.push({
     }
     // предупреждение 接近警告
     const age = t - this.alertT;
-    if (age < 20 && this.alertTxt) {
+    if (age < 20 && this.alertTxt && S.cfg.al_plate) {
       const bw = Math.min(u * 15, w * 0.36), bh = u * 7.6, bx = x + w - bw - u * 0.8, by = y0 + u * 0.8;
       g.fillStyle = 'rgba(40,0,0,.88)'; g.fillRect(bx, by, bw, bh);
       stripes(g, bx, by, bw, u * 0.55, E.red, u * 0.5); stripes(g, bx, by + bh - u * 0.55, bw, u * 0.55, E.red, u * 0.5);
@@ -539,27 +540,38 @@ T.views.push({
   },
   // активность эфира: новые BLE за минуту, посылки 433, громкость, пульты/карты
   actTick(dt, t) {
-    const now = performance.now();
-    let nb = 0; for (const e of S.dev.values()) if (!e.first && now - e.born < 60000) nb++;
-    const pkRate = S.sens ? T.clamp((now - S.sensPkT) < 5000 ? 0.6 : 0.1) : 0;
-    const snd = S.snd && S.snd.ok ? T.clamp((S.level + 70) / 50) : 0;
-    const probe = T.clamp(1 - (t - Math.max(this.flashIr, this.flashNfc)) / 10);
-    const target = T.clamp(0.1 + nb * 0.1 + pkRate * 0.15 + snd * 0.2 + probe * 0.15 + T.clamp(S.dev.size / 80) * 0.2);
-    this.lvl += (target - this.lvl) * T.ease(dt, 1.5);
+    const A = S.activity(), k = T.ease(dt, 1.5);
+    this.lvl += (A.v - this.lvl) * k;
+    this.parts = this.parts || { ble: 0, rf: 0, snd: 0, prb: 0 };
+    for (const q in A.parts) this.parts[q] += (A.parts[q] - this.parts[q]) * k;
+    this.partsEn = A.en;
+  },
+  // мини-шкалы источников активности: видно, ПОЧЕМУ уровень такой (выключенные — тусклые)
+  minis(g, x, y, w, h, u, cOn, cOff, cTxt) {
+    const L = [['ble', 'BLE'], ['rf', '433'], ['snd', 'SND'], ['prb', 'IR·NFC']], cw = w / 4;
+    L.forEach(([k, n], i) => {
+      const en = this.partsEn ? this.partsEn[k] : true, v = (this.parts || {})[k] || 0, xx = x + i * cw;
+      tx(g, n + (en ? '' : ' ×'), xx, y + u * 0.62, u * 0.55, en ? cTxt : cOff);
+      g.fillStyle = cOff; g.fillRect(xx, y + h - u * 0.45, cw - u * 0.5, u * 0.3);
+      if (en) { g.fillStyle = cOn; g.fillRect(xx, y + h - u * 0.45, (cw - u * 0.5) * T.clamp(v), u * 0.3); }
+    });
   },
   lvlPanel(g, x, y, w, h, u, dt, t) {
-    const v = this.lvl, hot = v > 0.62, st = v > 0.8 ? ['ALERT', '警報', E.red] : hot ? ['ELEVATED', '注意', E.red] : v > 0.35 ? ['ACTIVE', '活発', E.or2] : ['QUIET', '平穏', E.grn];
-    const y0 = panel(g, x, y, w, h, u, 'ACTIVITY LEVEL · 活動度', '', st[0], hot);
+    const v = this.lvl, lv = S.actState(v), hot = lv >= 2;
+    const st = [['QUIET', '平穏', E.grn], ['ACTIVE', '活発', E.or2], ['ATTENTION', '注意', E.red], ['ALARM', '警報', E.red]][lv];
+    const y0 = panel(g, x, y, w, h, u, 'ACTIVITY LEVEL · 活動度', '', st[0] + ' · ' + Math.round(v * 100) + '%', hot);
     jp(g, st[1], x + w - u * 0.6, y + h - u * 0.6, u * 1.6, st[2], 'right', 0.04);
-    const n = 30, bx = x + u * 0.6, bw = w - u * 5.5, gap = u * 0.15, sw = (bw - gap * (n - 1)) / n, top = y0 + u * 0.8, bh = y + h - top - u * 0.8;
-    const lit = Math.round(v * n), warm = Math.round(0.62 * n);
+    const n = 30, bx = x + u * 0.6, bw = w - u * 5.5, gap = u * 0.15, sw = (bw - gap * (n - 1)) / n, top = y0 + u * 0.5, bh = Math.max(u * 0.8, (y + h - top) * 0.5);
+    const lit = Math.round(v * n), warm = Math.round(S.cfg.al_warn / 100 * n);
     for (let i = 0; i < n; i++) {
       const on = i < lit, red = i >= warm;
       g.fillStyle = on ? (red ? (blink(t, 1.5) ? E.red : '#7a120c') : E.or) : E.dk;
       g.fillRect(bx + i * (sw + gap), top, sw, bh);
     }
+    // метки порогов «внимание» и «тревога»
+    for (const [p, c] of [[S.cfg.al_warn, E.or2], [S.cfg.al_alarm, E.red]]) { const xx = bx + bw * p / 100; g.fillStyle = c; g.fillRect(xx - 1, top - u * 0.25, 2, bh + u * 0.5); }
+    this.minis(g, bx, top + bh + u * 0.2, bw, y + h - (top + bh + u * 0.2) - u * 0.2, u, E.or, E.dk, E.txt);
   },
-
   log(g, x, y, w, h, u, t) {
     g.fillStyle = E.or; g.fillRect(x, y, w, u * 0.12);
     const my = y + h * 0.72;
@@ -811,15 +823,18 @@ T.views.push({
     g.fillStyle = '#000'; g.beginPath(); g.moveTo(x, y); g.lineTo(x + w, y + h * 0.14); g.lineTo(x + w, y + h); g.lineTo(x, y + h); g.closePath(); g.fill();
     jp(g, '呪力', x + u * 1, y + h * 0.82, h * 0.62, D.paper, 'left', 0.07);
     font(g, h * 0.62, JP()); const x1 = x + u * 2 + g.measureText('呪力').width;
-    const v = this.lvl, st = v > 0.8 ? ['ALERT · 警報', D.red] : v > 0.62 ? ['ELEVATED · 注意', D.red] : v > 0.35 ? ['ACTIVE · 活発', D.vio] : ['QUIET · 平穏', D.glow];
-    tx(g, 'AIR ACTIVITY', x1, y + h * 0.42, u * 0.65, D.glow);
+    const v = this.lvl, lv = S.actState(v);
+    const st = [['QUIET · 平穏', D.glow], ['ACTIVE · 活発', D.vio], ['ATTENTION · 注意', D.red], ['ALARM · 警報', D.red]][lv];
+    tx(g, 'AIR ACTIVITY · ' + Math.round(v * 100) + '%', x1, y + h * 0.42, u * 0.65, D.glow);
     tx(g, st[0], x1, y + h * 0.78, u * 1.25, st[1], FT(), 'left', '600 ');
-    const bx = x1 + u * 13, bw = x + w - u * 1 - bx, n = 40, gap = u * 0.12, sw = (bw - gap * (n - 1)) / n, lit = Math.round(v * n), warm = Math.round(0.62 * n);
+    const mw = Math.min(u * 16, w * 0.22), bx = x1 + u * 13, bw = x + w - u * 2 - mw - bx, n = 40, gap = u * 0.12, sw = (bw - gap * (n - 1)) / n, lit = Math.round(v * n), warm = Math.round(S.cfg.al_warn / 100 * n);
     for (let i = 0; i < n; i++) {
       const on = i < lit, hot = on && i >= warm, bh = (on ? 1 : 0.6) * h * 0.56, xx = bx + i * (sw + gap), yy = y + h * 0.84 - bh;
       g.fillStyle = hot ? (blink(t, 1.5) ? D.red : '#7a0f14') : on ? D.blue : '#1a1730';
       g.beginPath(); g.moveTo(xx + bh * 0.36, yy); g.lineTo(xx + sw + bh * 0.36, yy); g.lineTo(xx + sw, yy + bh); g.lineTo(xx, yy + bh); g.closePath(); g.fill();
     }
+    for (const [p, c] of [[S.cfg.al_warn, D.vio], [S.cfg.al_alarm, D.red]]) { const xx = bx + bw * p / 100; g.fillStyle = c; g.fillRect(xx, y + h * 0.18, 2, h * 0.7); }
+    this.minis(g, x + w - u * 1 - mw, y + h * 0.3, mw, h * 0.55, u, D.blue, '#1a1730', D.txt);
   },
   domLog(g, x, y, w, h, u) {
     g.fillStyle = D.red; g.fillRect(x, y, h, h);
@@ -838,7 +853,7 @@ T.views.push({
   },
   // 接近: чёрная косая плашка с красной трещиной (новое близкое устройство / трекер)
   domAlert(g, w, u, t, cx, cy, R, topH) {
-    const age = t - this.alertT; if (age > 20 || !this.alertTxt) return;
+    const age = t - this.alertT; if (age > 20 || !this.alertTxt || !S.cfg.al_plate) return;
     const bw = Math.min(u * 24, w * 0.3), bh = u * 7.2, bx = Math.min(w - bw - u, cx + R * 0.45), by = topH + u * 1.2;
     g.save(); g.translate(bx + bw / 2, by + bh / 2); g.rotate(-0.07); g.translate(-bw / 2, -bh / 2);
     g.fillStyle = '#000'; g.beginPath(); g.moveTo(0, bh * 0.12); g.lineTo(bw, 0); g.lineTo(bw * 0.97, bh); g.lineTo(bw * 0.03, bh * 0.92); g.closePath(); g.fill();
