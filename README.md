@@ -1,397 +1,365 @@
 <div align="center">
 
-<img src="docs/boot.gif" width="640" alt="TENGAN — анимация включения">
+<img src="docs/boot.gif" width="640" alt="TENGAN boot animation">
 
 # TENGAN 天眼
 
-**Карманный анализатор радиоэфира для LilyGO T-Embed CC1101**
+**A pocket radio-environment analyzer for the LilyGO T-Embed CC1101 Plus**
 
-Bluetooth · Wi-Fi · Sub-GHz · звук · монитор ноутбука · 3D и красивое — в одном «тактическом» интерфейсе.<br>
-**Только слушает.** Ничего не передаёт, ни к чему не подключается.
+Bluetooth · Wi-Fi · Sub-GHz · IR · NFC · sound · PC monitor — one tactical interface<br>
+on the device, on a tablet (TENGAN Tablet) and on a computer (TENGAN Desktop).<br>
+**Receive only.** TENGAN never transmits on the air and never writes to cards.
 
 [![build](https://github.com/wolfyboy1488/lilygostuff/actions/workflows/build.yml/badge.svg)](https://github.com/wolfyboy1488/lilygostuff/actions/workflows/build.yml)
-![ESP32-S3](https://img.shields.io/badge/ESP32--S3-T--Embed%20CC1101-3fd9ff?style=flat-square)
+![ESP32-S3](https://img.shields.io/badge/ESP32--S3-T--Embed%20CC1101%20Plus-3fd9ff?style=flat-square)
 ![receive only](https://img.shields.io/badge/RF-receive%20only-7f97a3?style=flat-square)
+![languages](https://img.shields.io/badge/lang-EN%20%C2%B7%20RU-02090b?style=flat-square&labelColor=7f97a3)
 ![style](https://img.shields.io/badge/theme-DENKO-02090b?style=flat-square&labelColor=3fd9ff)
 ![style](https://img.shields.io/badge/theme-KURENAI-0b0b0b?style=flat-square&labelColor=e5262f)
 
-[**Скачать**](https://github.com/wolfyboy1488/lilygostuff/releases/latest) ·
-[Быстрый старт](#-быстрый-старт) ·
-[Разделы](#-разделы) ·
-[Ноутбук](#-pc--монитор-ноутбука-и-пульт-музыки) ·
-[Телефон](#-web--страница-на-телефоне) ·
-[Сборка](#-для-разработчиков)
+[**Download**](https://github.com/wolfyboy1488/lilygostuff/releases/latest) ·
+[Quick start](#-quick-start) ·
+[Sections](#-sections) ·
+[Tablet & desktop](#-tengan-tablet-and-tengan-desktop) ·
+[FAQ](#-faq) ·
+[Build](#-building-from-source) ·
+[**Русский**](README.ru.md)
 
 </div>
 
 ---
 
-> **天眼 (тэнган)** — по-японски «небесное око». В буддизме так называют взгляд,
-> которому видно скрытое и далёкое. Эта палка видит то, чего не видно глазам:
-> радиоэфир вокруг — телефоны, наушники, роутеры, брелоки, датчики.
+> **天眼 (tengan)** is Japanese for "heavenly eye" — the sight that sees what is hidden and far away.
+> TENGAN shows what your eyes can't: the radio world around you — phones, earbuds, routers, remotes,
+> key fobs, outdoor sensors, cards.
 
-## ✨ Что умеет
+## ✨ Features
 
-| | Раздел | В двух словах |
+| | Section | What it shows |
 |:-:|---|---|
-| 📶 | **Bluetooth** | сколько устройств вокруг и кто это: телефоны, наушники, часы, **метки-трекеры**; радар, 3D-город, термометры |
-| 🛜 | **Wi-Fi** | сети вокруг, загрузка каналов, активность, «горячо-холодно» для поиска хорошего сигнала |
-| 📻 | **Sub-GHz** | эфир 315 / 433 / 868 / 915 МГц: спектр, водопад, ловля брелоков и датчиков |
-| 🎙 | **Sound** | спектр, 3D-горы, осциллограф — по микрофону палки **или по звуку, который играет на ноутбуке** |
-| 📱 | **Web** | палка раздаёт свой Wi-Fi и показывает всё на телефоне; там же — обновление по воздуху |
-| 💻 | **PC** | нагрузка ноутбука по USB: CPU, RAM, диск, сеть; **что сейчас играет** и колесо громкости |
-| 🌀 | **Gallery** | 4D-гиперкуб, тор, «Жизнь», маятник, **планетарий** и **МКС над тобой** |
-| ⚙️ | **Settings** | общие настройки и отдельно для каждого раздела |
+| 📶 | **Bluetooth** | how many devices are nearby and what they are: phones, earbuds, watches, **item trackers**; radar, 3D city, BLE thermometers |
+| 🛜 | **Wi-Fi** | networks around you, channel load, air activity, finding the spot with the best signal |
+| 📻 | **Sub-GHz** | 315 / 433 / 868 / 915 MHz: spectrum, waterfall, bursts; **433 MHz outdoor weather sensors** |
+| 🔦 | **IR · NFC** | "whose remote?" — protocol, brand, button code; "what card?" — card or tag type |
+| 🎙 | **Sound** | spectrum, 3D terrain, oscilloscope — from the microphone or from your computer's audio |
+| 🛰 | **HQ** | everything on one screen: radio horizon, alerts, sensors, sound, remotes and cards |
+| 💻 | **PC** | computer load, **now playing**, volume and track control |
+| 🌀 | **Gallery** | 4D hypercube, torus, Life, pendulum, **planetarium**, **the ISS above you**, radio weather |
+| ⚙️ | **Settings** | general, per section and **alerts** — the same on the device, tablet and computer |
 
 <div align="center">
-<img src="docs/screens.png" width="100%" alt="Экраны TENGAN">
-<br><sub>Экран палки 320×170, увеличен ровно вдвое — по пикселю. Все картинки — настоящий код рисования, снятый в симуляторе.</sub>
+<img src="docs/screens.png" width="100%" alt="TENGAN screens">
+<br><sub>The 320×170 device screen at 2×. Every image is the real drawing code captured in the simulator.</sub>
 </div>
 
-## 🚀 Быстрый старт
+## 🚀 Quick start
 
 <table>
 <tr>
 <td width="55%">
 
-1. Скачай **`flash_tengan.html`** со страницы
-   [**Releases**](https://github.com/wolfyboy1488/lilygostuff/releases/latest).
-2. Подключи палку USB-кабелем и открой файл двойным кликом
-   (нужен **Chrome** или **Edge** на компьютере).
-3. Нажми **«Прошить палку»**, выбери в списке *USB JTAG/serial debug unit*.
-4. Когда появится **«Готово»** — выдерни кабель и вставь обратно.
+1. Download the flasher from [**Releases**](https://github.com/wolfyboy1488/lilygostuff/releases/latest):
+   **`flash_tengan_en.html`** (English) or **`flash_tengan_ru.html`** (Russian).
+2. Connect the T-Embed to your computer with a USB cable and open the file in **Chrome** or **Edge**.
+3. Press **Flash** and pick *USB JTAG/serial debug unit*.
+4. When it says **Done**, reconnect the cable.
 
-Всё. Прошивка уже внутри файла: ни адресов, ни выбора файлов.
-Настройки палки при перепрошивке **сохраняются**.
+The firmware is inside the file — no addresses, no file picking. Settings are **kept** when you reflash.
 
-> Дальше можно обновляться и **без провода** — с телефона:
-> раздел Web → страница → вкладка **Update**.
+> Later updates can go **over the air**: Web section → page → **Update** tab.
 
 </td>
-<td width="45%"><img src="docs/flasher.png" alt="Прошивальщик в одном файле"></td>
+<td width="45%"><img src="docs/flasher.png" alt="Single-file flasher"></td>
 </tr>
 </table>
 
-## 🕹 Управление
+**Language** is chosen by the firmware edition (English or Russian). The device, tablet and desktop
+interfaces all follow it.
 
-| | Что делает — везде одинаково |
+## 🕹 Controls
+
+| | Action |
 |---|---|
-| **Колесо** | листать экраны раздела · выбирать строку · менять значение |
-| **Нажатие колеса** | главное действие экрана (подробности, частота, пауза…) — подписано внизу экрана |
-| **Боковая кнопка** | всегда **назад**: подробности → экран → подменю → главное меню |
-| **Боковая, держать 2 с** | выключить · включить — держать ~1 с |
+| **Wheel** | switch screens · select a row · change a value |
+| **Wheel press** | the screen's main action (details, frequency, pause…) — shown at the bottom |
+| **Side button** | back: details → screen → screen list → main menu |
+| **Side button, hold 2 s** | power off · power on — hold ~1 s |
 
-Точки под шапкой справа показывают, на каком ты экране раздела.
-Каждый раздел работает, **только пока он открыт**: в главном меню радио, микрофон и CC1101 выключены.
+A section runs **only while it is open**: in the main menu the radios, microphone and CC1101 are off, which saves battery.
 
 <div align="center">
-<img src="docs/shutdown.gif" width="480" alt="Анимация выключения">
-<br><sub>Выключение — как у старого телевизора.</sub>
+<img src="docs/shutdown.gif" width="480" alt="Power-off animation">
 </div>
 
-## 📡 Разделы
+## 📡 Sections
 
 ### 📶 Bluetooth
 
 <div align="center"><img src="docs/city.gif" width="480" alt="Bluetooth City — 3D"></div>
 
-| Экран | Что показывает |
+| Screen | What it shows |
 |---|---|
-| **Overview** | сколько устройств рядом (крупно), тренд за 2 минуты, из кого состоит толпа |
-| **Scope** | радар: расстояние по силе сигнала, цели окрашены «жаром», метки — оранжевые |
-| **City** | 3D: устройства — башни на площадке; ближе — выше и ближе к центру; колесо крутит камеру |
-| **Nearest** | ближайшее устройство на дуге-шкале, оценка расстояния, щелчки «ближе-дальше» |
-| **Devices** | список; нажатие — **подробности**: все адреса, сервисы, производитель, график сигнала |
-| **Weather** | BLE-термометры: Xiaomi (PVVX/ATC), BTHome, Govee, Qingping, SwitchBot, Ruuvi |
+| **Overview** | how many devices are nearby, the 2-minute trend, what the crowd is made of |
+| **Scope** | distance by signal strength; trackers highlighted |
+| **City** | 3D: devices are towers; closer means taller and nearer the center |
+| **Nearest** | the nearest device on a gauge, distance estimate, closer/farther ticks |
+| **Devices** | list; press for details: addresses, services, vendor, signal graph |
+| **Weather** | BLE thermometers: Xiaomi (PVVX/ATC), BTHome, Govee, Qingping, SwitchBot, Ruuvi |
 
 <details>
-<summary><b>Как палка понимает, что это за устройство</b></summary>
+<summary><b>How TENGAN recognizes devices</b></summary>
 
-- **Тип** (phone, computer, audio, watch, TV, tracker, beacon, input, sensor) — по тому, что устройство
-  само рассылает: имя, «внешний вид» (Appearance), сервисы, типы сообщений Apple (AirPods, AirTag, iPhone…).
-- **Производитель** — встроена официальная база Bluetooth: ~4000 компаний и ~700 «фирменных» сервисов.
-  У крупных брендов (Apple, Samsung, Google, Xiaomi, Huawei, Sony, JBL, Garmin…) свой цвет.
-- **Без двойников.** Телефоны меняют случайный адрес; если адрес замолчал, а сразу появился новый
-  с тем же «почерком» и похожей силой сигнала — они склеиваются в одно устройство.
-- **Дальность** — Settings → Bluetooth → Range: от `all` до `very near` (−60 dBm). В людном месте
-  поставь `room`, чтобы видеть только тех, кто рядом.
+- **Type** (phone, computer, audio, watch, TV, tracker, beacon, sensor…) — from what the device broadcasts itself:
+  name, Appearance, services, Apple message types (AirPods, AirTag, iPhone…).
+- **Vendor** — the Bluetooth SIG database is built in: ~4000 companies and ~700 member services.
+- **No duplicates.** Phones rotate random addresses; when one goes silent and a new one with the same
+  "handwriting" appears, they are merged into one device.
+- **Range** — Settings › Bluetooth › Range: from "all" to "very near" (−60 dBm).
+- **Your own devices** can be named ("my AirPods") from the tablet or computer.
 
 </details>
 
 ### 🛜 Wi-Fi
 
-| Экран | Что показывает |
+| Screen | What it shows |
 |---|---|
-| **Networks** | сети (сильные сверху): канал, защита, метки `OPEN` / `PHONE` / `WI-FI6`; нажатие — подробности и **производитель роутера** (~39 000 в базе) |
-| **Channels** | каждая сеть — «холмик» реальной ширины на своём канале; какой из 1 / 6 / 11 свободнее |
-| **Activity** | пакетов в секунду на каждом канале и шум эфира (например, от микроволновки) |
-| **Clients** | сколько устройств в каждой сети и сколько вокруг **ищут Wi-Fi** — только счёт |
-| **Find** | «горячо-холодно»: сила сигнала выбранной сети крупно, щелчки — найти, где Wi-Fi лучше |
+| **Networks** | networks (strongest first): channel, security, open networks; press for details and the router vendor (~39,000 in the database) |
+| **Channels** | each network is a hill of its real width on its channel — which of 1 / 6 / 11 is free |
+| **Activity** | packets per second on each channel and air noise |
+| **Clients** | how many devices are in each network and how many are looking for Wi-Fi — counts only |
+| **Find** | the selected network's signal, big, with ticks — find where Wi-Fi is best |
 
-<sub>ESP32-S3 видит только 2.4 ГГц. Скан пассивный, содержимое пакетов не читается — только заголовки для счёта.</sub>
+<sub>ESP32-S3 sees 2.4 GHz only. Scanning is passive: packet contents are never read, only headers for counting.</sub>
 
 ### 📻 Sub-GHz (CC1101)
 
-| Экран | Что показывает |
+| Screen | What it shows |
 |---|---|
-| **Spectrum** | развёртка ±2 МГц вокруг 315 / 433 / 868 / 915 МГц + **водопад** — история эфира |
-| **Monitor** | слушает одну частоту и ловит **всплески**: брелоки машин и шлагбаумов, звонки, датчики |
+| **Spectrum** | a ±2 MHz sweep around 315 / 433 / 868 / 915 MHz plus a **waterfall** — the air's history |
+| **Monitor** | one frequency and its **bursts**: key fobs, gates, doorbells, sensors |
+| **Sensors** | 433 MHz outdoor thermometers (Nexus, Rubicson, LaCrosse, Acurite, Bresser, Fine Offset…) and a pulse analysis of the last packet |
 
-<sub>Модуль никогда не переводится в передачу — палка только меряет силу сигнала. Нажатие колеса — следующая полоса.</sub>
+<sub>The radio is never switched to transmit. Remotes and doorbells show only a fingerprint; codes are not stored.</sub>
+
+### 🔦 IR · NFC
+
+- **IR — "whose remote?"**: point a remote at TENGAN and press a button. Protocol (NEC, Samsung, Sony, RC5/RC6, LG…),
+  likely brand, address and button code, waveform, press history.
+- **NFC — "what card?"**: touch a card or tag. Type (MIFARE, NTAG, DESFire, FeliCa…), a hint ("transit card",
+  "tag"), public tag records. **Bank cards: number and name are never read** — only "is it a payment card".
+  The UID is partly hidden.
 
 ### 🎙 Sound
 
-| Экран | Что показывает |
-|---|---|
-| **Bars** | спектр 32 полосы с «шапками» пиков и отражением |
-| **Terrain** | 3D «звуковые горы»: каждый кадр — новый хребет, старые уплывают к горизонту |
-| **Reactor** | кольцо из 64 лучей пульсирует и «раскаляется» в такт |
-| **Level** | шумомер: громкость, QUIET → VERY LOUD, пик, максимум, график за минуту |
-| **Scope** | осциллограф: форма волны |
-| **XY** | осциллограф X-Y: левый канал — по горизонтали, правый — по вертикали (фигуры Лиссажу) |
+32-band spectrum, 3D terrain, reactor, level meter, oscilloscope and X-Y figures.
+**Source** — Settings › Sound › Source: auto / mic / PC. With TENGAN Desktop the screens follow the audio
+playing on the computer — clean, no microphone.
 
-**Источник звука** — Settings → Sound → **Source**: `auto` / `mic` / `laptop`.
-Если палка подключена к ноутбуку и запущена [программа](#-pc--монитор-ноутбука-и-пульт-музыки),
-все экраны рисуются по **звуку, который играет на ноуте** — чисто, без микрофона. В шапке — метка `PC`.
+### 🛰 HQ
+
+One screen with everything: the radio horizon (Bluetooth, Wi-Fi, 433 MHz sensors), an air-activity level with a
+per-source breakdown, outdoor temperature, sound, the last remote and card, an event log. HQ is styled per theme.
+
+**Alerts** are configurable: what counts as "near", when a new device or a tracker raises an alert, sensitivity,
+the attention and alarm thresholds, which sources count, blinking and the "接近警告" plate.
+The same settings live in Settings › Alerts on the device, tablet and computer, and behind the ⚙ button on the HQ screen.
 
 ### 🌀 Gallery
 
-<div align="center"><img src="docs/tesseract.gif" width="420" alt="Тессеракт — 4D-гиперкуб"></div>
+<div align="center"><img src="docs/tesseract.gif" width="420" alt="Tesseract — 4D hypercube"></div>
 
-Красивое само по себе. Колесо — скорость.
-**Tesseract** — четырёхмерный куб, «выворачивающийся» сам через себя ·
-**Torus** — бублик из ~1000 точек со светом и тенью ·
-**Life** — игра Конвея с послесвечением (нажатие — новый мир) ·
-**Pendulum** — двойной маятник, честная физика и хаос (нажатие — новый запуск).
+**Tesseract**, **torus**, Conway's **Life**, **double pendulum** — beautiful on their own.
+**Sky** — a planetarium over your city: ~1600 stars, constellations, the Sun, the Moon with its phase, planets.
+**Globe** — the ISS, Tiangong and Hubble on their real orbits and the next pass over you.
+**Weather** — "radio weather": clouds from the devices around, rain from 433 MHz packets, thunder from loud sound,
+plus the temperature from an outdoor sensor.
 
-**Sky — планетарий.** Небо над твоим городом прямо сейчас: купол (зенит в центре, север сверху),
-~1600 звёзд, линии созвездий, Солнце, Луна с фазой и планеты — всё считается на палке. Колесо крутит
-купол, нажатие — подписи (созвездия → яркие звёзды → без подписей). Справа — время, Солнце, Луна,
-какие планеты сейчас над горизонтом.
+<sub>City — Settings › General › City (or the tablet's GPS). Exact time and orbits come from TENGAN Desktop;
+the device remembers them and keeps computing on its own, offline.</sub>
 
-**Globe — МКС и спутники.** Вращающаяся Земля с материками, днём и ночью; МКС, станция «Тяньгун» и
-«Хаббл» на настоящих орбитах, след полёта, зона, откуда спутник виден, и **ближайший пролёт над твоим
-городом**: во сколько, как высоко и с какой стороны смотреть. Колесо крутит Землю, нажатие — следить
-за МКС / за домом / за другим спутником.
-
-<sub>Город — Settings › General › City. Точное время палка берёт с ноутбука (программа `pc_monitor`)
-и помнит его во встроенных часах; орбиты ноутбук скачивает с CelesTrak раз в 6 часов и передаёт палке —
-она их запоминает и дальше считает сама.</sub>
-
-## 📱 Web — страница на телефоне
-
-<table>
-<tr>
-<td width="45%">
-
-1. На палке открой **Web** — на экране QR-код, сеть `TENGAN-XXXX` и пароль.
-2. Наведи камеру телефона на QR — страница откроется сама
-   (или открой `192.168.4.1`). С ноутбука — так же.
-
-**Вкладки:** Overview · Bluetooth (с подробностями по нажатию) · Wi-Fi ·
-Sub-GHz (спектр, водопад, журнал) · Sound · System (батарея, память, чип) ·
-**Update** — прошивка по воздуху.
-
-Работает только то, что нужно открытой вкладке — так страница обновляется быстрее.
-Пока телефон подключён к палке, интернета через Wi-Fi у него нет.
-
-**Планшет и ноутбук:** та же сеть палки, в браузере — **`192.168.4.1`**: шкала запуска, заставка,
-выбор **LITE** (эта лёгкая страница) или **FULL** (полная сцена, ниже). Сразу в полную — `192.168.4.1/full`.
-
-<details>
-<summary><b>Обновление по Wi-Fi и откат</b></summary>
-
-Вкладка **Update** принимает и `tengan_full_0x0.bin`, и `tengan_firmware_ota.bin`.
-Новая прошивка пишется во второй слот и считается «пробной»: если она не проработает
-15 секунд (зависла, перезагрузилась), загрузчик **сам вернёт старую**.
-
-</details>
-
-</td>
-<td width="55%"><img src="docs/web.png" alt="Веб-страница TENGAN"></td>
-</tr>
-</table>
-
-## 🖥 FULL — полная сцена на планшете
+## 📱 TENGAN Tablet and TENGAN Desktop
 
 <div align="center">
-<img src="docs/tablet.jpg" width="100%" alt="TENGAN на планшете — Bluetooth Scope">
+<img src="docs/tablet.jpg" width="100%" alt="TENGAN Tablet — Bluetooth scope">
 </div>
 
-Все разделы палки в полном разрешении планшета: объёмный радар (столбы света — сила сигнала), 3D-город
-с кольцами дальности, хребты Wi-Fi, водопад Sub-GHz в глубину, звуковой рельеф, монитор ноутбука,
-галерея с небом и глобусом (их считает сам планшет). Палка шлёт только числа (поток на порту 81), всё рисует планшет —
-60 кадров, без интернета. Последние три раздела живут в памяти: возвращаешься — сцена уже на месте.
+Every section at full screen resolution: a volumetric radar, the 3D city, Wi-Fi ridges, a deep Sub-GHz waterfall,
+sound terrain, HQ, the gallery. TENGAN sends only numbers; the tablet or computer draws everything —
+60 frames per second, no internet. The page is served **by the device itself**, so it always matches the
+firmware and updates together with it.
 
-<img src="docs/tablet_denko.jpg" width="100%" alt="Разделы на планшете — тема DENKO">
+<img src="docs/tablet_denko.jpg" width="100%" alt="Sections on a tablet — DENKO theme">
 
-**Приложение для Android** (`tengan_tablet.apk` в релизах): та же сцена, плюс **GPS** — небо и глобус
-считаются по твоим координатам, а палка получает их как город «GPS». Экран не гаснет, без системных панелей.
-Поставить: скопировать APK на планшет, открыть, разрешить установку; иконка — печать 天眼.
-
-## 🎨 Темы — DENKO 電光 и KURENAI 紅
-
-Тема выбирается **на палке**: Settings › Theme. Планшет, телефон и программа на компе переключаются сами —
-тема одна на всё. Пока страница не узнала тему палки, экран запуска строгий чёрно-белый.
-
-- **DENKO 電光** — светящийся HUD на тёмном фоне (бирюзовый неон, свечение, сканлайны). Штаб HQ — оранжевый, в духе «Евангелиона».
-- **KURENAI 紅** — манга-панк: только чёрный, белый и алый. Косые белые плашки, крупные рубленые цифры (Anton),
-  без свечения и сканлайнов — поэтому ещё и **быстрее** DENKO. Штаб HQ — белые плашки и алые полосы,
-  3D-сцены (город, каньон, эфир, глобус) перекрашены в чёрно-бело-красное.
-
-<img src="docs/tablet_kurenai.jpg" width="100%" alt="Разделы на планшете — тема KURENAI">
-
-<img src="docs/screens_kurenai.png" width="100%" alt="Экраны палки — тема KURENAI">
-
-Тему SUMI 墨 (тушь) убрали в v1.9: бумажная текстура и «растекание туши» слишком тормозили планшет.
-
-## 💻 PC — монитор ноутбука и пульт музыки
-
-Палка по USB-кабелю становится маленьким экраном для ноутбука:
-
-- **Обзор** — CPU крупно и график за минуту, RAM, диск, сеть, батарея ноута, самый «прожорливый» процесс;
-- **Cores** — загрузка каждого ядра;
-- **Process City** — 3D-город программ: высота башни — процессор, ширина — память, белая крыша —
-  активное окно, оранжевая — ест больше 50%; камера облетает город, нажатие — прожектор на следующую башню;
-- **Media** — **что сейчас играет** (название бегущей строкой, исполнитель, приложение, прогресс),
-  **колесо крутит громкость**, нажатие — пауза. Русские названия — как есть. Если ничего не играет — крутится пластинка.
-- **Звук ноута** для раздела Sound — см. выше.
-
-**Как поставить (Windows):**
-
-1. Нужен [Python](https://www.python.org/downloads/) — при установке поставь галочку **«Add python.exe to PATH»**.
-2. Скачай **`pc_monitor_windows.zip`** из [Releases](https://github.com/wolfyboy1488/lilygostuff/releases/latest),
-   распакуй (правой кнопкой → «Извлечь всё…»).
-3. Подключи палку к ноутбуку и дважды щёлкни **`start_pc_monitor.bat`**.
-   В первый раз он сам поставит нужные библиотеки (около минуты).
-4. На палке открой раздел **PC**.
-
-Чёрное окно пишет по-русски, что происходит: нашла ли палку, что играет, слушает ли звук.
-Закрыл окно — программа выключилась.
+| | How to connect |
+|---|---|
+| **Browser** (phone, tablet, computer) | open **Web** on TENGAN → scan the QR code or join `TENGAN-XXXX` → `192.168.4.1`. Choose **LITE** (a light page for phones) or **FULL** (the full scene) |
+| **TENGAN Tablet** (Android, `tengan_tablet.apk`) | the same scene full screen, plus **GPS**: sky and globe use your coordinates. Install: copy the APK to the tablet, open it, allow installation |
+| **TENGAN Desktop** (Windows, `tengan_desktop.exe`) | HQ and every section in a window **over the USB cable** (your computer keeps its internet) or over TENGAN's Wi-Fi. Includes the PC monitor: load, now playing, volume, PC audio for Sound, exact time and satellite orbits |
 
 <details>
-<summary><b>Что и как ставит запускалка, и почему названия трека может не быть</b></summary>
+<summary><b>TENGAN Desktop details</b></summary>
 
-- Обязательные библиотеки: `psutil` (показатели), `pyserial` (USB).
-- По желанию: `pycaw` (громкость в %), `winrt-*` (что играет), `numpy` + `PyAudioWPatch` (звук ноутбука).
-  Если какая-то не встала — остальное работает.
-- Название трека берётся из системной панели Windows «Сейчас воспроизводится». Не все сайты сообщают
-  туда трек (например, сайт Яндекс Музыки — нет, а приложение — да). Запасной способ — заголовок окна
-  (Spotify, вкладка YouTube).
-- Пока программа запущена, она занимает USB-порт палки — **перед прошивкой закрой окно**.
+- Start: connect TENGAN with a cable and run `tengan_desktop.exe` — the device opens Web by itself.
+  Modes: **USB**, **Wi-Fi**, **Auto** (the last choice is remembered). F11 — full screen, F2 — mode choice.
+- The track title comes from the Windows "Now playing" panel; if an app doesn't report it there, from the
+  window title (Spotify, a YouTube tab).
+- Log file: `%APPDATA%\TENGAN\desktop.log`.
+- The old console monitor `pc_monitor_windows.zip` is still in the releases but is no longer needed.
 
 </details>
 
-## 🎨 Дизайн DENKO 電光 — «Tactical HUD»
+<details>
+<summary><b>Over-the-air updates and rollback</b></summary>
 
-Как дисплей истребителя или интерфейс из фантастики: почти чёрный фон, тонкие линии, риски и уголки-скобки.
+Web → page → **Update** accepts `tengan_full_0x0.bin` and `tengan_firmware_ota.bin` (of your language).
+The new firmware goes to the second slot as a trial: if it does not run for 15 seconds, the bootloader
+**restores the previous one** by itself.
 
-| Цвет | Значит |
-|---|---|
-| 🟦 бирюзовый | выбор, главное значение, графики |
-| ⬜ белый | важные числа |
-| ▫️ стальной | подписи и подсказки |
-| 🟧 оранжевый | **только тревога**: трекеры, открытые сети, перегрузка, низкий заряд |
+</details>
 
-Сила сигнала — шкала «жара»: стальной → бирюзовый → белый. Шапка `// НАЗВАНИЕ`, одна сетка на всех экранах.
-Шрифты: **Rajdhani** (заголовки и числа), **Share Tech Mono** (текст), **JetBrains Mono** (кириллица).
+## 🎨 Themes — DENKO 電光 and KURENAI 紅
 
-## ⚠️ Честные ограничения
+The theme is chosen on the device: Settings › Theme. The tablet, phone and computer follow it.
+Until a screen knows the device's theme, startup is plain black and white.
 
-- **Направление не определить** одной антенной — только «ближе / дальше». Угол на Scope — для красоты.
-- **Метры — грубая оценка** по силе сигнала: стены и тело сбивают её в разы.
-- **Многие устройства остаются `unknown`** — современные телефоны специально сообщают о себе минимум.
-- **Wi-Fi — только 2.4 ГГц**, сети 5 ГГц палке не видны.
+- **DENKO 電光** — a glowing HUD on a dark background: cyan neon, bloom, scanlines. HQ is orange.
+- **KURENAI 紅** — manga punk: only black, white and red, skewed white plates, big condensed numbers,
+  no glow — which also makes it faster.
 
-## 🛠 Для разработчиков
+<img src="docs/tablet_kurenai.jpg" width="100%" alt="Sections on a tablet — KURENAI theme">
 
-**Версия** — одна на всё, в файле `VERSION` (палка: заставка и Settings → Version; планшет: угол экрана запуска; APK: versionName). Перед релизом поменять `VERSION`, потом Run workflow с `release_tag = vX.Y`.
+<img src="docs/screens_kurenai.png" width="100%" alt="Device screens — KURENAI theme">
+
+## 🔒 Privacy and the receive-only principle
+
+- TENGAN **transmits nothing** on the air: CC1101 and IR are never switched to transmit, NFC only reads.
+  The only thing the device emits is its own Wi-Fi access point for the tablet, while Web is open.
+- It shows only what devices already broadcast to everyone around. Wi-Fi packet contents are never read,
+  remote codes are not stored, bank card numbers and names are not read.
+- Everything works **offline**, with no cloud: data never leaves the device and your tablet/computer.
+
+## ❓ FAQ
 
 <details>
-<summary><b>Сборка</b></summary>
+<summary><b>What hardware do I need?</b></summary>
 
-Нужен [PlatformIO](https://platformio.org/):
+**LilyGO T-Embed CC1101 Plus** (ESP32-S3, 320×170 screen, wheel, CC1101, IR, PN532 NFC, microphone, speaker,
+LEDs, battery). The non-Plus version works too, without the NFC section.
+
+</details>
+
+<details>
+<summary><b>Can it find direction and exact distance?</b></summary>
+
+No. With a single antenna it can only tell "closer / farther", and meters are a rough estimate from signal
+strength — walls and bodies change it a lot. The angle on the radar is for visual clarity.
+
+</details>
+
+<details>
+<summary><b>Why are many devices "unknown"?</b></summary>
+
+Modern phones deliberately broadcast very little and rotate their addresses. TENGAN merges such addresses,
+but the type and vendor can't always be known.
+
+</details>
+
+<details>
+<summary><b>Does it see 5 GHz networks?</b></summary>
+
+No, ESP32-S3 works in 2.4 GHz only.
+
+</details>
+
+<details>
+<summary><b>How do I switch the language?</b></summary>
+
+Flash the edition you want (`flash_tengan_en.html` or `flash_tengan_ru.html`). Settings are kept.
+
+</details>
+
+## 🛠 Building from source
+
+**Version** — one for everything, in `VERSION`. Release: Actions → build → Run workflow, `release_tag = vX.Y`.
+
+<details>
+<summary><b>Firmware</b></summary>
+
+You need [PlatformIO](https://platformio.org/). English and Russian firmware are separate build environments
+(see `platformio.ini`); each carries the tablet page in its language.
 
 ```bash
 pio run
 ```
 
-Board-профиль — `boards/T_Embed_PN532.json` (из репозитория LilyGO): `qio_opi`, PSRAM, flash QIO 80 МГц,
-вариант `esp32s3` (не `adafruit_feather_esp32s3`: тот до старта программы включает GPIO21 — подсветку экрана).
-
-Общий образ для прошивки на `0x0`:
+Board profile — `boards/T_Embed_PN532.json` (from the LilyGO repository). A single image for offset `0x0`:
 
 ```bash
 esptool --chip esp32s3 merge-bin -o tengan_full_0x0.bin 0x0 bootloader.bin 0x8000 partitions.bin 0xe000 boot_app0.bin 0x10000 firmware.bin
 ```
 
-Прошивальщик в одном файле: `python tools/flasher/make_flasher.py tengan_full_0x0.bin flash_tengan.html v1.x`.
+Single-file flasher: `python tools/flasher/make_flasher.py tengan_full_0x0.bin flash_tengan.html vX.Y`.
 
 </details>
 
 <details>
-<summary><b>Автосборка и релизы</b></summary>
+<summary><b>Tablet page</b></summary>
 
-`.github/workflows/build.yml` собирает прошивку на каждый пуш (файлы — во вкладке Actions → Artifacts).
-Релиз: **Actions → build → Run workflow**, в поле `release_tag` вписать версию (например `v1.3`) —
-GitHub соберёт прошивальщик, оба `.bin`, программу для ноутбука и выложит их на страницу релиза.
-
-</details>
-
-<details>
-<summary><b>Симулятор экрана</b></summary>
-
-`tools/sim/build.sh` собирает настоящий код рисования на компьютере с правдоподобными данными и сохраняет
-все экраны в `tools/sim/out/` (и общий лист `contact.png`). `SIM_ANIM=1` — ещё и кадры анимаций;
-`python3 tools/make_docs.py` делает из них картинки для этого README.
+`tools/webapp/src` (HTML, CSS, JS) → `python3 tools/webapp/build.py` → `src/web/tablet_page_en.h` and
+`src/web/tablet_page_ru.h`. UI text is written in English; Russian is the dictionary `tools/webapp/i18n/ru.json`,
+applied when text is drawn. CI check: `build.py --check`.
+Without a device: `python3 tools/webapp/mock.py page.html 8090 [ru] [kurenai]`.
 
 </details>
 
 <details>
-<summary><b>Структура проекта</b></summary>
+<summary><b>TENGAN Desktop and TENGAN Tablet</b></summary>
+
+- Desktop: `tools/desktop` (Python + pywebview), single-file build — `tools/desktop/build_exe.py` (PyInstaller, CI on Windows).
+- Tablet: `app/` (Capacitor, Android), the APK is built in CI.
+
+</details>
+
+<details>
+<summary><b>Screen simulator</b></summary>
+
+`tools/sim/build.sh` compiles the real drawing code on a PC and saves every screen to `tools/sim/out/`.
+
+</details>
+
+<details>
+<summary><b>Project layout</b></summary>
 
 ```
-src/main.cpp              запуск и главный цикл
-src/core/                 общее: меню, экран, тема, кнопки, питание, батарея, настройки, светодиоды
-  board.h                 распиновка и DEVICE_NAME
-  section.h               что должен уметь «раздел» меню (одна таблица функций)
-  boot.* / seal.h         анимация включения и печать 天眼
-  power_screens.cpp       «держи кнопку» и анимация выключения
-  timeutil.h psram.h jsonutil.h   мелкие общие помощники
-src/ble/                  Bluetooth (ble_core, экраны, ble_city — 3D, базы производителей)
-src/wifi/                 Wi-Fi (скан, приём пакетов, экраны, база OUI)
-src/subghz/               Sub-GHz: драйвер CC1101 (только приём), спектр, монитор
-src/audio/                микрофон (БПФ), динамик, звук ноутбука, экраны Sound
-src/web/                  точка Wi-Fi, веб-страница, API, OTA
-src/pc/                   монитор ноутбука по USB, Media
-src/gallery/              тессеракт, тор, «Жизнь», маятник
-tools/pc_monitor/         программа для ноутбука (Python) + bat-запускалка
-tools/flasher/            прошивальщик в одном HTML (внутри esptool-js)
-tools/webapp/             приложение для планшета: src/ (HTML, CSS, JS) -> build.py -> src/web/tablet_page.h
-tools/sim/                симулятор экрана
-tools/gen_*.py            генераторы баз, шрифтов и печати
+src/main.cpp              startup and main loop
+src/core/                 menu, display, themes, buttons, power, battery, settings, LEDs
+src/ble/ src/wifi/        Bluetooth and Wi-Fi
+src/subghz/               CC1101 (receive only): spectrum, monitor, 433 MHz sensors
+src/probe/                IR receiver and NFC (read only)
+src/audio/                microphone, spectrum, PC audio
+src/web/                  Wi-Fi access point, pages, API, OTA, USB link
+src/pc/  src/gallery/     PC monitor; gallery, sky, globe, radio weather
+tools/webapp/             tablet page (EN/RU)
+tools/desktop/            TENGAN Desktop
+tools/flasher/            single-file flasher (esptool-js)
+tools/sim/                screen simulator
 ```
-
-Новый раздел меню = папка с таблицей `Section` (см. `core/section.h`) и одна строчка в `core/menu.cpp`.
 
 </details>
 
-## 📜 Лицензии и спасибо
+## 📜 Licenses
 
-Код проекта — **MIT** (`LICENSE`).
+Project code — **MIT** (`LICENSE`).
 
-- Шрифты: **Share Tech Mono** © Carrois Type Design, **Rajdhani** © Indian Type Foundry — SIL OFL 1.1;
-  **JetBrains Mono** © JetBrains — Apache 2.0; печать 天眼 отрисована шрифтом **IPAGothic** (IPA Font License).
-- Прошивальщик: [**esptool-js**](https://github.com/espressif/esptool-js) © Espressif — Apache 2.0 (внутри — pako, MIT).
-- Библиотеки: TFT_eSPI, NimBLE-Arduino, Adafruit NeoPixel, ESP-IDF / Arduino-ESP32.
-- Базы: Bluetooth SIG (Company ID, member UUID), IEEE OUI.
-- Небо и Земля: [d3-celestial](https://github.com/ofrohn/d3-celestial) © Olaf Frohn — BSD-3 (каталог Hipparcos,
-  созвездия); [world-atlas](https://github.com/topojson/world-atlas) © Mike Bostock — ISC (Natural Earth);
-  орбиты — [CelesTrak](https://celestrak.org); планеты — элементы орбит JPL (E. M. Standish).
+- Fonts: **Share Tech Mono**, **Rajdhani**, **Anton**, **Space Mono**, **Play** — SIL OFL 1.1;
+  **JetBrains Mono** — Apache 2.0; the 天眼 seal — **IPAGothic** (IPA Font License).
+- Flasher: [**esptool-js**](https://github.com/espressif/esptool-js) © Espressif — Apache 2.0.
+- Libraries: TFT_eSPI, NimBLE-Arduino, Adafruit NeoPixel, ESP-IDF / Arduino-ESP32.
+- Data: Bluetooth SIG (Company ID, member UUID), IEEE OUI; [d3-celestial](https://github.com/ofrohn/d3-celestial) — BSD-3;
+  [world-atlas](https://github.com/topojson/world-atlas) — ISC; orbits — [CelesTrak](https://celestrak.org);
+  433 MHz sensor decoding follows the protocol notes of [rtl_433](https://github.com/merbanan/rtl_433).
 
 <div align="center">
 <br>
-<sub>Хобби-проект. Всё, что показывает палка, устройства и так рассылают в эфир всем вокруг.</sub>
-<br><br>
 <b>// TENGAN 天眼</b>
 </div>
