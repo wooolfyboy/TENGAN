@@ -3,6 +3,7 @@
 //  тип карты, начало UID, открытые записи метки.
 // ============================================================
 #include "probe/nfc.h"
+#include "core/lang.h"
 #include "core/display.h"
 #include "core/theme.h"
 #include "core/ui.h"
@@ -101,7 +102,7 @@ void drawNfc(uint32_t now) {
   fitText(c.fam, f, sizeof f, tw, 2);
   txt(f, tx, 26, 2);
   spr.setTextColor(C_ACC());
-  char hu[44]; size_t k = 0; for (; c.hint[k] && k < sizeof(hu) - 1; k++) hu[k] = (char)toupper((unsigned char)c.hint[k]); hu[k] = 0;
+  char hu[88]; utf8Upper(c.hint, hu, sizeof hu);
   fitText(hu, f, sizeof f, tw, 1);
   txt(f, tx, 44, 1);
   // UID: первые два байта, остальное — точки

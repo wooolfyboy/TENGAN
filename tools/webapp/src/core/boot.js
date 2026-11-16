@@ -73,11 +73,11 @@ T.boot = (first) => {
     phase = 'launch';
     L = { t0: now, bar: 0, step: 0, mounted: 0, warm: 0, stepT: now,
       steps: [
-        ['LINK', 'связь с палкой', () => T.Stream.mode === 'live' || T.Stream.mode === 'poll'],
-        ['STICK', 'состояние палки', () => !!T.S.st],
-        ['RADIO', needBle ? 'Bluetooth' : 'радио по разделу', () => !needBle || (T.S.ble && T.S.ble.on)],
-        ['DATA', 'первые данные', () => !needBle || T.S.dev.size > 0],
-        ['RENDER', 'сцена', () => L.warm >= 3],
+        ['LINK', 'connecting to TENGAN', () => T.Stream.mode === 'live' || T.Stream.mode === 'poll'],
+        ['DEVICE', 'device status', () => !!T.S.st],
+        ['RADIO', needBle ? 'Bluetooth' : 'section radio', () => !needBle || (T.S.ble && T.S.ble.on)],
+        ['DATA', 'first data', () => !needBle || T.S.dev.size > 0],
+        ['RENDER', 'scene', () => L.warm >= 3],
       ] };
     T.Stream.connect(want);
   };

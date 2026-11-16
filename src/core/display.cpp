@@ -2,6 +2,7 @@
 //  display.cpp — экран и общие «кирпичики» интерфейса
 // ============================================================
 #include "core/display.h"
+#include "core/lang.h"
 #include "core/theme.h"
 #include "core/ui.h"
 
@@ -96,9 +97,7 @@ void drawSubmenu(const char* title, uint16_t acc, SubItem* it, int n, int sel) {
     spr.setTextDatum(ML_DATUM);
     spr.setTextColor(plate ? C_BG() : isSel ? C_HOT() : UI_LABEL());
     txt(it[i].name, UI_M + 8, cy + 1, n > 5 ? 2 : 4);
-    char d[32]; size_t k = 0;
-    for (; it[i].desc[k] && k < sizeof(d) - 1; k++) d[k] = (char)toupper((unsigned char)it[i].desc[k]);
-    d[k] = 0;
+    char d[64]; utf8Upper(it[i].desc, d, sizeof d);
     spr.setTextColor(plate ? UI_LINE() : isSel ? UI_LABEL() : UI_DIM());
     txt(d, 118, cy + 1, 1);
     char v[24]; fitText(it[i].value, v, sizeof(v), 84, 2);

@@ -144,7 +144,7 @@ S.onPc = d => {
   S.pc = d; S.pcT = performance.now();
   if (d.live && d.cpu != null) { S.pcHist.push(d.cpu); if (S.pcHist.length > 120) S.pcHist.shift(); }
   if (d.c) d.c.forEach((v, i) => { if (!S.cores[i]) S.cores[i] = T.steady(3, 0.5); S.cores[i].set(v); });
-  if (was !== undefined && !!was !== !!d.live) S.event('PC', d.live ? 'laptop online' : 'laptop stopped', !d.live);
+  if (was !== undefined && !!was !== !!d.live) S.event('PC', d.live ? 'PC online' : 'PC offline', !d.live);
 };
 S.onSat = d => { S.sky = d; };
 // ИК-пульты (событие ir — на каждое нажатие): последнее + история; удержание кнопки (rep) не плодит строк

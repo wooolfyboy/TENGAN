@@ -25,7 +25,7 @@ T.views.push({
     this.dust.draw(g, this.cam);
     T.bloom(this.cv, 0.75);
     T.hits.rect(rr.x, rr.y, rr.w, rr.h, { go: 'ble' });
-    T.header(g, m, y0, w - 2 * m, u, 'Overview', S.st ? `${S.st.name || 'TENGAN'} · up ${T.ago(S.st.up || 0)}` : 'waiting for tenGAN', !S.st);
+    T.header(g, m, y0, w - 2 * m, u, 'Overview', S.st ? `${S.st.name || 'TENGAN'} · up ${T.ago(S.st.up || 0)}` : 'waiting for TENGAN', !S.st);
     T.txt(g, '// BLE SCOPE  ›', rr.x, rr.y + u * 1, u * 0.95, T.C.acc, 't');
     // правая колонка
     const cx = portrait ? m : rr.x + rr.w + u * 2, cw = portrait ? w - 2 * m : w - m - cx;

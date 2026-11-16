@@ -22,7 +22,12 @@
 #include "core/perf.h"
 #include "core/board.h"
 #include "web/web_page.h"
-#include "web/tablet_page.h"    // приложение для планшета (gzip, собирается tools/webapp/build.py)
+#include "core/lang.h"
+#if LANG_RU                        // приложение для планшета (gzip, собирает tools/webapp/build.py) — на языке прошивки
+#include "web/tablet_page_ru.h"
+#else
+#include "web/tablet_page_en.h"
+#endif
 #include <lwip/sockets.h>
 #include "ble/ble.h"
 #include "wifi/wifi.h"
@@ -388,7 +393,7 @@ static void sseTick(uint32_t now) {
       o += ",\"usb\":"; o += g_bat.bus ? 1 : 0; o += ",\"chg\":"; o += g_bat.chg;
       o += ",\"cli\":"; o += WiFi.softAPgetStationNum(); o += ",\"heap\":"; o += ESP.getFreeHeap() / 1024;
       o += ",\"theme\":\""; o += g_theme == THEME_KURENAI ? "kurenai" : "denko"; o += '"';
-      o += ",\"ver\":\"" FW_VERSION "\"";
+      o += ",\"ver\":\"" FW_VERSION "\",\"lang\":\"" LANG_CODE "\"";
       o += ",\"rst\":"; jsonStr(o, crumbLastReason()); o += ",\"rstStep\":"; jsonStr(o, crumbLastStep());
       o += ",\"radio\":\""; o += bleRadioActive() ? "b" : ""; o += s_scanMs && now - s_scanMs < 25000 ? "w" : "";
       o += s_subOn ? "s" : ""; o += s_sndOn ? "m" : ""; o += pcLive(now) ? "p" : ""; o += s_irOn ? "i" : ""; o += s_nfcOn ? "n" : ""; o += '"';
@@ -536,7 +541,7 @@ static bool apiHandle(const char* path, const ApiArgs& A, String& o) {
     o += ",\"nets\":"; o += s_netCount;
     o += ",\"build\":\"" __DATE__ " " __TIME__ "\"";
     o += ",\"theme\":\""; o += g_theme == THEME_KURENAI ? "kurenai" : "denko"; o += '"';
-    o += ",\"ver\":\"" FW_VERSION "\"";
+    o += ",\"ver\":\"" FW_VERSION "\",\"lang\":\"" LANG_CODE "\"";
     o += ",\"rst\":"; jsonStr(o, crumbLastReason()); o += ",\"rstStep\":"; jsonStr(o, crumbLastStep());
     o += ",\"ssid\":\""; o += s_ssid; o += "\"}";
     return true;

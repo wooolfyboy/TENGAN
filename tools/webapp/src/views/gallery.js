@@ -584,8 +584,8 @@ T.views.push({
       plUp.push([i, a.alt]);
       g.fillStyle = T.C.hot; g.beginPath(); g.arc(p[0], p[1], u * 0.3, 0, T.TAU); g.fill();
       g.strokeStyle = T.C.acc; g.lineWidth = 1.2; g.beginPath(); g.arc(p[0], p[1], u * 0.65, 0, T.TAU); g.stroke();
-      label(A.PLANET_RU[i], p[0], p[1] - u * 1, u * 0.78, T.C.hot);
-      T.hits.circle(p[0], p[1], u * 1.5, { sky: { kind: 'planet', name: A.PLANET_RU[i], a } });
+      label(A.planetName(i), p[0], p[1] - u * 1, u * 0.78, T.C.hot);
+      T.hits.circle(p[0], p[1], u * 1.5, { sky: { kind: 'planet', name: A.planetName(i), a } });
     });
     // Луна с фазой
     let p = xy(c.moon);
@@ -595,8 +595,8 @@ T.views.push({
       g.save(); g.translate(p[0], p[1]); if (!c.waxing) g.scale(-1, 1);
       g.fillStyle = T.C.hot; g.beginPath(); g.arc(0, 0, r, -Math.PI / 2, Math.PI / 2); g.ellipse(0, 0, r * Math.abs(1 - 2 * k), r, 0, Math.PI / 2, -Math.PI / 2, k > 0.5); g.fill();
       g.restore();
-      label('Луна ' + Math.round(k * 100) + '%', p[0], p[1] - r - u * 0.5, u * 0.78, T.C.label);
-      T.hits.circle(p[0], p[1], u * 1.6, { sky: { kind: 'moon', name: 'Луна', a: c.moon, phase: k } });
+      label(T.L('Moon ', 'Луна ') + Math.round(k * 100) + '%', p[0], p[1] - r - u * 0.5, u * 0.78, T.C.label);
+      T.hits.circle(p[0], p[1], u * 1.6, { sky: { kind: 'moon', name: T.L('Moon', 'Луна'), a: c.moon, phase: k } });
     }
     // Солнце
     p = xy(c.sun);
@@ -604,7 +604,7 @@ T.views.push({
       const gr = g.createRadialGradient(p[0], p[1], 0, p[0], p[1], u * 3); gr.addColorStop(0, `rgba(${T.RGB.hot},.9)`); gr.addColorStop(0.25, `rgba(${T.RGB.acc},.35)`); gr.addColorStop(1, `rgba(${T.RGB.acc},0)`);
       g.fillStyle = gr; g.beginPath(); g.arc(p[0], p[1], u * 3, 0, T.TAU); g.fill();
       g.fillStyle = T.C.hot; g.beginPath(); g.arc(p[0], p[1], u * 0.8, 0, T.TAU); g.fill();
-      T.hits.circle(p[0], p[1], u * 2, { sky: { kind: 'sun', name: 'Солнце', a: c.sun } });
+      T.hits.circle(p[0], p[1], u * 2, { sky: { kind: 'sun', name: T.L('Sun', 'Солнце'), a: c.sun } });
     }
     // спутники над горизонтом: след и точка «сейчас»
     const satsUp = [];
@@ -624,7 +624,7 @@ T.views.push({
       }
     }
     // созвездия (по-русски)
-    if (!day) D.con.forEach((k, i) => { const a = c.con[i]; if (a.alt < 12) return; const q = xy(a); if (q) label(k.ru, q[0], q[1], u * 0.7, `rgba(${T.RGB.acc},.6)`); });
+    if (!day) D.con.forEach((k, i) => { const a = c.con[i]; if (a.alt < 12) return; const q = xy(a); if (q) label(T.L(k.ab, k.ru), q[0], q[1], u * 0.7, `rgba(${T.RGB.acc},.6)`); });
     // горизонт: кольцо с рисками и стороны света
     g.strokeStyle = T.C.acc; g.lineWidth = 1.6; g.beginPath(); g.arc(cx, cy, R, 0, T.TAU); g.stroke();
     g.lineWidth = 1; g.beginPath();
@@ -650,14 +650,14 @@ T.views.push({
         y += u * 3;
         const row = (k, v, col = T.C.hot) => { if (y > py + ph - u * 0.8) return; T.txt(g, k, px + u, y, u * 0.8, T.C.dim); T.txt(g, v, px + pw - u, y, u * 0.85, col, 'c', 'right'); y += u * 1.5; };
         row('SUN', `${sunAlt >= 0 ? '+' : ''}${Math.round(sunAlt)}°  ${state}`);
-        row('MOON', `${Math.round(c.phase * 100)}%  ${c.moon.alt >= 0 ? '+' : ''}${Math.round(c.moon.alt)}°  ${c.waxing ? 'растёт' : 'убывает'}`);
+        row('MOON', `${Math.round(c.phase * 100)}%  ${c.moon.alt >= 0 ? '+' : ''}${Math.round(c.moon.alt)}°  ${c.waxing ? T.L('waxing', 'растёт') : T.L('waning', 'убывает')}`);
         y += u * 0.4;
         T.txt(g, plUp.length ? 'PLANETS UP' : 'NO PLANETS UP', px + u, y, u * 0.75, T.C.acc); y += u * 1.4;
-        plUp.sort((a, b) => b[1] - a[1]).forEach(([i, alt]) => row(A.PLANET_RU[i], Math.round(alt) + '°'));
+        plUp.sort((a, b) => b[1] - a[1]).forEach(([i, alt]) => row(A.planetName(i), Math.round(alt) + '°'));
         y += u * 0.4;
         if (y < py + ph - u * 2) {
           const sats = A.sats();
-          T.txt(g, sats.length ? 'SATELLITES' : 'NO ORBITS · LAPTOP SENDS TLE', px + u, y, u * 0.75, T.C.acc); y += u * 1.4;
+          T.txt(g, sats.length ? 'SATELLITES' : 'NO ORBITS · TENGAN DESKTOP SENDS THEM', px + u, y, u * 0.75, T.C.acc); y += u * 1.4;
           for (const sat of sats) { const up = satsUp.find(q => q[0] === sat.name); row(sat.name, up ? 'UP ' + Math.round(up[1]) + '°' : 'below', up ? T.C.hot : T.C.dim); }
         }
         if (card) {
@@ -804,7 +804,7 @@ T.views.push({
         let y = py + u * 2;
         if (!fs) {
           T.txt(g, 'NO ORBITS YET', px + u, y + u, u * 1.4, T.C.hot, 't');
-          T.txt(g, 'LAPTOP SENDS TLE TO THE STICK', px + u, y + u * 2.6, u * 0.75, T.C.label);
+          T.txt(g, 'ORBITS COME FROM TENGAN DESKTOP', px + u, y + u * 2.6, u * 0.75, T.C.label);
           T.txt(g, 'ONCE — THEN IT WORKS OFFLINE', px + u, y + u * 3.8, u * 0.75, T.C.label);
           return;
         }

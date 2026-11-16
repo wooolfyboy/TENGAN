@@ -46,8 +46,8 @@
       T.backdrop(g, w, h, 0.45, 0.6);
       const p = S.pc, names = ['PC', 'Cores', 'Process city', 'Media'];
       if (!p || !p.live) {
-        T.header(g, m, y0, w - 2 * m, u, names[this.sub], this.wasLive ? 'laptop stopped' : 'waiting for laptop', this.wasLive);
-        T.emptyState(g, w, h, u, this.wasLive ? 'LAPTOP STOPPED' : 'LAPTOP', this.wasLive ? 'no data for a while · is pc_monitor running?' : 'waiting for laptop · run pc_monitor', this.wasLive);
+        T.header(g, m, y0, w - 2 * m, u, names[this.sub], this.wasLive ? 'PC offline' : 'waiting for PC', this.wasLive);
+        T.emptyState(g, w, h, u, this.wasLive ? 'PC OFFLINE' : 'PC', this.wasLive ? 'no data for a while · is TENGAN Desktop running?' : 'waiting for PC · run TENGAN Desktop', this.wasLive);
         T.finish(g, w, h); return;
       }
       this.wasLive = true;
@@ -55,7 +55,7 @@
       if (S.pcT !== this.lastT) { this.lastT = S.pcT; if (p.trk) { this.pos = p.trk.pos; this.posT = t; } }
       const top = y0 + u * 3.2, bot = h - m * 0.6 - u * 1.8, hot = this.cpu.v >= 90;
       const area = { x: m, y: top, w: w - 2 * m, h: bot - top };
-      let status = `${p.host || 'laptop'} · up ${fmtUp(p.up)}`;
+      let status = `${p.host || 'PC'} · up ${fmtUp(p.up)}`;
       if (this.sub === 0) this.overview(g, area, u, p);
       else if (this.sub === 1) { status = `${p.c ? p.c.length : 0} cores · ${Math.round(this.cpu.v)}%` + (p.ghz ? ` · ${p.ghz.toFixed(1)} GHz` : ''); this.cores(g, w, h, area, u, dt, t, p); }
       else if (this.sub === 2) { status = `${(p.city || []).length} programs · top ${p.top || '—'}`; this.city(g, w, h, area, u, dt, t, p); }
@@ -63,7 +63,7 @@
       T.header(g, m, y0, w - 2 * m, u, names[this.sub], status, hot);
       T.dots(g, m, y0 + u * 2.75, u, 4, this.sub);
       if (this.sub === 2 && this.selCard) this.selCard();
-      T.footer(g, m, bot + u * 0.2, w - 2 * m, u, ['laptop over usb', 'drag: orbit', 'drag: orbit · tap tower: details', 'now playing'][this.sub], (p.age || 0) >= 3 ? `data ${p.age}s old` : 'sse pc 1 hz');
+      T.footer(g, m, bot + u * 0.2, w - 2 * m, u, ['PC over USB', 'drag: orbit', 'drag: orbit · tap tower: details', 'now playing'][this.sub], (p.age || 0) >= 3 ? `data ${p.age}s old` : 'updates every second');
       T.finish(g, w, h);
     },
     // ---- обзор: два кольца, график CPU, диск/сеть/батарея ----
@@ -262,7 +262,7 @@
       // текст
       const tx = port ? a.x : cx + R * 1.45, tw = port ? a.w : a.x + a.w - tx;
       let ty = port ? cy + R * 1.35 + u * 2 : a.y + a.h * 0.3;
-      if (!trk) { T.txt(g, 'NOTHING PLAYING', tx, ty + u * 2, u * 2, T.C.label, 't'); T.txt(g, 'START A TRACK ON THE LAPTOP', tx, ty + u * 3.5, u * 0.85, T.C.dim); this.controls(g, tx, ty + u * 6, tw, u, t, false); return; }
+      if (!trk) { T.txt(g, 'NOTHING PLAYING', tx, ty + u * 2, u * 2, T.C.label, 't'); T.txt(g, 'START A TRACK ON THE PC', tx, ty + u * 3.5, u * 0.85, T.C.dim); this.controls(g, tx, ty + u * 6, tw, u, t, false); return; }
       T.txt(g, (trk.app || 'MEDIA').toUpperCase() + (play ? '  ▸ PLAYING' : '  ▮▮ PAUSED'), tx, ty, u * 0.85, play ? T.C.acc : T.C.label);
       ty += u * 3;
       g.font = `500 ${u * 2.4}px ${T.FC}`; T.txt(g, T.fit(g, trk.t || '—', tw), tx, ty, u * 2.4, T.C.hot, 'c');

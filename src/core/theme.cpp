@@ -6,6 +6,12 @@
 #include "core/ui.h"
 #include "core/display.h"
 #include "core/fonts/STM14.h"
+#include "core/lang.h"
+#if LANG_RU
+#include "core/fonts/PLY13.h"   // русская сборка: Play с кириллицей вместо STM14 / RAJ24 / RAJ44
+#include "core/fonts/PLB20.h"
+#include "core/fonts/PLB36.h"
+#endif
 #include "core/fonts/RAJ24.h"
 #include "core/fonts/RAJ44.h"
 #include "core/fonts/JBM14.h"   // с кириллицей — для текстов «снаружи» (названия треков)
@@ -92,8 +98,40 @@ uint16_t scale565(uint16_t c, int pct) {
   return tft.color565(r * pct / 100, g * pct / 100, b * pct / 100);
 }
 
-void txt(const char* s, int x, int y, int size) {
+// русская сборка: если в строке есть не-ASCII (кириллица), а у шрифта её нет — берём Play того же размера.
+// Латиница и цифры остаются в фирменных шрифтах (Share Tech Mono, Rajdhani).
+static const GFXfont* fontForText(const char* s, int size) {
   const GFXfont* f = fontFor(size);
+#if LANG_RU
+  bool hi = false; for (const char* p = s; *p; p++) if ((uint8_t)*p >= 0x80) { hi = true; break; }
+  if (hi) {
+    if (size == 2 || size == 1) return &PLY13;
+    if (size == 4) return &PLB20;
+    if (size == 6) return &PLB36;
+  }
+#endif
+  return f;
+}
+
+void utf8UpperInPlace(char* s) {
+  for (uint8_t* p = (uint8_t*)s; *p; p++) {
+    if (*p < 0x80) { *p = (uint8_t)toupper(*p); continue; }
+    if (p[0] == 0xD0 && p[1] >= 0xB0 && p[1] <= 0xBF) { p[1] -= 0x20; p++; continue; }          // а..п
+    if (p[0] == 0xD1 && p[1] >= 0x80 && p[1] <= 0x8F) { p[0] = 0xD0; p[1] += 0x20; p++; continue; }   // р..я
+    if (p[0] == 0xD1 && p[1] == 0x91) { p[0] = 0xD0; p[1] = 0x81; p++; continue; }               // ё
+  }
+}
+void utf8Upper(const char* s, char* out, size_t n) {
+  if (!n) return;
+  size_t i = 0;
+  while (s[i] && i < n - 1) i++;
+  while (i > 0 && ((uint8_t)s[i] & 0xC0) == 0x80 && i < strlen(s)) i--;   // не резать букву пополам
+  memcpy(out, s, i); out[i] = 0;
+  utf8UpperInPlace(out);
+}
+
+void txt(const char* s, int x, int y, int size) {
+  const GFXfont* f = fontForText(s, size);
   if (f) { spr.setFreeFont(f); spr.drawString(s, x, y); spr.setFreeFont(nullptr); }
   else   { spr.setFreeFont(nullptr); spr.drawString(s, x, y, size); }
 }
@@ -105,7 +143,7 @@ void txtNum(long n, int x, int y, int size) {
 }
 
 int txtW(const char* s, int size) {
-  const GFXfont* f = fontFor(size);
+  const GFXfont* f = fontForText(s, size);
   if (!f) return spr.textWidth(s, size);
   spr.setFreeFont(f);
   int w = spr.textWidth(s);

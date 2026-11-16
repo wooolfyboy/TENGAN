@@ -3,6 +3,7 @@
 //  и экран Gallery › Weather. Описание — в weather.h.
 // ============================================================
 #include <algorithm>
+#include "core/lang.h"
 #include "gallery/weather.h"
 #include "gallery/astro.h"
 #include "ble/ble.h"
@@ -269,7 +270,7 @@ static void drawSkyView(uint32_t now, int x0, int y0, int w, int h) {
     spr.drawCircle(dx, ty + 4, 3, C_HOT()); spr.drawCircle(dx, ty + 4, 2, C_HOT());
     char sb[28];
     char src[16]; strncpy(src, W.tsrc, sizeof(src)); src[sizeof(src) - 1] = 0;
-    for (char* c = src; *c; c++) { if (*c == '-') { *c = 0; break; } *c = toupper((unsigned char)*c); }
+    { char* d = strchr(src, '-'); if (d) *d = 0; utf8UpperInPlace(src); }
     if (W.hum >= 0) snprintf(sb, sizeof(sb), "%d%%  %s", W.hum, src); else snprintf(sb, sizeof(sb), "%s", src);
     spr.setTextColor(UI_LABEL());
     txt(sb, tx + 1, ty + 26, 1);

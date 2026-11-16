@@ -70,7 +70,7 @@
       T.header(g, m, y0, w - 2 * m, u, NAMES[this.sub], `mic · ${Math.round(this.lvS)} dBFS · ${word}${S.energy > 0.15 ? ' · ' + hz : ''}`, loud);
       T.dots(g, m, y0 + u * 2.75, u, 5, this.sub);
       this.meter(g, mx, top + u * 0.4, u * 1.2, bot - top - u * 0.8, u);
-      T.footer(g, m, bot + u * 0.2, w - 2 * m, u, ['32 bands · 25 fps', 'drag: tilt', 'bass: burst', 'phosphor trace', 'phase figure'][this.sub], 'sse snd 25 hz');
+      T.footer(g, m, bot + u * 0.2, w - 2 * m, u, ['32 bands · 25 fps', 'drag: tilt', 'bass: burst', 'phosphor trace', 'phase figure'][this.sub], 'live');
       T.finish(g, w, h);
     },
     // вертикальная шкала уровня с удержанием пика

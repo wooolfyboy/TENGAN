@@ -32,7 +32,7 @@ T.views.push({
     const hold = d && d.rep && now - I.t < 1200, fresh = d ? T.clamp(1 - (now - I.t) / 900) : 0;
     T.header(g, m, y0, w - 2 * m, u, 'IR · whose remote?', d ? `${I.n} presses · last ${AGO(now - I.t)} ago` : 'listening · 38 kHz', false);
     const top = y0 + u * 3.6, bot = h - u * 3;
-    if (!d) { this.irIdle(g, w, h, u, top, bot); T.bloom(this.cv, 0.7); T.footer(g, m, h - u * 2.2, w - 2 * m, u, 'point any remote at the stick and press a button', 'receive only · nothing is sent'); return; }
+    if (!d) { this.irIdle(g, w, h, u, top, bot); T.bloom(this.cv, 0.7); T.footer(g, m, h - u * 2.2, w - 2 * m, u, 'point any remote at TENGAN and press a button', 'receive only · nothing is sent'); return; }
     const lw = portrait ? w - 2 * m : (w - 2 * m) * 0.64, lh = portrait ? (bot - top) * 0.62 : bot - top;
     T.panel(g, m, top, lw, lh, u);
     if (fresh > 0) { T.cutPath(g, m, top, lw, lh, u * 0.8); g.strokeStyle = `rgba(${T.RGB.acc},${0.7 * fresh})`; g.lineWidth = 2; g.stroke(); }
@@ -99,7 +99,7 @@ T.views.push({
     const sx = cx + u * 12;
     for (let k = 0; k < 3; k++) { const p = (t * 0.5 + k / 3) % 1; g.strokeStyle = `rgba(${T.RGB.acc},${0.5 * (1 - p)})`; g.lineWidth = 1.2; g.beginPath(); g.arc(sx, ry, u * (1.2 + p * 3), 0, T.TAU); g.stroke(); }
     g.fillStyle = T.C.hot; g.beginPath(); g.arc(sx, ry, u * 0.9, 0, T.TAU); g.fill();
-    T.txt(g, 'POINT ANY REMOTE AT THE STICK', cx, cy + u * 6.5, u * 1.6, T.C.hot, 't', 'center');
+    T.txt(g, 'POINT ANY REMOTE AT TENGAN', cx, cy + u * 6.5, u * 1.6, T.C.hot, 't', 'center');
     T.txt(g, 'PRESS A BUTTON — WE GUESS WHOSE REMOTE IT IS', cx, cy + u * 8.2, u * 0.85, T.C.label, 'm', 'center');
   },
   // меандр из длительностей [метка, пауза, ...] (мкс)
@@ -127,7 +127,7 @@ T.views.push({
     const N = S.nfc, d = N.last, now = performance.now(), portrait = h > w * 1.05;
     if (N.err) {
       T.header(g, m, y0, w - 2 * m, u, 'NFC · what card?', 'no reader', true);
-      T.emptyState(g, w, h, u, 'NFC CHIP NOT FOUND', 'this stick may have no PN532 reader', true);
+      T.emptyState(g, w, h, u, 'NFC CHIP NOT FOUND', 'this device may have no NFC reader (PN532)', true);
       T.footer(g, m, h - u * 2.2, w - 2 * m, u, 'read only', ''); return;
     }
     if (N.t !== this.nfcSeen) { this.nfcSeen = N.t; this.tap = 0; }
@@ -165,7 +165,7 @@ T.views.push({
     g.strokeStyle = on ? T.C.hot : T.C.dim; g.lineWidth = 1.2;
     for (let k = 0; k < 3; k++) { g.beginPath(); g.arc(kx + cw * 0.84, ky + ch * 0.2, u * (0.5 + k * 0.45), -0.8, 0.8); g.stroke(); }
     if (d && on && /bank|emv/i.test(d.fam)) T.txt(g, '•••• •••• •••• ••••', kx + cw * 0.09, ky + ch * 0.8, u * 0.9, T.C.label);
-    T.txt(g, on ? 'ON THE STICK' : d ? 'LAST CARD ' + AGO(now - N.t) + ' AGO' : 'TOUCH A CARD TO THE STICK', cx, Math.min(top + lh - u, ry + cw * 0.36), u * 0.95, on ? T.C.hot : T.C.label, 't', 'center');
+    T.txt(g, on ? 'ON THE READER' : d ? 'LAST CARD ' + AGO(now - N.t) + ' AGO' : 'TOUCH A CARD TO TENGAN', cx, Math.min(top + lh - u, ry + cw * 0.36), u * 0.95, on ? T.C.hot : T.C.label, 't', 'center');
     // карточка данных
     const ix = portrait ? m : m + lw + u, iy = portrait ? top + lh + u : top, iw = portrait ? w - 2 * m : w - m - ix, ih = portrait ? bot - iy : lh;
     T.panel(g, ix, iy, iw, ih, u);

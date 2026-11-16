@@ -3,6 +3,7 @@
 //  имя сети, пароль и адрес страницы
 // ============================================================
 #include "web/web.h"
+#include "core/lang.h"
 #include "core/display.h"
 #include "core/theme.h"
 #include "core/ui.h"
@@ -39,7 +40,7 @@ void drawWebScreen(const WebView& v, const uint8_t* qr, int n) {
   spr.setTextColor(C_HOT());
   txt(v.url, tx, y + 84, 2);
   spr.setTextColor(UI_DIM());
-  if (v.tab && v.tab[0]) { char tb[16]; size_t k = 0; for (; v.tab[k] && k < 15; k++) tb[k] = (char)toupper((unsigned char)v.tab[k]); tb[k] = 0;
+  if (v.tab && v.tab[0]) { char tb[32]; utf8Upper(v.tab, tb, sizeof tb);
                           snprintf(buf, sizeof(buf), "VIEWING: %s", tb); }
   else snprintf(buf, sizeof(buf), "PHONE OR COMPUTER  REQ %lu", (unsigned long)v.reqs);
   txt(buf, tx, y + 106, 1);

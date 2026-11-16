@@ -91,13 +91,13 @@ T.views.push({
     const render = () => {
       const items = S.cfgItems;
       pan.innerHTML = `<div class="h"><span>// ALERTS · <b class="kj">警報設定</b></span><button class="x" aria-label="close">✕</button></div>` +
-        (items ? items.map(row).join('') : `<div class="r"><div class="n"><b>NO ALERT SETTINGS ON THE STICK</b><i>update the stick firmware (1.8.2+) · defaults are used</i></div></div>`) +
+        (items ? items.map(row).join('') : `<div class="r"><div class="n"><b>NO ALERT SETTINGS ON THE DEVICE</b><i>update TENGAN firmware (1.8.2+) · defaults are used</i></div></div>`) +
         `<div class="f"><span class="msg"></span><button class="rst">RESET TO DEFAULTS</button></div>`;
       pan.querySelector('.x').onclick = close;
       const msg = t => { const m = pan.querySelector('.msg'); if (m) m.textContent = t; };
       pan.querySelectorAll('.r[data-k]').forEach(el => {
         const it = items.find(x => x.k === el.dataset.k); if (!it) return;
-        const go = v => send(it.k, v).then(() => { render(); msg('saved on the stick'); }).catch(e => msg('not saved · ' + (e.message || 'no link')));
+        const go = v => send(it.k, v).then(() => { render(); msg('saved'); }).catch(e => msg('not saved · ' + (e.message || 'no link')));
         el.querySelectorAll('[data-d]').forEach(b => b.onclick = () => go(Math.max(it.min, Math.min(it.max, +it.v + (+b.dataset.d) * (it.step || 1)))));
         el.querySelectorAll('[data-o]').forEach(b => b.onclick = () => go(+b.dataset.o));
         const tg = el.querySelector('.tg'); if (tg) tg.onclick = () => go(+it.v === 1 || it.v === true ? 0 : 1);
@@ -216,7 +216,7 @@ T.views.push({
       const cols = [
         ['STATUS 状態', live ? '受信中' : poll ? '低速' : '断線', live ? E.grn : poll ? E.or2 : E.red, true],
         ['SOURCES 系統', srcs + ' / 7 ONLINE', E.or2, false],
-        ['STICK 棒', s.bat >= 0 ? 'BAT ' + s.bat + '%' + (s.usb ? ' ⚡' : '') : 'BAT —', s.bat >= 0 && s.bat <= 15 ? E.red : E.or2, false],
+        ['DEVICE 機', s.bat >= 0 ? 'BAT ' + s.bat + '%' + (s.usb ? ' ⚡' : '') : 'BAT —', s.bat >= 0 && s.bat <= 15 ? E.red : E.or2, false],
       ];
       const cw2 = sw / cols.length;
       cols.forEach(([k, v, col, j], i) => {
@@ -430,7 +430,7 @@ T.views.push({
         raw.forEach((v, i) => { const nx = xx + ww * v / tot, yy = i % 2 ? yl : yh; g.lineTo(xx, yy); g.lineTo(nx, yy); xx = nx; });
         g.stroke();
       }
-    } else tx(g, 'POINT A REMOTE AT THE STICK', bx + u * 0.5, by + u * 2.8, u * 0.7, E.dim);
+    } else tx(g, 'POINT A REMOTE AT TENGAN', bx + u * 0.5, by + u * 2.8, u * 0.7, E.dim);
     T.hits.rect(bx, by, bw, bh, { go: 'probe' });
     // NFC
     by += bh + u * 0.6;
@@ -442,7 +442,7 @@ T.views.push({
     if (N) {
       g.font = `600 ${u * 1.5}px ${FT()}`; tx(g, T.fit(g, String(N.fam || 'CARD').toUpperCase(), bw - u), bx + u * 0.5, by + u * 2.9, u * 1.5, E.or2, FT(), 'left', '600 ');
       g.font = `500 ${u * 0.62}px ${FC()}`; tx(g, T.fit(g, (N.hint ? N.hint + ' · ' : '') + 'UID ' + (N.uid || '—') + (N.sak ? ' · SAK ' + N.sak : ''), bw - u), bx + u * 0.5, by + u * 4, u * 0.62, E.txt, FC(), 'left', '500 ');
-    } else tx(g, 'TOUCH A CARD TO THE STICK', bx + u * 0.5, by + u * 2.8, u * 0.7, E.dim);
+    } else tx(g, 'TOUCH A CARD TO TENGAN', bx + u * 0.5, by + u * 2.8, u * 0.7, E.dim);
     T.hits.rect(bx, by, bw, bh, { go: 'probe' });
     // ПК
     const p = S.pc, py = y + h - u * 0.7;

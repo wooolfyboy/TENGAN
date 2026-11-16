@@ -28,7 +28,7 @@ Stream.setLink = (mode) => {
   Stream.mode = mode;
   const d = document.getElementById('link'), t = document.getElementById('linkTxt');
   d.className = 'dot ' + (mode === 'live' || mode === 'usb' ? 'live' : mode === 'poll' || mode === 'usbwait' ? 'poll' : 'off');
-  t.textContent = mode === 'live' ? 'LIVE' : mode === 'poll' ? 'POLL' : mode === 'usb' ? 'USB' : mode === 'usbwait' ? 'USB · OPEN WEB ON STICK' : mode === 'usboff' ? 'USB · NO STICK' : 'NO LINK';
+  t.textContent = mode === 'live' ? 'LIVE' : mode === 'poll' ? 'POLL' : mode === 'usb' ? 'USB' : mode === 'usbwait' ? 'USB · OPEN WEB ON TENGAN' : mode === 'usboff' ? 'USB · NO DEVICE' : 'NO LINK';
 };
 Stream.connect = (want) => {
   Stream.want = want;

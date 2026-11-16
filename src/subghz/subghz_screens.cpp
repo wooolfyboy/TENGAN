@@ -3,6 +3,7 @@
 //  Все экраны собраны из компонентов core/ui.h по общей сетке.
 // ============================================================
 #include "subghz/subghz_model.h"
+#include "core/lang.h"
 #include "subghz/sensors.h"
 #include "core/timeutil.h"
 #include "core/display.h"
@@ -161,7 +162,7 @@ static void shortName(const SensRec& r, char* b, size_t n) {
   if (r.kind == OOK_REMOTE) snprintf(b, n, "%s %04lX", strcmp(r.proto, "Rolling") ? "BELL/REMOTE" : "ROLLING", (unsigned long)(r.id & 0xFFFF));
   else if (r.ch) snprintf(b, n, "%s CH%d", p, r.ch);
   else snprintf(b, n, "%s %02lX", p, (unsigned long)(r.id & 0xFF));
-  for (char* c = b; *c; c++) *c = toupper((unsigned char)*c);
+  utf8UpperInPlace(b);
 }
 
 static void degree(int x, int y, uint16_t col) { spr.drawCircle(x, y, 2, col); }
@@ -186,7 +187,7 @@ static void drawPulseTrain(int x0, int y0, int w, int h) {
   txt(buf, x0 + 6, y0 + 4, 1);
   char cls[24];
   snprintf(cls, sizeof cls, "%s", sensor ? I.proto : I.cls);
-  for (char* c = cls; *c; c++) *c = toupper((unsigned char)*c);
+  utf8UpperInPlace(cls);
   spr.setTextDatum(TR_DATUM);
   spr.setTextColor(sensor ? C_ACC() : C_HOT());
   txt(cls, x0 + w - 6, y0 + 4, 1);

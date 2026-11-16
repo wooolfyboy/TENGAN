@@ -13,7 +13,7 @@ App.renderSubs = () => {
   const v = App.cur; subs.innerHTML = '';
   document.body.classList.toggle('hassubs', !!(v.subs && v.subs.length));
   (v.subs || []).forEach((n, i) => {
-    const b = T.el('button', i === v.sub ? 'on' : '', n);
+    const b = T.el('button', i === v.sub ? 'on' : '', T.tr(n));
     b.onclick = () => { v.sub = i; v.onSub && v.onSub(i); App.renderSubs(); App.fresh(); try { localStorage.setItem('sub_' + v.id, i); } catch (e) {} App.rewant(); };
     subs.appendChild(b);
   });
@@ -47,7 +47,7 @@ App.rewant = () => {
   const want = (typeof v.want === 'function' ? v.want() : v.want) || 'st';   // галерее палка не нужна — только статус
   if (want !== T.Stream.want) T.Stream.connect(want);
 };
-T.views.forEach(v => { const b = T.el('button', '', v.title); b.dataset.id = v.id; b.onclick = () => App.go(v.id); nav.appendChild(b); });
+T.views.forEach(v => { const b = T.el('button', '', T.tr(v.title)); b.dataset.id = v.id; b.onclick = () => App.go(v.id); nav.appendChild(b); });
 document.getElementById('upd').onclick = () => { const UP = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.TenganUpdate; if (UP) UP.check().catch(() => {}); };
 document.getElementById('fs').onclick = () => {
   const d = document.documentElement;
@@ -73,8 +73,13 @@ App.adapt = fps => {
   else if (slow >= 3 && T.Q.bloom) { T.Q.bloom = 0; T.Q.scan = 0; slow = 0; }
   else if (good >= 8 && T.RS < ceil - 0.01) { setRS(T.RS + 0.1); raiseT = performance.now(); good = 0; }
 };
-const SHOT = new URLSearchParams(location.search).has('shot');   // для картинок в README: все эффекты, без счётчика кадров
-if (SHOT) document.getElementById('fps').style.display = 'none';
+const SHOT = new URLSearchParams(location.search).has('shot');
+// служебное (кадры в секунду, статус обновления приложения) — только по ?debug или Настройки › Действия › «Показывать FPS»
+T.debug = new URLSearchParams(location.search).has('debug');
+T.setShowFps = on => { T.showFps = !!on; try { localStorage.setItem('showFps', on ? '1' : '0'); } catch (e) {} document.getElementById('fps').style.display = on && !SHOT ? '' : 'none'; };
+let fpsPref = false; try { fpsPref = localStorage.getItem('showFps') === '1'; } catch (e) {}
+T.setShowFps(T.debug || fpsPref);
+if (!T.debug) document.getElementById('upd').style.display = 'none';   // для картинок в README: все эффекты, без счётчика кадров
 let last = performance.now(), next = last, fpsN = 0, fpsT = 0;
 const loop = now => {
   requestAnimationFrame(loop);
@@ -90,7 +95,7 @@ const loop = now => {
     document.getElementById('fps').textContent = fps + ' FPS' + (T.RS < 1 ? ' · ' + Math.round(T.RS * 100) + '%' : '') + (T.Q.bloom ? '' : ' · LITE');
     // приложение: состояние обновления страницы от палки (диагностика) — тап по нему = проверить сейчас
     const UP = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.TenganUpdate;
-    if (UP) UP.status().then(r => { const el = document.getElementById('upd'); if (el) el.textContent = 'UPD ' + r.status; }).catch(() => {});
+    if (UP) UP.status().then(r => { T.updStatus = r.status; const el = document.getElementById('upd'); if (el) el.textContent = 'UPD ' + r.status; }).catch(() => {});
     fpsN = 0; fpsT = 0;
   }
   if (T.Stream.mode === 'live' && now - T.Stream.lastMsg > 6000) T.Stream.setLink('off');

@@ -115,8 +115,8 @@
   V.weather = function (g, w, h, L, dt, t) {
     const { u, m, top, bot } = L, d = S.wx, s = S.wxs;
     if (!d || !d.ok) {
-      T.emptyState(g, w, h, u, 'WEATHER', 'waiting for the stick');
-      return { status: 'radio weather', hint: 'open the Web section on the stick', right: 'wx · stick' };
+      T.emptyState(g, w, h, u, 'WEATHER', 'waiting for TENGAN');
+      return { status: 'radio weather', hint: 'open Web on TENGAN', right: 'radio weather' };
     }
     const hz = top + (bot - top) * 0.82;                       // горизонт
     const night = (() => { const hh = new Date().getHours(); return hh < 6 || hh >= 20; })();
@@ -214,7 +214,7 @@
     const draw = () => {
       const x0 = m, y1 = top + u * 1.2;
       T.txt(g, '// ' + nm[0], x0, y1 + u * 3.1, u * 3.6, d.cond === 'storm' ? T.C.alert : T.C.hot, 't');
-      T.txt(g, nm[1].toUpperCase(), x0 + u * 0.2, y1 + u * 4.8, u * 1.05, T.C.label, 'c');
+      if (T.LANG === 'ru') T.txt(g, nm[1].toUpperCase(), x0 + u * 0.2, y1 + u * 4.8, u * 1.05, T.C.label, 'c');
       // показания
       const rows = [['CLOUDS', d.ble + ' dev'], ['WIND', (d.turn | 0) + ' /min'], ['RAIN 433', (d.sub | 0) + ' /min' + (d.sub ? '  ' + Math.round(d.subPk) + ' dBm' : '')], ['THUNDER', Math.round(d.pk) + ' dBFS']];
       const ry = y1 + u * 7.6;
@@ -249,6 +249,6 @@
         hist.forEach((q, i) => { if (q[1] > 0.02) { const bw = hw / hist.length; g.fillRect(hx + i * bw, hy + hh - q[1] * hh, Math.max(1, bw * 0.6), q[1] * hh); } });
       }
     };
-    return { status: (d.cond || '').toUpperCase() + ' · ' + d.ble + ' DEV', hint: 'radio weather · devices = clouds · 433 = rain · loud = thunder', right: 'wx · stick 1 Hz', draw };
+    return { status: (d.cond || '').toUpperCase() + ' · ' + d.ble + ' DEV', hint: 'radio weather · devices = clouds · 433 = rain · loud = thunder', right: 'updates every second', draw };
   };
 })();

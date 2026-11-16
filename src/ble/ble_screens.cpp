@@ -5,6 +5,7 @@
 //  Все экраны собраны из компонентов core/ui.h по общей сетке.
 // ============================================================
 #include <algorithm>
+#include "core/lang.h"
 #include "core/timeutil.h"
 #include "ble/ble_model.h"
 #include "ble/vendors.h"
@@ -55,11 +56,7 @@ static const char* uuidName(uint16_t u) {
   }
 }
 
-static void upperCopy(const char* s, char* out, size_t n) {
-  size_t i = 0;
-  for (; s[i] && i < n - 1; i++) out[i] = (char)toupper((unsigned char)s[i]);
-  out[i] = 0;
-}
+static void upperCopy(const char* s, char* out, size_t n) { utf8Upper(s, out, n); }
 
 // типы по убыванию количества
 static int sortedTypes(const int* cnt, int* order) {

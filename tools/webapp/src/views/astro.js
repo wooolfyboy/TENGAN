@@ -34,6 +34,7 @@ T.astro = (() => {
   const EARTH = [1.00000261, 0.00000562, 0.01671123, -0.00004392, -0.00001531, -0.01294668, 100.46457166, 35999.37244981, 102.93768193, 0.32327364, 0, 0];
   A.PLANET_RU = ['Меркурий', 'Венера', 'Марс', 'Юпитер', 'Сатурн'];
   A.PLANET_EN = ['MERCURY', 'VENUS', 'MARS', 'JUPITER', 'SATURN'];
+  A.planetName = i => T.L(['Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn'][i], A.PLANET_RU[i]);
   const helio = (el, Tc) => {
     const a = el[0] + el[1] * Tc, e = el[2] + el[3] * Tc, I = (el[4] + el[5] * Tc) * D2R;
     const L = el[6] + el[7] * Tc, w = el[8] + el[9] * Tc, N = (el[10] + el[11] * Tc) * D2R;

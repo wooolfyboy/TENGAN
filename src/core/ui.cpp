@@ -2,6 +2,7 @@
 //  ui.cpp — компоненты дизайн-системы
 // ============================================================
 #include "core/ui.h"
+#include "core/lang.h"
 #include "core/display.h"
 #include "core/theme.h"
 #include "core/settings.h"
@@ -11,11 +12,7 @@ uint16_t UI_DIM()   { return themeKurenai() ? tft.color565(138, 138, 138) : tft.
 uint16_t UI_LINE()  { return themeKurenai() ? tft.color565(58, 58, 58)    : tft.color565(32, 50, 64); }
 uint16_t UI_PANEL() { return themeKurenai() ? tft.color565(34, 34, 34)    : tft.color565(14, 42, 52); }
 
-static void upper(const char* s, char* out, size_t n) {
-  size_t i = 0;
-  for (; s[i] && i < n - 1; i++) out[i] = (char)toupper((unsigned char)s[i]);
-  out[i] = 0;
-}
+static void upper(const char* s, char* out, size_t n) { utf8Upper(s, out, n); }
 
 void uiHeader(const char* title, const char* right, bool rightAlert) {
   int W = spr.width();

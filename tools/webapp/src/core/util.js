@@ -67,7 +67,7 @@ T.tw = (g, s, px, f = 'm') => { g.font = f === 't' ? `600 ${px}px ${T.FT}` : f =
 // обрезка текста «…»: результат запоминается (раньше — десятки замеров текста каждый кадр)
 T._fitC = new Map();
 T.fit = (g, s, max) => {
-  s = String(s); const key = g.font + '|' + Math.round(max) + '|' + s;
+  s = T.tr ? T.tr(String(s)) : String(s); const key = g.font + '|' + Math.round(max) + '|' + s;
   const hit = T._fitC.get(key); if (hit !== undefined) return hit;
   let r = s;
   if (g.measureText(s).width > max) {

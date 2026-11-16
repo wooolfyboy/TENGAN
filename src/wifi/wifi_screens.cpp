@@ -5,6 +5,7 @@
 //  Все экраны собраны из компонентов core/ui.h по общей сетке.
 // ============================================================
 #include <esp_wifi.h>
+#include "core/lang.h"
 #include "core/timeutil.h"
 #include "core/settings.h"
 #include "wifi/wifi_model.h"
@@ -32,11 +33,7 @@ static char secGlyph(uint8_t e) {
 }
 static bool secAlert(uint8_t e) { return e == WIFI_AUTH_OPEN || e == WIFI_AUTH_WEP; }
 
-static void upperCopy(const char* s, char* out, size_t n) {
-  size_t i = 0;
-  for (; s[i] && i < n - 1; i++) out[i] = (char)toupper((unsigned char)s[i]);
-  out[i] = 0;
-}
+static void upperCopy(const char* s, char* out, size_t n) { utf8Upper(s, out, n); }
 
 // «идёт приём» — мигающая точка в конце линии шапки
 static void scanDot() {
