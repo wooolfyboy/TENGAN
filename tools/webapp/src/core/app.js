@@ -76,9 +76,10 @@ App.adapt = fps => {
 const SHOT = new URLSearchParams(location.search).has('shot');
 // служебное (кадры в секунду, статус обновления приложения) — только по ?debug или Настройки › Действия › «Показывать FPS»
 T.debug = new URLSearchParams(location.search).has('debug');
-T.setShowFps = on => { T.showFps = !!on; try { localStorage.setItem('showFps', on ? '1' : '0'); } catch (e) {} document.getElementById('fps').style.display = on && !SHOT ? '' : 'none'; };
+const applyFps = on => { T.showFps = !!on; document.getElementById('fps').style.display = on && !SHOT ? '' : 'none'; };
+T.setShowFps = on => { try { localStorage.setItem('showFps', on ? '1' : '0'); } catch (e) {} applyFps(on); };
 let fpsPref = false; try { fpsPref = localStorage.getItem('showFps') === '1'; } catch (e) {}
-T.setShowFps(T.debug || fpsPref);
+applyFps(T.debug || fpsPref);
 if (!T.debug) document.getElementById('upd').style.display = 'none';   // для картинок в README: все эффекты, без счётчика кадров
 let last = performance.now(), next = last, fpsN = 0, fpsT = 0;
 const loop = now => {
