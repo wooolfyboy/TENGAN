@@ -135,3 +135,4 @@ html.sumi .lbl-dlg input{background:rgba(255,255,255,.4);border-color:var(--acc)
 html.sumi .lbl-btns button{border-color:var(--line);color:var(--label)}
 html.sumi .lbl-btns button.pri{background:var(--alert);border-color:var(--alert);color:var(--bg)}
 @media (max-width:1400px){html.sumi #nav button{padding:8px 7px 6px;font-size:16px}html.sumi #nav button .kj{margin-right:.15em}}
+#linkTxt{max-width:11em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

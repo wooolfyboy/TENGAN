@@ -14,7 +14,7 @@ App.renderSubs = () => {
   document.body.classList.toggle('hassubs', !!(v.subs && v.subs.length));
   (v.subs || []).forEach((n, i) => {
     const b = T.el('button', i === v.sub ? 'on' : '', n);
-    b.onclick = () => { v.sub = i; v.onSub && v.onSub(i); App.renderSubs(); try { localStorage.setItem('sub_' + v.id, i); } catch (e) {} App.rewant(); };
+    b.onclick = () => { v.sub = i; v.onSub && v.onSub(i); App.renderSubs(); App.fresh(); try { localStorage.setItem('sub_' + v.id, i); } catch (e) {} App.rewant(); };
     subs.appendChild(b);
   });
 };
@@ -37,6 +37,7 @@ App.go = id => {
   [...nav.children].forEach(b => b.classList.toggle('on', b.dataset.id === v.id));
   const w = document.getElementById('wipe'); w.classList.remove('go'); void w.offsetWidth; w.classList.add('go');
   App.renderSubs();
+  App.fresh();                                         // LITE — только для раздела, который не тянул: новый раздел снова полный
   if (v.root) { v.root.hidden = false; v.cv && v.cv.fit(); } else v.mount(main);
   App.rewant();
 };
@@ -56,9 +57,25 @@ document.getElementById('fs').onclick = () => {
 // Свечение — единственный тяжёлый эффект: если 3 с подряд меньше 45 кадров, оно гаснет
 // (страховка; на нормальном планшете не срабатывает).
 const FPS_CAP = 60, STEP = 1000 / FPS_CAP;
+// ---- адаптивное качество (как в играх): если планшет не успевает, сначала плавно снижаем
+// разрешение картинки (100% → 60%, шагами по 10%; браузер растягивает её видеокартой — почти незаметно),
+// и только если и на 60% мало — выключаем свечение (LITE). Когда всё спокойно — разрешение возвращается.
+// Действует на текущий раздел/вкладку: при смене — снова 100%. Первые 2.5 с после смены не считаем.
+T.RS = 1;
+App.graceT = 0;
+let slow = 0, good = 0, raiseT = 0, ceil = 1;
+const setRS = v => { v = Math.round(v * 10) / 10; if (v === T.RS) return; T.RS = v; for (const o of T._cvs) o.fit(); App.graceT = performance.now() + 1500; };
+App.fresh = () => { T.Q.bloom = 1; T.Q.scan = 1; slow = good = 0; ceil = 1; setRS(1); App.graceT = performance.now() + 2500; };
+App.adapt = fps => {
+  if (performance.now() < App.graceT) return;
+  slow = fps < 50 ? slow + 1 : 0; good = fps >= 58 ? good + 1 : 0;
+  if (slow >= 2 && T.RS > 0.6) { if (performance.now() - raiseT < 15000) ceil = Math.min(ceil, T.RS - 0.1); setRS(T.RS - 0.1); slow = 0; }
+  else if (slow >= 3 && T.Q.bloom) { T.Q.bloom = 0; T.Q.scan = 0; slow = 0; }
+  else if (good >= 8 && T.RS < ceil - 0.01) { setRS(T.RS + 0.1); raiseT = performance.now(); good = 0; }
+};
 const SHOT = new URLSearchParams(location.search).has('shot');   // для картинок в README: все эффекты, без счётчика кадров
 if (SHOT) document.getElementById('fps').style.display = 'none';
-let last = performance.now(), next = last, fpsN = 0, fpsT = 0, slow = 0;
+let last = performance.now(), next = last, fpsN = 0, fpsT = 0;
 const loop = now => {
   requestAnimationFrame(loop);
   if (now < next - 1) return;                          // экран 120/144 Гц: лишние кадры пропускаем
@@ -69,14 +86,15 @@ const loop = now => {
   fpsN++; fpsT += dt;
   if (fpsT >= 1) {
     const fps = Math.round(fpsN / fpsT); T.fps = fps;
-    if (!document.hidden && !SHOT) { slow = fps < 45 ? slow + 1 : 0; if (slow >= 3 && T.Q.bloom) { T.Q.bloom = 0; T.Q.scan = 0; } }
-    document.getElementById('fps').textContent = fps + ' FPS' + (T.Q.bloom ? '' : ' · LITE');
+    if (!document.hidden && !SHOT) App.adapt(fps);
+    document.getElementById('fps').textContent = fps + ' FPS' + (T.RS < 1 ? ' · ' + Math.round(T.RS * 100) + '%' : '') + (T.Q.bloom ? '' : ' · LITE');
     // приложение: состояние обновления страницы от палки (диагностика) — тап по нему = проверить сейчас
     const UP = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.TenganUpdate;
     if (UP) UP.status().then(r => { const el = document.getElementById('upd'); if (el) el.textContent = 'UPD ' + r.status; }).catch(() => {});
     fpsN = 0; fpsT = 0;
   }
   if (T.Stream.mode === 'live' && now - T.Stream.lastMsg > 6000) T.Stream.setLink('off');
+  if (T.Stream.mode === 'usb' && now - T.Stream.lastMsg > 6000) T.Stream.setLink('usbwait');
 };
 // старт (boot.js): сначала «запуск» со шкалой — связь, радио раздела (по умолчанию Bluetooth),
 // данные, сцена; потом красивая заставка; потом раздел

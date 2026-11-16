@@ -1,0 +1,12 @@
+# приложение для компьютера (Windows): окно + монитор ПК
+pywebview>=5.0
+pyserial
+psutil
+pycaw
+comtypes
+numpy
+PyAudioWPatch
+winrt-runtime
+winrt-Windows.Media.Control
+winrt-Windows.Foundation
+winrt-Windows.Foundation.Collections

@@ -25,10 +25,13 @@
 #include "ble/ble.h"
 #include "core/boot.h"
 #include "pc/pc.h"
+#include "web/web.h"
 #include "gallery/sat.h"
 #include <driver/gpio.h>
 #include <esp_ota_ops.h>
 #include "audio/audio.h"
+#include "core/perf.h"
+
 
 // Самый ранний момент, где можно что-то сделать (ещё до setup): гасим подсветку,
 // чтобы не было видно «мусора» на экране, пока он не инициализирован.
@@ -65,6 +68,7 @@ void setup() {
   pinMode(PIN_NRF_CS,  OUTPUT);  digitalWrite(PIN_NRF_CS,  HIGH);
 
   Serial.setRxBufferSize(2048);
+  Serial.setTxBufferSize(8192);    // поток приложения для компьютера (link/serout) — без ожидания
   Serial.begin(115200);  // USB: сюда пишет программа ноутбука (раздел PC)
   inputBegin();
   displayBegin();
@@ -82,6 +86,7 @@ void setup() {
 
 void loop() {
   static uint32_t lastDraw = 0;
+  uint32_t tLoop = micros();
   crumbFeed();
   crumb("input");   inputPoll();
   uint32_t now = millis();
@@ -89,6 +94,7 @@ void loop() {
   ledsTick();
   batTick(now);
   crumb("pc poll"); pcPoll(now);                        // строки с ноутбука по USB (раздел PC)
+  crumb("usb out"); webLinkPump();                     // в USB: страница и поток приложения для компьютера
   crumb("nav tick"); navTick(now);                       // работа открытого раздела (сканы, развёртки)
 
   powerIdleTick(now);
@@ -99,9 +105,13 @@ void loop() {
     lastDraw = now;
     crumb("ble update"); bleUpdate(now);                   // нужно всегда: меню показывает число устройств, лента — события
     g_fastFrame = false;              // экран сам попросит снова, если ему нужно
+    uint32_t tDraw = micros();
     if (g_powerHold) drawPowerHold();
     else             { crumb("draw"); navDraw(now); }
+    perfDraw(micros() - tDraw);
     crumb("autosave"); settingsAutosave(now);
   }
+  perfLoop(micros() - tLoop);
+  perfTick(now);
   delay(5);
 }

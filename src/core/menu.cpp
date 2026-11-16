@@ -53,6 +53,17 @@ static void goMain() {
   s_sub = false;
 }
 
+// открыть раздел «снаружи» (например, приложение на компе подключилось по USB — открыть Web)
+void navOpen(const Section* target) {
+  if (cur() == target) return;
+  int idx = -1;
+  for (int i = 0; i < N_SECTIONS; i++) if (SECTIONS[i] == target) idx = i;
+  if (idx < 0) return;
+  if (cur()) goMain();
+  enterSection(idx);
+  if (s_sub) { target->open(s_subSel); s_sub = false; }
+}
+
 void navClick() {
   const Section* s = cur();
   if (!s)    { enterSection(s_menuSel); return; }

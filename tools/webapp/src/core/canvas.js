@@ -11,7 +11,7 @@ T.canvas = (parent, maxDpr = 3) => {
   const fit = () => {
     const r = parent.getBoundingClientRect();
     if (r.width < 2 || r.height < 2) return;           // раздел спрятан — холст не трогаем (не терять картинку и память на пересоздание)
-    const d = Math.min(window.devicePixelRatio || 1, maxDpr, T.RES / Math.max(1, r.width, r.height));
+    const d = Math.min(window.devicePixelRatio || 1, maxDpr, T.RES / Math.max(1, r.width, r.height)) * (T.RS || 1);   // T.RS — адаптивное разрешение (app.js)
     const W = Math.max(1, Math.round(r.width * d)), H = Math.max(1, Math.round(r.height * d));
     if (W !== cv.width || H !== cv.height) { cv.width = W; cv.height = H; }
     o.w = r.width; o.h = r.height; o.dpr = d;

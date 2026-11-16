@@ -9,6 +9,8 @@
 #include "audio/audio.h"
 #include "gallery/astro.h"
 #include "gallery/sat.h"
+#include "link/serout.h"
+#include "web/web.h"
 
 PcStat g_pc;
 int    g_pcPage = 0;
@@ -74,6 +76,7 @@ static void parseAudio(char* s) {
 }
 
 static void parseLine(char* s) {
+  if (s[0] == '@') { webLinkLine(s); return; }      // приложение для компьютера (web.cpp, «@…»)
   if (!strncmp(s, "PA ", 3)) { parseAudio(s); return; }
   if (!strncmp(s, "TLE\t", 4)) { satFromLine(s); return; }   // орбиты спутников с ноутбука
   if (!strncmp(s, "PP\t", 3)) { pcCityLine(s); return; }      // программы для города процессов
@@ -137,9 +140,7 @@ bool pcLive(uint32_t now) { return g_pc.have && msSince(now, g_pc.t) < 10000; }
 static void pcSend(const char* cmd, int code) {
   g_pcLastCmd = code; g_pcLastCmdMs = millis();
   if (!pcLive(millis())) return;                     // программа не запущена — некому слать
-  if (Serial.availableForWrite() < 16) return;       // не ждать, если ноут не читает
-  Serial.print(cmd);
-  Serial.print('\n');
+  serOutLine(cmd);                                   // общая очередь USB: строка уходит целиком, без ожидания
 }
 
 // пульт с планшета (/api/pckey): только разрешённые клавиши
@@ -155,9 +156,7 @@ bool pcKey(const char* name) {
 
 void pcSendLine(const char* s) {
   if (!pcLive(millis())) return;                     // программа не запущена — некому слать
-  if (Serial.availableForWrite() < (int)strlen(s) + 2) return;
-  Serial.print(s);
-  Serial.print('\n');
+  serOutLine(s);
 }
 
 // ---------- раздел ----------

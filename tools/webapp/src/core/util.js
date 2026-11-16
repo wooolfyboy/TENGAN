@@ -64,7 +64,20 @@ T.txt = (g, s, x, y, px, col, f = 'm', al = 'left', bl = 'alphabetic') => {
   g.fillStyle = col; g.textAlign = al; g.textBaseline = bl; g.fillText(s, x, y);
 };
 T.tw = (g, s, px, f = 'm') => { g.font = f === 't' ? `600 ${px}px ${T.FT}` : f === 'c' ? `500 ${px}px ${T.FC}` : f === 'k' ? `${px}px ${T.SEAL_FONT}` : `${px}px ${T.FM}`; return g.measureText(s).width; };
-T.fit = (g, s, max) => { s = String(s); if (g.measureText(s).width <= max) return s; while (s.length > 1 && g.measureText(s + '…').width > max) s = s.slice(0, -1); return s + '…'; };
+// обрезка текста «…»: результат запоминается (раньше — десятки замеров текста каждый кадр)
+T._fitC = new Map();
+T.fit = (g, s, max) => {
+  s = String(s); const key = g.font + '|' + Math.round(max) + '|' + s;
+  const hit = T._fitC.get(key); if (hit !== undefined) return hit;
+  let r = s;
+  if (g.measureText(s).width > max) {
+    let lo = 0, hi = s.length;                          // двоичный поиск длины вместо посимвольного
+    while (lo < hi) { const m = (lo + hi + 1) >> 1; if (g.measureText(s.slice(0, m) + '…').width <= max) lo = m; else hi = m - 1; }
+    r = s.slice(0, Math.max(1, lo)) + '…';
+  }
+  if (T._fitC.size > 3000) T._fitC.clear();
+  T._fitC.set(key, r); return r;
+};
 
 // ---- единица разметки: 16 px на планшете 1280×800, пропорционально на других ----
 T.unit = (W, H) => Math.min(W / 80, H / 50);
@@ -193,40 +206,68 @@ T.drag = (cv, cam, opt = {}) => {
 };
 
 // ---- атмосфера: свечение, пыль, сканлайны, виньетка ----
-// свечение (bloom): кадр уменьшается цепочкой ½ → ¼ → ⅛ (каждый шаг честно усредняет,
-// поэтому тонкие линии не мерцают) и ложится поверх «светом». Только drawImage — дёшево на GPU,
-// без ctx.filter (на Android он считается процессором и роняет кадры).
+// ---- пост-эффекты: главное правило мобильной графики — меньше полных перекрасок экрана за кадр ----
+// (MDN «Optimizing canvas», web.dev «Improving HTML5 Canvas performance»: пререндер неизменного,
+// меньше перерисовки одних и тех же пикселей). Было 4 полных прохода за кадр, стало 2.
+//
+// свечение (bloom): кадр уменьшается ¼ → ⅛ (через кадр), обе копии сводятся в ОДНУ маленькую
+// «карту света», и она ложится на экран одним проходом (раньше — двумя).
 T.bloom = (o, strength = 0.85) => {
   if (!T.Q.bloom) return;
   const cv = o.cv, g = o.g;
-  if (!o.bl) o.bl = [0, 1, 2].map(() => { const c = document.createElement('canvas'); return { c, g: c.getContext('2d') }; });
-  // «фейк»: само размытие пересчитываем через кадр, накладываем каждый кадр — глазу не видно, нагрузка вдвое меньше
+  if (!o.bl) o.bl = [0, 1, 2].map(() => { const c = document.createElement('canvas'); return { c, g: c.getContext('2d', { alpha: false }) }; });
   o.blN = (o.blN || 0) + 1;
-  const redo = (o.blN & 1) || o.bl[0].c.width !== Math.max(1, cv.width >> 1);
-  let src = cv;
-  for (let i = 0; redo && i < 3; i++) {
-    const b = o.bl[i], w = Math.max(1, cv.width >> (i + 1)), h = Math.max(1, cv.height >> (i + 1));
-    if (b.c.width !== w || b.c.height !== h) { b.c.width = w; b.c.height = h; }
-    b.g.globalCompositeOperation = 'copy'; b.g.imageSmoothingEnabled = true; b.g.imageSmoothingQuality = 'low';
-    b.g.drawImage(src, 0, 0, w, h);
-    src = b.c;
+  const w1 = Math.max(1, cv.width >> 2), h1 = Math.max(1, cv.height >> 2), w2 = Math.max(1, w1 >> 1), h2 = Math.max(1, h1 >> 1);
+  const [A, B, L] = o.bl;
+  if (A.c.width !== w1 || A.c.height !== h1) { A.c.width = L.c.width = w1; A.c.height = L.c.height = h1; B.c.width = w2; B.c.height = h2; o.blN = 1; }
+  if (o.blN & 1) {
+    A.g.imageSmoothingEnabled = B.g.imageSmoothingEnabled = L.g.imageSmoothingEnabled = true;
+    A.g.imageSmoothingQuality = 'low'; A.g.drawImage(cv, 0, 0, w1, h1);
+    B.g.drawImage(A.c, 0, 0, w2, h2);
+    // карта света = 0.45·(¼) + 0.6·(⅛), всё в маленьком размере — дёшево
+    L.g.globalCompositeOperation = 'copy'; L.g.globalAlpha = 0.45; L.g.drawImage(A.c, 0, 0);
+    L.g.globalCompositeOperation = 'lighter'; L.g.globalAlpha = 0.6; L.g.drawImage(B.c, 0, 0, w1, h1);
+    L.g.globalAlpha = 1;
   }
   g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'lighter'; g.imageSmoothingEnabled = true;
-  g.globalAlpha = strength * 0.45; g.drawImage(o.bl[1].c, 0, 0, cv.width, cv.height);
-  g.globalAlpha = strength * 0.6; g.drawImage(o.bl[2].c, 0, 0, cv.width, cv.height);
+  g.globalAlpha = strength; g.drawImage(L.c, 0, 0, cv.width, cv.height);
   g.restore();
 };
+// фон: градиент один раз в маленькую картинку, потом растягивается (не создаётся заново каждый кадр)
 T.backdrop = (g, W, H, fx = 0.45, fy = 0.55) => {
-  const r = g.createRadialGradient(W * fx, H * fy, 0, W * fx, H * fy, Math.max(W, H) * 0.75);
-  r.addColorStop(0, '#0a1722'); r.addColorStop(1, T.C.bg); g.fillStyle = r; g.fillRect(0, 0, W, H);
+  const key = W + 'x' + H + ':' + fx + ':' + fy + ':' + T.C.bg;
+  let c = T._bdCache && T._bdCache.get(key);
+  if (!c) {
+    if (!T._bdCache || T._bdCache.size > 24) T._bdCache = new Map();
+    c = document.createElement('canvas'); const s = 1 / 4; c.width = Math.max(1, Math.round(W * s)); c.height = Math.max(1, Math.round(H * s));
+    const x = c.getContext('2d', { alpha: false }); x.scale(s, s);
+    const r = x.createRadialGradient(W * fx, H * fy, 0, W * fx, H * fy, Math.max(W, H) * 0.75);
+    r.addColorStop(0, '#0a1722'); r.addColorStop(1, T.C.bg); x.fillStyle = r; x.fillRect(0, 0, W, H);
+    T._bdCache.set(key, c);
+  }
+  g.drawImage(c, 0, 0, W, H);
 };
-T.finish = (g, W, H) => {                               // сканлайны + виньетка: последним слоем
+// сканлайны + виньетка: одна готовая картинка на размер экрана — один проход вместо двух, без
+// пересоздания градиента и узора каждый кадр
+T.finishLayer = (W, H, pw, ph, paint) => {
+  const key = pw + 'x' + ph + ':' + paint.name;
+  if (T._finKey === key) return T._finC;
+  const c = T._finC || document.createElement('canvas'); c.width = pw; c.height = ph;
+  const x = c.getContext('2d'); x.setTransform(pw / W, 0, 0, ph / H, 0, 0); x.clearRect(0, 0, W, H);
+  paint(x, W, H, pw / W);
+  T._finC = c; T._finKey = key; return c;
+};
+const paintScan = (x, W, H, d) => {
+  x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = 'rgba(0,0,0,.16)';
+  for (let y = 0; y < H * d; y += 4) x.fillRect(0, y, W * d, 1);
+  x.setTransform(d, 0, 0, d, 0, 0);
+  const v = x.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.45, W / 2, H / 2, Math.max(W, H) * 0.75);
+  v.addColorStop(0, 'rgba(5,8,13,0)'); v.addColorStop(1, 'rgba(5,8,13,.7)'); x.fillStyle = v; x.fillRect(0, 0, W, H);
+};
+T.finish = (g, W, H, paint = paintScan) => {
   if (!T.Q.scan) return;
-  if (!T._scan) { const c = document.createElement('canvas'); c.width = 4; c.height = 4; const x = c.getContext('2d'); x.fillStyle = 'rgba(0,0,0,.16)'; x.fillRect(0, 0, 4, 1); T._scanC = c; }
-  if (!T._scan || T._scanG !== g) { T._scan = g.createPattern(T._scanC, 'repeat'); T._scanG = g; }
-  g.fillStyle = T._scan; g.fillRect(0, 0, W, H);
-  const v = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.45, W / 2, H / 2, Math.max(W, H) * 0.75);
-  v.addColorStop(0, 'rgba(5,8,13,0)'); v.addColorStop(1, 'rgba(5,8,13,.7)'); g.fillStyle = v; g.fillRect(0, 0, W, H);
+  const cv = g.canvas, c = T.finishLayer(W, H, cv.width, cv.height, paint);
+  g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; g.drawImage(c, 0, 0); g.restore();
 };
 // пыль в объёме: T.dust(n) -> {tick(dt), draw(g, cam)}
 T.dust = (n = 220, ext = 1.7, top = 1.1) => {

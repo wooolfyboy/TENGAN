@@ -7,7 +7,9 @@ const E = {
   bg: '#050302', or: '#ff8c1a', or2: '#ffb347', dim: '#5a2e08', dk: '#2a1405', red: '#ff2a1f',
   grn: '#69ff6e', cy: '#5fe3ff', txt: '#ffcf99', wht: '#fff4e6',
 };
-const JP = () => T.SEAL_FONT, FT = () => T.FT, FM = () => T.FM, FC = () => T.FC;
+// шрифты фиксированные: штаб выглядит одинаково в DENKO и SUMI
+const RAJ = "Rajdhani,'Arial Narrow',sans-serif";
+const JP = () => T.SEAL_FONT, FT = () => RAJ, FM = () => T.FM, FC = () => T.FC;
 const font = (g, px, f, w = '') => { g.font = `${w}${px}px ${f}`; };
 const tx = (g, s, x, y, px, col, f = FM(), al = 'left', w = '') => { font(g, px, f, w); g.fillStyle = col; g.textAlign = al; g.textBaseline = 'alphabetic'; g.fillText(s, x, y); };
 // «жирный» японский: системный шрифт печати один, толщину добираем обводкой
@@ -42,8 +44,124 @@ const panel = (g, x, y, w, h, u, en, kj, right, hot) => {
 };
 const blink = (t, hz = 1) => (t * hz) % 1 < 0.6;
 
+// ================== стиль DOMAIN 天眼領域 («магическая битва»: тушь, манга, талисманы) ==================
+const D = {
+  bg: '#07060c', ink: '#0d0b17', blue: '#4f7bff', vio: '#9d6bff', glow: '#7fb2ff', red: '#e3212b',
+  paper: '#efe6d2', txt: '#d9d4ef', dim: '#3a3560', mute: '#8a85b0',
+};
+// ранги по силе сигнала
+const GRADES = [[-45, '特級', 'SPECIAL', D.red], [-60, '一級', 'GRADE 1', D.vio], [-75, '二級', 'GRADE 2', D.blue], [-999, '三級', 'GRADE 3', D.mute]];
+const gradeOf = rs => GRADES.findIndex(q => rs > q[0]);
+// растр-скринтон (кэш узоров на холст)
+const tones = new WeakMap();
+const tone = (g, rgba, step) => {
+  let m = tones.get(g); if (!m) { m = new Map(); tones.set(g, m); }
+  const k = rgba + step; let p = m.get(k);
+  if (!p) { const c = document.createElement('canvas'); c.width = c.height = step; const q = c.getContext('2d'); q.fillStyle = rgba; q.beginPath(); q.arc(step / 2, step / 2, step * 0.15, 0, T.TAU); q.fill(); p = g.createPattern(c, 'repeat'); m.set(k, p); }
+  return p;
+};
+// свечение-ореол точки: спрайт на цвет
+const auras = new Map();
+const aura = col => {
+  let c = auras.get(col); if (c) return c;
+  c = document.createElement('canvas'); c.width = c.height = 64; const q = c.getContext('2d');
+  const n = parseInt(col.slice(1), 16), rgb = `${n >> 16},${(n >> 8) & 255},${n & 255}`;
+  const gr = q.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, `rgba(${rgb},.75)`); gr.addColorStop(0.4, `rgba(${rgb},.3)`); gr.addColorStop(1, `rgba(${rgb},0)`);
+  q.fillStyle = gr; q.fillRect(0, 0, 64, 64); auras.set(col, c); return c;
+};
+// панель-кадр манги: косой край, двойная рамка, подпись на чёрной плашке
+const mpanel = (g, x, y, w, h, u, cap, opt = {}) => {
+  const sl = opt.slant || 0;
+  g.save();
+  g.beginPath(); g.moveTo(x, y + (sl < 0 ? -sl * h : 0)); g.lineTo(x + w, y + (sl > 0 ? sl * h : 0)); g.lineTo(x + w, y + h); g.lineTo(x, y + h); g.closePath();
+  g.fillStyle = D.ink; g.fill();
+  if (opt.tone) { g.fillStyle = tone(g, opt.tone, Math.max(6, Math.round(u * 0.42))); g.fill(); }
+  g.lineWidth = u * 0.16; g.strokeStyle = '#000'; g.stroke();
+  g.clip();
+  g.strokeStyle = D.txt; g.lineWidth = Math.max(1, u * 0.07); g.strokeRect(x + u * 0.35, y + u * 0.35 + (sl ? Math.abs(sl) * h : 0), w - u * 0.7, h - u * 0.7 - (sl ? Math.abs(sl) * h : 0));
+  g.restore();
+  if (cap) { font(g, u * 0.78, FT(), '600 '); const cw = g.measureText(cap).width + u * 1.2, cy = y + u * 0.8 + (sl ? Math.abs(sl) * h : 0);
+    g.fillStyle = '#000'; g.fillRect(x + u * 0.7, cy, cw, u * 1.2); tx(g, cap, x + u * 1.3, cy + u * 0.9, u * 0.78, D.paper, FT(), 'left', '600 '); return cy + u * 1.2; }
+  return y;
+};
+// бумажный талисман офуда
+const ofuda = (g, x, y, w, h, u, rot, kj, seal, lines, fresh) => {
+  g.save(); g.translate(x + w / 2, y + h / 2); g.rotate(rot); g.translate(-w / 2, -h / 2);
+  g.fillStyle = '#000'; g.fillRect(u * 0.35, u * 0.35, w, h);
+  g.fillStyle = D.paper; g.fillRect(0, 0, w, h); g.strokeStyle = '#111'; g.lineWidth = u * 0.1; g.strokeRect(0, 0, w, h);
+  if (fresh > 0) { g.fillStyle = `rgba(227,33,43,${0.25 * fresh})`; g.fillRect(0, 0, w, h); }
+  // вертикальные иероглифы справа
+  const kp = Math.min(u * 2.1, h / (kj.length + 0.6));
+  for (let i = 0; i < kj.length; i++) jp(g, kj[i], w - kp * 0.6, kp * (1.05 + i), kp, '#111', 'center', 0.05);
+  const tw = w - kp * 1.4;
+  let yy = u * 1.3;
+  for (const [s, px, col, f] of lines) { g.font = `${f === 't' ? '600 ' : ''}${px}px ${f === 't' ? FT() : FM()}`; const str = T.fit(g, s, tw - u * 0.6); tx(g, str, u * 0.6, yy, px, col, f === 't' ? FT() : FM(), 'left', f === 't' ? '600 ' : ''); yy += px * 1.25; }
+  // красная печать
+  const ss = Math.min(u * 2.4, w * 0.3);
+  g.save(); g.translate(u * 0.7 + ss / 2, h - u * 0.7 - ss / 2); g.rotate(-0.14);
+  g.strokeStyle = D.red; g.lineWidth = u * 0.16; g.strokeRect(-ss / 2, -ss / 2, ss, ss);
+  jp(g, seal[0], 0, -ss * 0.04, ss * 0.42, D.red, 'center', 0.02); jp(g, seal[1], 0, ss * 0.42, ss * 0.42, D.red, 'center', 0.02);
+  g.restore();
+  g.restore();
+};
+// молния-трещина 黒閃
+const crack = (g, pts, col, lw) => { g.strokeStyle = col; g.lineWidth = lw; g.lineJoin = 'miter'; g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.stroke(); };
+// глаз домена — шейдер (WebGL); вокруг — дымный ореол и тёмное ядро
+const EYE_FS = () => `precision highp float;uniform vec2 res;uniform float t;uniform float open;uniform float red;uniform float flare;uniform vec2 look;
+${T.GL.NOISE}
+float fq3(vec3 p){float v=0.,a=.5;for(int i=0;i<3;i++){v+=a*noise3(p);p=p*2.03+vec3(1.7,9.2,3.1);a*=.5;}return v*1.14;}
+float fb3(vec2 p){float v=0.,a=.5;for(int i=0;i<3;i++){v+=a*noise(p);p=p*2.03+vec2(1.7,9.2);a*=.5;}return v*1.14;}
+void main(){
+ vec2 q=(gl_FragCoord.xy/res)*2.-1.;float r=length(q);if(r>1.){gl_FragColor=vec4(0.);return;}float ang=atan(q.y,q.x);
+ vec3 col=vec3(0.);float a=0.;
+ vec2 cs=vec2(cos(ang),sin(ang));float sm=fq3(vec3(cs*1.6,r*5.-t*.25));
+ float halo=smoothstep(.6,.8,r)*smoothstep(1.,.8,r)*(.3+sm*.95);
+ vec3 hc=mix(vec3(.25,.35,1.),vec3(.62,.38,1.),sm);hc=mix(hc,vec3(1.,.13,.1),red*.55);
+ col+=hc*halo;a+=halo;
+ float core=smoothstep(.8,.74,r);
+ vec3 cc=mix(vec3(0.),vec3(.043,.031,.125),smoothstep(0.,.55,r));cc=mix(cc,vec3(.106,.08,.31),smoothstep(.45,.78,r));
+ cc+=vec3(.25,.15,.6)*pow(fb3(q*3.+t*.03),3.)*.5;
+ col=mix(col,cc,core);a=mix(a,1.,core);
+ // глаз: только радужка со зрачком, без век — висит в центре домена
+ vec2 p=q/.42;float x=p.x,y=p.y;
+ vec2 c=look*.09;float R=.255*(1.+.12*red);
+ float d=length(p-c)-R;
+ float rr=length(p);float pa=atan(p.y,p.x);
+ vec3 fq=vec3(cos(pa)*1.4,sin(pa)*1.4,rr*3.-t*(.55+flare*.8));
+ float fall=smoothstep(1.+flare*.6,.25,rr);float fl=0.,e=0.;
+ if(fall>0.){fl=fq3(fq*2.)*fq3(fq*1.3+3.);e=pow(fl*2.1,2.4)*fall*smoothstep(-.02,.08,d)*(1.4+flare*2.5);}
+ vec3 eC=mix(vec3(.18,.25,1.),vec3(.62,.36,1.),smoothstep(.2,.7,rr))+vec3(.5,.6,1.)*pow(fl,6.)*3.;
+ eC=mix(eC,vec3(1.,.2,.12),red*.6);
+ col+=eC*e;a+=e*.8;
+ float hl=exp(-max(d,0.)*14.)*.6;
+ col+=mix(vec3(.35,.45,1.),vec3(1.,.25,.2),red)*hl;a+=hl*.7;
+ if(d<.01){
+  vec3 sc=vec3(0.);
+  vec2 ip=p-c;float ir=length(ip);float ia=atan(ip.y,ip.x);
+  float fib=fb3(vec2(ia*14.,ir*7.-t*.15))*.7+fb3(vec2(ia*40.,ir*3.))*.5;
+  vec3 iC=mix(vec3(.55,.85,1.),vec3(.12,.25,.95),smoothstep(.06,R,ir));
+  iC=mix(iC,vec3(.6,.35,1.),smoothstep(.15,R,ir)*.6);
+  iC=mix(iC,vec3(1.,.25,.15),red*.75);
+  iC*=.35+pow(fib,1.6)*1.5;
+  float ring=smoothstep(.006,0.,abs(ir-.175))*(.6+.4*step(.5,fract(ia*6./3.14159+t*.2)));
+  iC+=vec3(.9,.95,1.)*ring*.9;
+  iC*=1.-smoothstep(R-.04,R,ir)*.85;
+  float pr=.075+.006*sin(t*1.3)-red*.025;
+  iC=mix(iC,vec3(0.),smoothstep(pr,pr-.008,ir));
+  iC+=mix(vec3(.4,.6,1.),vec3(1.,.3,.2),red)*smoothstep(.02,0.,abs(ir-pr-.01))*.8;
+  vec3 eye=mix(sc,iC,smoothstep(R,R-.006,ir));
+  eye+=vec3(1.)*smoothstep(.035,0.,length(ip-vec2(-.07,.07)))*.9;
+  eye+=vec3(.7,.8,1.)*smoothstep(.015,0.,length(ip-vec2(.05,-.05)))*.6;
+  float k=smoothstep(.01,-.004,d);
+  col=mix(col,eye,k);a=max(a,k);
+ }
+ gl_FragColor=vec4(col,clamp(a,0.,1.));}`;
+let EYE = null, eyeFail = false;
+const RING_JP = '天眼 領域展開 電波 受信 解析 近接 感知 赤外 網 波 音 機 星 空 ';
+const RING_EN = 'BLE · WI-FI · 433 MHz · SOUND · IR · NFC · SKY · PC · ';
+
 T.views.push({
-  id: 'hq', title: 'HQ', want: 'ble,wifi,snd,sens,wx,pc,ir,nfc',
+  id: 'hq', title: 'HQ', want: 'ble,wifi,snd,sens,wx,pc,ir,nfc', subs: ['NERV', 'DOMAIN'], sub: 0,
   mount(main) {
     this.root = T.el('div', 'view'); const st = T.el('div', 'stage'); this.root.appendChild(st); this.cv = T.canvas(st); main.appendChild(this.root);
     this.sweep = 0; this.wf = []; this.wfPk = -1; this.lvl = 0; this.alertT = -99; this.alertTxt = null;
@@ -52,12 +170,26 @@ T.views.push({
   },
   unmount() { this.cv.dispose(); this.root.remove(); },
 
+  // свои цвета без перекраски SUMI: на время кадра тема «сырая» (см. T.hookCanvas)
   frame(dt, t) {
-    const { g, w, h } = this.cv; T.hits.clear();
+    const th = T.theme; T.theme = 'raw';
+    try { this.frame2(dt, t); } finally { T.theme = th; }
+  },
+  frame2(dt, t) {
+    // полоса вкладок NERV/DOMAIN сверху: сцена сдвигается под неё (касания — тоже)
+    const off = document.body.classList.contains('hassubs') ? 44 : 0, o = this.cv;
+    o.g.fillStyle = this.sub === 1 ? D.bg : E.bg; o.g.fillRect(0, 0, o.w, off);
+    o.g.save(); o.g.translate(0, off);
+    try { this.frame3(dt, t, o.g, o.w, o.h - off); } finally { o.g.restore(); }
+    if (off) for (const q of T.hits.list) q.y += off;
+  },
+  frame3(dt, t, g, w, h) {
+    T.hits.clear();
     const now = performance.now(), u = Math.min(w / 96, h / 60), m = u * 0.8;
-    g.fillStyle = E.bg; g.fillRect(0, 0, w, h);
     this.sweep = (this.sweep + dt * 1.6) % T.TAU;
-    this.track(now, t);
+    this.track(now, t); this.wfTick(dt); this.actTick(dt, t);
+    if (this.sub === 1) { this.domain(g, w, h, u, dt, t, now); return; }
+    g.fillStyle = E.bg; g.fillRect(0, 0, w, h);
 
     // ---------- раскладка ----------
     const topH = u * 5.2, logH = u * 2.4, botH = u * 6;
@@ -380,10 +512,6 @@ T.views.push({
     const d = S.sens, last = d && d.last;
     const y0 = panel(g, x, y, w, h, u, '433.92 MHz · PULSE FLOW', '滝', d ? (d.pk || 0) + ' PKTS' : 'OFF');
     T.hits.rect(x, y, w, h, { go: 'sub' });
-    if (d && d.pk !== this.wfPk && last && last.pt) {
-      if (this.wfPk >= 0) this.wf.unshift({ pt: last.pt, cls: last.cls, p: last.p, a: 1 });
-      this.wfPk = d.pk; if (this.wf.length > 5) this.wf.pop();
-    }
     const top = y0 + u * 0.3, H = y + h - top - u * 0.3, rowH = H / 5;
     g.fillStyle = '#0d0602'; g.fillRect(x + 1, top, w - 2, H);
     this.wf.forEach((r, i) => {
@@ -400,8 +528,16 @@ T.views.push({
     if (!this.wf.length) tx(g, d ? 'WAITING FOR 433 MHz PACKETS' : 'SENSORS STREAM OFF', x + w / 2, top + H / 2 + u * 0.3, u * 0.8, E.dim, FM(), 'center');
   },
 
-  lvlPanel(g, x, y, w, h, u, dt, t) {
-    // активность эфира: новые BLE за минуту, посылки 433, громкость, пульты/карты
+  // новые посылки 433 — в ленту (общая для обоих стилей)
+  wfTick(dt) {
+    const d = S.sens, last = d && d.last;
+    if (d && d.pk !== this.wfPk && last && last.pt) {
+      if (this.wfPk >= 0) this.wf.unshift({ pt: last.pt, cls: last.cls, p: last.p, a: 1 });
+      this.wfPk = d.pk; if (this.wf.length > 5) this.wf.pop();
+    }
+  },
+  // активность эфира: новые BLE за минуту, посылки 433, громкость, пульты/карты
+  actTick(dt, t) {
     const now = performance.now();
     let nb = 0; for (const e of S.dev.values()) if (!e.first && now - e.born < 60000) nb++;
     const pkRate = S.sens ? T.clamp((now - S.sensPkT) < 5000 ? 0.6 : 0.1) : 0;
@@ -409,6 +545,8 @@ T.views.push({
     const probe = T.clamp(1 - (t - Math.max(this.flashIr, this.flashNfc)) / 10);
     const target = T.clamp(0.1 + nb * 0.1 + pkRate * 0.15 + snd * 0.2 + probe * 0.15 + T.clamp(S.dev.size / 80) * 0.2);
     this.lvl += (target - this.lvl) * T.ease(dt, 1.5);
+  },
+  lvlPanel(g, x, y, w, h, u, dt, t) {
     const v = this.lvl, hot = v > 0.62, st = v > 0.8 ? ['ALERT', '警報', E.red] : hot ? ['ELEVATED', '注意', E.red] : v > 0.35 ? ['ACTIVE', '活発', E.or2] : ['QUIET', '平穏', E.grn];
     const y0 = panel(g, x, y, w, h, u, 'ACTIVITY LEVEL · 活動度', '', st[0], hot);
     jp(g, st[1], x + w - u * 0.6, y + h - u * 0.6, u * 1.6, st[2], 'right', 0.04);
@@ -440,6 +578,275 @@ T.views.push({
       if (lx > x + w) break;
     }
     if (blink(t)) tx(g, '_', lx, my, u * 0.78, E.or);
+    g.restore();
+  },
+  // ================= DOMAIN =================
+  domain(g, w, h, u, dt, t, now) {
+    if (w < 4 || h < 4) return;
+    g.fillStyle = D.bg; g.fillRect(0, 0, w, h);
+    const portrait = h > w * 1.05, m = u * 0.9;
+    const topH = u * 6.4, barH = u * 4.2, logH = u * 3.6;
+    const yBar = h - m - logH - u * 0.6 - barH, yLog = yBar + barH + u * 0.6;
+    let sw = Math.min(u * 22, w * 0.23), cx, cy, R, L, Rc;
+    if (!portrait) {
+      cx = w / 2; cy = topH + (yBar - topH) / 2 + u * 0.4; R = Math.min((w - 2 * sw - 4 * m) * 0.47, (yBar - topH) * 0.48);
+      L = { x: m, y: topH + u * 1.2, w: sw, h: yBar - m - topH - u * 1.2 }; Rc = { x: w - m - sw, y: L.y, w: sw, h: L.h };
+    } else {
+      const dh = (yBar - topH) * 0.52; cx = w / 2; cy = topH + dh / 2 + u; R = Math.min(w * 0.44, dh * 0.47);
+      sw = (w - 3 * m) / 2; L = { x: m, y: topH + dh + u * 1.5, w: sw, h: yBar - m - (topH + dh + u * 1.5) }; Rc = { x: 2 * m + sw, y: L.y, w: sw, h: L.h };
+    }
+    this.speed(g, w, h, cx, cy, R, u);
+    this.domHead(g, w, topH, u, t);
+    this.domCore(g, w, h, u, dt, t, now, cx, cy, R);
+    // кистевые вертикальные надписи по бокам домена
+    if (!portrait) {
+      for (const [s, x, col, px] of [['領域展開', cx - R * 1.13, D.red, u * 3.2], ['天眼無窮', cx + R * 1.1, D.glow, u * 2]]) {
+        const y = x < cx ? cy - R * 0.85 : cy + R * 0.95 - px * s.length;
+        for (let i = 0; i < s.length; i++) jp(g, s[i], x, y + px * (i + 1), px, col, 'center', 0.07);
+      }
+    }
+    // левая колонка
+    this.domGrades(g, L.x, L.y, L.w, L.h * 0.52, u, t, now);
+    this.domSens(g, L.x, L.y + L.h * 0.52 + m, L.w, L.h * 0.48 - m, u, dt, t);
+    // правая колонка
+    this.domRight(g, Rc.x, Rc.y, Rc.w, Rc.h, u, t, now);
+    this.domBar(g, m, yBar, w - 2 * m, barH, u, t);
+    this.domLog(g, m, yLog, w - 2 * m, logH, u);
+    this.domAlert(g, w, u, t, cx, cy, R, topH);
+  },
+  // скорость-линии от домена (кэш на размер)
+  speed(g, w, h, cx, cy, R, u) {
+    const k = [w, h, cx | 0, cy | 0, R | 0].join();
+    if (!this.spd || this.spd.k !== k) {
+      const c = document.createElement('canvas'), d = Math.min(2, this.cv.dpr || 1); c.width = Math.round(w * d); c.height = Math.round(h * d);
+      const q = c.getContext('2d'); q.scale(d, d); let seed = 11; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+      for (let i = 0; i < 240; i++) {
+        const a = rnd() * T.TAU, r1 = R * (1.05 + rnd() * 0.3), r2 = r1 + R * (0.4 + rnd() * 1.6);
+        q.strokeStyle = rnd() > 0.85 ? 'rgba(157,107,255,.55)' : 'rgba(42,37,72,.9)'; q.lineWidth = 0.5 + rnd() * 2.5;
+        q.beginPath(); q.moveTo(cx + r1 * Math.cos(a), cy + r1 * Math.sin(a)); q.lineTo(cx + r2 * Math.cos(a), cy + r2 * Math.sin(a)); q.stroke();
+      }
+      this.spd = { k, c };
+    }
+    g.drawImage(this.spd.c, 0, 0, w, h);
+  },
+  domHead(g, w, H, u, t) {
+    const pw = Math.min(w * 0.6, u * 62);
+    g.fillStyle = '#000'; g.beginPath(); g.moveTo(0, 0); g.lineTo(pw, 0); g.lineTo(pw - H * 0.6, H); g.lineTo(0, H); g.closePath(); g.fill();
+    const px = H * 0.78;
+    jp(g, '天眼', u * 1.2, H * 0.84, px, D.paper, 'left', 0.08);
+    font(g, px, JP()); const w1 = g.measureText('天眼').width;
+    jp(g, '領域', u * 1.2 + w1, H * 0.84, px, D.red, 'left', 0.08);
+    const x2 = u * 2.6 + w1 * 2;
+    if (x2 + u * 14 < pw) {
+      tx(g, 'T E N G A N', x2, H * 0.38, u * 1.5, D.paper, FT(), 'left', '600 ');
+      tx(g, 'DOMAIN · 領域展開', x2, H * 0.62, u * 0.95, D.glow, FT(), 'left', '600 ');
+      tx(g, 'ALL SIGNALS WITHIN REACH ARE SEEN', x2, H * 0.82, u * 0.6, D.glow);
+    }
+    const d = new Date(), s = S.st || {};
+    tx(g, pad2(d.getHours()) + ':' + pad2(d.getMinutes()), w - u * 1.2, H * 0.68, H * 0.62, D.paper, FT(), 'right', '600 ');
+    const live = T.Stream.mode === 'live';
+    tx(g, (live ? '受信中' : '断線') + ' · ' + (s.bat >= 0 ? 'BAT ' + s.bat + '%' : 'BAT —') + ' · 月齢 ' + moonAge().toFixed(0), w - u * 1.2, H * 0.92, u * 0.72, live ? D.glow : D.red, FC(), 'right');
+  },
+  // центр: глаз-шейдер + кольца-печати + присутствия
+  domCore(g, w, h, u, dt, t, now, cx, cy, R) {
+    const devs = [...S.dev.values()].filter(e => e.h > 0.05 && e.rs != null);
+    const pos = (id, rs) => { const a = (T.hash(id) % 3600) / 3600 * T.TAU, rr = R * (0.36 + 0.5 * (1 - T.pct(rs))); return [a, cx + rr * Math.cos(a), cy + rr * Math.sin(a)]; };
+    // куда смотрит зрачок: на сильнейший сигнал
+    let best = null; for (const e of devs) if (e.alive && (!best || e.rs > best.rs)) best = e;
+    const la = best ? (T.hash(best.id) % 3600) / 3600 * T.TAU : t * 0.2;
+    this.look = this.look || [0, 0];
+    const lk = T.ease(dt, 0.8); this.look[0] += (Math.cos(la) * 0.9 - this.look[0]) * lk; this.look[1] += (-Math.sin(la) * 0.6 - this.look[1]) * lk;
+    const special = devs.some(e => e.alive && e.rs > -45), alertA = T.clamp(1 - (t - this.alertT) / 6);
+    const redT = Math.max(alertA, special ? 0.35 : 0);
+    this.redV = (this.redV || 0) + (redT - (this.redV || 0)) * T.ease(dt, 0.5);
+    const fl = T.clamp(1 - (t - Math.max(this.flashIr, this.flashNfc)) / 1.6);
+    const S0 = R * 2.3;
+    if (T.GL && T.GL.ok && !eyeFail) {
+      if (!EYE) { EYE = T.GL.prog(EYE_FS()); if (!EYE) eyeFail = true; }
+      if (EYE) {
+        // глаз считается через кадр (30 раз в секунду — глазу незаметно), между ними рисуется копия
+        this.eyeN = (this.eyeN || 0) + 1;
+        if (!this.eyeC) { this.eyeC = document.createElement('canvas'); this.eyeG = this.eyeC.getContext('2d'); }
+        if ((this.eyeN & 1) || this.eyeS !== S0) {
+          T.GL.begin(S0, S0, 0.6);
+          T.GL.quad(EYE, { t, open: 0.3 + 0.1 * this.redV, red: this.redV, flare: fl, look: this.look });
+          if (this.eyeC.width !== T.GL.w || this.eyeC.height !== T.GL.h) { this.eyeC.width = T.GL.w; this.eyeC.height = T.GL.h; }
+          this.eyeG.globalCompositeOperation = 'copy'; this.eyeG.drawImage(T.GL.cv, 0, 0); this.eyeS = S0;
+        }
+        g.drawImage(this.eyeC, cx - S0 / 2, cy - S0 / 2, S0, S0);
+      }
+    }
+    if (!T.GL || !T.GL.ok || eyeFail) {                    // запасной путь: ядро градиентом, глаз эллипсами
+      const gr = g.createRadialGradient(cx, cy, 0, cx, cy, R * 0.95); gr.addColorStop(0, '#000'); gr.addColorStop(0.6, '#0b0820'); gr.addColorStop(0.85, '#1b1450'); gr.addColorStop(1, 'rgba(79,123,255,0)');
+      g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, R * 0.95, 0, T.TAU); g.fill();
+      g.fillStyle = '#000'; g.strokeStyle = D.paper; g.lineWidth = u * 0.2; g.beginPath(); g.ellipse(cx, cy, R * 0.34, R * 0.14, 0, 0, T.TAU); g.fill(); g.stroke();
+      g.fillStyle = this.redV > 0.5 ? D.red : D.blue; g.beginPath(); g.arc(cx + this.look[0] * R * 0.04, cy - this.look[1] * R * 0.04, R * 0.1, 0, T.TAU); g.fill();
+      g.fillStyle = '#000'; g.beginPath(); g.arc(cx + this.look[0] * R * 0.04, cy - this.look[1] * R * 0.04, R * 0.04, 0, T.TAU); g.fill();
+    }
+    // кольцо-печать с иероглифами (медленно вращается) и внутреннее кольцо латиницей навстречу
+    g.strokeStyle = D.txt; g.lineWidth = u * 0.12; g.beginPath(); g.arc(cx, cy, R * 1.0, 0, T.TAU); g.stroke();
+    g.lineWidth = u * 0.06; g.beginPath(); g.arc(cx, cy, R * 0.86, 0, T.TAU); g.stroke();
+    const ringTxt = (txt, rad, px, col, rot, f) => {
+      g.save(); g.translate(cx, cy); g.rotate(rot);
+      font(g, px, f); g.fillStyle = col; g.textAlign = 'center'; g.textBaseline = 'middle';
+      const chars = [...txt], step = px * 1.05 / rad, n = Math.floor(T.TAU / step), k = T.TAU / n;
+      for (let i = 0; i < n; i++) { const ch = chars[i % chars.length]; if (ch === ' ') continue; g.save(); g.rotate(i * k); g.translate(0, -rad); g.fillText(ch, 0, 0); g.restore(); }
+      g.restore();
+    };
+    ringTxt(RING_JP, R * 0.93, R * 0.075, D.txt, t * 0.06, JP());
+    ringTxt(RING_EN, R * 0.8, R * 0.032, D.blue, -t * 0.09, RAJ);
+    // круги рангов
+    g.setLineDash([u * 0.1, u * 0.5]); g.lineWidth = u * 0.12;
+    [[-45, D.red], [-60, D.vio], [-75, D.blue]].forEach(([db, col]) => { g.strokeStyle = col; g.globalAlpha = 0.55; g.beginPath(); g.arc(cx, cy, R * (0.36 + 0.5 * (1 - T.pct(db))), 0, T.TAU); g.stroke(); });
+    g.setLineDash([]); g.globalAlpha = 1;
+    // Wi-Fi: чёрные ромбы-печати на внешнем кольце (сильнейшие 10)
+    const aps = [...S.aps.values()].filter(a => a.alive).sort((a, b) => b.rs - a.rs).slice(0, 10);
+    for (const a of aps) { const q = (T.hash('ap' + a.k) % 3600) / 3600 * T.TAU, x = cx + R * Math.cos(q), y = cy + R * Math.sin(q), s = u * (0.35 + 0.4 * T.pct(a.rs));
+      g.save(); g.translate(x, y); g.rotate(Math.PI / 4); g.fillStyle = '#000'; g.fillRect(-s, -s, 2 * s, 2 * s); g.strokeStyle = D.red; g.lineWidth = u * 0.12; g.strokeRect(-s, -s, 2 * s, 2 * s); g.restore(); }
+    // присутствия: огоньки с ореолом, цвет — ранг
+    const labels = [];
+    for (const e of devs) {
+      const [, x, y] = pos(e.id, e.rs), gi = gradeOf(e.rs), col = GRADES[gi][3], lv = 3 - gi, sz = u * (1.4 + lv * 0.7);
+      g.globalAlpha = T.clamp(e.h); g.drawImage(aura(col), x - sz, y - sz, sz * 2, sz * 2);
+      g.fillStyle = '#fff'; g.beginPath(); g.arc(x, y, u * (0.18 + lv * 0.08), 0, T.TAU); g.fill(); g.globalAlpha = 1;
+      if (gi === 0) { const j = (Math.sin(t * 7 + e.id) > 0.3) ? 1 : 0.6; crack(g, [[x - u * 2.2, y + u * 1.6], [x - u * 0.6, y + u * 0.3], [x - u * 1.2, y - u * 0.2], [x + u * 0.9, y - u * 1.6], [x + u * 0.4, y - u * 2], [x + u * 2.4, y - u * 3.2]], `rgba(227,33,43,${j})`, u * 0.22); }
+      if (e.label || e.name || gi === 0) labels.push([x, y, e.label || e.name || e.type || 'presence', gi === 0 ? D.red : D.paper]);
+      T.hits.circle(x, y, u * 1.4, { go: 'ble' });
+    }
+    const boxes = [];
+    for (const [x, y, s, col] of labels.slice(0, 16)) {
+      g.font = `500 ${u * 0.72}px ${FC()}`; const str = T.fit(g, s, u * 9), bw = g.measureText(str).width, b = [x + u * 1.3, y - u * 2.2, bw, u * 1];
+      if (boxes.some(q => b[0] < q[0] + q[2] && q[0] < b[0] + b[2] && b[1] < q[1] + q[3] && q[1] < b[1] + b[3])) continue;
+      boxes.push(b); g.strokeStyle = D.txt; g.lineWidth = 1; g.beginPath(); g.moveTo(x, y); g.lineTo(x + u * 1.1, y - u * 1.4); g.stroke();
+      tx(g, str, b[0], y - u * 1.45, u * 0.72, col, FC(), 'left', '500 ');
+    }
+  },
+  domGrades(g, x, y, w, h, u, t, now) {
+    const y0 = mpanel(g, x, y, w, h, u, '呪力 · SIGNAL GRADES', { slant: 0.04, tone: 'rgba(157,107,255,.22)' });
+    T.hits.rect(x, y, w, h, { go: 'ble' });
+    const devs = [...S.dev.values()].filter(e => e.alive && e.rs != null), cnt = [0, 0, 0, 0];
+    for (const e of devs) cnt[gradeOf(e.rs)]++;
+    const fresh = devs.filter(e => !e.first && now - e.born < 300000).length;
+    const n = S.ble ? S.ble.n : devs.length, big = Math.min(u * 4.8, h * 0.28);
+    jp(g, S.ble ? String(n) : '—', x + u * 1.2, y0 + big * 1.05, big, D.paper, 'left', 0.05);
+    font(g, big, JP()); const nx = x + u * 2 + g.measureText(S.ble ? String(n) : '—').width;
+    tx(g, 'BLE PRESENCES', nx, y0 + big * 0.6, u * 0.62, D.glow);
+    tx(g, '+' + fresh + ' NEW', nx, y0 + big * 0.95, u * 0.62, fresh ? D.red : D.dim);
+    let ry = y0 + big * 1.05 + u * 0.6; const rh = Math.min(u * 2, (y + h - ry - u * 0.6) / 4);
+    GRADES.forEach(([db, kj, en, col], i) => {
+      if (ry + rh > y + h - u * 0.3) return;
+      g.strokeStyle = D.dim; g.setLineDash([u * 0.2, u * 0.2]); g.lineWidth = 1; g.beginPath(); g.moveTo(x + u * 1.2, ry + rh); g.lineTo(x + w - u * 1.2, ry + rh); g.stroke(); g.setLineDash([]);
+      jp(g, kj, x + u * 1.2, ry + rh * 0.82, rh * 0.75, col, 'left', 0.06);
+      tx(g, en + (i === 0 ? ' · > −45' : i === 1 ? ' · −45…−60' : i === 2 ? ' · −60…−75' : ' · weaker'), x + u * 1.6 + rh * 1.6, ry + rh * 0.72, u * 0.62, D.txt);
+      tx(g, String(cnt[i]), x + w - u * 1.2, ry + rh * 0.78, rh * 0.62, col, FT(), 'right', '600 ');
+      ry += rh;
+    });
+  },
+  domSens(g, x, y, w, h, u, dt, t) {
+    const y0 = mpanel(g, x, y, w, h, u, '感知 · 433 MHz SENSORS');
+    T.hits.rect(x, y, w, h, { go: 'sub' });
+    const d = S.sens, list = (d && d.sensors) || [];
+    const wfH = Math.min(u * 4, h * 0.3), yw = y + h - u * 0.8 - wfH;
+    let ry = y0 + u * 1.6;
+    if (!list.length) tx(g, d ? 'LISTENING · NO SENSORS YET' : 'NO DATA', x + u * 1.2, ry, u * 0.7, D.dim);
+    for (const s of list) {
+      if (ry > yw - u * 0.3) break;
+      const rem = s.kind === 'remote', id = rem ? 'REMOTE ⌁ #' + String(s.id).split('-').pop().toUpperCase() : (s.p + ' · ch' + s.ch).toUpperCase();
+      g.font = `${u * 0.68}px ${FM()}`; tx(g, T.fit(g, id, w * 0.45), x + u * 1.2, ry, u * 0.68, rem ? D.glow : D.txt);
+      if (!rem && s.t != null) tx(g, (s.t > 0 ? '+' : '') + s.t.toFixed(1) + '°' + (s.h != null ? ' · ' + s.h + '%' : ''), x + w - u * 1.2, ry, u * 1.05, D.paper, FT(), 'right', '600 ');
+      else tx(g, s.ago < 3 ? 'NOW' : T.ago(s.ago) + ' ago', x + w - u * 1.2, ry, u * 0.68, s.ago < 3 ? D.red : D.glow, FM(), 'right');
+      g.strokeStyle = D.dim; g.setLineDash([u * 0.2, u * 0.2]); g.beginPath(); g.moveTo(x + u * 1.2, ry + u * 0.5); g.lineTo(x + w - u * 1.2, ry + u * 0.5); g.stroke(); g.setLineDash([]);
+      ry += u * 1.45;
+    }
+    // поток посылок — фиолетовым
+    const ww = w - u * 2.4, rowH = wfH / 5;
+    g.fillStyle = '#05040a'; g.fillRect(x + u * 1.2, yw, ww, wfH);
+    this.wf.forEach((r, i) => {
+      if (i >= 5) return; let tot = 0; for (const v of r.pt) tot += v;
+      const col = r.cls === 'sensor' ? D.vio : r.cls === 'remote' ? D.glow : r.cls === 'noise' ? D.dim : D.red;
+      let xx = x + u * 1.2; g.fillStyle = col; g.globalAlpha = Math.max(0.3, 1 - i * 0.18);
+      r.pt.forEach((v, k) => { const nw = ww * v / tot; if (k % 2 === 0) g.fillRect(xx, yw + i * rowH + rowH * 0.2, Math.max(1, nw), rowH * 0.6); xx += nw; });
+      g.globalAlpha = 1;
+    });
+  },
+  domRight(g, x, y, w, h, u, t, now) {
+    // 外気: крупная кистевая температура на красном растре
+    const wxH = h * 0.36, d = S.wx || {}, has = d.temp != null;
+    const y0 = mpanel(g, x, y, w, wxH, u, '外気 · OUTSIDE', { slant: -0.04, tone: 'rgba(227,33,43,.35)' });
+    T.hits.rect(x, y, w, wxH, { go: 'gal' });
+    const big = has ? (d.temp > 0 ? '+' : '') + Number(d.temp).toFixed(1) + '°' : '—';
+    const bp = Math.min(u * 5.6, wxH * 0.42, w / (big.length * 0.62));
+    jp(g, big, x + u * 1.2, y0 + bp * 1.05, bp, D.paper, 'left', 0.07);
+    let ry = y0 + bp * 1.05 + u * 1.2;
+    for (const [k, v, c] of [['HUMIDITY', d.hum != null ? d.hum + '%' : '—', D.txt], ['SOURCE', has ? '433 · ' + (d.tsrc || '?') : 'NO OUTDOOR SENSOR', has ? D.txt : D.dim]]) {
+      if (ry > y + wxH - u * 0.5) break; tx(g, k, x + u * 1.2, ry, u * 0.65, D.txt); tx(g, v, x + w - u * 1.2, ry, u * 0.65, c, FC(), 'right'); ry += u * 1.2;
+    }
+    // талисманы: последний пульт и последняя карта
+    const oy = y + wxH + u * 1.2, oh = h * 0.42, ow = (w - u * 1.2) / 2;
+    const I = S.ir && S.ir.last, N = S.nfc && S.nfc.last;
+    const fI = T.clamp(1 - (t - this.flashIr) / 1.2), fN = T.clamp(1 - (t - this.flashNfc) / 1.2);
+    const ir = I ? [['IR · ' + T.ago((now - S.ir.t) / 1000) + ' AGO', u * 0.62, '#333', 'm'], [(I.brand || I.p).toUpperCase(), u * 1.15, '#111', 't'], [T.hexs(I.cmd), u * 1.3, D.red, 't'], [I.p, u * 0.6, '#333', 'm'], [T.hexs(I.addr, 4), u * 0.6, '#333', 'm']]
+      : [['IR · LISTENING', u * 0.62, '#333', 'm'], ['POINT A', u * 0.9, '#111', 't'], ['REMOTE', u * 0.9, '#111', 't']];
+    const nf = N ? [['NFC · ' + T.ago((now - S.nfc.t) / 1000) + ' AGO', u * 0.62, '#333', 'm'], [String(N.fam || 'CARD').toUpperCase(), u * 1.1, '#111', 't'], [N.hint || '', u * 0.55, D.red, 'm'], ['UID ' + (N.uid || '—'), u * 0.6, '#333', 'm'], [N.sak ? 'SAK ' + N.sak : '', u * 0.6, '#333', 'm']]
+      : [['NFC · ' + (S.nfc && S.nfc.err ? 'NO READER' : 'WAITING'), u * 0.62, '#333', 'm'], ['TOUCH', u * 0.9, '#111', 't'], ['A CARD', u * 0.9, '#111', 't']];
+    ofuda(g, x, oy, ow, oh, u, -0.05 - 0.04 * fI, '赤外封', ['天', '眼'], ir, fI);
+    ofuda(g, x + ow + u * 1.2, oy + u * 0.6, ow, oh, u, 0.06 + 0.04 * fN, '近接札', ['解', '析'], nf, fN);
+    T.hits.rect(x, oy, w, oh, { go: 'probe' });
+    // звук
+    const ay = oy + oh + u * 1.6, ah = y + h - ay;
+    if (ah > u * 3) {
+      const sn = S.snd && S.snd.ok;
+      const y1 = mpanel(g, x, ay, w, ah, u, '音 · AUDIO ' + (sn ? Math.round(S.level) + ' dB' : 'OFF'));
+      T.hits.rect(x, ay, w, ah, { go: 'snd' });
+      const mid = (y1 + ay + ah) / 2, amp = (ay + ah - y1) * 0.38;
+      for (const [lw, col] of [[u * 0.5, 'rgba(127,178,255,.3)'], [u * 0.12, D.paper]]) {
+        g.strokeStyle = col; g.lineWidth = lw; g.beginPath();
+        for (let i = 0; i < 64; i++) { const xx = x + u * 1.2 + (w - u * 2.4) * i / 63, yy = mid - (sn ? S.wave[i] : 0) * amp; i ? g.lineTo(xx, yy) : g.moveTo(xx, yy); }
+        g.stroke();
+      }
+    }
+  },
+  domBar(g, x, y, w, h, u, t) {
+    g.fillStyle = '#000'; g.beginPath(); g.moveTo(x, y); g.lineTo(x + w, y + h * 0.14); g.lineTo(x + w, y + h); g.lineTo(x, y + h); g.closePath(); g.fill();
+    jp(g, '呪力', x + u * 1, y + h * 0.82, h * 0.62, D.paper, 'left', 0.07);
+    font(g, h * 0.62, JP()); const x1 = x + u * 2 + g.measureText('呪力').width;
+    const v = this.lvl, st = v > 0.8 ? ['ALERT · 警報', D.red] : v > 0.62 ? ['ELEVATED · 注意', D.red] : v > 0.35 ? ['ACTIVE · 活発', D.vio] : ['QUIET · 平穏', D.glow];
+    tx(g, 'AIR ACTIVITY', x1, y + h * 0.42, u * 0.65, D.glow);
+    tx(g, st[0], x1, y + h * 0.78, u * 1.25, st[1], FT(), 'left', '600 ');
+    const bx = x1 + u * 13, bw = x + w - u * 1 - bx, n = 40, gap = u * 0.12, sw = (bw - gap * (n - 1)) / n, lit = Math.round(v * n), warm = Math.round(0.62 * n);
+    for (let i = 0; i < n; i++) {
+      const on = i < lit, hot = on && i >= warm, bh = (on ? 1 : 0.6) * h * 0.56, xx = bx + i * (sw + gap), yy = y + h * 0.84 - bh;
+      g.fillStyle = hot ? (blink(t, 1.5) ? D.red : '#7a0f14') : on ? D.blue : '#1a1730';
+      g.beginPath(); g.moveTo(xx + bh * 0.36, yy); g.lineTo(xx + sw + bh * 0.36, yy); g.lineTo(xx + sw, yy + bh); g.lineTo(xx, yy + bh); g.closePath(); g.fill();
+    }
+  },
+  domLog(g, x, y, w, h, u) {
+    g.fillStyle = D.red; g.fillRect(x, y, h, h);
+    jp(g, '記', x + h / 2, y + h * 0.78, h * 0.66, '#000', 'center', 0.06);
+    const tagJ = { BLE: ['近接', D.red], IR: ['赤外', D.glow], NFC: ['近接', D.paper], '433': ['感知', D.vio], SUB: ['電波', D.red], PC: ['機', D.txt], PWR: ['電源', D.red] };
+    const cw = (w - h - u * 2) / 2, rows = Math.max(1, Math.floor(h / (u * 1.15)));
+    if (!S.events.length) tx(g, 'QUIET SO FAR', x + h + u, y + u * 1.2, u * 0.8, D.dim);
+    S.events.slice(0, rows * 2).forEach((ev, i) => {
+      const col = i < rows ? 0 : 1, row = i % rows, xx = x + h + u + col * (cw + u), yy = y + u * 1.0 + row * u * 1.15;
+      const [kj, c] = tagJ[ev.tag] || [ev.tag, D.txt], ts = hms(new Date(ev.t)) + ' ';
+      font(g, u * 0.78, FC(), '500 '); tx(g, ts, xx, yy, u * 0.78, ev.alert ? D.red : c, FC(), 'left', '500 ');
+      const x2 = xx + g.measureText(ts).width; jp(g, kj, x2, yy, u * 0.78, ev.alert ? D.red : c, 'left', 0.02);
+      font(g, u * 0.78, JP()); const x3 = x2 + g.measureText(kj).width + u * 0.5;
+      g.font = `500 ${u * 0.78}px ${FC()}`; tx(g, T.fit(g, String(ev.text), cw - (x3 - xx)), x3, yy, u * 0.78, D.txt, FC(), 'left', '500 ');
+    });
+  },
+  // 接近: чёрная косая плашка с красной трещиной (новое близкое устройство / трекер)
+  domAlert(g, w, u, t, cx, cy, R, topH) {
+    const age = t - this.alertT; if (age > 20 || !this.alertTxt) return;
+    const bw = Math.min(u * 24, w * 0.3), bh = u * 7.2, bx = Math.min(w - bw - u, cx + R * 0.45), by = topH + u * 1.2;
+    g.save(); g.translate(bx + bw / 2, by + bh / 2); g.rotate(-0.07); g.translate(-bw / 2, -bh / 2);
+    g.fillStyle = '#000'; g.beginPath(); g.moveTo(0, bh * 0.12); g.lineTo(bw, 0); g.lineTo(bw * 0.97, bh); g.lineTo(bw * 0.03, bh * 0.92); g.closePath(); g.fill();
+    if (age > 4 || blink(t, 2)) jp(g, '接近', u * 1.2, bh * 0.62, bh * 0.5, D.red, 'left', 0.08);
+    tx(g, this.alertTxt.tr ? 'TRACKER NEARBY' : 'SPECIAL GRADE', bw * 0.48, bh * 0.3, u * 1, D.paper, FT(), 'left', '600 ');
+    tx(g, 'PRESENCE DETECTED', bw * 0.48, bh * 0.5, u * 0.9, D.red, FT(), 'left', '600 ');
+    g.font = `500 ${u * 0.7}px ${FC()}`;
+    tx(g, T.fit(g, String(this.alertTxt.n), bw * 0.45) + ' · ' + this.alertTxt.r + ' dBm · ' + Math.round(age) + 's', u * 1.2, bh * 0.85, u * 0.7, D.paper, FC(), 'left', '500 ');
+    crack(g, [[bw * 0.5, bh * 0.92], [bw * 0.62, bh * 0.7], [bw * 0.6, bh * 0.8], [bw * 0.78, bh * 0.6], [bw * 0.76, bh * 0.68], [bw * 0.98, bh * 0.5]], D.red, u * 0.25);
     g.restore();
   },
 });

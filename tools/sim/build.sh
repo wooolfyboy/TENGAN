@@ -21,11 +21,11 @@ DEFS="-DUSER_SETUP_LOADED=1 -DST7789_DRIVER=1 -DTFT_WIDTH=170 -DTFT_HEIGHT=320 -
  -DLOAD_FONT6=1 -DLOAD_FONT7=1 -DLOAD_FONT8=1 -DLOAD_GFXFF=1 -DSPI_FREQUENCY=40000000 -DDISABLE_ALL_LIBRARY_WARNINGS"
 SRC=(
   "$SIM/sim.cpp" "$WORK/tftlib/TFT_eSPI.cpp"
-  "$ROOT/src/core/display.cpp" "$ROOT/src/core/theme.cpp" "$ROOT/src/core/menu.cpp" "$ROOT/src/core/settings.cpp"
+  "$ROOT/src/core/display.cpp" "$ROOT/src/core/perf.cpp" "$ROOT/src/core/theme.cpp" "$ROOT/src/core/menu.cpp" "$ROOT/src/core/settings.cpp"
   "$ROOT/src/core/battery.cpp" "$ROOT/src/core/ui.cpp" "$ROOT/src/core/leds.cpp" "$ROOT/src/core/boot.cpp" "$ROOT/src/core/power_screens.cpp"
   "$ROOT/src/ble/ble_screens.cpp" "$ROOT/src/ble/ble_city.cpp" "$ROOT/src/ble/vendors.cpp"
   "$ROOT/src/wifi/wifi_model.cpp" "$ROOT/src/wifi/wifi_screens.cpp"
-  "$ROOT/src/subghz/subghz_screens.cpp" "$ROOT/src/subghz/ook.cpp" "$ROOT/src/subghz/sensors.cpp" "$ROOT/src/audio/audio_screens.cpp" "$ROOT/src/gallery/gallery.cpp" "$ROOT/src/gallery/gallery_sky.cpp" "$ROOT/src/gallery/weather.cpp" "$ROOT/src/gallery/astro.cpp" "$ROOT/src/gallery/sat.cpp" "$ROOT/src/web/web_screen.cpp" "$ROOT/src/pc/pc.cpp" "$ROOT/src/pc/pc_screens.cpp" "$ROOT/src/pc/pc_city.cpp"
+  "$ROOT/src/subghz/subghz_screens.cpp" "$ROOT/src/subghz/ook.cpp" "$ROOT/src/subghz/sensors.cpp" "$ROOT/src/audio/audio_screens.cpp" "$ROOT/src/gallery/gallery.cpp" "$ROOT/src/gallery/gallery_sky.cpp" "$ROOT/src/gallery/weather.cpp" "$ROOT/src/gallery/astro.cpp" "$ROOT/src/gallery/sat.cpp" "$ROOT/src/web/web_screen.cpp" "$ROOT/src/pc/pc.cpp" "$ROOT/src/link/serout.cpp" "$ROOT/src/pc/pc_screens.cpp" "$ROOT/src/pc/pc_city.cpp"
   "$ROOT/src/probe/ir_decode.cpp" "$ROOT/src/probe/ir_screens.cpp" "$ROOT/src/probe/nfc_model.cpp" "$ROOT/src/probe/nfc_screens.cpp"
 )
 g++ -O1 -std=gnu++17 -w -I"$SIM/stubs" -I"$WORK/tftlib" -I"$ROOT/src" $DEFS "${SRC[@]}" -o "$WORK/sim"

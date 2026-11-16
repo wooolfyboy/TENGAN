@@ -62,6 +62,10 @@ void crumb(const char*) {}
 bool crumbWasCrash() { return false; }
 const char* crumbLastStep() { return ""; }
 const char* crumbLastReason() { return ""; }
+// приложение для компьютера по USB (в прошивке — web/web.cpp): в симуляторе только запоминаем строки
+std::string g_simLinkLines;
+void webLinkLine(char* s) { g_simLinkLines += s; g_simLinkLines += '\n'; }
+void webLinkPump() {}
 void bleRadioOff() {}
 void bleRadioOn() {}
 bool bleRadioActive() { return true; }

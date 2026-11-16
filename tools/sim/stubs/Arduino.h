@@ -90,7 +90,9 @@ struct SimSerial {
   int available() { return (int)(buf.size() - pos); }
   int read() { return pos < buf.size() ? (unsigned char)buf[pos++] : -1; }
   void feed(const char* s) { buf += s; }
-  int availableForWrite() { return 64; }
+  std::string out;                                   // что палка «написала» компьютеру
+  int availableForWrite() { return 4096; }
+  size_t write(const uint8_t* p, size_t n) { out.append((const char*)p, n); return n; }
   void print(const char*) {}
   void print(char) {}
 };
