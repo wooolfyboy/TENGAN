@@ -368,7 +368,7 @@ class JsApi:
 
 LAUNCHER = """<!doctype html><html><head><meta charset="utf-8"><title>TENGAN</title>
 <style>
-:root{--bg:#05080d;--acc:#3ee6ff;--hot:#ebfaff;--dim:#5a7080;--line:#203240}
+:root{--bg:#000;--acc:#fff;--hot:#fff;--dim:#8a8a8a;--line:#2e2e2e}  /* строгий чёрно-белый старт: тема палки ещё не известна */
 html,body{margin:0;height:100%;background:var(--bg);color:var(--hot);font:16px/1.4 'Segoe UI',system-ui,sans-serif}
 .w{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px}
 h1{margin:0;font-weight:600;letter-spacing:.3em;font-size:40px}h1 b{color:var(--acc)}
@@ -377,7 +377,7 @@ h1{margin:0;font-weight:600;letter-spacing:.3em;font-size:40px}h1 b{color:var(--
 button{background:rgba(14,42,52,.4);color:var(--hot);border:1px solid var(--line);padding:22px 30px;min-width:190px;
  font:600 18px 'Segoe UI',sans-serif;letter-spacing:.12em;cursor:pointer;text-align:left}
 button small{display:block;font-weight:400;font-size:12px;color:var(--dim);letter-spacing:.05em;margin-top:6px}
-button:hover,button.on{border-color:var(--acc);box-shadow:0 0 18px rgba(62,230,255,.25)}
+button:hover,button.on{border-color:var(--acc);box-shadow:0 0 18px rgba(255,255,255,.18)}
 #st{min-height:22px;color:var(--acc);letter-spacing:.08em}
 .bar{width:420px;height:3px;background:var(--line)}.bar i{display:block;height:100%;width:0;background:var(--acc)}
 .hint{color:var(--dim);font-size:12px}
@@ -458,7 +458,7 @@ class App:
             self.busy = False
 
     def full_html(self):
-        h = self.html or "<html><body style='background:#05080d;color:#fff'>нет страницы</body></html>"
+        h = self.html or "<html><body style='background:#000;color:#fff'>нет страницы</body></html>"
         i = h.find("<head>")
         inj = BRIDGE + "<script>" + KEYS + "</script>"
         return h[:i + 6] + inj + h[i + 6:] if i >= 0 else inj + h
@@ -543,7 +543,7 @@ def main():
     app = App(link)
     serve(app)
     win = webview.create_window(APP_NAME, "http://127.0.0.1:%d/" % app.port, width=1600, height=1000,
-                                background_color="#05080D", min_size=(900, 600), js_api=JsApi(app))
+                                background_color="#000000", min_size=(900, 600), js_api=JsApi(app))
     app.window = win
 
     def on_loaded():

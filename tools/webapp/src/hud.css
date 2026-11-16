@@ -151,3 +151,5 @@ html.kurenai .rng input::-webkit-slider-thumb{background:#f4f1ea;border-color:#e
 html.kurenai .rng output,html.kurenai .info{font:400 26px/1 var(--ft)}
 html.kurenai .tgl.on i::after{background:#e5262f}
 html.kurenai #modal .card{clip-path:none;border:3px solid #f4f1ea}
+
+html.mono{--bg:#000;--acc:#fff;--hot:#fff;--label:#b4b4b4;--dim:#6c6c6c;--line:#2e2e2e}
