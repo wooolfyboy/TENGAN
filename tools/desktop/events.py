@@ -33,7 +33,7 @@ PREFS_DEF = {
     "merge_s": 2.0,                 # одинаковые события за N с — одной плашкой («3 новых устройства»)
     "duration": 4.5,                # сколько висит плашка, с
     "corner": "br",                 # угол: br bl tr tl
-    "style": "auto",                # auto (как вкладка штаба NERV/DOMAIN) / nerv / domain
+    "style": "auto",                # auto (как тема TENGAN) / denko / kurenai
     "native": False,                # системные уведомления Windows вместо своих плашек
     "widget": False, "opacity": 1.0, "clickthrough": False,
     "widget_rect": None,            # [x, y, w, h]
@@ -276,7 +276,7 @@ class Engine:
         b = d.get("bat")
         if isinstance(b, int) and b >= 0:
             if self.bat is not None and self.bat > 15 >= b and not d.get("usb"):
-                self._note("battery", now, "STICK BATTERY LOW", "%d%%" % b, sev="alert")
+                self._note("battery", now, "TENGAN BATTERY LOW", "%d%%" % b, sev="alert")
             self.bat = b
 
     def _on_snd(self, d, now):
@@ -299,7 +299,7 @@ class Engine:
             self.link_ok = lp[0]
             self.link_pending = None
             if was is not None:
-                self._note("link", now, "STICK LINK " + ("RESTORED" if lp[0] else "LOST"), "", sev="info" if lp[0] else "alert")
+                self._note("link", now, "LINK RESTORED" if lp[0] else "LINK LOST", "", sev="info" if lp[0] else "alert")
             if lp[0] and was is False:
                 self.reset_soft()
 

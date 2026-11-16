@@ -109,7 +109,7 @@ static const Elem EL[] = {
   { 9.53667594, -0.00125060, 0.05386179, -0.00050991, 2.48599187, 0.00193609, 49.95424423, 1222.49362201, 92.59887831, -0.41897216, 113.66242448, -0.28867794 },
 };
 static const Elem EARTH = { 1.00000261, 0.00000562, 0.01671123, -0.00004392, -0.00001531, -0.01294668, 100.46457166, 35999.37244981, 102.93768193, 0.32327364, 0.0, 0.0 };
-const char* const PLANET_RU[PL_NUM] = { "Меркурий", "Венера", "Марс", "Юпитер", "Сатурн" };
+const char* const PLANET_RU[PL_NUM] = { L("Mercury", "Меркурий"), L("Venus", "Венера"), L("Mars", "Марс"), L("Jupiter", "Юпитер"), L("Saturn", "Сатурн") };   // имена на языке прошивки
 
 static void helio(const Elem& el, double T, double& x, double& y, double& z) {
   double a = el.a + el.da * T, e = el.e + el.de * T, I = (el.I + el.dI * T) * D2R;

@@ -3,7 +3,7 @@
 TENGAN desktop — трей, всплывашки и виджет поверх всех окон.
 
   Tray     — значок у часов (pystray): штаб / виджет / всплывашки / стиль / угол / режим / выход.
-  Popups   — одно маленькое окно без рамки поверх всех; в нём стопка до 3 плашек (NERV / DOMAIN),
+  Popups   — одно маленькое окно без рамки поверх всех; в нём стопка до 3 плашек (стиль темы DENKO / KURENAI),
              окно подгоняется по высоте стопки и прячется, когда плашки ушли. Клик — открыть штаб.
   Widget   — окошко без рамки поверх всех (мини-радар, активность, температура, пульт, карта);
              таскается мышкой, помнит место и размер; прозрачность и «сквозные клики» — через Win32.
@@ -254,22 +254,25 @@ class Tray:
         a = app
         p = lambda k: (lambda item: bool(a.engine.prefs.get(k)))
         radio = lambda k, v: (lambda item: a.engine.prefs.get(k) == v)
-        self.icon = pystray.Icon("TENGAN", img, "TENGAN 天眼", menu=M(
-            I("Открыть штаб", lambda: a.show_main(), default=True),
+        T = lambda k: (lambda item: a.t(k))                 # подписи на языке окна (язык TENGAN может прийти позже)
+        L2 = lambda en, ru: (lambda item: ru if a.lang == "ru" else en)
+        self.icon = pystray.Icon("TENGAN", img, "TENGAN Desktop", menu=M(
+            I(T("tray_open"), lambda: a.show_main(), default=True),
             M.SEPARATOR,
-            I("Виджет поверх окон", lambda: a.toggle_pref("widget"), checked=p("widget")),
-            I("Всплывающие оповещения", lambda: a.toggle_pref("popups"), checked=p("popups")),
-            I("Уведомления Windows вместо плашек", lambda: a.toggle_pref("native"), checked=p("native")),
-            I("Сквозные клики по виджету", lambda: a.toggle_pref("clickthrough"), checked=p("clickthrough")),
-            I("Стиль", M(*[I(n, (lambda v: lambda: a.set_pref("style", v))(v), checked=radio("style", v), radio=True)
-                           for n, v in (("как в штабе", "auto"), ("NERV", "nerv"), ("DOMAIN", "domain"))])),
-            I("Угол", M(*[I(n, (lambda v: lambda: a.set_pref("corner", v))(v), checked=radio("corner", v), radio=True)
-                          for n, v in (("справа внизу", "br"), ("слева внизу", "bl"), ("справа вверху", "tr"), ("слева вверху", "tl"))])),
-            I("Режим связи", M(*[I(n, (lambda v: lambda: a.start(v))(v), checked=(lambda v: lambda item: a.cfg.get("mode") == v)(v), radio=True)
-                                 for n, v in (("USB", "usb"), ("Wi-Fi", "wifi"), ("Авто", "auto"))])),
-            I("Настройки оповещений…", lambda: a.show_main(prefs=True)),
+            I(T("tray_widget"), lambda: a.toggle_pref("widget"), checked=p("widget")),
+            I(T("tray_popups"), lambda: a.toggle_pref("popups"), checked=p("popups")),
+            I(T("tray_native"), lambda: a.toggle_pref("native"), checked=p("native")),
+            I(T("tray_click"), lambda: a.toggle_pref("clickthrough"), checked=p("clickthrough")),
+            I(T("tray_style"), M(*[I(n, (lambda v: lambda: a.set_pref("style", v))(v), checked=radio("style", v), radio=True)
+                                   for n, v in ((L2("as the TENGAN theme", "как тема TENGAN"), "auto"), ("DENKO", "denko"), ("KURENAI", "kurenai"))])),
+            I(T("tray_corner"), M(*[I(n, (lambda v: lambda: a.set_pref("corner", v))(v), checked=radio("corner", v), radio=True)
+                                    for n, v in ((L2("bottom right", "справа внизу"), "br"), (L2("bottom left", "слева внизу"), "bl"),
+                                                 (L2("top right", "справа вверху"), "tr"), (L2("top left", "слева вверху"), "tl"))])),
+            I(T("tray_mode"), M(*[I(n, (lambda v: lambda: a.start(v))(v), checked=(lambda v: lambda item: a.cfg.get("mode") == v)(v), radio=True)
+                                  for n, v in (("USB", "usb"), ("Wi-Fi", "wifi"), (L2("Auto", "Авто"), "auto"))])),
+            I(T("tray_prefs"), lambda: a.show_main(prefs=True)),
             M.SEPARATOR,
-            I("Выход", lambda: a.quit()),
+            I(T("tray_quit"), lambda: a.quit()),
         ))
         threading.Thread(target=self.icon.run, daemon=True).start()
 

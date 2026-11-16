@@ -17,7 +17,7 @@ TENGAN — приложение для компьютера (Windows).
 Клавиши: F11 — во весь экран, F2 — снова выбор режима.
 
 Плюс (WIDGET.md): значок в трее (закрытие окна — в трей), всплывашки при событиях
-(NERV / DOMAIN) и мини-виджет поверх всех окон. Решения «что показать» — events.py,
+(в стиле темы TENGAN: DENKO / KURENAI) и мини-виджет поверх всех окон. Решения «что показать» — events.py,
 окна — overlay.py.
 """
 import base64
@@ -25,6 +25,7 @@ import gzip
 import hashlib
 import http.server
 import json
+import re
 import os
 import socketserver
 import sys
@@ -70,6 +71,12 @@ TX = {
         "not_on_usb": "TENGAN is not on USB",
         "no_answer": "TENGAN does not answer — is firmware v1.8-test4 or newer installed? Is the old PC monitor closed?",
         "no_send": "TENGAN did not send the page", "partial": "the page arrived incomplete ({a} of {b})",
+        "pp_btn": "⚙ ALERTS & WIDGET", "pp_h": "ALERTS <b>警報</b> · WIDGET",
+        "pp_hint": "Near / new / tracker thresholds are shared with TENGAN and the tablet (HQ → ⚙ ALERTS). Here: what to show on this computer and how.",
+        "pp_test": "TEST POPUP", "pp_done": "DONE",
+        "tray_open": "Open HQ", "tray_widget": "Widget on top", "tray_popups": "Popup alerts", "tray_native": "Windows notifications instead of popups",
+        "tray_click": "Click-through widget", "tray_style": "Style", "tray_corner": "Corner", "tray_mode": "Connection", "tray_prefs": "Alert settings…",
+        "tray_quit": "Quit", "test_text": "this is how an alert looks",
     },
     "ru": {
         "sub": "desktop · штаб и монитор ПК", "usb_s": "по кабелю · интернет остаётся", "wifi_s": "через точку доступа TENGAN",
@@ -82,8 +89,70 @@ TX = {
         "not_on_usb": "TENGAN не на USB",
         "no_answer": "TENGAN не отвечает — на нём прошивка v1.8-test4 или новее? Старый монитор ПК закрыт?",
         "no_send": "TENGAN не прислал страницу", "partial": "страница пришла не целиком ({a} из {b})",
+        "pp_btn": "⚙ ОПОВЕЩЕНИЯ И ВИДЖЕТ", "pp_h": "ОПОВЕЩЕНИЯ <b>警報</b> · ВИДЖЕТ",
+        "pp_hint": "Пороги «близко», «новое» и трекеры — общие с TENGAN и планшетом (штаб → ⚙ ALERTS). Здесь — что и как показывать на этом компьютере.",
+        "pp_test": "ПРОВЕРИТЬ ПЛАШКУ", "pp_done": "ГОТОВО",
+        "tray_open": "Открыть штаб", "tray_widget": "Виджет поверх окон", "tray_popups": "Всплывающие оповещения", "tray_native": "Уведомления Windows вместо плашек",
+        "tray_click": "Сквозные клики по виджету", "tray_style": "Стиль", "tray_corner": "Угол", "tray_mode": "Связь", "tray_prefs": "Настройки оповещений…",
+        "tray_quit": "Выход", "test_text": "так будет выглядеть оповещение",
     },
 }
+
+
+# настройки оповещений и виджета (панель на стартовом экране) — по языку окна
+PP_TX = {
+    "en": {
+        "h_pop": "Popups", "h_kinds": "What to show", "h_quiet": "Quiet hours", "h_widget": "Widget", "h_window": "Window",
+        "rows": {"popups": ["Show alerts", "a card in the screen corner, above all windows"],
+                 "native": ["Windows notifications instead", "regular system ones, in the notification center"],
+                 "style": ["Style", "follows the TENGAN theme, or fixed"], "corner": ["Screen corner", ""],
+                 "duration": ["Shown for, s", ""], "per_min": ["At most per minute", "alarms may exceed the limit (up to twice)"],
+                 "quiet": ["Enable", "no popups during these hours"], "quiet_from": ["From (hour)", ""], "quiet_to": ["To (hour)", ""],
+                 "quiet_trackers": ["Still show a nearby tracker", ""],
+                 "widget": ["Widget on top", "mini radar, activity, temperature, remote, card · double click — HQ"],
+                 "opacity": ["Opacity", "0.3 … 1"], "clickthrough": ["Click-through", "clicks pass through the widget (turn off in the tray menu)"],
+                 "tray": ["Close button — to tray", "keeps running by the clock; quit from the tray icon menu"]},
+        "styles": [["auto", "as the TENGAN theme"], ["denko", "DENKO"], ["kurenai", "KURENAI"]],
+        "corners": [["br", "bottom right"], ["bl", "bottom left"], ["tr", "top right"], ["tl", "top left"]],
+        "kinds": {"new": ["New device nearby", "per the TENGAN alert thresholds"], "tracker": ["Tracker nearby", "AirTag and similar tags"],
+                  "ir": ["Remote", "which remote and which button"], "nfc": ["NFC card / tag", "card type"],
+                  "sensor": ["New 433 MHz sensor", "thermometer, doorbell, gate remote"], "temp": ["Outdoor temperature", "if it changed by 1° or more"],
+                  "battery": ["TENGAN battery", "below 15%"], "link": ["Link to TENGAN", "lost / restored"]},
+    },
+    "ru": {
+        "h_pop": "Всплывающие плашки", "h_kinds": "Что показывать", "h_quiet": "Тихие часы", "h_widget": "Виджет", "h_window": "Окно",
+        "rows": {"popups": ["Показывать оповещения", "плашка в углу экрана поверх всех окон"],
+                 "native": ["Уведомления Windows вместо плашек", "обычные системные, в центре уведомлений"],
+                 "style": ["Стиль", "как тема TENGAN или всегда один"], "corner": ["Угол экрана", ""],
+                 "duration": ["Сколько висит, с", ""], "per_min": ["Не больше в минуту", "тревоги могут пройти сверх лимита (не больше двойного)"],
+                 "quiet": ["Включить", "в эти часы плашек нет"], "quiet_from": ["С (час)", ""], "quiet_to": ["До (час)", ""],
+                 "quiet_trackers": ["Трекер рядом — всё равно показать", ""],
+                 "widget": ["Виджет поверх окон", "мини-радар, активность, температура, пульт, карта · двойной клик — штаб"],
+                 "opacity": ["Непрозрачность", "0.3 … 1"], "clickthrough": ["Сквозные клики", "клики проходят сквозь виджет (выключить — в меню трея)"],
+                 "tray": ["Крестик — в трей", "программа работает у часов; выход — из меню значка"]},
+        "styles": [["auto", "как тема TENGAN"], ["denko", "DENKO"], ["kurenai", "KURENAI"]],
+        "corners": [["br", "справа внизу"], ["bl", "слева внизу"], ["tr", "справа вверху"], ["tl", "слева вверху"]],
+        "kinds": {"new": ["Новое устройство рядом", "по порогам тревог TENGAN"], "tracker": ["Трекер рядом", "AirTag и похожие метки"],
+                  "ir": ["Пульт", "кто и какую кнопку нажал"], "nfc": ["Карта / метка NFC", "тип карты"],
+                  "sensor": ["Новый датчик 433 МГц", "термометр, звонок, пульт ворот"], "temp": ["Температура за окном", "если изменилась на 1° и больше"],
+                  "battery": ["Батарея TENGAN", "ниже 15%"], "link": ["Связь с TENGAN", "пропала / вернулась"]},
+    },
+}
+
+# заголовки оповещений (events.py пишет по-английски) — перевод для русского окна
+NOTE_RU = {"TRACKER NEARBY": "ТРЕКЕР РЯДОМ", "NEW DEVICE NEARBY": "НОВОЕ УСТРОЙСТВО РЯДОМ", "REMOTE": "ПУЛЬТ", "CARD": "КАРТА",
+           "433 REMOTE / BELL": "ПУЛЬТ / ЗВОНОК 433", "NEW 433 SENSOR": "НОВЫЙ ДАТЧИК 433", "OUTSIDE": "ЗА ОКНОМ",
+           "TENGAN BATTERY LOW": "TENGAN: БАТАРЕЯ РАЗРЯЖЕНА", "LINK LOST": "СВЯЗЬ С TENGAN ПРОПАЛА", "LINK RESTORED": "СВЯЗЬ С TENGAN ВЕРНУЛАСЬ",
+           "TEST · NEW DEVICE NEARBY": "ПРОВЕРКА · НОВОЕ УСТРОЙСТВО РЯДОМ"}
+
+
+def note_title(title, lang):
+    if lang != "ru" or not title:
+        return title
+    if title in NOTE_RU:
+        return NOTE_RU[title]
+    m = re.match(r"^(\d+) NEW DEVICES$", title)
+    return "НОВЫХ УСТРОЙСТВ: %s" % m.group(1) if m else title
 
 
 def os_lang():
@@ -468,7 +537,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--hot);font:16px/1
 h1{margin:0;font-weight:600;letter-spacing:.3em;font-size:40px}h1 b{color:var(--acc)}
 .sub{color:var(--dim);letter-spacing:.15em;text-transform:uppercase;font-size:13px}
 .row{display:flex;gap:16px}
-button{background:rgba(14,42,52,.4);color:var(--hot);border:1px solid var(--line);padding:22px 30px;min-width:190px;
+button{background:#0a0a0a;color:var(--hot);border:1px solid var(--line);padding:22px 30px;min-width:190px;
  font:600 18px 'Segoe UI',sans-serif;letter-spacing:.12em;cursor:pointer;text-align:left}
 button small{display:block;font-weight:400;font-size:12px;color:var(--dim);letter-spacing:.05em;margin-top:6px}
 button:hover,button.on{border-color:var(--acc);box-shadow:0 0 18px rgba(255,255,255,.18)}
@@ -477,16 +546,16 @@ button:hover,button.on{border-color:var(--acc);box-shadow:0 0 18px rgba(255,255,
 .hint{color:var(--dim);font-size:12px}
 #pb2{background:none;border:1px solid var(--line);color:var(--dim);padding:8px 16px;min-width:0;font-size:13px;letter-spacing:.1em}
 #pb2:hover{color:var(--hot)}
-#pp{position:fixed;inset:0;background:#05080d;display:none;overflow:auto}
+#pp{position:fixed;inset:0;background:#000;display:none;overflow:auto}
 #pp.on{display:block}
 #pp .in{max-width:760px;margin:40px auto;padding:0 20px}
 #pp h2{font-weight:600;letter-spacing:.2em;font-size:22px;margin:0 0 6px}#pp h2 b{color:var(--acc)}
 #pp h3{color:var(--acc);font-size:13px;letter-spacing:.2em;margin:22px 0 6px;text-transform:uppercase}
 .it{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:9px 0;border-bottom:1px solid var(--line)}
 .it span small{display:block;color:var(--dim);font-size:12px}
-.it select,.it input[type=number]{background:#0b1620;color:var(--hot);border:1px solid var(--line);padding:6px 8px;font:14px 'Segoe UI'}
+.it select,.it input[type=number]{background:#111;color:var(--hot);border:1px solid var(--line);padding:6px 8px;font:14px 'Segoe UI'}
 .it input[type=number]{width:80px}
-.tg{width:54px;height:26px;border:1px solid var(--line);background:#0b1620;position:relative;cursor:pointer;min-width:0;padding:0}
+.tg{width:54px;height:26px;border:1px solid var(--line);background:#111;position:relative;cursor:pointer;min-width:0;padding:0}
 .tg:after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;background:var(--dim);transition:.15s}
 .tg.on{border-color:var(--acc)}.tg.on:after{left:31px;background:var(--acc)}
 .ppb{display:flex;gap:10px;margin:22px 0 40px}
@@ -499,54 +568,44 @@ button:hover,button.on{border-color:var(--acc);box-shadow:0 0 18px rgba(255,255,
 <button data-m="auto">%AUTO_T%<small>%AUTO_S%</small></button>
 </div>
 <div id="st"></div><div class="bar"><i id="pb"></i></div>
-<<<<<<< HEAD
 <div class="hint">%HINT%</div>
-</div><script>
-var last='%LAST%',auto=%AUTO%,cd=3,timer=null;
-var st=document.getElementById('st');
-function go(m){clearInterval(timer);st.textContent='…';fetch('/__app/start?mode='+m).then(function(r){return r.text()}).then(function(t){if(t)st.textContent=t});}
-document.querySelectorAll('button').forEach(function(b){if(b.dataset.m===last)b.classList.add('on');b.onclick=function(){go(b.dataset.m)}});
-if(auto&&last){timer=setInterval(function(){if(cd<=0){go(last);return}st.textContent='%COUNTDOWN%'.replace('{m}',last.toUpperCase()).replace('{n}',cd);cd--},1000);}
-=======
-<div class="hint">F11 — во весь экран · F2 — снова этот выбор · на палке открой раздел Web</div>
-<button id="pb2">⚙ ОПОВЕЩЕНИЯ И ВИДЖЕТ</button>
+<button id="pb2">%PP_BTN%</button>
 </div>
-<div id="pp"><div class="in"><h2>ОПОВЕЩЕНИЯ <b>警報</b> · ВИДЖЕТ</h2>
-<div class="hint">Пороги «близко», «новое», трекеры — общие с палкой и планшетом (штаб → ⚙ ALERTS). Здесь — что и как показывать на этом компьютере.</div>
+<div id="pp"><div class="in"><h2>%PP_H%</h2>
+<div class="hint">%PP_HINT%</div>
 <div id="ppl"></div>
-<div class="ppb"><button id="ppt">ПРОВЕРИТЬ ПЛАШКУ</button><button id="ppc">ГОТОВО</button></div></div></div>
+<div class="ppb"><button id="ppt">%PP_TEST%</button><button id="ppc">%PP_DONE%</button></div></div></div>
 <script>
 (function(){
-var NAMES={new:['Новое устройство рядом','по порогам тревог с палки'],tracker:['Трекер рядом','AirTag и похожие метки'],
- ir:['Пульт','кто и какую кнопку нажал'],nfc:['Карта / метка NFC','тип карты'],sensor:['Новый датчик 433','термометр, звонок, пульт ворот'],
- temp:['Температура за окном','если изменилась на 1° и больше'],battery:['Батарея палки','ниже 15%'],link:['Связь с палкой','пропала / вернулась']};
+var X=%PP_TX%;
 var L=document.getElementById('ppl'),P=null;
 function set(k,v){fetch('/__app/prefs_set?k='+encodeURIComponent(k)+'&v='+encodeURIComponent(JSON.stringify(v))).then(function(r){return r.json()}).then(function(d){P=d.prefs;draw()})}
-function row(t,h,el){var d=document.createElement('div');d.className='it';d.innerHTML='<span>'+t+(h?'<small>'+h+'</small>':'')+'</span>';d.appendChild(el);L.appendChild(d)}
-function tog(k,v){var b=document.createElement('button');b.className='tg'+(v?' on':'');b.onclick=function(){set(k,!v)};return b}
+function row(t,h,el){var d=document.createElement('div');d.className='it';var sp=document.createElement('span');sp.textContent=t;if(h){var sm=document.createElement('small');sm.textContent=h;sp.appendChild(sm)}d.appendChild(sp);d.appendChild(el);L.appendChild(d)}
+function tog(k,v){var b=document.createElement('button');b.className='tg'+(v?' on':'');b.setAttribute('aria-label',k);b.onclick=function(){set(k,!v)};return b}
 function num(k,v,mn,mx,st){var i=document.createElement('input');i.type='number';i.min=mn;i.max=mx;i.step=st;i.value=v;i.onchange=function(){var x=Math.min(mx,Math.max(mn,+i.value));set(k,x)};return i}
 function sel(k,v,opts){var s=document.createElement('select');opts.forEach(function(o){var e=document.createElement('option');e.value=o[0];e.textContent=o[1];if(o[0]===v)e.selected=true;s.appendChild(e)});s.onchange=function(){set(k,s.value)};return s}
 function h3(t){var e=document.createElement('h3');e.textContent=t;L.appendChild(e)}
+function r(k){return X.rows[k]||[k,'']}
 function draw(){L.innerHTML='';var p=P;
- h3('Всплывающие плашки');
- row('Показывать оповещения','плашка в углу экрана поверх всех окон',tog('popups',p.popups));
- row('Уведомления Windows вместо плашек','обычные системные, в центре уведомлений',tog('native',p.native));
- row('Стиль','как вкладка штаба или всегда один',sel('style',p.style,[['auto','как в штабе'],['nerv','NERV'],['domain','DOMAIN']]));
- row('Угол экрана','',sel('corner',p.corner,[['br','справа внизу'],['bl','слева внизу'],['tr','справа вверху'],['tl','слева вверху']]));
- row('Сколько висит, с','',num('duration',p.duration,2,15,0.5));
- row('Не больше в минуту','тревоги могут пройти сверх лимита (не больше двойного)',num('per_min',p.per_min,1,30,1));
- h3('Что показывать');
- Object.keys(NAMES).forEach(function(k){row(NAMES[k][0],NAMES[k][1],tog('kinds.'+k,p.kinds[k]))});
- h3('Тихие часы');
- row('Включить','в эти часы плашек нет',tog('quiet',p.quiet));
- row('С (час)','',num('quiet_from',p.quiet_from,0,23,1));row('До (час)','',num('quiet_to',p.quiet_to,0,23,1));
- row('Трекер рядом — всё равно показать','',tog('quiet_trackers',p.quiet_trackers));
- h3('Виджет');
- row('Виджет поверх окон','мини-радар, активность, температура, пульт, карта · двойной клик — штаб',tog('widget',p.widget));
- row('Непрозрачность','0.3 … 1',num('opacity',p.opacity,0.3,1,0.05));
- row('Сквозные клики','клики проходят сквозь виджет (выключить — в меню трея)',tog('clickthrough',p.clickthrough));
- h3('Окно');
- row('Крестик — в трей','программа работает у часов; выход — из меню значка',tog('tray',p.tray));
+ h3(X.h_pop);
+ row(r('popups')[0],r('popups')[1],tog('popups',p.popups));
+ row(r('native')[0],r('native')[1],tog('native',p.native));
+ row(r('style')[0],r('style')[1],sel('style',p.style,X.styles));
+ row(r('corner')[0],'',sel('corner',p.corner,X.corners));
+ row(r('duration')[0],'',num('duration',p.duration,2,15,0.5));
+ row(r('per_min')[0],r('per_min')[1],num('per_min',p.per_min,1,30,1));
+ h3(X.h_kinds);
+ Object.keys(X.kinds).forEach(function(k){row(X.kinds[k][0],X.kinds[k][1],tog('kinds.'+k,p.kinds[k]))});
+ h3(X.h_quiet);
+ row(r('quiet')[0],r('quiet')[1],tog('quiet',p.quiet));
+ row(r('quiet_from')[0],'',num('quiet_from',p.quiet_from,0,23,1));row(r('quiet_to')[0],'',num('quiet_to',p.quiet_to,0,23,1));
+ row(r('quiet_trackers')[0],'',tog('quiet_trackers',p.quiet_trackers));
+ h3(X.h_widget);
+ row(r('widget')[0],r('widget')[1],tog('widget',p.widget));
+ row(r('opacity')[0],r('opacity')[1],num('opacity',p.opacity,0.3,1,0.05));
+ row(r('clickthrough')[0],r('clickthrough')[1],tog('clickthrough',p.clickthrough));
+ h3(X.h_window);
+ row(r('tray')[0],r('tray')[1],tog('tray',p.tray));
 }
 function open_(){fetch('/__app/prefs').then(function(r){return r.json()}).then(function(d){P=d.prefs;draw();document.getElementById('pp').classList.add('on')})}
 document.getElementById('pb2').onclick=open_;
@@ -559,8 +618,7 @@ var last='%LAST%',auto=%AUTO%,cd=3,timer=null;
 var st=document.getElementById('st');
 function go(m){clearInterval(timer);st.textContent='…';fetch('/__app/start?mode='+m).then(function(r){return r.text()}).then(function(t){if(t)st.textContent=t});}
 document.querySelectorAll('button[data-m]').forEach(function(b){if(b.dataset.m===last)b.classList.add('on');b.onclick=function(){go(b.dataset.m)}});
-if(auto&&last){timer=setInterval(function(){if(cd<=0){go(last);return}st.textContent='запуск: '+last.toUpperCase()+' через '+cd+' с · или выбери другой';cd--},1000);}
->>>>>>> 419e5c2 (Desktop app: tray, styled event popups, always-on-top mini widget (design + implementation))
+if(auto&&last){timer=setInterval(function(){if(cd<=0){go(last);return}st.textContent='%COUNTDOWN%'.replace('{m}',last.toUpperCase()).replace('{n}',cd);cd--},1000);}
 setInterval(function(){fetch('/__app/status').then(function(r){return r.json()}).then(function(s){if(s.msg)st.textContent=s.msg;document.getElementById('pb').style.width=(s.pct||0)+'%'}).catch(function(){})},300);
 </script></body></html>"""
 
@@ -574,7 +632,7 @@ class App:
         self.mode_on = ""              # режим, в котором штаб реально запущен: usb / wifi
         self.popups = self.widget = self.tray = self.sse = None
         self.quitting = False
-        self.hq_style = "nerv"         # вкладка штаба NERV / DOMAIN (читается со страницы)
+        self.hq_style = "denko"        # тема TENGAN (st.theme): denko / kurenai — по ней красятся плашки и виджет
         self.ev_t = 0.0                # когда пришло последнее событие палки
         link.on_event = self.on_stick_event
         self.window = None
@@ -600,7 +658,10 @@ class App:
     def launcher_html(self, last, auto):
         rep = {"%LANG%": self.lang, "%SUB%": self.t("sub"), "%USB_S%": self.t("usb_s"), "%WIFI_S%": self.t("wifi_s"),
                "%AUTO_T%": self.t("auto"), "%AUTO_S%": self.t("auto_s"), "%HINT%": self.t("hint"),
-               "%COUNTDOWN%": self.t("countdown").replace("'", "\\'"), "%LAST%": last, "%AUTO%": auto}
+               "%COUNTDOWN%": self.t("countdown").replace("'", "\\'"), "%LAST%": last, "%AUTO%": auto,
+               "%PP_BTN%": self.t("pp_btn"), "%PP_H%": self.t("pp_h"), "%PP_HINT%": self.t("pp_hint"),
+               "%PP_TEST%": self.t("pp_test"), "%PP_DONE%": self.t("pp_done"),
+               "%PP_TX%": json.dumps(PP_TX[self.lang], ensure_ascii=False).replace("</", "<\\/")}
         h = LAUNCHER
         for k, v in rep.items():
             h = h.replace(k, v)
@@ -619,13 +680,9 @@ class App:
         if mode == "auto":
             mode = "usb" if (self.link.connected() or self.link.find_port()) else "wifi"
         if mode == "wifi":
-<<<<<<< HEAD
             self.msg = self.t("wifi_open")
-=======
-            self.msg = "открываю 192.168.4.1 — компьютер должен быть подключён к Wi-Fi палки"
             self.mode_on = "wifi"
             self.apply_prefs()
->>>>>>> 419e5c2 (Desktop app: tray, styled event popups, always-on-top mini widget (design + implementation))
             if self.window:
                 self.window.load_url(STICK_URL)
             return self.msg
@@ -666,6 +723,15 @@ class App:
                 self.engine.link(js == "true")
                 return
             self.ev_t = time.time()
+            if ev == "st":                                   # тема устройства — стиль плашек и виджета
+                try:
+                    th = json.loads(js).get("theme")
+                except Exception:
+                    th = None
+                if th in ("denko", "kurenai") and th != self.hq_style:
+                    self.hq_style = th
+                    if self.widget:
+                        threading.Thread(target=self.widget.apply_style, daemon=True).start()
             self.engine.feed_raw(ev, js)
 
     def on_sse_link(self, ok):
@@ -712,7 +778,8 @@ class App:
 
     def style(self):
         s = self.engine.prefs.get("style", "auto")
-        return self.hq_style if s == "auto" else s
+        s = {"nerv": "denko", "domain": "kurenai"}.get(s, s)          # старые значения из конфига
+        return self.hq_style if s not in ("denko", "kurenai") else s
 
     def show_main(self, prefs=False):
         w = self.window
@@ -755,28 +822,15 @@ class App:
             pass
 
     def ticker(self):
-        """5 раз в секунду: показать готовые плашки, обновить виджет; раз в 30 с — настройки тревог с палки;
-        раз в 5 с — стиль вкладки штаба (NERV / DOMAIN) со страницы."""
+        """5 раз в секунду: показать готовые плашки, обновить виджет; раз в 30 с — настройки тревог с TENGAN.
+        Стиль плашек — тема устройства (событие st)."""
         last_cfg = 0.0
-        last_style = 0.0
         while not self.quitting:
             time.sleep(0.2)
             now = time.time()
             if self.need_events() and now - last_cfg > 30:
                 last_cfg = now
                 threading.Thread(target=self._settings_from_stick, daemon=True).start()
-            if self.window and now - last_style > 5:
-                last_style = now
-                try:
-                    v = self.window.evaluate_js("(function(){try{return localStorage.getItem('sub_hq')}catch(e){return null}})()")
-                    if v in ("0", "1", 0, 1):
-                        st = "domain" if str(v) == "1" else "nerv"
-                        if st != self.hq_style:
-                            self.hq_style = st
-                            if self.widget:
-                                self.widget.apply_style()
-                except Exception:
-                    pass
             if self.mode_on == "usb":
                 self.on_stick_event("_link", "true" if (self.link.connected() and now - self.ev_t < 8) else "false")
             with self.eng_lock:
@@ -789,6 +843,7 @@ class App:
 
     def show_note(self, n):
         p = self.engine.prefs
+        n = dict(n, title=note_title(n.get("title", ""), self.lang))
         log("оповещение:", n["kind"], n["title"], n["text"])
         if p.get("native") or not self.popups:
             if self.tray and self.tray.notify("%s  %s" % (n.get("kj", ""), n["title"]), n["text"]):
@@ -868,7 +923,7 @@ def make_handler(app):
                 self._send(app.prefs_json())
             elif p == "/__app/test_popup":                # кнопка «проверить» в настройках
                 app.show_note({"kind": "new", "kj": "接近警告", "title": "TEST · NEW DEVICE NEARBY",
-                               "text": "так будет выглядеть оповещение", "sev": "alert"})
+                               "text": app.t("test_text"), "sev": "alert"})
                 self._send('{"ok":true}')
             else:
                 self._send('{"ok":false}', code=404)

@@ -12,6 +12,7 @@
 //  Колесо — скорость, нажатие — назад в подменю.
 // ============================================================
 #include <algorithm>
+#include "core/lang.h"
 #include "core/timeutil.h"
 #include "gallery/gallery.h"
 #include "core/display.h"
@@ -37,7 +38,7 @@ static void advance(uint32_t now) {
   s_phase += dt * 0.001f * s_speed;
 }
 
-static void speedLabel(char* buf, size_t n) { snprintf(buf, n, "speed x%.1f", s_speed); }
+static void speedLabel(char* buf, size_t n) { snprintf(buf, n, L("speed x%.1f", "скорость x%.1f"), s_speed); }
 
 // ---------- TESSERACT ----------
 #define TS_TRAIL 3
@@ -97,8 +98,8 @@ void drawTesseract(uint32_t now) {
   if (s_trailN < TS_TRAIL) s_trailN++;
 
   char buf[24]; speedLabel(buf, sizeof(buf));
-  uiHeader("Tesseract", buf);
-  uiFooter("wheel: speed", "side: back");
+  uiHeader(L("Tesseract", "Тессеракт"), buf);
+  uiFooter(L("wheel: speed", "колесо: скорость"), L("side: back", "кнопка: назад"));
   present();
   (void)H;
 }
@@ -156,8 +157,8 @@ void drawTorus(uint32_t now) {
     else           spr.drawPixel(p.x, p.y, col);
   }
   char buf[24]; speedLabel(buf, sizeof(buf));
-  uiHeader("Torus", buf);
-  uiFooter("wheel: speed", "side: back");
+  uiHeader(L("Torus", "Тор"), buf);
+  uiFooter(L("wheel: speed", "колесо: скорость"), L("side: back", "кнопка: назад"));
   present();
 }
 
@@ -254,9 +255,9 @@ void drawLife(uint32_t now) {
       }
     }
   char buf[40];
-  snprintf(buf, sizeof(buf), "gen %lu  cells %d  x%.1f", (unsigned long)s_lfGen, s_lfPop, s_speed);
-  uiHeader("Life", buf);
-  uiFooter("wheel: speed  click: new world", "side: back");
+  snprintf(buf, sizeof(buf), L("gen %lu  ·  cells %d  ·  x%.1f", "пок. %lu  ·  клеток %d  ·  x%.1f"), (unsigned long)s_lfGen, s_lfPop, s_speed);
+  uiHeader(L("Life", "Жизнь"), buf);
+  uiFooter(L("wheel: speed  ·  click: new world", "колесо: скорость  ·  нажать: новый мир"), L("side: back", "кнопка: назад"));
   present();
 }
 
@@ -337,24 +338,24 @@ void drawPendulum(uint32_t now) {
   spr.fillCircle(x1, y1, 4, C_ACC());
   spr.fillCircle(x2, y2, 5, C_HOT());
   char buf[24]; speedLabel(buf, sizeof(buf));
-  uiHeader("Pendulum", buf);
-  uiFooter("wheel: speed  click: new swing", "side: back");
+  uiHeader(L("Pendulum", "Маятник"), buf);
+  uiFooter(L("wheel: speed  ·  click: new swing", "колесо: скорость  ·  нажать: новый"), L("side: back", "кнопка: назад"));
   present();
 }
 
 // ---------- раздел ----------
-static void galSubtitle(char* out, size_t n) { snprintf(out, n, "%d demos", G_NUM); }
+static void galSubtitle(char* out, size_t n) { snprintf(out, n, L("%d scenes", "%d сцен"), G_NUM); }
 static void galEnter() { s_lastMs = 0; }
 static void galLeave() { if (s_wxOpen) { wxStop(); s_wxOpen = false; } }
 static void galInfo(int i, SubItem& it) {
-  static const char* const names[G_NUM] = { "Tesseract", "Torus", "Life", "Pendulum", "Sky", "Globe", "Weather" };
-  static const char* const descs[G_NUM] = { "4D hypercube", "donut of points", "game of life", "double pendulum chaos", "stars over you now", "ISS and satellites", "radio weather" };
+  static const char* const names[G_NUM] = { L("Tesseract", "Тессеракт"), L("Torus", "Тор"), L("Life", "Жизнь"), L("Pendulum", "Маятник"), L("Sky", "Небо"), L("Globe", "Глобус"), L("Weather", "Погода") };
+  static const char* const descs[G_NUM] = { L("4D hypercube", "4D-гиперкуб"), L("donut of points", "тор из точек"), L("game of life", "игра «Жизнь»"), L("double pendulum chaos", "хаос двойного маятника"), L("stars over you now", "звёзды над вами сейчас"), L("ISS and satellites", "МКС и спутники"), L("radio weather", "радиопогода") };
   it.name = names[i]; it.desc = descs[i]; it.value[0] = 0;
   if (i == G_TESS)       strcpy(it.value, "4D");
   else if (i == G_TORUS) strcpy(it.value, "3D");
-  else if (s_lfGen && i == G_LIFE) snprintf(it.value, sizeof(it.value), "gen %lu", (unsigned long)s_lfGen);
+  else if (s_lfGen && i == G_LIFE) snprintf(it.value, sizeof(it.value), L("gen %lu", "пок. %lu"), (unsigned long)s_lfGen);
   else if (i == G_SKY)   snprintf(it.value, sizeof(it.value), "%s", curCity().name);
-  else if (i == G_GLOBE) snprintf(it.value, sizeof(it.value), "%d sats", g_nSats);
+  else if (i == G_GLOBE) snprintf(it.value, sizeof(it.value), L("%d sats", "%d спутн."), g_nSats);
   else if (i == G_WX && g_wx.ok) snprintf(it.value, sizeof(it.value), "%s", g_wx.cond);
 }
 static int  galNow() { return g_gal; }
@@ -381,7 +382,7 @@ static void galDraw(uint32_t now) {
 }
 
 const Section gallerySection = {
-  "Gallery", 150, 120, 255, iconCube, galSubtitle,
+  L("Gallery", "Галерея"), 150, 120, 255, iconCube, galSubtitle,
   galEnter, galLeave,
   G_NUM, galInfo, galNow, galOpen, galClose,
   galClick, galRotate, nullptr, galTick, galDraw,

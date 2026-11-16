@@ -768,14 +768,14 @@ static void webDraw(uint32_t now) {
   char st[72] = "";
   if (s_sse[USB_SLOT].on) strcat(st, "USB  ");    // приложение на компьютере по кабелю
   if (b) strcat(st, "BLE  "); if (w) strcat(st, "WIFI  "); if (su) strcat(st, "SUB  "); if (sn) strcat(st, "SND  "); if (pc) strcat(st, "PC  "); if (wx) strcat(st, "WX  "); if (ir) strcat(st, "IR  "); if (nf) strcat(st, "NFC  ");
-  if (!st[0]) strcpy(st, "STATUS");
+  if (!st[0]) strcpy(st, L("STATUS", "СТАТУС"));
   WebLink l = { tablets, st, (uint32_t)bps, s_sseBytes };
   drawWebLink(l, now);
 }
 
 static void webSubtitle(char* out, size_t n) {
-  if (s_on && s_ok) snprintf(out, n, "%d online", (int)WiFi.softAPgetStationNum());
-  else              snprintf(out, n, "phone view");
+  if (s_on && s_ok) snprintf(out, n, L("%d online", "%d на связи"), (int)WiFi.softAPgetStationNum());
+  else              snprintf(out, n, "%s", L("apps & phone", "приложения"));
 }
 static void webEnter() { webStart(); }
 static void webLeave() { webStop(); ledsOff(); }
@@ -783,7 +783,7 @@ static void webClick() { s_showInfo = !s_showInfo; s_infoMs = millis(); }
 static void webRotate(int) { s_showInfo = !s_showInfo; s_infoMs = millis(); }
 
 const Section webSection = {
-  "Web", 90, 200, 230, iconPhone, webSubtitle,
+  L("Web", "Веб"), 90, 200, 230, iconPhone, webSubtitle,
   webEnter, webLeave,
   0, nullptr, nullptr, nullptr, nullptr,
   webClick, webRotate, nullptr, webTick, webDraw,

@@ -11,6 +11,7 @@
 //          следить за МКС / за домом / за следующим спутником.
 // ============================================================
 #include "gallery/gallery.h"
+#include "core/lang.h"
 #include "gallery/astro.h"
 #include "gallery/astrodata.h"
 #include "gallery/sat.h"
@@ -122,7 +123,7 @@ void drawSky(uint32_t now) {
     spr.fillCircle(x, y, 2, C_HOT());
     spr.drawCircle(x, y, 4, C_ACC());
     if (s_skyLabels == 0) {
-      static const char* const EN[PL_NUM] = { "MER", "VEN", "MAR", "JUP", "SAT" };
+      static const char* const EN[PL_NUM] = { L("MER", "МЕР"), L("VEN", "ВЕН"), L("MAR", "МАР"), L("JUP", "ЮП"), L("SAT", "САТ") };
       spr.setTextColor(C_HOT());
       label(EN[p], x, y - 9);
     }
@@ -174,17 +175,17 @@ void drawSky(uint32_t now) {
   char buf[40];
   spr.setTextDatum(TL_DATUM);
   if (timeOk) { hhmm(t, buf, sizeof(buf)); spr.setTextColor(C_HOT()); txt(buf, px, UI_TOP + 2, 4); }
-  else { spr.setTextColor(C_ALERT()); txt("TIME?", px, UI_TOP + 2, 4); }
+  else { spr.setTextColor(C_ALERT()); txt(L("TIME?", "ВРЕМЯ?"), px, UI_TOP + 2, 4); }
   spr.setTextColor(UI_LABEL());
-  txt(timeOk ? "LOCAL TIME" : "CONNECT LAPTOP ONCE", px, UI_TOP + 28, 1);
-  snprintf(buf, sizeof(buf), "SUN %+d", (int)lroundf(sunA.alt));
+  txt(timeOk ? L("LOCAL TIME", "МЕСТНОЕ ВРЕМЯ") : L("CONNECT TO AN APP ONCE", "ПОДКЛЮЧИТЕ ПРИЛОЖЕНИЕ"), px, UI_TOP + 28, 1);
+  snprintf(buf, sizeof(buf), L("SUN %+d", "СОЛНЦЕ %+d"), (int)lroundf(sunA.alt));
   spr.setTextColor(C_HOT()); txt(buf, px, UI_TOP + 44, 1);
-  spr.setTextColor(UI_DIM()); txt(day ? (sunA.alt > 0 ? "DAY" : "TWILIGHT") : night ? "NIGHT" : "TWILIGHT", px + 64, UI_TOP + 44, 1);
-  snprintf(buf, sizeof(buf), "MOON %d%%  %+d", (int)lroundf(phase * 100), (int)lroundf(moA.alt));
+  spr.setTextColor(UI_DIM()); txt(day ? (sunA.alt > 0 ? L("DAY", "ДЕНЬ") : L("TWILIGHT", "СУМЕРКИ")) : night ? L("NIGHT", "НОЧЬ") : L("TWILIGHT", "СУМЕРКИ"), px + 64, UI_TOP + 44, 1);
+  snprintf(buf, sizeof(buf), L("MOON %d%%  %+d", "ЛУНА %d%%  %+d"), (int)lroundf(phase * 100), (int)lroundf(moA.alt));
   spr.setTextColor(C_HOT()); txt(buf, px, UI_TOP + 56, 1);
   int yy = UI_TOP + 70;
   spr.setTextColor(UI_LABEL());
-  txt(nVis ? "PLANETS UP, DEG" : "NO PLANETS UP", px, yy, 1);
+  txt(nVis ? L("PLANETS UP, DEG", "ПЛАНЕТЫ НАД ГОРИЗОНТОМ") : L("NO PLANETS UP", "ПЛАНЕТ НЕ ВИДНО"), px, yy, 1);
   for (int i = 0; i < nVis && i < 3; i++) {                // по-русски, шрифтом с кириллицей
     snprintf(buf, sizeof(buf), "%s  %d", PLANET_RU[visPl[i]], (int)lroundf(visAlt[i]));
     spr.setTextColor(C_HOT());
@@ -192,9 +193,9 @@ void drawSky(uint32_t now) {
   }
   if (nVis > 3) { snprintf(buf, sizeof(buf), "+%d", nVis - 3); spr.setTextColor(UI_DIM()); spr.setTextDatum(TR_DATUM); txt(buf, spr.width() - UI_M - 4, yy, 1); spr.setTextDatum(TL_DATUM); }
   snprintf(buf, sizeof(buf), "%s", c.name);
-  uiHeader("Sky", buf);
-  static const char* const LBL[3] = { "wheel: turn  click: stars", "wheel: turn  click: no labels", "wheel: turn  click: constell." };
-  uiFooter(LBL[s_skyLabels], "side: back");
+  uiHeader(L("Sky", "Небо"), buf);
+  static const char* const LBL[3] = { L("wheel: turn  ·  click: stars", "колесо: поворот  ·  нажать: звёзды"), L("wheel: turn  ·  click: no labels", "колесо: поворот  ·  нажать: без подписей"), L("wheel: turn  ·  click: constellations", "колесо: поворот  ·  нажать: созвездия") };
+  uiFooter(LBL[s_skyLabels], L("side: back", "кнопка: назад"));
   present();
   (void)now; (void)W;
 }
@@ -336,18 +337,18 @@ void drawGlobe(uint32_t now) {
   spr.setTextDatum(TL_DATUM);
   int si = satIdx >= 0 ? satIdx : 0;
   if (!timeOk) {
-    spr.setTextColor(C_ALERT()); txt("TIME UNKNOWN", px, UI_TOP + 4, 2);
-    spr.setTextColor(UI_LABEL()); txt("CONNECT THE LAPTOP ONCE:", px, UI_TOP + 26, 1);
-    txt("RUN start_pc_monitor.bat", px, UI_TOP + 38, 1);
+    spr.setTextColor(C_ALERT()); txt(L("TIME UNKNOWN", "ВРЕМЯ НЕИЗВЕСТНО"), px, UI_TOP + 4, 2);
+    spr.setTextColor(UI_LABEL()); txt(L("CONNECT ONCE TO", "ОДИН РАЗ ПОДКЛЮЧИТЕ"), px, UI_TOP + 26, 1);
+    txt(L("TENGAN DESKTOP OR TABLET", "TENGAN DESKTOP ИЛИ ПЛАНШЕТ"), px, UI_TOP + 38, 1);
   } else if (g_nSats == 0) {
-    spr.setTextColor(C_ALERT()); txt("NO ORBITS", px, UI_TOP + 4, 2);
-    spr.setTextColor(UI_LABEL()); txt("LAPTOP DOWNLOADS THEM:", px, UI_TOP + 26, 1);
-    txt("RUN start_pc_monitor.bat", px, UI_TOP + 38, 1);
-    txt("(NEEDS INTERNET ONCE)", px, UI_TOP + 50, 1);
+    spr.setTextColor(C_ALERT()); txt(L("NO ORBITS", "НЕТ ОРБИТ"), px, UI_TOP + 4, 2);
+    spr.setTextColor(UI_LABEL()); txt(L("TENGAN DESKTOP LOADS THEM:", "ИХ ЗАГРУЖАЕТ TENGAN DESKTOP:"), px, UI_TOP + 26, 1);
+    txt(L("START IT ON THE COMPUTER", "ЗАПУСТИТЕ ЕГО НА КОМПЬЮТЕРЕ"), px, UI_TOP + 38, 1);
+    txt(L("(NEEDS INTERNET ONCE)", "(НУЖЕН ИНТЕРНЕТ ОДИН РАЗ)"), px, UI_TOP + 50, 1);
   } else if (spOk[si]) {
     const SatPos& p = sp[si];
     spr.setTextColor(C_HOT()); txt(g_sats[si].name, px, UI_TOP + 2, 4);
-    snprintf(buf, sizeof(buf), "ALT %d KM   %.2f KM/S", (int)p.altKm, p.speedKms);
+    snprintf(buf, sizeof(buf), L("ALT %d KM   %.2f KM/S", "ВЫС %d КМ   %.2f КМ/С"), (int)p.altKm, p.speedKms);
     spr.setTextColor(UI_LABEL()); txt(buf, px, UI_TOP + 28, 1);
     snprintf(buf, sizeof(buf), "%.1f%c  %.1f%c", fabsf(p.lat), p.lat >= 0 ? 'N' : 'S', fabsf(p.lon), p.lon >= 0 ? 'E' : 'W');
     txt(buf, px, UI_TOP + 40, 1);
@@ -358,31 +359,31 @@ void drawGlobe(uint32_t now) {
       s_passAt = t; lastSi = si; lastCity = g_city;
     }
     float el, az; satLook(p, c.lat, c.lon, el, az);
-    static const char* const DIR8[8] = { "N", "NE", "E", "SE", "S", "SW", "W", "NW" };
+    static const char* const DIR8[8] = { L("N", "С"), L("NE", "СВ"), L("E", "В"), L("SE", "ЮВ"), L("S", "Ю"), L("SW", "ЮЗ"), L("W", "З"), L("NW", "СЗ") };
     if (el >= 10) {
-      spr.setTextColor(C_HOT()); txt("OVERHEAD NOW", px, UI_TOP + 58, 2);
-      snprintf(buf, sizeof(buf), "LOOK %s, %d DEG UP", DIR8[((int)(az + 22.5f) / 45) % 8], (int)el);
+      spr.setTextColor(C_HOT()); txt(L("OVERHEAD NOW", "НАД ВАМИ"), px, UI_TOP + 58, 2);
+      snprintf(buf, sizeof(buf), L("LOOK %s, %d DEG UP", "СМОТРИТЕ %s, %d° ВВЕРХ"), DIR8[((int)(az + 22.5f) / 45) % 8], (int)el);
       spr.setTextColor(C_ACC()); txt(buf, px, UI_TOP + 76, 1);
     } else if (s_pass.found) {
-      spr.setTextColor(UI_LABEL()); txt("NEXT PASS OVER YOU", px, UI_TOP + 58, 1);
+      spr.setTextColor(UI_LABEL()); txt(L("NEXT PASS OVER YOU", "СЛЕДУЮЩИЙ ПРОЛЁТ"), px, UI_TOP + 58, 1);
       hhmm(s_pass.rise, b2, sizeof(b2));
       long in = (long)(s_pass.rise - t);
       snprintf(buf, sizeof(buf), "%s", b2);
       spr.setTextColor(C_HOT()); txt(buf, px, UI_TOP + 70, 4);
-      snprintf(buf, sizeof(buf), "IN %ldH %02ldM", in / 3600, in / 60 % 60);
+      snprintf(buf, sizeof(buf), L("IN %ldH %02ldM", "ЧЕРЕЗ %ld Ч %02ld МИН"), in / 3600, in / 60 % 60);
       spr.setTextColor(C_ACC()); txt(buf, px, UI_TOP + 96, 1);
-      snprintf(buf, sizeof(buf), "UP TO %d DEG, FROM %s", (int)s_pass.maxEl, DIR8[((int)(s_pass.azRise + 22.5f) / 45) % 8]);
+      snprintf(buf, sizeof(buf), L("UP TO %d DEG, FROM %s", "ДО %d°, С %s"), (int)s_pass.maxEl, DIR8[((int)(s_pass.azRise + 22.5f) / 45) % 8]);
       txt(buf, px, UI_TOP + 106, 1);
     } else {
-      spr.setTextColor(UI_LABEL()); txt("NO PASS IN 24 H", px, UI_TOP + 58, 1);
+      spr.setTextColor(UI_LABEL()); txt(L("NO PASS IN 24 H", "ЗА 24 Ч ПРОЛЁТОВ НЕТ"), px, UI_TOP + 58, 1);
     }
     float age = satAgeDays(g_sats[si], t);
-    snprintf(buf, sizeof(buf), "ORBIT DATA %.1f DAYS OLD", age);
+    snprintf(buf, sizeof(buf), L("ORBIT DATA %.1f DAYS OLD", "ОРБИТЫ ОТ %.1f ДН. НАЗАД"), age);
     spr.setTextColor(age > 7 ? C_ALERT() : UI_DIM()); txt(buf, px, UI_TOP + 120, 1);
   }
-  const char* follow = s_gFollow == 1 ? "home" : (satIdx >= 0 && satIdx < g_nSats ? g_sats[satIdx].name : "ISS");
-  snprintf(buf, sizeof(buf), "following %s", follow);
-  uiHeader("Globe", buf);
-  uiFooter("wheel: turn  click: follow", "side: back");
+  const char* follow = s_gFollow == 1 ? L("home", "дом") : (satIdx >= 0 && satIdx < g_nSats ? g_sats[satIdx].name : "ISS");
+  snprintf(buf, sizeof(buf), L("following %s", "слежу: %s"), follow);
+  uiHeader(L("Globe", "Глобус"), buf);
+  uiFooter(L("wheel: turn  ·  click: follow", "колесо: поворот  ·  нажать: следить"), L("side: back", "кнопка: назад"));
   present();
 }

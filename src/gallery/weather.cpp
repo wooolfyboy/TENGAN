@@ -59,6 +59,15 @@ static float easeTo(float v, float target, float dt, float tau) { return v + (ta
 
 static int sumOf(const uint8_t* a) { int s = 0; for (int i = 0; i < 60; i++) s += a[i]; return s; }
 
+// состояние для экрана (машинное имя остаётся в JSON)
+static const char* condLabel(const char* c) {
+#if LANG_RU
+  static const char* const M[][2] = { { "calm", "штиль" }, { "storm", "гроза" }, { "rain", "дождь" }, { "windy", "ветрено" },
+                                      { "overcast", "пасмурно" }, { "cloudy", "облачно" }, { "clear", "ясно" } };
+  for (auto& m : M) if (!strcmp(c, m[0])) return m[1];
+#endif
+  return c;
+}
 static const char* condFor(const WxState& w) {
   if (w.clouds < 0.08f && w.rain < 0.05f && w.wind < 0.1f) return "calm";
   if (w.storm > 0.6f) return "storm";
@@ -292,8 +301,8 @@ static void drawChartView(int x0, int y0, int w, int h) {
   spr.drawRect(x0, y0, w, h, UI_LINE());
   for (int k = 1; k < 4; k++) spr.drawFastHLine(x0 + 1, y0 + h * k / 4, w - 2, UI_LINE());
   spr.setTextDatum(TL_DATUM); spr.setTextColor(UI_DIM());
-  txt("10 MIN", x0 + 3, y0 + 3, 1);
-  if (W.histN < 2) { spr.setTextColor(UI_LABEL()); txt("COLLECTING...", x0 + 30, y0 + h / 2 - 4, 1); return; }
+  txt(L("10 MIN", "10 МИН"), x0 + 3, y0 + 3, 1);
+  if (W.histN < 2) { spr.setTextColor(UI_LABEL()); txt(L("COLLECTING...", "СОБИРАЮ..."), x0 + 30, y0 + h / 2 - 4, 1); return; }
   int px = 0, pyC = 0, pyR = 0;
   for (int i = 0; i < W.histN; i++) {
     int x = x0 + 2 + (w - 4) * i / (WX_HIST - 1);
@@ -304,15 +313,15 @@ static void drawChartView(int x0, int y0, int w, int h) {
     }
     px = x; pyC = yc; pyR = yr;
   }
-  spr.setTextColor(C_ACC()); txt("CLOUDS", x0 + w - 70, y0 + 3, 1);
-  spr.setTextColor(C_ALERT()); txt("RAIN", x0 + w - 28, y0 + 3, 1);
+  spr.setTextColor(C_ACC()); txt(L("CLOUDS", "ОБЛАКА"), x0 + w - 70, y0 + 3, 1);
+  spr.setTextColor(C_ALERT()); txt(L("RAIN", "ДОЖДЬ"), x0 + w - 28, y0 + 3, 1);
 }
 
 void drawWeather(uint32_t now) {
   const WxState& W = g_wx;
   spr.fillSprite(C_BG());
-  char cond[16]; strncpy(cond, W.cond, sizeof(cond)); cond[sizeof(cond) - 1] = 0;
-  uiHeader("Radio weather", W.ok ? cond : "starting", W.storm > 0.6f);
+  char cond[40]; snprintf(cond, sizeof cond, "%s", condLabel(W.cond));
+  uiHeader(L("Radio weather", "Радиопогода"), W.ok ? cond : L("starting", "запуск"), W.storm > 0.6f);
 
   const int lx = UI_M, ly = UI_TOP + 2, lw = 186, lh = UI_BOTTOM - UI_TOP - 2;
   if (s_view == 0) drawSkyView(now, lx, ly, lw, lh); else drawChartView(lx, ly, lw, lh);
@@ -320,14 +329,14 @@ void drawWeather(uint32_t now) {
   // метеостанция справа
   int x = lx + lw + 8, y = UI_TOP + 2;
   char v[24];
-  snprintf(v, sizeof(v), "%d dev", W.ble);
-  uiReadout(x, y, "clouds", v, C_HOT(), 2);           y += 30;
-  snprintf(v, sizeof(v), "%.0f/min", W.turn);
-  uiReadout(x, y, "wind", v, C_HOT(), 2);             y += 30;
-  if (W.subOk) snprintf(v, sizeof(v), "%.0f/min", W.sub); else strcpy(v, "no radio");
-  uiReadout(x, y, "rain 433", v, W.rain > 0.35f ? C_ALERT() : C_HOT(), 2);   y += 30;
-  if (W.sndOk) snprintf(v, sizeof(v), "%.0f dBFS", W.pk); else strcpy(v, "mic off");
-  uiReadout(x, y, "thunder", v, W.thunder ? C_ALERT() : C_HOT(), 2);
+  snprintf(v, sizeof(v), L("%d dev", "%d устр."), W.ble);
+  uiReadout(x, y, L("clouds", "облака"), v, C_HOT(), 2);           y += 30;
+  snprintf(v, sizeof(v), L("%.0f/min", "%.0f/мин"), W.turn);
+  uiReadout(x, y, L("wind", "ветер"), v, C_HOT(), 2);             y += 30;
+  if (W.subOk) snprintf(v, sizeof(v), L("%.0f/min", "%.0f/мин"), W.sub); else strcpy(v, L("no radio", "нет радио"));
+  uiReadout(x, y, L("rain 433", "дождь 433"), v, W.rain > 0.35f ? C_ALERT() : C_HOT(), 2);   y += 30;
+  if (W.sndOk) snprintf(v, sizeof(v), L("%.0f dBFS", "%.0f дБFS"), W.pk); else strcpy(v, L("mic off", "мик. выкл"));
+  uiReadout(x, y, L("thunder", "гром"), v, W.thunder ? C_ALERT() : C_HOT(), 2);
 
   // барометр: стрелка вверх/вниз по тренду облачности
   int bx = x + 100, by = UI_TOP + 12;
@@ -336,6 +345,6 @@ void drawWeather(uint32_t now) {
   spr.fillTriangle(bx - 4, by + dy + (dy <= 0 ? 4 : -4), bx + 4, by + dy + (dy <= 0 ? 4 : -4), bx, by + dy + (dy <= 0 ? -3 : 3),
                    fabsf(W.trend) > 0.3f ? C_ACC() : UI_DIM());
 
-  uiFooter(s_view == 0 ? "wheel: chart" : "wheel: sky", "side: back");
+  uiFooter(s_view == 0 ? L("wheel: chart", "колесо: график") : L("wheel: sky", "колесо: небо"), L("side: back", "кнопка: назад"));
   present();
 }
