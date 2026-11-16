@@ -97,12 +97,13 @@ T.galGL = (() => {
     vec3 col; float al=smoothstep(1.,.992,r);
     if(ink>.5){
       float gran=noise(gl_FragCoord.xy*.35)*.12;
-      float w=.06+m*(.42+.25*det)+gran*m;                 // суша — размывка тушью, океан — чистая бумага
-      w+= (1.-day)*.38;                                     // ночь — общая заливка
+      float w=.05+m*(.20+.22*det)+gran*m;                 // суша — размывка тушью, океан — чистая бумага
+      w+= (1.-day)*(.20+.12*m);                             // ночь — общая заливка
+      w+= smoothstep(.40,.50,m0+(det-.5)*.32)*smoothstep(.62,.50,m0+(det-.5)*.32)*.35;   // берег — линия кистью
       w+= term*.18*(1.+det);                                // терминатор — мазок
       w+= pow(1.-n.z,2.5)*.35;                              // край диска темнее
       w-= cl*day*.12;
-      col=mix(P,K,clamp(w,0.,.95));
+      col=mix(P,K,clamp(w,0.,.85));
       gl_FragColor=vec4(col*al,al); return;
     }
     vec3 ocean=mix(vec3(.01,.05,.09),vec3(.02,.14,.22),day);
