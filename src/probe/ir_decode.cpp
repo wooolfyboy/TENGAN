@@ -16,7 +16,7 @@ static bool near(uint32_t v, uint32_t t) {
 // «расстояние между вспышками»: бит = вспышка mark + пауза one/zero. Начало — с индекса i0.
 static bool pulseDist(const uint16_t* d, int n, int i0, int bits, uint32_t mark, uint32_t one, uint32_t zero,
                       bool lsb, uint64_t& v) {
-  if (n < i0 + 2 * bits) return false;
+  if (n < i0 + 2 * bits || n > i0 + 2 * bits + 2) return false;   // лишние импульсы — значит, не этот протокол
   v = 0;
   for (int b = 0; b < bits; b++) {
     if (!near(d[i0 + 2 * b], mark)) return false;
@@ -28,7 +28,6 @@ static bool pulseDist(const uint16_t* d, int n, int i0, int bits, uint32_t mark,
   return true;
 }
 
-static uint8_t rev8(uint8_t x) { uint8_t r = 0; for (int i = 0; i < 8; i++) if (x & (1 << i)) r |= 0x80 >> i; return r; }
 static void setP(IrCode& c, const char* p) { snprintf(c.proto, sizeof(c.proto), "%s", p); }
 
 // Manchester: разложить длительности на «полубиты» по unit мкс (1 — вспышка, 0 — пауза)
@@ -44,7 +43,7 @@ static int halves(const uint16_t* d, int n, int i0, uint32_t unit, uint8_t* h, i
 }
 
 static bool decodeRc5(const uint16_t* d, int n, IrCode& c) {
-  if (n < 9 || !near(d[0], 889) && !near(d[0], 1778)) return false;
+  if (n < 9 || (!near(d[0], 889) && !near(d[0], 1778))) return false;
   uint8_t h[40]; h[0] = 0;                                 // первая половина стартового бита — пауза (не видна)
   int m = halves(d, n, 0, 889, h + 1, 38, 2);
   if (m < 0) return false;
@@ -120,7 +119,7 @@ bool irDecode(const uint16_t* d, int n, IrCode& c) {
   if (near(d[0], 9000) && near(d[1], 2250) && n <= 4) { setP(c, "NEC"); c.rep = true; return true; }   // «держат кнопку»
   if (near(d[0], 8800) && near(d[1], 4400)) {
     int bits = (n - 3) / 2;
-    if (bits >= 32 && pulseDist(d, n, 2, 32, 560, 1690, 560, true, v)) {
+    if (bits == 32 && pulseDist(d, n, 2, 32, 560, 1690, 560, true, v)) {
       uint8_t b0 = v, b1 = v >> 8, b2 = v >> 16, b3 = v >> 24;
       if ((uint8_t)~b0 == b1) { setP(c, "NEC"); c.addr = b0; } else { setP(c, "NEC-EXT"); c.addr = b0 | b1 << 8; }
       c.cmd = ((uint8_t)~b2 == b3) ? b2 : (b2 | b3 << 8);
@@ -220,6 +219,5 @@ bool irFeed(const uint16_t* d, int n, uint32_t now) {
   } else if (m.histN) m.hist[0].t = now;
   m.last = c; m.have = true;
   m.gen++;
-  (void)rev8;
   return true;
 }

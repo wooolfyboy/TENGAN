@@ -26,6 +26,7 @@ SRC=(
   "$ROOT/src/ble/ble_screens.cpp" "$ROOT/src/ble/ble_city.cpp" "$ROOT/src/ble/vendors.cpp"
   "$ROOT/src/wifi/wifi_model.cpp" "$ROOT/src/wifi/wifi_screens.cpp"
   "$ROOT/src/subghz/subghz_screens.cpp" "$ROOT/src/audio/audio_screens.cpp" "$ROOT/src/gallery/gallery.cpp" "$ROOT/src/gallery/gallery_sky.cpp" "$ROOT/src/gallery/weather.cpp" "$ROOT/src/gallery/astro.cpp" "$ROOT/src/gallery/sat.cpp" "$ROOT/src/web/web_screen.cpp" "$ROOT/src/pc/pc.cpp" "$ROOT/src/pc/pc_screens.cpp" "$ROOT/src/pc/pc_city.cpp"
+  "$ROOT/src/probe/ir_decode.cpp" "$ROOT/src/probe/ir_screens.cpp" "$ROOT/src/probe/nfc_model.cpp" "$ROOT/src/probe/nfc_screens.cpp"
 )
 g++ -O1 -std=gnu++17 -w -I"$SIM/stubs" -I"$WORK/tftlib" -I"$ROOT/src" $DEFS "${SRC[@]}" -o "$WORK/sim"
 rm -f "$OUT"/*.ppm "$OUT"/*.png

@@ -19,9 +19,11 @@
 #include "wifi/wifi.h"
 #include "subghz/subghz.h"
 #include "audio/audio.h"
+#include "probe/ir.h"
+#include "probe/nfc.h"
 
 // порядок карточек в главном меню
-static const Section* const SECTIONS[] = { &bleSection, &wifiSection, &subghzSection, &soundSection, &webSection, &pcSection, &gallerySection, &settingsSection };
+static const Section* const SECTIONS[] = { &bleSection, &wifiSection, &subghzSection, &soundSection, &irSection, &nfcSection, &webSection, &pcSection, &gallerySection, &settingsSection };
 static const int N_SECTIONS = sizeof(SECTIONS) / sizeof(SECTIONS[0]);
 
 static int  s_cur = -1;          // открытый раздел; -1 — главное меню

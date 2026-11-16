@@ -30,6 +30,8 @@
 #include "subghz/subghz_model.h"
 #include "audio/audio.h"
 #include "audio/audio_model.h"
+#include "probe/ir.h"
+#include "probe/nfc.h"
 #include <esp_wifi.h>
 #include <Wire.h>
 #include <SPI.h>
@@ -54,6 +56,11 @@ int      g_top = 0;
 bool     g_detail = false;
 int8_t   g_spark[SPARK_N];
 int      g_sparkN = 0;
+// «чёрный ящик» (в прошивке — core/crumb.cpp)
+void crumb(const char*) {}
+bool crumbWasCrash() { return false; }
+const char* crumbLastStep() { return ""; }
+const char* crumbLastReason() { return ""; }
 void bleRadioOff() {}
 void bleRadioOn() {}
 bool bleRadioActive() { return true; }
@@ -155,6 +162,60 @@ const Section soundSection = { "Sound", 120, 200, 255, iconMic, sndSub, noop, no
   A_NUM, sndInfo, zero, noopI, noop, noop, noopI, noBack, noopT, noopT };
 const Section subghzSection = { "Sub-GHz", 240, 120, 90, iconAntenna, subSub, noop, noop,
   G_NUM, subInfo, zero, noopI, noop, noop, noopI, noBack, noopT, noopT };
+static void irSub(char* o, size_t n) { snprintf(o, n, g_ir.have ? "%s" : "whose remote?", g_ir.last.proto); }
+static void nfcSub(char* o, size_t n) { snprintf(o, n, "%lu cards", (unsigned long)g_nfc.taps); }
+const Section irSection = { "IR", 230, 90, 120, iconRemote, irSub, noop, noop,
+  0, nullptr, nullptr, nullptr, nullptr, noop, noopI, noBack, noopT, drawIr };
+const Section nfcSection = { "NFC", 120, 230, 160, iconCard, nfcSub, noop, noop,
+  0, nullptr, nullptr, nullptr, nullptr, noop, noopI, noBack, noopT, drawNfc };
+
+// ---------- ИК: синтетические пачки разных пультов (проверка разбора) ----------
+static std::vector<uint16_t> irDist(uint32_t hm, uint32_t hs, const std::vector<uint8_t>& bytes, int bits, uint32_t mk, uint32_t one, uint32_t zero, bool lsb) {
+  std::vector<uint16_t> d = { (uint16_t)hm, (uint16_t)hs };
+  for (int b = 0; b < bits; b++) {
+    int bit = lsb ? (bytes[b / 8] >> (b % 8)) & 1 : (bytes[b / 8] >> (7 - b % 8)) & 1;
+    d.push_back(mk + 40); d.push_back(bit ? one - 40 : zero - 40);   // приёмник удлиняет вспышки
+  }
+  d.push_back(mk);
+  return d;
+}
+static std::vector<uint16_t> runs(const std::vector<uint8_t>& h, uint32_t unit) {   // полубиты -> длительности (с первой вспышки)
+  std::vector<uint16_t> d; int i = 0;
+  while (i < (int)h.size() && h[i] == 0) i++;
+  while (i < (int)h.size()) { int j = i; while (j < (int)h.size() && h[j] == h[i]) j++; d.push_back((j - i) * unit); i = j; }
+  if (d.size() % 2 == 0) d.pop_back();                      // хвостовая пауза не видна
+  return d;
+}
+static void irTestAll(bool verbose) {
+  std::vector<std::vector<uint16_t>> f;
+  f.push_back(irDist(9000, 4500, { 0x04, 0xFB, 0x08, 0xF7 }, 32, 560, 1690, 560, true));        // LG TV, power
+  f.push_back(irDist(4500, 4500, { 0x07, 0x07, 0x02, 0xFD }, 32, 560, 1690, 560, true));        // Samsung TV
+  { std::vector<uint16_t> d = { 2400, 600 }; uint32_t v = 0x15 | (1 << 7);                       // Sony TV 12 бит
+    for (int b = 0; b < 12; b++) { d.push_back((v >> b) & 1 ? 1200 : 600); if (b < 11) d.push_back(600); } f.push_back(d); }
+  { std::vector<uint8_t> h; uint16_t v = 0x3000 | (0 << 6) | 0x0C;                              // RC5 Philips TV, cmd 12
+    for (int b = 13; b >= 0; b--) { int bit = (v >> b) & 1; h.push_back(bit ? 0 : 1); h.push_back(bit ? 1 : 0); }
+    f.push_back(runs(h, 889)); }
+  { std::vector<uint8_t> h = { 1, 1, 1, 1, 1, 1, 0, 0 };                                         // RC6: лидер 6+2 полубитов по 444
+    h.push_back(1); h.push_back(0);                                                               // старт 1
+    for (int b = 0; b < 3; b++) { h.push_back(0); h.push_back(1); }                               // режим 0
+    h.push_back(0); h.push_back(0); h.push_back(1); h.push_back(1);                               // прицеп (toggle 0)
+    uint16_t v = 0x000C;
+    for (int b = 15; b >= 0; b--) { int bit = (v >> b) & 1; h.push_back(bit); h.push_back(!bit); }
+    auto d = runs(h, 444); d[0] = 2666; d[1] = 889; f.push_back(d); }
+  f.push_back(irDist(3456, 1728, { 0x02, 0x20, 0xE0, 0x04, 0x3D, 0xBD }, 48, 432, 1296, 432, true));   // Panasonic
+  f.push_back(irDist(8500, 4250, { 0x88, 0x00, 0x34, 0x70 }, 28, 550, 1600, 550, false));          // LG кондиционер
+  { std::vector<uint16_t> d = { 3100, 1600 }; for (int i = 0; i < 139; i++) d.push_back(i % 2 ? (i % 7 < 3 ? 1150 : 400) : 450); f.push_back(d); }   // «кондиционер»
+  f.push_back(irDist(9000, 4500, { 0xEE, 0x87, 0x0C, 0x5A }, 32, 560, 1690, 560, true));          // Apple
+  for (auto& d : f) {
+    IrCode c;
+    bool ok = irDecode(d.data(), (int)d.size(), c);
+    if (verbose) printf("ir: n=%3d -> %s %-9s addr=%lX cmd=%lX bits=%d brand=%s\n", (int)d.size(), ok ? "ok" : "--", c.proto,
+                        (unsigned long)c.addr, (unsigned long)c.cmd, c.bits, ok ? irBrand(c) : "");
+  }
+  for (size_t i = 0; i < f.size(); i++) { s_now += 1500; irFeed(f[i].data(), (int)f[i].size(), s_now); }
+  s_now += 1500; irFeed(f[0].data(), (int)f[0].size(), s_now);                                   // снова LG — последняя
+  { uint16_t r[] = { 9000, 2250, 560 }; s_now += 110; irFeed(r, 3, s_now); }                     // держат кнопку
+}
 
 // ---------- вывод ----------
 static const char* s_outDir = "out";
@@ -422,6 +483,41 @@ int main(int argc, char** argv) {
     settingsSetKey("theme", "denko", o); printf("set denko: %s\n", o.c_str());
     for (int f = 0; f < 5; f++) drawWebLink(l, 9500 + f * 70);
     snap("zz_theme_flip"); printf("theme flip ok\n"); }
+  { // IR и NFC (разбор — настоящий код, данные синтетические)
+    g_ir.on = g_ir.ok = true;
+    drawIr(s_now);                                       snap("80_ir_idle");
+    uint32_t keep = s_now;
+    irTestAll(true);
+    drawIr(s_now + 120);                                 snap("81_ir_lg");
+    drawIr(s_now + 2000);                                snap("81b_ir_settled");
+    s_now = keep;
+    g_nfc.state = NFC_SCAN;
+    drawNfc(s_now + 900);                                snap("82_nfc_idle");
+    NfcCard c; memset(&c, 0, sizeof c);
+    uint8_t u1[4] = { 0x3A, 0x91, 0x0C, 0x55 }; memcpy(c.uid, u1, 4); c.uidLen = 4; c.atqa = 0x0004; c.sak = 0x08;
+    nfcClassify(c, -1); nfcCommit(c, s_now - 60000);
+    NfcCard t; memset(&t, 0, sizeof t);
+    uint8_t u2[7] = { 0x04, 0xA2, 0x5B, 0x1A, 0x9C, 0x70, 0x80 }; memcpy(t.uid, u2, 7); t.uidLen = 7; t.atqa = 0x0044; t.sak = 0x00;
+    const char url[] = "tengan.dev/hello";
+    uint8_t mem[64] = { 0x03, 0, 0xD1, 0x01, (uint8_t)(sizeof(url)), 'U', 0x04 };
+    memcpy(mem + 7, url, sizeof(url) - 1);
+    int p = 7 + sizeof(url) - 1;
+    const char txtr[] = "\x02" "ruПривет, палка";
+    mem[p++] = 0x51; mem[p++] = 0x01; mem[p++] = (uint8_t)(sizeof(txtr) - 1); mem[p++] = 'T';
+    memcpy(mem + p, txtr, sizeof(txtr) - 1); p += sizeof(txtr) - 1;
+    mem[1] = (uint8_t)(p - 2); mem[p++] = 0xFE;
+    mem[2] = 0x91;                                           // первая запись: MB, SR, TNF=1 (не последняя)
+    nfcParseNdef(mem, p, t); nfcClassify(t, 0x0F); nfcCommit(t, s_now - 200);
+    printf("nfc: %s / %s / ndef=%d [%s] [%s]\n", t.fam, t.hint, t.nNdef, t.ndef[0], t.nNdef > 1 ? t.ndef[1] : "");
+    g_nfc.lastSeen = s_now;
+    drawNfc(s_now);                                      snap("83_nfc_tag");
+    NfcCard b; memset(&b, 0, sizeof b);
+    uint8_t u3[4] = { 0x08, 0x4F, 0x21, 0x9E }; memcpy(b.uid, u3, 4); b.uidLen = 4; b.atqa = 0x0004; b.sak = 0x20; b.isoDep = true; b.bank = true;
+    nfcClassify(b, -1); nfcCommit(b, s_now - 300); g_nfc.lastSeen = s_now;
+    drawNfc(s_now);                                      snap("84_nfc_bank");
+    g_nfc.present = false; drawNfc(s_now + 14000);       snap("84b_nfc_bank_gone");
+    { String j; char u[24]; nfcUidMasked(b, u, sizeof u, true); printf("nfc uid: %s\n", u); }
+    g_nfc.state = NFC_NOREADER; drawNfc(s_now);          snap("85_nfc_noreader"); g_nfc.state = NFC_SCAN; }
   drawPcWaiting(s_now);      snap("70_pc_waiting");
   for (int i = 0; i < 60; i++) {                        // минута «настоящих» строк с ноутбука
     char ln[300];

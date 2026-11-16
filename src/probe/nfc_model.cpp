@@ -1,0 +1,128 @@
+// ============================================================
+//  nfc_model.cpp — что за карта: по ATQA/SAK (+ ответу на PPSE и
+//  GET_VERSION), разбор NDEF-записей метки, история прикладываний.
+//  Без железа — собирается и в симуляторе.
+// ============================================================
+#include "probe/nfc.h"
+
+NfcModel g_nfc;
+
+static void put(NfcCard& c, const char* fam, const char* hint) {
+  snprintf(c.fam, sizeof(c.fam), "%s", fam);
+  snprintf(c.hint, sizeof(c.hint), "%s", hint);
+}
+
+void nfcClassify(NfcCard& c, int ulVer) {
+  if (c.felica) { put(c, "FeliCa", "Japan transit / e-money - likely"); return; }
+  if (c.bank)   { put(c, "Bank card (EMV)", "contactless payment card or phone"); return; }
+  uint8_t sak = c.sak & 0x7F;                    // бит 7 (0x80) у некоторых — «каскад», не тип
+  switch (c.sak) {
+    case 0x09: put(c, "MIFARE Mini", "old transit / access card"); return;
+    case 0x08: case 0x88: put(c, "MIFARE Classic 1K", "transit pass / door key - likely"); return;
+    case 0x18: put(c, "MIFARE Classic 4K", "transit / campus card - likely"); return;
+    case 0x10: put(c, "MIFARE Plus 2K", "transit / access card - likely"); return;
+    case 0x11: put(c, "MIFARE Plus 4K", "transit / access card - likely"); return;
+    case 0x28: put(c, "Classic + smart chip", "transit + smart card - likely"); return;
+    case 0x38: put(c, "Classic 4K + smart chip", "transit + smart card - likely"); return;
+  }
+  if (sak == 0x00) {
+    switch (ulVer) {
+      case 0x0F: put(c, "NTAG213", "sticker / tag - 144 bytes"); return;
+      case 0x11: put(c, "NTAG215", "tag / game figure - 504 bytes"); return;
+      case 0x13: put(c, "NTAG216", "sticker / tag - 888 bytes"); return;
+      case 0x0B: put(c, "Ultralight EV1", "one-trip ticket / tag - likely"); return;
+      case 0x0E: put(c, "Ultralight EV1", "ticket / tag - likely"); return;
+    }
+    put(c, "Ultralight / NTAG", "ticket, sticker or tag - likely"); return;
+  }
+  if (c.sak & 0x20) {
+    if (c.atqa == 0x0344) { put(c, "MIFARE DESFire", "transit / access card - likely"); return; }
+    put(c, "Smart card (ISO-DEP)", "ID / access / transit - unknown"); return;
+  }
+  put(c, "ISO 14443-A tag", "unknown chip");
+}
+
+// ---------- NDEF ----------
+static const char* const URI_PFX[] = {
+  "", "http://www.", "https://www.", "http://", "https://", "tel:", "mailto:", "ftp://anonymous:anonymous@",
+  "ftp://ftp.", "ftps://", "sftp://", "smb://", "nfs://", "ftp://", "dav://", "news:", "telnet://", "imap:",
+  "rtsp://", "urn:", "pop:", "sip:", "sips:", "tftp:", "btspp://", "btl2cap://", "btgoep://", "tcpobex://",
+  "irdaobex://", "file://", "urn:epc:id:", "urn:epc:tag:", "urn:epc:pat:", "urn:epc:raw:", "urn:epc:", "urn:nfc:",
+};
+
+static void addRec(NfcCard& c, const char* pre, const uint8_t* p, int n) {
+  if (c.nNdef >= NFC_NDEF_N) return;
+  char* o = c.ndef[c.nNdef++];
+  int k = snprintf(o, NFC_NDEF_LEN, "%s", pre);
+  for (int i = 0; i < n && k < NFC_NDEF_LEN - 1; i++) o[k++] = p[i] < 0x20 ? ' ' : (char)p[i];
+  if (k > NFC_NDEF_LEN - 1) k = NFC_NDEF_LEN - 1;
+  o[k] = 0;
+  // не оставлять «половинку» русской буквы в конце
+  while (k > 0 && ((uint8_t)o[k - 1] & 0xC0) == 0xC0) o[--k] = 0;
+}
+
+static void parseMsg(const uint8_t* p, int n, NfcCard& c) {
+  int i = 0;
+  while (i + 3 <= n && c.nNdef < NFC_NDEF_N) {
+    uint8_t h = p[i++];
+    uint8_t tnf = h & 7; bool sr = h & 0x10, il = h & 0x08;
+    uint8_t tl = p[i++];
+    uint32_t pl;
+    if (sr) { if (i >= n) return; pl = p[i++]; }
+    else    { if (i + 4 > n) return; pl = (uint32_t)p[i] << 24 | p[i + 1] << 16 | p[i + 2] << 8 | p[i + 3]; i += 4; }
+    uint8_t idl = 0;
+    if (il) { if (i >= n) return; idl = p[i++]; }
+    if (i + tl + idl > n) return;
+    const uint8_t* type = p + i; i += tl + idl;
+    int avail = min((int)pl, n - i);
+    if (avail < 0) return;
+    const uint8_t* pay = p + i;
+    if (tnf == 1 && tl == 1 && type[0] == 'U' && avail >= 1) {
+      uint8_t pc = pay[0];
+      addRec(c, pc < sizeof(URI_PFX) / sizeof(URI_PFX[0]) ? URI_PFX[pc] : "", pay + 1, avail - 1);
+    } else if (tnf == 1 && tl == 1 && type[0] == 'T' && avail >= 1) {
+      int ll = pay[0] & 0x3F;
+      if (1 + ll <= avail) addRec(c, "", pay + 1 + ll, avail - 1 - ll);
+    } else if (tnf == 2) {                                   // MIME: показываем только тип (vCard, Wi-Fi — личное/пароль)
+      bool wifi = tl >= 19 && !memcmp(type, "application/vnd.wfa", 19);
+      if (wifi) addRec(c, "Wi-Fi settings (hidden)", nullptr, 0);
+      else addRec(c, "data: ", type, tl);
+    } else if (tnf == 4) {
+      addRec(c, "app: ", type, tl);                          // android.com:pkg и т.п.
+    }
+    i += pl;
+    if (h & 0x40) break;                                     // ME — последняя запись
+  }
+}
+
+void nfcParseNdef(const uint8_t* m, int n, NfcCard& c) {
+  c.nNdef = 0;
+  int i = 0;
+  while (i < n) {
+    uint8_t t = m[i++];
+    if (t == 0x00) continue;                                 // NULL TLV
+    if (t == 0xFE) return;                                   // конец
+    if (i >= n) return;
+    uint32_t len = m[i++];
+    if (len == 0xFF) { if (i + 2 > n) return; len = m[i] << 8 | m[i + 1]; i += 2; }
+    if (t == 0x03) { parseMsg(m + i, min((int)len, n - i), c); return; }
+    i += len;
+  }
+}
+
+void nfcUidMasked(const NfcCard& c, char* out, size_t n, bool utf8Dots) {
+  int k = 0;
+  out[0] = 0;
+  for (int i = 0; i < 2 && i < c.uidLen; i++) k += snprintf(out + k, n - k, "%02X", c.uid[i]);
+  if (c.uidLen > 2 && (size_t)k + 7 < n) k += snprintf(out + k, n - k, utf8Dots ? "\xE2\x80\xA2\xE2\x80\xA2" : "..");
+}
+
+void nfcCommit(const NfcCard& c0, uint32_t now) {
+  NfcModel& m = g_nfc;
+  NfcCard c = c0; c.t = now;
+  m.last = c; m.have = true; m.present = true; m.lastSeen = now;
+  m.taps++; m.gen++;
+  memmove(m.hist + 1, m.hist, sizeof(NfcCard) * (NFC_HIST - 1));
+  m.hist[0] = c;
+  if (m.histN < NFC_HIST) m.histN++;
+}
