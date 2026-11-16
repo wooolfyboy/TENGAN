@@ -132,10 +132,24 @@ void utf8Upper(const char* s, char* out, size_t n) {
   utf8UpperInPlace(out);
 }
 
+// встроенный шрифт 6x8 (кодовая страница 437, у Adafruit сдвинута на 1 после 0xB0) не знает UTF-8: «·» и «°» -> их коды
+static const char* glcdText(const char* s, char* buf, size_t n) {
+  bool hi = false; for (const char* p = s; *p; p++) if ((uint8_t)*p >= 0x80) { hi = true; break; }
+  if (!hi) return s;
+  size_t j = 0;
+  for (const uint8_t* p = (const uint8_t*)s; *p && j < n - 1; p++) {
+    if (p[0] == 0xC2 && p[1] == 0xB7) { buf[j++] = (char)0xF9; p++; continue; }
+    if (p[0] == 0xC2 && p[1] == 0xB0) { buf[j++] = (char)0xF7; p++; continue; }
+    buf[j++] = (char)*p;
+  }
+  buf[j] = 0;
+  return buf;
+}
+
 void txt(const char* s, int x, int y, int size) {
   const GFXfont* f = fontForText(s, size);
   if (f) { spr.setFreeFont(f); spr.drawString(s, x, y); spr.setFreeFont(nullptr); }
-  else   { spr.setFreeFont(nullptr); spr.drawString(s, x, y, size); }
+  else   { char b[160]; spr.setFreeFont(nullptr); spr.drawString(glcdText(s, b, sizeof b), x, y, size); }
 }
 
 void txtNum(long n, int x, int y, int size) {
@@ -146,7 +160,7 @@ void txtNum(long n, int x, int y, int size) {
 
 int txtW(const char* s, int size) {
   const GFXfont* f = fontForText(s, size);
-  if (!f) return spr.textWidth(s, size);
+  if (!f) { char b[160]; return spr.textWidth(glcdText(s, b, sizeof b), size); }
   spr.setFreeFont(f);
   int w = spr.textWidth(s);
   spr.setFreeFont(nullptr);
