@@ -25,6 +25,7 @@
 #include "ble/ble.h"
 #include "core/boot.h"
 #include "pc/pc.h"
+#include "web/web.h"
 #include "gallery/sat.h"
 #include <driver/gpio.h>
 #include <esp_ota_ops.h>
@@ -67,6 +68,7 @@ void setup() {
   pinMode(PIN_NRF_CS,  OUTPUT);  digitalWrite(PIN_NRF_CS,  HIGH);
 
   Serial.setRxBufferSize(2048);
+  Serial.setTxBufferSize(8192);    // поток приложения для компьютера (link/serout) — без ожидания
   Serial.begin(115200);  // USB: сюда пишет программа ноутбука (раздел PC)
   inputBegin();
   displayBegin();
@@ -92,6 +94,7 @@ void loop() {
   ledsTick();
   batTick(now);
   crumb("pc poll"); pcPoll(now);                        // строки с ноутбука по USB (раздел PC)
+  crumb("usb out"); webLinkPump();                     // в USB: страница и поток приложения для компьютера
   crumb("nav tick"); navTick(now);                       // работа открытого раздела (сканы, развёртки)
 
   powerIdleTick(now);
