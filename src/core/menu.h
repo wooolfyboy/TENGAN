@@ -9,6 +9,7 @@ void navClick();                   // нажатие колеса
 void navRotate(int dir);           // шаг колеса
 void navBack();                    // короткое нажатие боковой кнопки: на шаг назад
 void navToSub();                   // с экрана — обратно в подменю
+void navOpen(const Section* s);    // открыть раздел извне (приложение на компе)
 void navTick(uint32_t now);        // каждый проход loop()
 void navDraw(uint32_t now);        // нарисовать кадр
 

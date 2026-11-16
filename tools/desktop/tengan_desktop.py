@@ -253,6 +253,8 @@ class Link:
             while not pg["done"].wait(0.2):
                 if progress and pg["size"]:
                     progress(pg["got"], pg["size"])
+                if not pg["size"] and time.time() - t0 > 6:
+                    raise RuntimeError("палка не отвечает — на ней прошивка v1.8-test4 или новее? старый монитор ПК закрыт?")
                 if time.time() - t0 > timeout:
                     raise RuntimeError("палка не прислала страницу")
             data = b"".join(pg["chunks"][k] for k in sorted(pg["chunks"]))

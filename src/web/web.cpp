@@ -40,6 +40,8 @@
 #include "core/crumb.h"
 #include "core/battery.h"
 #include "core/display.h"
+#include "core/menu.h"
+#include "core/power.h"
 #include "core/leds.h"
 #include "probe/ir.h"
 #include "probe/nfc.h"
@@ -678,6 +680,7 @@ static void webTick(uint32_t now) {
 //  Без ответа 6 с — приложение закрыто, радио гаснет само (как у планшета).
 // ============================================================
 static uint32_t s_linkXMs = 0;
+static uint32_t s_linkWMs = 0;                    // последний «@W» от приложения (новое подключение — открыть Web)
 static int32_t  s_pgId = -1;                      // страница: кому и с какого места шлём
 static size_t   s_pgOff = 0;
 
@@ -686,6 +689,11 @@ void webLinkLine(char* s) {
   char cmd = s[1];
   char* rest = s[2] == ' ' ? s + 3 : s + 2;
   if (cmd == 'W') {
+    // новое подключение приложения (не было «@W» дольше 8 с) — палка сама открывает раздел Web;
+    // если Web потом закрыли руками при подключённом приложении — не навязываемся, только подсказка «@X»
+    bool fresh = !s_linkWMs || msSince(now, s_linkWMs) > 8000;
+    s_linkWMs = now ? now : 1;
+    if (!s_on && fresh) { powerTouch(); navOpen(&webSection); }
     if (!s_on) {                                   // подписаться не на что — раздел закрыт
       if (msSince(now, s_linkXMs) > 1500 || !s_linkXMs) { s_linkXMs = now ? now : 1; serOutLine("@X web"); }
       return;
