@@ -411,11 +411,12 @@ int main(int argc, char** argv) {
   { const char* pg[] = { "06a_set_general", "06b_set_ble", "06c_set_wifi", "06d_set_subghz", "06e_set_sound" };
     for (int p = 0; p < 5; p++) {
       if (p) navRotate(+1);
-      if (p == 0) { navClick(); navClick(); navDraw(s_now); snap("06a0_set_language"); navBack(); }   // пункт «Язык»
       navClick(); if (p == 0) for (int k = 0; k < 5; k++) navClick(); navDraw(s_now); snap(pg[p]); navBack();
     } }
   navBack();
   // Settings › Alerts (тревоги штаба): из главного меню — последняя карточка
+  navBegin(); navRotate(-1); navClick(); navClick(); navClick(); navDraw(s_now); snap("06a0_set_language");   // Настройки › Общие › «Язык»
+  navBack(); navBack();
   navBegin(); navRotate(-1); navClick(); navDraw(s_now); snap("06s_settings_pages");
   for (int k = 0; k < 5; k++) navRotate(+1);
   navClick(); navDraw(s_now); snap("06f_set_alerts");
