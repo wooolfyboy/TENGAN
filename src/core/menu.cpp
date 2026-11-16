@@ -138,11 +138,11 @@ static void drawMainMenuHud() {
   spr.fillSprite(bg);
   spr.setTextDatum(TL_DATUM);
   spr.setTextColor(dim);
-  txt("// " DEVICE_NAME " - SYS ONLINE", 8, 5, 1);
+  txt(L("// " DEVICE_NAME " · ONLINE", "// " DEVICE_NAME " · ГОТОВ"), 8, 5, 1);
   // заряд: «PWR 87%» и пять сегментов
   char buf[32];
   if (g_bat.ok) {
-    snprintf(buf, sizeof(buf), "PWR %d%%", g_bat.soc);
+    snprintf(buf, sizeof(buf), L("BAT %d%%", "ЗАРЯД %d%%"), g_bat.soc);
     spr.setTextDatum(TR_DATUM);
     spr.setTextColor(g_bat.soc <= 20 ? C_ALERT() : acc);
     txt(buf, W - 44, 5, 1);
@@ -177,14 +177,14 @@ static void drawMainMenuHud() {
     spr.setTextDatum(TC_DATUM);
     spr.setTextColor(sel ? C_SELFG() : steel);
     txt(title, cx, y0 + 62, txtW(title, 2) > cw - 4 ? 1 : 2);   // длинное название — мельче
-    char sub[24], big[16], small[16];
+    char sub[48], big[40], small[40];
     s->subtitle(sub, sizeof(sub));
     splitSubtitle(sub, big, small, sizeof(big));
-    bool alertish = (strcmp(small, "NO CHIP") == 0);
+    bool alertish = (strcmp(small, L("NO CHIP", "НЕТ ЧИПА")) == 0);
     spr.setTextColor(alertish ? C_ALERT() : (sel ? C_SELACC() : steel));
-    txt(big, cx, y0 + 82, 4);
+    { char bf[40]; fitText(big, bf, sizeof bf, cw - 4, 4); txt(bf, cx, y0 + 82, 4); }
     spr.setTextColor(sel && themeKurenai() ? UI_LINE() : dim);
-    char sm[16]; snprintf(sm, sizeof(sm), "%.*s", cw / 6, small);   // сколько влезает
+    char sm[40]; fitText(small, sm, sizeof sm, cw - 4, 1);   // сколько влезает (с учётом UTF-8)
     txt(sm, cx, y0 + 110, 1);
   }
 
@@ -193,7 +193,7 @@ static void drawMainMenuHud() {
   snprintf(buf, sizeof(buf), "T+%02lu:%02lu:%02lu", (unsigned long)(t / 3600), (unsigned long)(t / 60 % 60), (unsigned long)(t % 60));
   spr.setTextDatum(BL_DATUM);
   spr.setTextColor(dim);
-  txt("CLICK: OPEN   HOLD SIDE: OFF", 8, H - 4, 1);
+  txt(L("CLICK: OPEN  ·  HOLD SIDE: POWER", "НАЖАТЬ: ОТКРЫТЬ  ·  ДЕРЖАТЬ БОК: ПИТАНИЕ"), 8, H - 4, 1);
   spr.setTextDatum(BR_DATUM);
   spr.setTextColor(acc);
   txt(buf, W - 8, H - 4, 1);

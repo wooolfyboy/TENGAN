@@ -82,7 +82,7 @@ void drawSpark(int gx, int gy, int gw, int gh, const int8_t* buf, int n, int cap
 void drawSubmenu(const char* title, uint16_t acc, SubItem* it, int n, int sel) {
   int W = spr.width();
   spr.fillSprite(C_BG());
-  uiHeader(title, "click: open");
+  uiHeader(title, L("click: open", "нажать: открыть"));
   int rh = n > 5 ? 18 : 25, y0 = UI_TOP + 1;
   for (int i = 0; i < n; i++) {
     int y = y0 + i * rh, cy = y + (rh - 2) / 2;
@@ -105,7 +105,7 @@ void drawSubmenu(const char* title, uint16_t acc, SubItem* it, int n, int sel) {
     spr.setTextColor(plate ? C_ACC() : isSel ? acc : C_HOT());
     txt(v, W - UI_M - 8, cy + 1, 2);
   }
-  uiFooter("wheel: choose", "side: back");
+  uiFooter(L("wheel: choose", "колесо: выбор"), L("side: back", "кнопка: назад"));
   present();
 }
 

@@ -4,6 +4,7 @@
 //  их видел симулятор.
 // ============================================================
 #include "core/power.h"
+#include "core/lang.h"
 #include "core/board.h"
 #include "core/display.h"
 #include "core/theme.h"
@@ -38,14 +39,14 @@ void drawPowerHold() {
   // подписи
   spr.setTextDatum(TL_DATUM);
   spr.setTextColor(C_ACC());
-  txt("// POWER", UI_M + 4, 8, 2);
+  txt(L("// POWER", "// ПИТАНИЕ"), UI_M + 4, 8, 2);
   spr.setTextDatum(TR_DATUM);
   spr.setTextColor(UI_LABEL());
   char buf[16]; snprintf(buf, sizeof(buf), "%d%%", (int)(k * 100));
   txt(buf, W - UI_M - 4, 10, 1);
   spr.setTextDatum(MC_DATUM);
   spr.setTextColor(UI_LABEL());
-  txt("KEEP HOLDING THE SIDE BUTTON", cx, H - 18, 1);
+  txt(L("KEEP HOLDING THE SIDE BUTTON", "ДЕРЖИТЕ БОКОВУЮ КНОПКУ"), cx, H - 18, 1);
   present();
 }
 
@@ -69,7 +70,7 @@ void shutFrame(uint32_t t) {
     if ((t / 90) % 4 != 0) {
       spr.setTextDatum(MC_DATUM);
       spr.setTextColor(C_ACC());
-      txt("SHUTTING DOWN", cx, cy + 40, 1);
+      txt(L("SHUTTING DOWN", "ВЫКЛЮЧЕНИЕ"), cx, cy + 40, 1);
       spr.setTextColor(UI_LABEL());
       txt(DEVICE_NAME, cx, cy - 42, 1);
     }

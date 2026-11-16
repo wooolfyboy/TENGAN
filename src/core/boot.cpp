@@ -7,6 +7,7 @@
 //  яркая строка развёртки стирает экран сверху вниз — и меню.
 // ============================================================
 #include "core/boot.h"
+#include "core/lang.h"
 #include "core/board.h"
 #include "core/seal.h"      // печать 天眼
 #include "core/display.h"
@@ -128,9 +129,14 @@ void bootFrame(uint32_t t) {
     }
   }
   if (t >= 1700) {                                         // подпись печатается
-    static const char SUB[] = "// ENVIRONMENT ANALYZER";
+#if LANG_RU
+    static const char SUB[] = "// АНАЛИЗАТОР ЭФИРА";
+#else
+    static const char SUB[] = "// RADIO ENVIRONMENT ANALYZER";
+#endif
     int k = min((int)sizeof(SUB) - 1, (int)((t - 1700) / 14));
-    char buf[sizeof(SUB)]; memcpy(buf, SUB, k); buf[k] = 0;
+    while (k > 0 && k < (int)sizeof(SUB) - 1 && ((uint8_t)SUB[k] & 0xC0) == 0x80) k--;   // не резать букву UTF-8
+    char buf[sizeof(SUB) + 2]; memcpy(buf, SUB, k); buf[k] = 0;
     if (((t / 120) & 1) && k < (int)sizeof(SUB) - 1) strcat(buf, "_");
     spr.setTextDatum(TC_DATUM);
     spr.setTextColor(UI_LABEL());

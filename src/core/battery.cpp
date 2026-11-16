@@ -7,6 +7,7 @@
 //  Шина I2C: SDA 8, SCL 18 (по utilities.h из репозитория LilyGO).
 // ============================================================
 #include <Wire.h>
+#include "core/lang.h"
 #include "core/timeutil.h"
 #include "core/battery.h"
 #include "core/display.h"
@@ -81,15 +82,15 @@ uint16_t batColor() {
 
 // одна строка о питании (для настроек)
 void batSummary(char* out, size_t n) {
-  if (!g_bat.ok) { snprintf(out, n, "battery gauge not found"); return; }
+  if (!g_bat.ok) { snprintf(out, n, L("battery gauge not found", "датчик батареи не найден")); return; }
   if (batCharging()) {
-    if (g_bat.ttf > 0) snprintf(out, n, "charging %d mA, full in ~%dh %02dm", g_bat.ma, g_bat.ttf / 60, g_bat.ttf % 60);
-    else               snprintf(out, n, "charging %d mA", g_bat.ma);
+    if (g_bat.ttf > 0) snprintf(out, n, L("charging %d mA, full in ~%dh %02dm", "зарядка %d мА, полностью через ~%d ч %02d мин"), g_bat.ma, g_bat.ttf / 60, g_bat.ttf % 60);
+    else               snprintf(out, n, L("charging %d mA", "зарядка %d мА"), g_bat.ma);
   } else if (batUsb()) {
-    snprintf(out, n, g_bat.chg == 3 ? "USB power, fully charged" : "USB power");
+    snprintf(out, n, "%s", g_bat.chg == 3 ? L("USB power, fully charged", "питание USB, заряжено") : L("USB power", "питание USB"));
   } else if (g_bat.tte > 0) {
-    snprintf(out, n, "on battery %d mA, ~%dh %02dm left", g_bat.ma, g_bat.tte / 60, g_bat.tte % 60);
+    snprintf(out, n, L("on battery %d mA, ~%dh %02dm left", "от батареи %d мА, осталось ~%d ч %02d мин"), g_bat.ma, g_bat.tte / 60, g_bat.tte % 60);
   } else {
-    snprintf(out, n, "on battery %d mA", g_bat.ma);
+    snprintf(out, n, L("on battery %d mA", "от батареи %d мА"), g_bat.ma);
   }
 }

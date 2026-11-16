@@ -57,6 +57,9 @@ def main():
         face("Anton", 400, woff2(os.path.join(FONTS, "Anton-Regular.ttf"), ASCII + EXTRA)),
         face("Space Mono", 400, woff2(os.path.join(FONTS, "SpaceMono-Regular.ttf"), ASCII + EXTRA)),
         face("Space Mono", 700, woff2(os.path.join(FONTS, "SpaceMono-Bold.ttf"), ASCII + EXTRA)),
+        # русская версия: кириллица для заголовков и крупных надписей (Play — в стеке шрифтов сразу за Rajdhani/Anton;
+        # латиница остаётся прежней, браузер берёт из Play только русские буквы)
+        face("Play", 700, woff2(os.path.join(FONTS, "Play-Bold.ttf"), CYR + "«»№")),
     ]
     if os.path.exists(IPA):
         parts.append(face("Tengan Seal", 400, woff2(IPA, SEAL_TEXT)))

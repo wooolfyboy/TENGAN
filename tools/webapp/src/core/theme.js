@@ -15,7 +15,7 @@
       panel: '#1e1e1e', steel: '#bdb9b0', seal: '#e5262f', mid: '#6e6e6c', bg2: '#101010' },
     HEAT: [[0, [38, 38, 38]], [0.4, [110, 110, 108]], [0.75, [244, 241, 234]], [1, [229, 38, 47]]],
     COOL: [[0, [11, 11, 11]], [0.25, [42, 42, 42]], [0.5, [95, 95, 95]], [0.72, [150, 150, 148]], [0.86, [229, 38, 47]], [1, [244, 241, 234]]],
-    ALERT: [255, 59, 48], FT: "Anton,Rajdhani,'Arial Narrow',sans-serif", FM: "'Space Mono','JetBrains Mono',ui-monospace,monospace", GLK: 1,
+    ALERT: [255, 59, 48], FT: "Anton,Play,Rajdhani,'Arial Narrow',sans-serif", FM: "'Space Mono','JetBrains Mono',ui-monospace,monospace", GLK: 1,
   };
   // MONO — строгий чёрно-белый старт: пока не знаем тему палки, экран запуска нейтральный
   // (одинаковый в браузере, приложении планшета и программе на компе), потом сразу нужная тема

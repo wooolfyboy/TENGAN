@@ -4,21 +4,22 @@
 //  Луна — укороченный ряд из «Астрономических алгоритмов» (Meeus).
 // ============================================================
 #include "gallery/astro.h"
+#include "core/lang.h"
 #include <sys/time.h>
 #include <time.h>
 #include "core/settings.h"
 
 const City CITIES[] = {
-  { "Moscow", 55.756f, 37.617f },        { "Saint Petersburg", 59.939f, 30.316f },
-  { "Novosibirsk", 55.030f, 82.920f },   { "Yekaterinburg", 56.838f, 60.605f },
-  { "Kazan", 55.796f, 49.106f },         { "Nizhny Novgorod", 56.327f, 44.006f },
-  { "Samara", 53.195f, 50.100f },        { "Krasnodar", 45.035f, 38.975f },
-  { "Rostov-on-Don", 47.222f, 39.718f }, { "Vladivostok", 43.115f, 131.886f },
-  { "Irkutsk", 52.287f, 104.305f },      { "Minsk", 53.902f, 27.562f },
-  { "Kyiv", 50.450f, 30.523f },          { "Almaty", 43.238f, 76.946f },
-  { "Tbilisi", 41.716f, 44.783f },       { "Yerevan", 40.183f, 44.515f },
-  { "Berlin", 52.520f, 13.405f },        { "London", 51.507f, -0.128f },
-  { "New York", 40.713f, -74.006f },     { "Tokyo", 35.676f, 139.650f },
+  { L("Moscow", "Москва"), 55.756f, 37.617f },        { L("Saint Petersburg", "Санкт-Петербург"), 59.939f, 30.316f },
+  { L("Novosibirsk", "Новосибирск"), 55.030f, 82.920f },   { L("Yekaterinburg", "Екатеринбург"), 56.838f, 60.605f },
+  { L("Kazan", "Казань"), 55.796f, 49.106f },         { L("Nizhny Novgorod", "Нижний Новгород"), 56.327f, 44.006f },
+  { L("Samara", "Самара"), 53.195f, 50.100f },        { L("Krasnodar", "Краснодар"), 45.035f, 38.975f },
+  { L("Rostov-on-Don", "Ростов-на-Дону"), 47.222f, 39.718f }, { L("Vladivostok", "Владивосток"), 43.115f, 131.886f },
+  { L("Irkutsk", "Иркутск"), 52.287f, 104.305f },      { L("Minsk", "Минск"), 53.902f, 27.562f },
+  { L("Kyiv", "Киев"), 50.450f, 30.523f },          { L("Almaty", "Алматы"), 43.238f, 76.946f },
+  { L("Tbilisi", "Тбилиси"), 41.716f, 44.783f },       { L("Yerevan", "Ереван"), 40.183f, 44.515f },
+  { L("Berlin", "Берлин"), 52.520f, 13.405f },        { L("London", "Лондон"), 51.507f, -0.128f },
+  { L("New York", "Нью-Йорк"), 40.713f, -74.006f },     { L("Tokyo", "Токио"), 35.676f, 139.650f },
 };
 const int N_CITIES = sizeof(CITIES) / sizeof(CITIES[0]);
 
