@@ -60,8 +60,10 @@ def main():
         # ditto сохраняет права и атрибуты .app (обычный zip ломает подпись/запуск)
         sys.exit(subprocess.call(["ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", app, out]))
     else:
-        args = common() + ["--onefile", "--windowed", "--name", "tengan_desktop",
-                           "--collect-submodules", "qtpy", "--hidden-import", "PyQt6.QtWebEngineWidgets",
+        # onedir (не onefile): Qt WebEngine нужен QtWebEngineProcess и ресурсы рядом —
+        # в одном файле они теряются. Папку dist/tengan_desktop/ упакует в AppImage сам CI.
+        args = common() + ["--onedir", "--name", "tengan_desktop",
+                           "--collect-all", "PySide6", "--collect-submodules", "qtpy",
                            "--hidden-import", "sounddevice",
                            os.path.join(HERE, "tengan_desktop.py")]
         print(" ".join(args), flush=True)

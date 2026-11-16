@@ -81,6 +81,10 @@ js = {}
 for lg, t in TEXT.items():                          # оба языка — в странице, выбор при открытии
     d = {k: (v % {"v": version, "b": built} if isinstance(v, str) and k in ("title", "sub") else v) for k, v in t.items()}
     js[lg] = d
+# те же шрифты, что на планшете (JetBrains Mono + Exo 2, латиница и кириллица) — встроены, без интернета
+fonts_css = open(os.path.join(here, "..", "webapp", "src", "fonts.css"), encoding="utf-8").read()
+fonts_css = "\n".join(l for l in fonts_css.splitlines() if "font-family:'JetBrains Mono'" in l or "font-family:'Exo 2'" in l)
+page = page.replace("__FONTS__", fonts_css)
 page = page.replace("__VER__", htmlmod.escape(version)).replace("__JS_TEXT__", json.dumps(js, ensure_ascii=False))
 if "{{" in page:
     sys.exit("flasher template: unfilled placeholder")

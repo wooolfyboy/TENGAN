@@ -260,6 +260,8 @@ class Tray:
     def __init__(self, app):
         self.app = app
         self.icon = None
+        if os.environ.get("TENGAN_NO_TRAY"):             # CI / headless: трей не нужен
+            return
         try:
             import pystray
             from PIL import Image
@@ -296,7 +298,12 @@ class Tray:
             # macOS: значок живёт в цикле Cocoa, который запускает окно (webview.start) — без своего потока
             self.icon.run_detached()
         else:
-            threading.Thread(target=self.icon.run, daemon=True).start()
+            def _run():
+                try:
+                    self.icon.run()
+                except Exception as e:
+                    log("трей не запустился:", e)
+            threading.Thread(target=_run, daemon=True).start()
 
     def refresh(self):
         if self.icon:

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Превращает TTF-шрифт в растровый шрифт формата Adafruit GFX (его понимает TFT_eSPI).
 
-Запуск:  python3 tools/gen_gfxfont.py fonts/ShareTechMono-Regular.ttf 15 STM15 > src/core/fonts/STM15.h
+Запуск:  python3 tools/gen_gfxfont.py fonts/JetBrainsMono-Medium.ttf 12 JBM12 --cyr > src/core/fonts/JBM12.h
 Символы — печатный ASCII (0x20..0x7E). С --latin1 ещё · « » ° ×; с --cyr — они же и кириллица (до U+045F:
 А–я, Ё, ё и др.); коды между ними — пустые (GFX-шрифту нужна сплошная таблица).
 TFT_eSPI сам разбирает UTF-8, поэтому русский текст выводится как есть. Нужен Pillow.

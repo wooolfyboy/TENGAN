@@ -145,15 +145,15 @@ T.views.push({
     for (let k = 0; k < 4; k++) {
       const p = (t * 0.45 + k / 4) % 1, r = cw * (0.3 + p * 0.7);
       g.strokeStyle = `rgba(${T.RGB.acc},${(on ? 0.35 : 0.18) * (1 - p)})`; g.lineWidth = 1.2;
-      g.beginPath(); g.ellipse(rx, ry, r, r * 0.32, 0, 0, T.TAU); g.stroke();
+      g.beginPath(); g.ellipse(rx, ry, Math.max(0, r), Math.max(0, r * 0.32), 0, 0, T.TAU); g.stroke();
     }
     // вспышка касания
     if (this.tap < 1) {
       const p = this.tap, r = cw * (0.2 + p * 1.1);
       g.strokeStyle = `rgba(${T.RGB.hot},${0.9 * (1 - p)})`; g.lineWidth = 3 * (1 - p) + 1;
-      g.beginPath(); g.ellipse(rx, ry, r, r * 0.32, 0, 0, T.TAU); g.stroke();
+      g.beginPath(); g.ellipse(rx, ry, Math.max(0, r), Math.max(0, r * 0.32), 0, 0, T.TAU); g.stroke();
     }
-    g.fillStyle = T.C.line; g.beginPath(); g.ellipse(rx, ry, cw * 0.28, cw * 0.09, 0, 0, T.TAU); g.fill();
+    g.fillStyle = T.C.line; g.beginPath(); g.ellipse(rx, ry, Math.max(0, cw * 0.28), Math.max(0, cw * 0.09), 0, 0, T.TAU); g.fill();
     T.txt(g, 'TENGAN', rx, ry + cw * 0.2, u * 0.75, T.C.dim, 'm', 'center');
     // карта: без карты парит выше пунктиром; при касании опускается
     const lift = on ? (1 - T.clamp(this.tap * 2.5)) * ch * 0.6 : ch * 0.55 + Math.sin(t * 1.6) * u * 0.6;

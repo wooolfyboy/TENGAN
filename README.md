@@ -377,7 +377,7 @@ tools/sim/                screen simulator
 
 Project code — **MIT** (`LICENSE`).
 
-- Fonts: **Share Tech Mono**, **Rajdhani**, **Anton**, **Space Mono**, **Play** — SIL OFL 1.1;
+- Fonts (one family draws both Latin and Cyrillic, so switching the language never shifts the layout): **Exo 2**, **Oswald** — SIL OFL 1.1;
   **JetBrains Mono** — Apache 2.0; the 天眼 seal — **IPAGothic** (IPA Font License).
 - Flasher: [**esptool-js**](https://github.com/espressif/esptool-js) © Espressif — Apache 2.0.
 - Libraries: TFT_eSPI, NimBLE-Arduino, Adafruit NeoPixel, ESP-IDF / Arduino-ESP32.

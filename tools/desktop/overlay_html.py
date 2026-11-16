@@ -40,7 +40,7 @@ body.kurenai .card{background:#0b0b0b;border:2px solid #f4f1ea;color:#f4f1ea}
 body.kurenai .card .side{position:absolute;left:8px;top:8px;bottom:8px;width:40px;background:#f4f1ea;transform:skewX(-8deg);
  display:flex;align-items:center;justify-content:center}
 body.kurenai .card .side b{display:block;color:#e5262f;font:900 14px/1.05 'Yu Gothic','Meiryo','IPAGothic',sans-serif;transform:skewX(8deg);text-align:center}
-body.kurenai .kj{color:#f4f1ea}body.kurenai .tt{color:#e5262f;font-family:Anton,Impact,'Arial Narrow',sans-serif;font-weight:400;letter-spacing:1px;font-size:15px}
+body.kurenai .kj{color:#f4f1ea}body.kurenai .tt{color:#e5262f;font-family:Oswald,'Arial Narrow',Impact,sans-serif;font-weight:400;letter-spacing:1px;font-size:15px}
 body.kurenai .tm{background:#e5262f}
 body.kurenai .card.alert{border-color:#e5262f;background:#1a0405}body.kurenai .card.alert .side{background:#e5262f}
 body.kurenai .card.alert .side b{color:#0b0b0b}body.kurenai .card.alert .kj{color:#e5262f;animation:bl 1s steps(1) 3}
@@ -86,7 +86,7 @@ body.denko .parts{color:#ff8c1a}body.denko .parts u{background:#ff8c1a}body.denk
 /* KURENAI */
 body.kurenai #w{background:#0b0b0b;border:2px solid #f4f1ea}
 body.kurenai #hd{color:#f4f1ea}body.kurenai #hd .jp{background:#e5262f;color:#f4f1ea;padding:0 3px}
-body.kurenai .lv b{color:#e5262f}body.kurenai .tp{color:#f4f1ea;font-family:Anton,Impact,'Arial Narrow',sans-serif;font-weight:400}body.kurenai .ln{color:#bdb9b0}
+body.kurenai .lv b{color:#e5262f}body.kurenai .tp{color:#f4f1ea;font-family:Oswald,'Arial Narrow',Impact,sans-serif;font-weight:400}body.kurenai .ln{color:#bdb9b0}
 body.kurenai .bar i{background:#2a2a2a;transform:skewX(-12deg)}body.kurenai .bar i.on{background:#f4f1ea}body.kurenai .bar i.hot{background:#e5262f}
 body.kurenai .parts{color:#bdb9b0}body.kurenai .parts u{background:#e5262f}body.kurenai .parts span.off{opacity:.3}
 </style></head><body class="denko"><div id="w">

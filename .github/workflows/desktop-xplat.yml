@@ -38,7 +38,7 @@ jobs:
       - name: Build .app
         run: python tools/desktop/build_xplat.py mac
       - name: Smoke run (start the app for 25 s, check the log)
-        run: python tools/desktop/smoke_run.py "dist/TENGAN Desktop.app/Contents/MacOS/TENGAN Desktop" 25
+        run: TENGAN_NO_TRAY=1 python tools/desktop/smoke_run.py "dist/TENGAN Desktop.app/Contents/MacOS/TENGAN Desktop" 25
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-mac-${{ github.sha }}
@@ -73,13 +73,17 @@ jobs:
       - name: Build binary
         run: python tools/desktop/build_xplat.py linux
       - name: Smoke run (start the app for 25 s under a virtual display)
-        run: xvfb-run -a python tools/desktop/smoke_run.py dist/tengan_desktop 25
+        env:
+          TENGAN_NO_TRAY: "1"
+          QTWEBENGINE_DISABLE_SANDBOX: "1"
+          QTWEBENGINE_CHROMIUM_FLAGS: "--no-sandbox --disable-gpu --disable-software-rasterizer"
+        run: xvfb-run -a python tools/desktop/smoke_run.py dist/tengan_desktop/tengan_desktop 25
       - name: AppImage
         run: |
           set -e
           A=build/AppDir
           rm -rf $A && mkdir -p $A/usr/bin
-          cp dist/tengan_desktop $A/usr/bin/
+          cp -r dist/tengan_desktop $A/usr/bin/tengan_desktop
           cp dist/tengan.png $A/tengan.png
           cat > $A/tengan-desktop.desktop <<'EOF'
           [Desktop Entry]
@@ -92,7 +96,7 @@ jobs:
           Terminal=false
           EOF
           sed -i 's/^          //' $A/tengan-desktop.desktop
-          printf '#!/bin/sh\nexec "$(dirname "$(readlink -f "$0")")/usr/bin/tengan_desktop" "$@"\n' > $A/AppRun
+          printf '#!/bin/sh\nexec "$(dirname "$(readlink -f "$0")")/usr/bin/tengan_desktop/tengan_desktop" "$@"\n' > $A/AppRun
           chmod +x $A/AppRun
           curl -fsSL -o appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
           chmod +x appimagetool

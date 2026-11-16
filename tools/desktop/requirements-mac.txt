@@ -1,5 +1,5 @@
 # TENGAN Desktop для macOS: окно (системный WebKit через pyobjc) + монитор ПК
-pywebview>=5.0
+pywebview[cocoa]>=5.0
 pyserial
 psutil
 pystray

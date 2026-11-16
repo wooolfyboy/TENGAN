@@ -47,6 +47,9 @@ elif sys.platform == "darwin":                        # macOS: ~/Library/Applica
 else:                                                 # Linux: ~/.config/TENGAN
     APPDIR = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.join(os.path.expanduser("~"), ".config"), "TENGAN")
 os.makedirs(APPDIR, exist_ok=True)
+if sys.platform.startswith("linux"):
+    os.environ.setdefault("PYWEBVIEW_GUI", "qt")        # окно на Qt WebEngine (надёжно упаковывается PyInstaller)
+
 if getattr(sys, "frozen", False) or sys.stdout is None:
     _log = open(os.path.join(APPDIR, "desktop.log"), "a", encoding="utf-8", buffering=1)
     sys.stdout = _log
@@ -551,13 +554,13 @@ class JsApi:
 LAUNCHER = """<!doctype html><html lang="%LANG%"><head><meta charset="utf-8"><title>TENGAN Desktop</title>
 <style>
 :root{--bg:#000;--acc:#fff;--hot:#fff;--dim:#8a8a8a;--line:#2e2e2e}  /* строгий чёрно-белый старт: тема TENGAN ещё не известна */
-html,body{margin:0;height:100%;background:var(--bg);color:var(--hot);font:16px/1.4 'Segoe UI',system-ui,sans-serif}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--hot);font:16px/1.4 'JetBrains Mono','Cascadia Mono',Consolas,monospace}
 .w{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px}
-h1{margin:0;font-weight:600;letter-spacing:.3em;font-size:40px}h1 b{color:var(--acc)}
+h1{margin:0;font-family:'Exo 2','Segoe UI',sans-serif;font-weight:600;letter-spacing:.3em;font-size:40px}h1 b{color:var(--acc)}
 .sub{color:var(--dim);letter-spacing:.15em;text-transform:uppercase;font-size:13px}
 .row{display:flex;gap:16px}
 button{background:#0a0a0a;color:var(--hot);border:1px solid var(--line);padding:22px 30px;min-width:190px;
- font:600 18px 'Segoe UI',sans-serif;letter-spacing:.12em;cursor:pointer;text-align:left}
+ font:600 18px 'Exo 2','Segoe UI',sans-serif;letter-spacing:.12em;cursor:pointer;text-align:left}
 button small{display:block;font-weight:400;font-size:12px;color:var(--dim);letter-spacing:.05em;margin-top:6px}
 button:hover,button.on{border-color:var(--acc);box-shadow:0 0 18px rgba(255,255,255,.18)}
 #st{min-height:22px;color:var(--acc);letter-spacing:.08em}
