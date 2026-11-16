@@ -124,7 +124,10 @@ void loadSettings() {
   g_micEn     = g_prefs.getInt("mic", 1) ? 1 : 0;
   g_clickEn   = g_prefs.getInt("click", 1) ? 1 : 0;
   g_theme     = constrain(g_prefs.getInt("th2", THEME_DENKO), 0, THEME_N - 1);
-  { int lg = g_prefs.getInt("lang", -1); g_langAsk = lg < 0; g_lang = lg == 1 ? 1 : 0; }   // нет ключа — первый запуск: экран выбора языка   // новый ключ: старое «theme»=1 было SUMI
+  { int lg = g_prefs.getInt("langv", -1);            // «langv» пишет только настоящий выбор языка (экран выбора / Настройки)
+    g_langAsk = lg < 0;                                 // нет — показать экран выбора (в т.ч. один раз после обновления с 2.0-test1..4,
+    if (lg < 0) lg = g_prefs.getInt("lang", 0);         //   где «lang» мог записаться автосохранением); старый «lang» — только подсказка
+    g_lang = lg == 1 ? 1 : 0; }
   g_auLeds    = g_prefs.getInt("auled", 0) ? 1 : 0;
   g_auSrc     = constrain(g_prefs.getInt("ausrc", 0), 0, 2);
   g_gpsKnown  = g_prefs.getBool("gpsok", false);
@@ -172,7 +175,7 @@ void saveSettings() {
   g_prefs.putInt("mic", g_micEn);
   g_prefs.putInt("click", g_clickEn);
   g_prefs.putInt("th2", g_theme);
-  if (!g_langAsk) g_prefs.putInt("lang", g_lang);   // пока язык не выбран — не писать: иначе автосохранение (время с ПК, GPS) съест экран выбора
+  if (!g_langAsk) { g_prefs.putInt("langv", g_lang); g_prefs.putInt("lang", g_lang); }   // пока язык не выбран — не писать: иначе автосохранение (время с ПК, GPS) съест экран выбора
   g_prefs.putInt("auled", g_auLeds);
   g_prefs.putInt("ausrc", g_auSrc);
   g_prefs.putInt("city", g_city);
