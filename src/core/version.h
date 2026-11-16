@@ -1,3 +1,3 @@
 // АВТОМАТИЧЕСКИ СГЕНЕРИРОВАНО tools/version.py из файла VERSION — не править руками.
 #pragma once
-#define FW_VERSION "1.8.2-test2"
+#define FW_VERSION "1.8.2-test3"
