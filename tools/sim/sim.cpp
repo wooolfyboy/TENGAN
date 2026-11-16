@@ -28,6 +28,7 @@
 #include "wifi/wifi_model.h"
 #include "subghz/subghz.h"
 #include "subghz/subghz_model.h"
+#include "subghz/sensors.h"
 #include "audio/audio.h"
 #include "audio/audio_model.h"
 #include "probe/ir.h"
@@ -72,6 +73,42 @@ bool audioWebUse() { return true; }
 void audioWebTick(uint32_t) {}
 void audioWebStop() {}
 void wifiRadioOff() {}
+
+// ---------- датчики 433 (в прошивке — sens_rx.cpp): посылки собираем сами и кормим настоящий разбор ----------
+void sensRxStart() {}
+void sensRxStop() {}
+void sensRxTick(uint32_t, int) {}
+bool sensRxOn() { return true; }
+static OokTrain s_tr;
+static void trAdd(int p, int g) { if (s_tr.n < OOK_MAXP) { s_tr.p[s_tr.n] = p; s_tr.g[s_tr.n] = g; s_tr.n++; } }
+static void trBits(const uint8_t* b, int nbits, int p0, int g0, int p1, int g1) {
+  for (int i = 0; i < nbits; i++) { bool one = b[i >> 3] & (0x80 >> (i & 7)); trAdd(one ? p1 : p0, one ? g1 : g0); }
+}
+static void simNexus(uint8_t id, int ch, float t, int hum) {         // 36 бит PPM, 12 повторов
+  int raw = (int)lroundf(t * 10) & 0xFFF;
+  uint8_t b[5] = { id, (uint8_t)(0x80 | ((ch - 1) << 4) | (raw >> 8)), (uint8_t)raw, (uint8_t)(0xF0 | (hum >> 4)), (uint8_t)(hum << 4) };
+  s_tr.n = 0;
+  for (int r = 0; r < 12; r++) { trBits(b, 36, 500, 1000, 500, 2000); trAdd(500, r == 11 ? 30000 : 4000); }
+}
+static uint8_t simDigest(const uint8_t* m, int bytes) {               // LaCrosse: lfsr 0x31 / 0xf4, отражённый
+  uint8_t sum = 0, key = 0xF4;
+  for (int k = bytes - 1; k >= 0; --k) for (int i = 0; i < 8; ++i) { if ((m[k] >> i) & 1) sum ^= key; key = (key & 0x80) ? (key << 1) ^ 0x31 : key << 1; }
+  return sum;
+}
+static void simTx141(uint8_t id, int ch, float t, int hum) {         // 40 бит PWM, преамбула 4×833, 12 повторов
+  int raw = (int)lroundf(t * 10) + 500;
+  uint8_t b[5] = { id, (uint8_t)(((ch - 1) << 4) | (raw >> 8)), (uint8_t)raw, (uint8_t)hum, 0 };
+  b[4] = simDigest(b, 4);
+  s_tr.n = 0;
+  for (int r = 0; r < 12; r++) { for (int k = 0; k < 4; k++) trAdd(833, 833); trBits(b, 40, 208, 417, 417, 208); }
+  s_tr.g[s_tr.n - 1] = 30000;
+}
+static void simBell() {                                               // звонок EV1527: 24 бита, 6 повторов
+  uint8_t b[3] = { 0x5C, 0x3A, 0x91 };
+  s_tr.n = 0;
+  for (int r = 0; r < 6; r++) { trAdd(350, 10850); trBits(b, 24, 350, 1050, 1050, 350); }
+  s_tr.g[s_tr.n - 1] = 30000;
+}
 
 // ---------- состояние Sub-GHz (в прошивке — subghz.cpp) ----------
 int  g_gMode = 0, g_band = 1;
@@ -139,9 +176,9 @@ static void wifiInfo(int i, SubItem& it) {
   it.name = nm[i]; it.desc = ds[i]; snprintf(it.value, sizeof(it.value), "%s", vv[i]);
 }
 static void subInfo(int i, SubItem& it) {
-  static const char* const nm[] = { "Spectrum", "Monitor" };
-  static const char* const ds[] = { "band + waterfall", "catch remotes" };
-  static const char* const vv[] = { "433 MHz", "3" };
+  static const char* const nm[] = { "Spectrum", "Monitor", "Sensors" };
+  static const char* const ds[] = { "band + waterfall", "catch remotes", "thermometers, bells" };
+  static const char* const vv[] = { "433 MHz", "3", "3" };
   it.name = nm[i]; it.desc = ds[i]; snprintf(it.value, sizeof(it.value), "%s", vv[i]);
 }
 const Section bleSection = { "Bluetooth", 80, 150, 240, iconBluetooth, bleSub, noop, noop,
@@ -545,6 +582,21 @@ int main(int argc, char** argv) {
   drawSpectrum();            snap("30_subghz_spectrum");
   g_uiPages = 0;
   drawMonitor(s_now);        snap("31_subghz_monitor");
+  drawSensors(s_now);        snap("32a_subghz_sensors_empty");
+  simBell();                 sensFeed(s_tr, -71, s_now - 95000);
+  simTx141(0x9b, 1, 21.4f, 38); sensFeed(s_tr, -78, s_now - 41000);
+  simNexus(0x5a, 1, 4.2f, 81);  sensFeed(s_tr, -62, s_now - 12000);
+  simNexus(0x2c, 3, -1.6f, 0);  sensFeed(s_tr, -88, s_now - 700000);
+  printf("sensors: %d decoded\n", g_sensN);
+  { String o; sensJson(o, s_now); printf("sens json: %s\n", o.c_str()); }
+  drawSensors(s_now - 11000);  snap("32b_subghz_sensors");
+  simBell();                 sensFeed(s_tr, -66, s_now - 400);
+  drawSensors(s_now);        snap("32c_subghz_sensors_bell");
+  { WxState& w = g_wx; w.thunder = false; w.thunderMs = 0; w.cond = "cloudy"; w.clouds = 0.45f; w.rain = 0.1f; w.storm = 0.1f;
+    float t; int h; const char* src;
+    w.tOk = sensOutside(t, h, src, s_now); if (w.tOk) { w.temp = t; w.hum = h; w.tsrc = src; }
+    drawWeather(s_now);      snap("56e_gallery_weather_temp");
+    String o; wxJson(o); printf("wx json tail: %s\n", o.c_str() + (o.length() > 60 ? o.length() - 60 : 0)); }
   if (getenv("SIM_ANIM")) {                              // кадры для гифок README (tools/make_docs.py)
     char nm[48];
     for (int f = 0; f * 40 <= 2700; f++) { bootFrame(f * 40); snprintf(nm, sizeof nm, "anim_boot_%03d", f); snap(nm); }

@@ -185,7 +185,45 @@ def wx():
         WX["histT"] = t; WX["hist"].append([round(clouds, 2), round(rain, 2)]); WX["hist"] = WX["hist"][-60:]
     return {"ok": 1, "cond": cond, "clouds": round(clouds, 3), "wind": round(wind, 3), "rain": round(rain, 3), "storm": round(storm, 3),
             "thunder": thunder, "trend": round(-math.cos(ph * math.pi * 2 - 1.2), 2), "ble": int(8 + clouds * 40), "turn": int(wind * 20),
-            "sub": int(rain * 9), "subPk": int(-70 + rain * 25), "snd": int(-50 + storm * 30), "pk": int(-40 + storm * 30), "hist": WX["hist"]}
+            "sub": int(rain * 9), "subPk": int(-70 + rain * 25), "snd": int(-50 + storm * 30), "pk": int(-40 + storm * 30), "hist": WX["hist"],
+            "temp": round(4.2 + 0.4 * math.sin(t / 300), 1), "hum": 81, "tsrc": "Nexus"}   # за окном: датчик 433 (null, если не слышно)
+
+
+SENS = {"t0": time.time(), "pk": 0, "last": 0.0, "lastKind": "sensor"}
+
+
+def sens():
+    """Датчики 433 (как событие "sens" палки): три термометра и звонок; посылки приходят раз в ~4 с."""
+    t = time.time()
+    el = t - SENS["t0"]
+    nx_t = round(4.2 + 0.4 * math.sin(t / 300), 1)
+    lc_t = round(21.4 + 0.2 * math.sin(t / 200), 1)
+    def ago(period, off): return int((el + off) % period)
+    rows = [
+        {"id": "nexus-1-0x5a", "p": "Nexus", "ch": 1, "kind": "th", "t": nx_t, "h": 81, "bat": 1, "rssi": -62, "ago": ago(57, 3), "n": 5 + int(el / 57)},
+        {"id": "lacrosse-tx141th-1-0x9b", "p": "LaCrosse-TX141TH", "ch": 1, "kind": "th", "t": lc_t, "h": 38, "bat": 1, "rssi": -78, "ago": ago(50, 20), "n": 3 + int(el / 50)},
+        {"id": "nexus-3-0x2c", "p": "Nexus", "ch": 3, "kind": "t", "t": -1.6, "h": None, "bat": 0, "rssi": -88, "ago": 700 + int(el), "n": 1},
+        {"id": "remote-7a0b", "p": "Remote", "ch": 0, "kind": "remote", "t": None, "h": None, "bat": None, "btn": 1, "rssi": -71, "ago": ago(40, 10), "n": 2 + int(el / 40)},
+    ]
+    if t - SENS["last"] > 4:                      # «пришла посылка»
+        SENS["last"] = t; SENS["pk"] += 1
+        SENS["lastKind"] = "remote" if SENS["pk"] % 4 == 0 else "sensor"
+    if SENS["lastKind"] == "sensor":             # Nexus: 36 бит PPM, рисунок — 48 пар импульс/пауза
+        raw = int(round(nx_t * 10)) & 0xFFF
+        b = [0x5A, 0x80 | (raw >> 8), raw & 0xFF, 0xF0 | (81 >> 4), (81 << 4) & 0xFF]
+        bits = [(b[i >> 3] >> (7 - (i & 7))) & 1 for i in range(36)]
+        pt = []
+        for bit in bits + bits: pt += [500, 2000 if bit else 1000]
+        pt = pt[:72]; pt[71] = 4000
+        last = {"p": "Nexus", "cls": "sensor", "pulses": 444, "bits": 36, "rows": 12, "mod": "PPM", "hex": "".join("%02x" % x for x in b),
+                "short": 500, "long": 500, "gs": 1000, "gl": 2000, "gap": 4000, "hash": "e30b", "pt": pt}
+    else:                                         # звонок: только начало посылки, без кода
+        pt = [350, 4000] + [350, 1050, 1050, 350, 350, 1050, 1050, 350, 1050, 350, 350, 1050, 1050, 350, 1050, 350, 350, 1050, 350, 1050, 1050, 350]
+        last = {"p": "Remote", "cls": "remote", "pulses": 150, "bits": 25, "rows": 6, "mod": "PWM", "hex": "",
+                "short": 350, "long": 1050, "gs": 350, "gl": 1050, "gap": 10850, "hash": "7a0b", "pt": pt}
+    last.update({"rssi": -62 if SENS["lastKind"] == "sensor" else -71, "ago": int(t - SENS["last"]), "us": 902000})
+    rows.sort(key=lambda r: (r["kind"] == "remote", r["ago"] > 600, -r["rssi"]))
+    return {"on": 1, "pk": SENS["pk"], "noise": 3, "sensors": rows, "last": last}
 
 
 def st():
@@ -228,6 +266,8 @@ class Api(http.server.BaseHTTPRequestHandler):
         elif u.path == "/api/loc":                 # GPS с приложения планшета
             print("loc", q.get("lat"), q.get("lon"), flush=True)
             body, ct = b'{"ok":true}', "application/json"
+        elif u.path == "/api/sens":
+            body, ct = json.dumps(sens()).encode(), "application/json"
         elif u.path == "/api/sub":
             body, ct = json.dumps(sub(int(q.get("m", ["0"])[0]), int(q.get("b", ["1"])[0]))).encode(), "application/json"
         else:
@@ -248,7 +288,7 @@ class Sse(http.server.BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Origin", "*"); self.end_headers()
 
         def ev(name, d): self.wfile.write(("event: %s\ndata: %s\n\n" % (name, json.dumps(d, ensure_ascii=False))).encode()); self.wfile.flush()
-        tb = tw = ts = tsub = tpc = twx = 0
+        tb = tw = ts = tsub = tpc = twx = tsens = 0
         tir, tnfc = time.time(), time.time()
         sent_sat = False
         try:
@@ -263,6 +303,7 @@ class Sse(http.server.BaseHTTPRequestHandler):
                 if "sub" in want and now - tsub > 0.14: tsub = now; ev("sub", sub(sm, sb))
                 if "pc" in want and now - tpc > 1: tpc = now; ev("pc", pc())
                 if "wx" in want and now - twx > 1: twx = now; ev("wx", wx())
+                if "sens" in want.split(",") and now - tsens > 1: tsens = now; ev("sens", sens())
                 if "ir" in want.split(",") and now - tir > 2.5: tir = now; ev("ir", ir_ev())
                 if "nfc" in want.split(",") and now - tnfc > 6: tnfc = now; ev("nfc", nfc_ev())
                 time.sleep(0.04)

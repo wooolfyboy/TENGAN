@@ -456,7 +456,7 @@ void ookAnalyze(const OokTrain& T, OokInfo& I, const OokMsg* dec, int nDec) {
   int ng = significant(cl, k, n - 1, 8, G, 4);
   // синхро-пауза: самая длинная редкая пауза (не значимая)
   uint16_t syncG = 0;
-  for (int i = 0; i < k; i++) if (cl[i].n >= 1 && cl[i].c > (ng ? G[ng - 1] : 0) * 2) { syncG = cl[i].c; }
+  for (int i = 0; i < k; i++) if (cl[i].n >= 1 && cl[i].c * 10 >= (ng ? G[ng - 1] : 0) * 18 && cl[i].c > 1200) { syncG = cl[i].c; break; }
   if (np) { I.shortW = P[0]; I.longW = P[np - 1]; }
   if (ng) { I.shortG = G[0]; I.longG = ng > 1 ? G[1] : 0; }
   I.syncG = syncG;
@@ -476,8 +476,8 @@ void ookAnalyze(const OokTrain& T, OokInfo& I, const OokMsg* dec, int nDec) {
 
   // биты: самая длинная строка
   int best = 0, cur = 0, rows = 0;
-  int brk = (int)(I.longW + (I.longG ? I.longG : I.shortG)) * 5 / 2;
-  if (brk < 1500) brk = 1500;
+  int brk = syncG ? syncG * 3 / 4 : (int)(I.longW + (I.longG ? I.longG : I.shortG)) * 5 / 2;
+  if (brk < 1200) brk = 1200;
   for (int i = 0; i < n; i++) {
     cur++;
     if (T.g[i] > brk || i == n - 1) { rows++; if (cur > best) best = cur; cur = 0; }
