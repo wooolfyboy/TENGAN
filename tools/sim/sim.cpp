@@ -409,6 +409,13 @@ int main(int argc, char** argv) {
       navClick(); if (p == 0) for (int k = 0; k < 5; k++) navClick(); navDraw(s_now); snap(pg[p]); navBack();
     } }
   navBack();
+  // Settings › Alerts (тревоги штаба): из главного меню — последняя карточка
+  navBegin(); navRotate(-1); navClick(); navDraw(s_now); snap("06s_settings_pages");
+  for (int k = 0; k < 5; k++) navRotate(+1);
+  navClick(); navDraw(s_now); snap("06f_set_alerts");
+  for (int k = 0; k < 9; k++) navClick();
+  navDraw(s_now); snap("06g_set_alerts_more");
+  navBack(); navBack(); navBegin();
 
   std::vector<Blip> blips;
   int typeCnt[T_NUM] = {0};
