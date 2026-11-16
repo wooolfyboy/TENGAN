@@ -86,18 +86,24 @@ void drawSubmenu(const char* title, uint16_t acc, SubItem* it, int n, int sel) {
   for (int i = 0; i < n; i++) {
     int y = y0 + i * rh, cy = y + (rh - 2) / 2;
     bool isSel = (i == sel);
-    if (isSel) uiRowHighlight(y, rh - 2);
+    bool plate = isSel && themeKurenai();             // KURENAI: выбранная строка — белая скошенная плашка
+    if (plate) {
+      int x0 = UI_M - 4, x1 = W - UI_M + 4, h = rh - 2;
+      spr.fillTriangle(x0 + 5, y, x1, y, x0, y + h, C_HOT());
+      spr.fillTriangle(x1, y, x1 - 5, y + h, x0, y + h, C_HOT());
+      spr.fillRect(x0 + 2, y + 3, 3, h - 6, C_ACC());
+    } else if (isSel) uiRowHighlight(y, rh - 2);
     spr.setTextDatum(ML_DATUM);
-    spr.setTextColor(isSel ? C_HOT() : UI_LABEL());
+    spr.setTextColor(plate ? C_BG() : isSel ? C_HOT() : UI_LABEL());
     txt(it[i].name, UI_M + 8, cy + 1, n > 5 ? 2 : 4);
     char d[32]; size_t k = 0;
     for (; it[i].desc[k] && k < sizeof(d) - 1; k++) d[k] = (char)toupper((unsigned char)it[i].desc[k]);
     d[k] = 0;
-    spr.setTextColor(isSel ? UI_LABEL() : UI_DIM());
+    spr.setTextColor(plate ? UI_LINE() : isSel ? UI_LABEL() : UI_DIM());
     txt(d, 118, cy + 1, 1);
     char v[24]; fitText(it[i].value, v, sizeof(v), 84, 2);
     spr.setTextDatum(MR_DATUM);
-    spr.setTextColor(isSel ? acc : C_HOT());
+    spr.setTextColor(plate ? C_ACC() : isSel ? acc : C_HOT());
     txt(v, W - UI_M - 8, cy + 1, 2);
   }
   uiFooter("wheel: choose", "side: back");

@@ -6,10 +6,10 @@
 #include "core/theme.h"
 #include "core/settings.h"
 
-uint16_t UI_LABEL() { return tft.color565(150, 175, 192); }
-uint16_t UI_DIM()   { return tft.color565(90, 112, 128); }
-uint16_t UI_LINE()  { return tft.color565(32, 50, 64); }
-uint16_t UI_PANEL() { return tft.color565(14, 42, 52); }
+uint16_t UI_LABEL() { return themeKurenai() ? tft.color565(190, 186, 178) : tft.color565(150, 175, 192); }
+uint16_t UI_DIM()   { return themeKurenai() ? tft.color565(138, 138, 138) : tft.color565(90, 112, 128); }
+uint16_t UI_LINE()  { return themeKurenai() ? tft.color565(58, 58, 58)    : tft.color565(32, 50, 64); }
+uint16_t UI_PANEL() { return themeKurenai() ? tft.color565(34, 34, 34)    : tft.color565(14, 42, 52); }
 
 static void upper(const char* s, char* out, size_t n) {
   size_t i = 0;
@@ -23,8 +23,17 @@ void uiHeader(const char* title, const char* right, bool rightAlert) {
   upper(title, u, sizeof(u));
   snprintf(t, sizeof(t), "// %s", u);
   spr.setTextDatum(TL_DATUM);
-  spr.setTextColor(C_ACC());
-  txt(t, UI_M + 4, 3, 2);
+  if (themeKurenai()) {                            // KURENAI: заголовок — белая скошенная плашка, текст чёрный
+    snprintf(t, sizeof(t), "%s", u);
+    int tw = txtW(t, 2), x0 = UI_M, x1 = UI_M + tw + 16;
+    spr.fillTriangle(x0 + 4, 1, x1 + 4, 1, x0, 17, C_HOT());
+    spr.fillTriangle(x1 + 4, 1, x1, 17, x0, 17, C_HOT());
+    spr.setTextColor(C_BG());
+    txt(t, UI_M + 8, 3, 2);
+  } else {
+    spr.setTextColor(C_ACC());
+    txt(t, UI_M + 4, 3, 2);
+  }
   if (right && right[0]) {
     char r0[48], r[48]; upper(right, r0, sizeof(r0));
     int room = W - UI_M - 4 - (UI_M + 4 + txtW(t, 2)) - 10;   // сколько места справа от заголовка
@@ -33,6 +42,7 @@ void uiHeader(const char* title, const char* right, bool rightAlert) {
     spr.setTextColor(rightAlert ? C_ALERT() : UI_LABEL());
     txt(r, W - UI_M - 4, 6, 1);
   }
+  if (themeKurenai()) { spr.fillRect(UI_M, 19, W - 2 * UI_M, 2, C_ACC()); return; }   // KURENAI: сплошная красная черта
   // линия под шапкой, угасающая вправо
   uint16_t a = C_ACC();
   for (int x = UI_M; x < W - UI_M; x++) {

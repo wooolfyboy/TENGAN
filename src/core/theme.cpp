@@ -23,7 +23,7 @@ static uint16_t ramp(const Stop* s, int n, float x) {
                       s[i].b + (s[i + 1].b - s[i].b) * k);
 }
 
-// палитра: яркость исходного цвета -> бирюзово-стальная шкала
+// палитра: яркость исходного цвета -> шкала темы (DENKO — бирюзово-стальная, KURENAI — чёрно-бело-красная)
 static const Stop COOL[] = {
   { 0.00f,   5,   8,  13 }, { 0.25f,  24,  40,  54 }, { 0.50f,  95, 125, 145 },
   { 0.72f, 150, 185, 205 }, { 0.86f,  62, 230, 255 }, { 1.00f, 235, 250, 255 },
@@ -32,24 +32,45 @@ static const Stop COOL[] = {
 static const Stop HEAT[] = {
   { 0.00f,  14,  30,  46 }, { 0.35f,  40,  95, 130 }, { 0.75f,  62, 230, 255 }, { 1.00f, 235, 250, 255 },
 };
+// KURENAI 紅: только плоские чёрный / серый / белый, красный — акцент и самое сильное
+static const Stop K_COOL[] = {
+  { 0.00f,  11,  11,  11 }, { 0.25f,  42,  42,  42 }, { 0.50f,  95,  95,  95 },
+  { 0.72f, 150, 150, 148 }, { 0.86f, 229,  38,  47 }, { 1.00f, 244, 241, 234 },
+};
+static const Stop K_HEAT[] = {
+  { 0.00f,  38,  38,  38 }, { 0.40f, 110, 110, 108 }, { 0.75f, 244, 241, 234 }, { 1.00f, 229,  38,  47 },
+};
 
 static uint16_t s_lut[256];
-static bool     s_lutOk = false;
+static int      s_lutTheme = -1;
+bool themeKurenai() { return g_theme == THEME_KURENAI; }
+void themeChanged() { s_lutTheme = -1; }
 
 uint16_t C(uint8_t r, uint8_t g, uint8_t b) {
-  if (!s_lutOk) { for (int i = 0; i < 256; i++) s_lut[i] = ramp(COOL, 6, i / 255.0f); s_lutOk = true; }
+  if (s_lutTheme != g_theme) {
+    const Stop* st = themeKurenai() ? K_COOL : COOL;
+    for (int i = 0; i < 256; i++) s_lut[i] = ramp(st, 6, i / 255.0f);
+    s_lutTheme = g_theme;
+  }
   return s_lut[(77 * r + 150 * g + 29 * b) >> 8];    // яркость по восприятию глаза
 }
-// TC — «буквальный» цвет и C_SEAL — цвет печати 天眼: точки, через которые новая тема сможет
-// перекрасить экраны (сейчас тема одна — DENKO, и это просто цвет как есть / акцент)
-uint16_t TC(uint8_t r, uint8_t g, uint8_t b) { return tft.color565(r, g, b); }
-uint16_t C_BG()    { return tft.color565(5, 8, 13); }
-uint16_t C_HOT()   { return tft.color565(235, 250, 255); }
-uint16_t C_ALERT() { return tft.color565(255, 122, 26); }
-uint16_t C_ACC()   { return tft.color565(62, 230, 255); }
+// TC — «буквальный» цвет (как есть), C_SEAL — цвет печати 天眼
+uint16_t TC(uint8_t r, uint8_t g, uint8_t b) {
+  if (!themeKurenai()) return tft.color565(r, g, b);
+  uint8_t l = (77 * r + 150 * g + 29 * b) >> 8;      // KURENAI: без синевы — та же яркость серым
+  return tft.color565(l, l, l);
+}
+uint16_t C_BG()    { return themeKurenai() ? tft.color565(11, 11, 11)   : tft.color565(5, 8, 13); }
+uint16_t C_HOT()   { return themeKurenai() ? tft.color565(244, 241, 234) : tft.color565(235, 250, 255); }
+uint16_t C_ALERT() { return themeKurenai() ? tft.color565(255, 59, 48)  : tft.color565(255, 122, 26); }
+uint16_t C_ACC()   { return themeKurenai() ? tft.color565(229, 38, 47)  : tft.color565(62, 230, 255); }
 uint16_t C_SEAL()  { return C_ACC(); }
+// выбранная карточка / строка: DENKO — тёмная панель с бирюзой; KURENAI — белая плашка с чёрным
+uint16_t C_SELBG()  { return themeKurenai() ? C_HOT() : UI_PANEL(); }
+uint16_t C_SELFG()  { return themeKurenai() ? C_BG()  : C_HOT(); }
+uint16_t C_SELACC() { return themeKurenai() ? C_ACC() : C_ACC(); }
 
-uint16_t heatV(float x) { return ramp(HEAT, 4, x); }
+uint16_t heatV(float x) { return ramp(themeKurenai() ? K_HEAT : HEAT, 4, x); }
 uint16_t heat(int rssi) { return heatV((rssi + 100) / 60.0f); }
 
 // ---------- текст ----------

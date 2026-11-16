@@ -377,13 +377,13 @@ int main(int argc, char** argv) {
   spr.setColorDepth(16);
   spr.createSprite(320, 170);
   settingsBegin();
+  if (getenv("SIM_THEME") && !strcmp(getenv("SIM_THEME"), "kurenai")) { g_theme = THEME_KURENAI; themeChanged(); }   // SIM_THEME=kurenai bash build.sh
   g_bat.ok = true; g_bat.soc = 87; g_bat.mv = 3980; g_bat.ma = -132; g_bat.tte = 250; g_bat.chgOk = true;
   fillBle(); fillWifi(); fillSub();
   { String j; settingsJson(j);                            // то же, что палка отдаёт планшету по /api/settings
     FILE* f = fopen((std::string(getenv("SIM_OUT") ? getenv("SIM_OUT") : "tools/sim/out") + "/settings.json").c_str(), "w");
     if (f) { fputs(j.c_str(), f); fclose(f); }
     String r; settingsSetKey("ledbr", "70", r); printf("set ledbr: %s\n", r.c_str());
-    settingsSetKey("theme", "denko", r); printf("set theme: %s\n", r.c_str());
     settingsSetKey("nope", "1", r); printf("set nope: %s\n", r.c_str()); }
 
   { const uint32_t ts[] = { 250, 600, 1000, 1300, 1680, 1950, 2200 };
