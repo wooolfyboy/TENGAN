@@ -144,7 +144,7 @@ void drawPcWaiting(uint32_t now) {
   spr.setTextColor(C_HOT());  txt(L("CONNECT TENGAN TO THE COMPUTER (USB)", "ПОДКЛЮЧИТЕ TENGAN К КОМПЬЮТЕРУ (USB)"), x + 22, y + 6, 1);
   y += 34;
   spr.setTextColor(C_ACC());  txt("2", x, y, 4);
-  spr.setTextColor(C_HOT());  txt(L("ON THE COMPUTER START", "НА КОМПЬЮТЕРЕ ЗАПУСТИТЕ"), x + 22, y + 2, 1);
+  spr.setTextColor(C_HOT());  txt(L("ON THE COMPUTER START", "НА КОМПЬЮТЕРЕ ЗАПУСТИТЕ"), x + 22, y, 1);
   spr.setTextColor(C_ACC());  txt("TENGAN Desktop", x + 22, y + 13, 1);
   y += 34;
   spr.setTextColor(C_ACC());  txt("3", x, y, 4);

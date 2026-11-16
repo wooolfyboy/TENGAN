@@ -197,7 +197,7 @@ static void drawMainMenuHud() {
   snprintf(buf, sizeof(buf), "T+%02lu:%02lu:%02lu", (unsigned long)(t / 3600), (unsigned long)(t / 60 % 60), (unsigned long)(t % 60));
   spr.setTextDatum(BL_DATUM);
   spr.setTextColor(dim);
-  txt(L("CLICK: OPEN  ·  HOLD SIDE: POWER", "НАЖАТЬ: ОТКРЫТЬ  ·  ДЕРЖАТЬ БОК: ПИТАНИЕ"), 8, H - 4, 1);
+  txt(L("CLICK: OPEN  ·  HOLD SIDE: POWER", "НАЖАТЬ: ОТКРЫТЬ  ·  БОК: ПИТАНИЕ"), 8, H - 4, 1);
   spr.setTextDatum(BR_DATUM);
   spr.setTextColor(acc);
   txt(buf, W - 8, H - 4, 1);

@@ -475,7 +475,7 @@ void drawSettings() {
       txt("<", W - UI_M - 16 - vw, cy, 2);
     }
   }
-  uiFooter(n > 1 ? L("wheel: change  ·  click: next", "колесо: изменить · нажать: далее") : L("wheel: change", "колесо: изменить"), L("side: back", "кнопка: назад"));
+  uiFooter(n > 1 ? L("wheel: change  ·  click: next", "колесо: менять · нажать: далее") : L("wheel: change", "колесо: изменить"), L("side: back", "кнопка: назад"));
   present();
 }
 
