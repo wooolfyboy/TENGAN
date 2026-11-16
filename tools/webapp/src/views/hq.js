@@ -109,51 +109,44 @@ const crack = (g, pts, col, lw) => { g.strokeStyle = col; g.lineWidth = lw; g.li
 // глаз домена — шейдер (WebGL); вокруг — дымный ореол и тёмное ядро
 const EYE_FS = () => `precision highp float;uniform vec2 res;uniform float t;uniform float open;uniform float red;uniform float flare;uniform vec2 look;
 ${T.GL.NOISE}
+float fb3(vec2 p){float v=0.,a=.5;for(int i=0;i<3;i++){v+=a*noise(p);p=p*2.03+vec2(1.7,9.2);a*=.5;}return v*1.14;}
 void main(){
- vec2 q=(gl_FragCoord.xy/res)*2.-1.;float r=length(q),ang=atan(q.y,q.x);
+ vec2 q=(gl_FragCoord.xy/res)*2.-1.;float r=length(q);if(r>1.){gl_FragColor=vec4(0.);return;}float ang=atan(q.y,q.x);
  vec3 col=vec3(0.);float a=0.;
- float sm=fbm(vec2(ang*2.5+t*.05,r*5.-t*.25));
+ float sm=fb3(vec2(ang*2.5+t*.05,r*5.-t*.25));
  float halo=smoothstep(.6,.8,r)*smoothstep(1.,.8,r)*(.3+sm*.95);
  vec3 hc=mix(vec3(.25,.35,1.),vec3(.62,.38,1.),sm);hc=mix(hc,vec3(1.,.13,.1),red*.55);
  col+=hc*halo;a+=halo;
  float core=smoothstep(.8,.74,r);
  vec3 cc=mix(vec3(0.),vec3(.043,.031,.125),smoothstep(0.,.55,r));cc=mix(cc,vec3(.106,.08,.31),smoothstep(.45,.78,r));
- cc+=vec3(.25,.15,.6)*pow(fbm(q*3.+t*.03),3.)*.5;
+ cc+=vec3(.25,.15,.6)*pow(fb3(q*3.+t*.03),3.)*.5;
  col=mix(col,cc,core);a=mix(a,1.,core);
  // глаз
  vec2 p=q/.42;float x=p.x,y=p.y;float W=.8;
  float op=open+.015*sin(t*.7);
  float lid=op*max(0.,1.-pow(abs(x)/W,2.2));
- float lidN=lid+.018*(fbm(vec2(x*9.,t*.3))-.5);
+ float lidN=lid+.018*(fb3(vec2(x*9.,t*.3))-.5);
  float d=abs(y)-lidN;
  float rr=length(p*vec2(.9,1.6));float pa=atan(p.y,p.x);
  vec2 fq=vec2(pa*2.2,rr*3.-t*(.55+flare*.8));
- float fl=fbm(fq*2.)*fbm(fq*1.3+3.);
- float fall=smoothstep(1.+flare*.6,.25,rr);
- float e=pow(fl*2.1,2.4)*fall*smoothstep(-.02,.05,d)*(1.4+flare*2.5);
+ float fall=smoothstep(1.+flare*.6,.25,rr);float fl=0.,e=0.;
+ if(fall>0.){fl=fb3(fq*2.)*fb3(fq*1.3+3.);e=pow(fl*2.1,2.4)*fall*smoothstep(-.02,.05,d)*(1.4+flare*2.5);}
  vec3 eC=mix(vec3(.18,.25,1.),vec3(.62,.36,1.),smoothstep(.2,.7,rr))+vec3(.5,.6,1.)*pow(fl,6.)*3.;
  eC=mix(eC,vec3(1.,.2,.12),red*.6);
  col+=eC*e;a+=e*.8;
  float hl=exp(-max(d,0.)*18.)*.5*smoothstep(W+.1,W-.3,abs(x));
  col+=mix(vec3(.35,.45,1.),vec3(1.,.25,.2),red)*hl;a+=hl*.7;
  if(d<0.){
-  float v=fbm(vec2(x*6.,y*14.)+t*.05);
+  float v=fb3(vec2(x*6.,y*14.)+t*.05);
   vec3 sc=vec3(.02,.015,.06)+mix(vec3(.25,.1,.5),vec3(.6,.05,.08),red)*pow(v,4.)*1.4;
-  vec2 c=look*.09;vec2 ip=p-c;float ir=length(ip);float ia=atan(ip.y,ip.x);float R=.255;
-  float fib=fbm(vec2(ia*14.,ir*7.-t*.15))*.7+fbm(vec2(ia*40.,ir*3.))*.5;
-  vec3 iC=mix(vec3(.55,.85,1.),vec3(.12,.25,.95),smoothstep(.06,R,ir));
-  iC=mix(iC,vec3(.6,.35,1.),smoothstep(.15,R,ir)*.6);
-  iC=mix(iC,vec3(1.,.25,.15),red*.75);
-  iC*=.35+pow(fib,1.6)*1.5;
-  float ring=smoothstep(.006,0.,abs(ir-.175))*(.6+.4*step(.5,fract(ia*6./3.14159+t*.2)));
-  iC+=vec3(.9,.95,1.)*ring*.9;
-  iC*=1.-smoothstep(R-.04,R,ir)*.85;
-  float pr=.075+.006*sin(t*1.3)-red*.025;
-  iC=mix(iC,vec3(0.),smoothstep(pr,pr-.008,ir));
-  iC+=mix(vec3(.4,.6,1.),vec3(1.,.3,.2),red)*smoothstep(.02,0.,abs(ir-pr-.01))*.8;
-  vec3 eye=mix(sc,iC,smoothstep(R,R-.006,ir));
-  eye+=vec3(1.)*smoothstep(.035,0.,length(ip-vec2(-.07,.07)))*.9;
-  eye+=vec3(.7,.8,1.)*smoothstep(.015,0.,length(ip-vec2(.05,-.05)))*.6;
+  vec2 c=look*.09;vec2 ip=p-c;float ir=length(ip);
+  // только зрачок: чёрный диск с тонким светящимся ободком и бликом
+  float pr=.11+.008*sin(t*1.3)-red*.03;
+  vec3 rim=mix(vec3(.45,.65,1.),vec3(1.,.25,.15),red);
+  vec3 eye=sc+rim*exp(-max(ir-pr,0.)*28.)*.35;
+  eye=mix(eye,vec3(0.),smoothstep(pr,pr-.006,ir));
+  eye+=rim*smoothstep(.012,0.,abs(ir-pr))*.9;
+  eye+=vec3(1.)*smoothstep(.022,0.,length(ip-vec2(-.04,.04)))*.8;
   eye*=mix(1.,.35,smoothstep(lidN-.09,lidN,y));
   col=eye;a=1.;
  }
@@ -670,9 +663,16 @@ T.views.push({
     if (T.GL && T.GL.ok && !eyeFail) {
       if (!EYE) { EYE = T.GL.prog(EYE_FS()); if (!EYE) eyeFail = true; }
       if (EYE) {
-        T.GL.begin(S0, S0, 0.65);
-        T.GL.quad(EYE, { t, open: 0.3 + 0.1 * this.redV, red: this.redV, flare: fl, look: this.look });
-        T.GL.draw(g, cx - S0 / 2, cy - S0 / 2, S0, S0);
+        // глаз считается через кадр (30 раз в секунду — глазу незаметно), между ними рисуется копия
+        this.eyeN = (this.eyeN || 0) + 1;
+        if (!this.eyeC) { this.eyeC = document.createElement('canvas'); this.eyeG = this.eyeC.getContext('2d'); }
+        if ((this.eyeN & 1) || this.eyeS !== S0) {
+          T.GL.begin(S0, S0, 0.6);
+          T.GL.quad(EYE, { t, open: 0.3 + 0.1 * this.redV, red: this.redV, flare: fl, look: this.look });
+          if (this.eyeC.width !== T.GL.w || this.eyeC.height !== T.GL.h) { this.eyeC.width = T.GL.w; this.eyeC.height = T.GL.h; }
+          this.eyeG.globalCompositeOperation = 'copy'; this.eyeG.drawImage(T.GL.cv, 0, 0); this.eyeS = S0;
+        }
+        g.drawImage(this.eyeC, cx - S0 / 2, cy - S0 / 2, S0, S0);
       }
     }
     if (!T.GL || !T.GL.ok || eyeFail) {                    // запасной путь: ядро градиентом, глаз эллипсами

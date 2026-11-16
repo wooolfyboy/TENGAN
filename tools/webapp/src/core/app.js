@@ -14,7 +14,7 @@ App.renderSubs = () => {
   document.body.classList.toggle('hassubs', !!(v.subs && v.subs.length));
   (v.subs || []).forEach((n, i) => {
     const b = T.el('button', i === v.sub ? 'on' : '', n);
-    b.onclick = () => { v.sub = i; v.onSub && v.onSub(i); App.renderSubs(); try { localStorage.setItem('sub_' + v.id, i); } catch (e) {} App.rewant(); };
+    b.onclick = () => { v.sub = i; v.onSub && v.onSub(i); App.renderSubs(); App.fresh(); try { localStorage.setItem('sub_' + v.id, i); } catch (e) {} App.rewant(); };
     subs.appendChild(b);
   });
 };
@@ -37,6 +37,7 @@ App.go = id => {
   [...nav.children].forEach(b => b.classList.toggle('on', b.dataset.id === v.id));
   const w = document.getElementById('wipe'); w.classList.remove('go'); void w.offsetWidth; w.classList.add('go');
   App.renderSubs();
+  App.fresh();                                         // LITE — только для раздела, который не тянул: новый раздел снова полный
   if (v.root) { v.root.hidden = false; v.cv && v.cv.fit(); } else v.mount(main);
   App.rewant();
 };
@@ -56,6 +57,10 @@ document.getElementById('fs').onclick = () => {
 // Свечение — единственный тяжёлый эффект: если 3 с подряд меньше 45 кадров, оно гаснет
 // (страховка; на нормальном планшете не срабатывает).
 const FPS_CAP = 60, STEP = 1000 / FPS_CAP;
+// автоматический LITE действует только на текущий раздел (и вкладку): при смене — снова полное качество,
+// первые 2.5 с после смены не считаем (сцена прогревается, шейдеры компилируются)
+App.graceT = 0;
+App.fresh = () => { T.Q.bloom = 1; T.Q.scan = 1; slow = 0; App.graceT = performance.now() + 2500; };
 const SHOT = new URLSearchParams(location.search).has('shot');   // для картинок в README: все эффекты, без счётчика кадров
 if (SHOT) document.getElementById('fps').style.display = 'none';
 let last = performance.now(), next = last, fpsN = 0, fpsT = 0, slow = 0;
@@ -69,7 +74,7 @@ const loop = now => {
   fpsN++; fpsT += dt;
   if (fpsT >= 1) {
     const fps = Math.round(fpsN / fpsT); T.fps = fps;
-    if (!document.hidden && !SHOT) { slow = fps < 45 ? slow + 1 : 0; if (slow >= 3 && T.Q.bloom) { T.Q.bloom = 0; T.Q.scan = 0; } }
+    if (!document.hidden && !SHOT && performance.now() > App.graceT) { slow = fps < 45 ? slow + 1 : 0; if (slow >= 3 && T.Q.bloom) { T.Q.bloom = 0; T.Q.scan = 0; } }
     document.getElementById('fps').textContent = fps + ' FPS' + (T.Q.bloom ? '' : ' · LITE');
     // приложение: состояние обновления страницы от палки (диагностика) — тап по нему = проверить сейчас
     const UP = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.TenganUpdate;
