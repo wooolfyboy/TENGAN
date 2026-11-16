@@ -109,11 +109,12 @@ const crack = (g, pts, col, lw) => { g.strokeStyle = col; g.lineWidth = lw; g.li
 // глаз домена — шейдер (WebGL); вокруг — дымный ореол и тёмное ядро
 const EYE_FS = () => `precision highp float;uniform vec2 res;uniform float t;uniform float open;uniform float red;uniform float flare;uniform vec2 look;
 ${T.GL.NOISE}
+float fq3(vec3 p){float v=0.,a=.5;for(int i=0;i<3;i++){v+=a*noise3(p);p=p*2.03+vec3(1.7,9.2,3.1);a*=.5;}return v*1.14;}
 float fb3(vec2 p){float v=0.,a=.5;for(int i=0;i<3;i++){v+=a*noise(p);p=p*2.03+vec2(1.7,9.2);a*=.5;}return v*1.14;}
 void main(){
  vec2 q=(gl_FragCoord.xy/res)*2.-1.;float r=length(q);if(r>1.){gl_FragColor=vec4(0.);return;}float ang=atan(q.y,q.x);
  vec3 col=vec3(0.);float a=0.;
- float sm=fb3(vec2(ang*2.5+t*.05,r*5.-t*.25));
+ vec2 cs=vec2(cos(ang),sin(ang));float sm=fq3(vec3(cs*1.6,r*5.-t*.25));
  float halo=smoothstep(.6,.8,r)*smoothstep(1.,.8,r)*(.3+sm*.95);
  vec3 hc=mix(vec3(.25,.35,1.),vec3(.62,.38,1.),sm);hc=mix(hc,vec3(1.,.13,.1),red*.55);
  col+=hc*halo;a+=halo;
@@ -121,39 +122,39 @@ void main(){
  vec3 cc=mix(vec3(0.),vec3(.043,.031,.125),smoothstep(0.,.55,r));cc=mix(cc,vec3(.106,.08,.31),smoothstep(.45,.78,r));
  cc+=vec3(.25,.15,.6)*pow(fb3(q*3.+t*.03),3.)*.5;
  col=mix(col,cc,core);a=mix(a,1.,core);
- // глаз
- vec2 p=q/.42;float x=p.x,y=p.y;float W=.8;
- float op=open+.015*sin(t*.7);
- float lid=op*max(0.,1.-pow(abs(x)/W,2.2));
- float lidN=lid+.018*(fb3(vec2(x*9.,t*.3))-.5);
- float d=abs(y)-lidN;
- float rr=length(p*vec2(.9,1.6));float pa=atan(p.y,p.x);
- vec2 fq=vec2(pa*2.2,rr*3.-t*(.55+flare*.8));
+ // глаз: только радужка со зрачком, без век — висит в центре домена
+ vec2 p=q/.42;float x=p.x,y=p.y;
+ vec2 c=look*.09;float R=.255*(1.+.12*red);
+ float d=length(p-c)-R;
+ float rr=length(p);float pa=atan(p.y,p.x);
+ vec3 fq=vec3(cos(pa)*1.4,sin(pa)*1.4,rr*3.-t*(.55+flare*.8));
  float fall=smoothstep(1.+flare*.6,.25,rr);float fl=0.,e=0.;
- if(fall>0.){fl=fb3(fq*2.)*fb3(fq*1.3+3.);e=pow(fl*2.1,2.4)*fall*smoothstep(-.02,.05,d)*(1.4+flare*2.5);}
+ if(fall>0.){fl=fq3(fq*2.)*fq3(fq*1.3+3.);e=pow(fl*2.1,2.4)*fall*smoothstep(-.02,.08,d)*(1.4+flare*2.5);}
  vec3 eC=mix(vec3(.18,.25,1.),vec3(.62,.36,1.),smoothstep(.2,.7,rr))+vec3(.5,.6,1.)*pow(fl,6.)*3.;
  eC=mix(eC,vec3(1.,.2,.12),red*.6);
  col+=eC*e;a+=e*.8;
- float hl=exp(-max(d,0.)*18.)*.5*smoothstep(W+.1,W-.3,abs(x));
+ float hl=exp(-max(d,0.)*14.)*.6;
  col+=mix(vec3(.35,.45,1.),vec3(1.,.25,.2),red)*hl;a+=hl*.7;
- if(d<0.){
-  float v=fb3(vec2(x*6.,y*14.)+t*.05);
-  vec3 sc=vec3(.02,.015,.06)+mix(vec3(.25,.1,.5),vec3(.6,.05,.08),red)*pow(v,4.)*1.4;
-  vec2 c=look*.09;vec2 ip=p-c;float ir=length(ip);
-  // только зрачок: чёрный диск с тонким светящимся ободком и бликом
-  float pr=.11+.008*sin(t*1.3)-red*.03;
-  vec3 rim=mix(vec3(.45,.65,1.),vec3(1.,.25,.15),red);
-  vec3 eye=sc+rim*exp(-max(ir-pr,0.)*28.)*.35;
-  eye=mix(eye,vec3(0.),smoothstep(pr,pr-.006,ir));
-  eye+=rim*smoothstep(.012,0.,abs(ir-pr))*.9;
-  eye+=vec3(1.)*smoothstep(.022,0.,length(ip-vec2(-.04,.04)))*.8;
-  eye*=mix(1.,.35,smoothstep(lidN-.09,lidN,y));
-  col=eye;a=1.;
+ if(d<.01){
+  vec3 sc=vec3(0.);
+  vec2 ip=p-c;float ir=length(ip);float ia=atan(ip.y,ip.x);
+  float fib=fb3(vec2(ia*14.,ir*7.-t*.15))*.7+fb3(vec2(ia*40.,ir*3.))*.5;
+  vec3 iC=mix(vec3(.55,.85,1.),vec3(.12,.25,.95),smoothstep(.06,R,ir));
+  iC=mix(iC,vec3(.6,.35,1.),smoothstep(.15,R,ir)*.6);
+  iC=mix(iC,vec3(1.,.25,.15),red*.75);
+  iC*=.35+pow(fib,1.6)*1.5;
+  float ring=smoothstep(.006,0.,abs(ir-.175))*(.6+.4*step(.5,fract(ia*6./3.14159+t*.2)));
+  iC+=vec3(.9,.95,1.)*ring*.9;
+  iC*=1.-smoothstep(R-.04,R,ir)*.85;
+  float pr=.075+.006*sin(t*1.3)-red*.025;
+  iC=mix(iC,vec3(0.),smoothstep(pr,pr-.008,ir));
+  iC+=mix(vec3(.4,.6,1.),vec3(1.,.3,.2),red)*smoothstep(.02,0.,abs(ir-pr-.01))*.8;
+  vec3 eye=mix(sc,iC,smoothstep(R,R-.006,ir));
+  eye+=vec3(1.)*smoothstep(.035,0.,length(ip-vec2(-.07,.07)))*.9;
+  eye+=vec3(.7,.8,1.)*smoothstep(.015,0.,length(ip-vec2(.05,-.05)))*.6;
+  float k=smoothstep(.01,-.004,d);
+  col=mix(col,eye,k);a=max(a,k);
  }
- float edge=smoothstep(.012,0.,abs(d))*smoothstep(W,W-.12,abs(x));
- col=mix(col,vec3(.94,.9,.82),edge);a=max(a,edge);
- for(int k=0;k<2;k++){float sg=k==0?1.:-1.;float uu=(x*sg-W+.03);
-  if(uu>0.&&uu<.2){float ty=sg*uu*.55;float th=.014*(1.-uu/.2);float tl=smoothstep(th,0.,abs(y-ty));col=mix(col,vec3(.94,.9,.82),tl);a=max(a,tl);}}
  gl_FragColor=vec4(col,clamp(a,0.,1.));}`;
 let EYE = null, eyeFail = false;
 const RING_JP = '天眼 領域展開 電波 受信 解析 近接 感知 赤外 網 波 音 機 星 空 ';
