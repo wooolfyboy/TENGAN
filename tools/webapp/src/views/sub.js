@@ -123,7 +123,7 @@ T.views.push({
 
   // WebGL-водопад: меш до ROWS_GL строк, цвет по высоте, светящиеся строки и пики, туман вглубь
   spectrumGL(g, w, h, cam, n, X, Z, HY) {
-    const RG = 64, O = T.glOrbit;
+    const RG = 48, O = T.glOrbit;
     if (!this.glP) {
       this.glP = O.prog(`
 uniform vec3 cBg, cAcc, cHot, cLine, cAlert; uniform float flash, rows, sumi;
@@ -254,7 +254,7 @@ void main(){
     const sx = m, sy = y0 + u * 3.3, sw = u * 9;
     for (let i = 0; i < 40; i++) { g.fillStyle = T.heat(i / 39); g.fillRect(sx + i * sw / 40, sy, sw / 40 + 0.5, u * 0.45); }
     T.txt(g, '-110', sx, sy + u * 1.4, u * 0.62, T.C.dim); T.txt(g, '-40 DBM', sx + sw, sy + u * 1.4, u * 0.62, T.C.dim, 'm', 'right');
-    T.footer(g, m, h - u * 2.2, w - 2 * m, u, 'drag: orbit  ·  time flows into depth', `${R} rows · receive only`);
+    T.footer(g, m, h - u * 2.2, w - 2 * m, u, 'drag: orbit  ·  time flows into depth', `${Math.min(T.glOrbit && T.GL.ok ? 48 : ROWS, S.subWf.length)} rows · receive only`);
   },
 
   // ---------- MONITOR: уровень и всплески ----------

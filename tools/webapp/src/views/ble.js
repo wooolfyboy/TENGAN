@@ -116,6 +116,172 @@ BU.sceneInk = (g, cam, sw, opt) => {
 };
 BU.sceneAny = (g, cam, sw, opt) => (T.theme === 'sumi' ? BU.sceneInk : BU.scene)(g, cam, sw, opt);
 
+// ---- ГОРОД НА ВИДЕОКАРТЕ (WebGL): башни-коробки с окнами, мокрый асфальт с отражениями, туман ----
+// Проекция в шейдере повторяет T.orbit один в один — подписи и касания (cam.p) ложатся точно на башни.
+// Общий для Bluetooth › City и PC › City. SUMI: бумажная «вода» с кругами туши (бамбук рисует 2D поверх).
+// towers: [{x, z, sx, sz, h, col:[r,g,b] 0..255, roof:[r,g,b], seed, glow 0..1, tr, sel}]
+// opt: {t, rings:[радиусы], rmax, grid:'radial'|'square', step, ext}
+BU.glCity = (() => {
+  const MAXP = 48, STRIDE = 14;
+  let P = null, PG = null, PI = null, data = new Float32Array(MAXP * 30 * STRIDE), failed = false;
+  const VS = `
+attribute vec3 pos;attribute vec3 fuv;attribute float face;attribute vec3 col;attribute vec4 ex;
+uniform vec4 cam1;uniform vec4 cam2;uniform vec2 scr;uniform float mir;
+varying vec3 vuv;varying float vface;varying vec3 vcol;varying vec4 vex;varying float vdep;varying float vy;
+void main(){vec3 p=pos;p.y*=mir;
+ float x1=p.x*cam1.x-p.z*cam1.y,z1=p.x*cam1.y+p.z*cam1.x;float y2=p.y*cam1.z+z1*cam1.w,z2=-p.y*cam1.w+z1*cam1.z;
+ float wv=max(.05,cam2.x+z2);
+ gl_Position=vec4((2.*cam2.z/scr.x-1.)*wv+2.*x1*cam2.y/scr.x,(1.-2.*cam2.w/scr.y)*wv+2.*y2*cam2.y/scr.y,((wv-.05)/12.*2.-1.)*wv,wv);
+ vuv=fuv;vface=face;vcol=col;vex=ex;vdep=wv;vy=pos.y;}`;
+  // башни: фасад с окнами (этажи по 0.035, колонки по 0.03), светящиеся рёбра, крыша
+  const FS = `precision highp float;
+varying vec3 vuv;varying float vface;varying vec3 vcol;varying vec4 vex;varying float vdep;varying float vy;
+uniform float t;uniform float refl;uniform float fogA;uniform float fogB;uniform float sumi;
+float h1(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+void main(){
+ vec3 c=vcol;float h=vex.x,seed=vex.y,glow=vex.z,fl=vex.w;float tr=mod(fl,2.),sel=step(1.5,fl);
+ vec3 col;float a=1.;
+ if(vface<3.5){
+  float along=vuv.x,y=vuv.y,wd=vuv.z;
+  vec3 base=c*(.07+.05*mod(vface,2.))+vec3(.01,.02,.03);
+  vec2 cell=vec2(floor(along/.03),floor(y/.035));vec2 lc=vec2(fract(along/.03),fract(y/.035));
+  float win=step(.22,lc.x)*step(lc.x,.78)*step(.28,lc.y)*step(lc.y,.72)*step(.02,y)*step(y,h-.015)*step(.012,along)*step(along,wd-.012);
+  float r=h1(cell+seed*13.1),lit=step(1.-(.22+.55*glow),r);
+  float fl2=.85+.15*sin(t*(1.+r*3.)+r*40.);
+  vec3 wc=mix(c,vec3(1.),.35+.3*r);
+  col=base+win*(lit*wc*fl2*1.1+(1.-lit)*c*.06);
+  float edge=1.-smoothstep(0.,.006,min(along,wd-along));
+  float topb=smoothstep(h-.012,h,y);
+  col+=c*(edge*.55+topb*.9)+(sel>.5?vec3(.8)*edge:vec3(0.));
+  col+=c*exp(-y*28.)*.35;
+ } else {
+  vec2 q=vuv.xy;float e=1.-smoothstep(0.,.006,min(min(q.x,vuv.z-q.x),min(q.y,vuv.z-q.y)));
+  col=c*(.55+.35*glow)+c*e*.8+(sel>.5?vec3(.9)*e:vec3(0.));
+ }
+ if(sumi>.5){                                      // тушь: силуэт размывкой, окна — бумага, у трекера — киноварь
+  vec3 pap=vec3(.925,.894,.831),ink=tr>.5?vec3(.76,.23,.17):vec3(.11,.094,.078);
+  float lum=dot(col,vec3(.3,.5,.2));
+  col=mix(ink,pap,clamp(lum*.9,0.,.85));a=.92;
+ }
+ float fog=smoothstep(fogA,fogB,vdep);a*=1.-fog*.8;
+ if(refl>0.){a*=refl*exp(-vy*5.);col*=.9;}
+ gl_FragColor=vec4(col*a,a);}`;
+  // земля: мокрый асфальт (DENKO) или бумажная вода (SUMI); кольца/спицы или квадратная сетка; лужи; пятна света под башнями
+  const FG = `#extension GL_OES_standard_derivatives : enable
+precision highp float;
+varying vec3 vuv;varying float vdep;
+uniform float t;uniform float rmax;uniform float rings[6];uniform float mode;uniform float step0;uniform float sumi;
+uniform vec4 tw[${MAXP}];uniform vec3 tc[${MAXP}];uniform float n;uniform float fogA;uniform float fogB;uniform vec3 paper;
+${T.GL ? T.GL.NOISE : ''}
+float line(float d,float w){float f=fwidth(d);return 1.-smoothstep(w,w+f*1.5,abs(d));}
+void main(){
+ vec2 p=vuv.xz;float r=length(p),ang=atan(p.y,p.x);
+ float edge=smoothstep(rmax+.28,rmax-.05,r);
+ if(edge<=0.)discard;
+ float pud=smoothstep(.48,.62,fbm(p*2.6+3.));
+ vec3 col;float a;
+ if(sumi<.5){
+  col=vec3(.012,.03,.042)+vec3(.0,.02,.03)*fbm(p*9.);
+  a=mix(.9,.5,pud)*edge;
+  float gl=0.;
+  if(mode<.5){for(int i=0;i<6;i++){if(rings[i]>0.)gl+=line(r-rings[i],.0025)*(i==3?.8:.45);}
+   gl+=line(r-rmax,.004);float sp=mod(ang,.5236)-.2618;gl+=line(sp*r,.002)*.35*step(.1,r);}
+  else{vec2 gq=mod(p+step0*.5,step0)-step0*.5;gl+=(line(gq.x,.0018)+line(gq.y,.0018))*.4;}
+  col+=vec3(.15,.55,.65)*gl*.55;
+  vec3 pool=vec3(0.);
+  for(int i=0;i<${MAXP};i++){if(float(i)>=n)break;vec2 d=p-tw[i].xy;float dd=dot(d,d);
+   pool+=tc[i]*(exp(-dd/(.006+.012*tw[i].z))*(.35+.5*tw[i].z)+exp(-dd/.12)*.06);}
+  col+=pool*mix(.8,1.6,pud);
+  col+=vec3(.25,.6,.7)*pud*.04*(.5+.5*sin(p.x*40.+t*.5));
+ } else {
+  col=paper*(1.-.06*fbm(p*3.))-vec3(.05)*smoothstep(.4,.8,fbm(p*1.3+7.));
+  a=edge*.92;
+  float ink=0.;
+  if(mode<.5){for(int i=0;i<6;i++){if(rings[i]>0.)ink+=line(r-rings[i],.002)*.18;}ink+=line(r-rmax,.004)*.35;}
+  else{vec2 gq=mod(p+step0*.5,step0)-step0*.5;ink+=(line(gq.x,.0015)+line(gq.y,.0015))*.12;}
+  for(int i=0;i<${MAXP};i++){if(float(i)>=n)break;float d=length(p-tw[i].xy);
+   float rip=sin((d-t*.05-tw[i].z)*80.)*.5+.5;ink+=pow(rip,6.)*exp(-d*9.)*(.25+.3*tw[i].z);
+   ink+=exp(-d*d/.002)*.25*tw[i].z;}
+  col=mix(col,vec3(.11,.09,.08),clamp(ink,0.,1.));
+ }
+ float fog=smoothstep(fogA,fogB,vdep);a*=1.-fog*.75;
+ gl_FragColor=vec4(col*a,a);}`;
+  const VG = `
+attribute vec3 pos;uniform vec4 cam1;uniform vec4 cam2;uniform vec2 scr;varying vec3 vuv;varying float vdep;
+void main(){vec3 p=pos;float x1=p.x*cam1.x-p.z*cam1.y,z1=p.x*cam1.y+p.z*cam1.x;float y2=p.y*cam1.z+z1*cam1.w,z2=-p.y*cam1.w+z1*cam1.z;
+ float wv=max(.05,cam2.x+z2);
+ gl_Position=vec4((2.*cam2.z/scr.x-1.)*wv+2.*x1*cam2.y/scr.x,(1.-2.*cam2.w/scr.y)*wv+2.*y2*cam2.y/scr.y,((wv-.05)/12.*2.-1.)*wv,wv);
+ vuv=pos;vdep=wv;}`;
+  const init = () => {
+    if (P || failed) return !!P;
+    P = T.GL.prog(FS, VS); PG = T.GL.prog(FG, VG);
+    if (!P || !PG) { failed = true; P = null; return false; }
+    const gd = []; const N = 48, R = 2.1;                 // земля: сетка-квадрат (мелко — для правильной перспективы)
+    for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+      const x0 = -R + 2 * R * i / N, x1 = -R + 2 * R * (i + 1) / N, z0 = -R + 2 * R * j / N, z1 = -R + 2 * R * (j + 1) / N;
+      gd.push(x0, 0, z0, x1, 0, z0, x1, 0, z1, x0, 0, z0, x1, 0, z1, x0, 0, z1);
+    }
+    T.GL.buf('cityGround', new Float32Array(gd)); PG.nGround = gd.length / 3;
+    return true;
+  };
+  let k = 0;
+  const v = (x, y, z, a, b, c, f, col, ex) => { const o = k * STRIDE; data[o] = x; data[o + 1] = y; data[o + 2] = z; data[o + 3] = a; data[o + 4] = b; data[o + 5] = c; data[o + 6] = f; data[o + 7] = col[0]; data[o + 8] = col[1]; data[o + 9] = col[2]; data[o + 10] = ex[0]; data[o + 11] = ex[1]; data[o + 12] = ex[2]; data[o + 13] = ex[3]; k++; };
+  const camU = (cam, W, H, vals) => { vals.cam1 = [cam.cs, cam.sn, cam.cp, cam.sp]; vals.cam2 = [cam.D, cam.F, cam.cx, cam.cy]; vals.scr = [W, H]; return vals; };
+  const attrib = (prog, name, size, off) => { const gl = T.GL.gl, l = prog.a[name]; if (l == null || l < 0) return; gl.enableVertexAttribArray(l); gl.vertexAttribPointer(l, size, gl.FLOAT, false, STRIDE * 4, off * 4); };
+  return {
+    ok: () => T.GL && T.GL.ok && init(),
+    // рисует всю сцену в общий GL-холст и кладёт на 2D-холст вида
+    render(g, cam, W, H, towers, opt) {
+      if (!this.ok()) return false;
+      const GL = T.GL, gl = GL.gl, sumi = T.theme === 'sumi';
+      GL.begin(W, H, opt.scale || 1);
+      // вершины башен (дальние/ближние — неважно: буфер глубины)
+      k = 0;
+      const list = towers.slice(0, MAXP);
+      for (const b of list) {
+        const col = b.col.map(q => q / 255), roof = (b.roof || b.col).map(q => q / 255), ex = [b.h, b.seed % 97, b.glow, (b.tr ? 1 : 0) + (b.sel ? 2 : 0)];
+        const c = [[b.x - b.sx, b.z - b.sz], [b.x + b.sx, b.z - b.sz], [b.x + b.sx, b.z + b.sz], [b.x - b.sx, b.z + b.sz]];
+        for (let i = 0; i < 4; i++) {
+          const A = c[i], B = c[(i + 1) % 4], wd = i % 2 ? b.sz * 2 : b.sx * 2;
+          v(A[0], 0, A[1], 0, 0, wd, i, col, ex); v(B[0], 0, B[1], wd, 0, wd, i, col, ex); v(B[0], b.h, B[1], wd, b.h, wd, i, col, ex);
+          v(A[0], 0, A[1], 0, 0, wd, i, col, ex); v(B[0], b.h, B[1], wd, b.h, wd, i, col, ex); v(A[0], b.h, A[1], 0, b.h, wd, i, col, ex);
+        }
+        const s2 = b.sx * 2;
+        v(c[0][0], b.h, c[0][1], 0, 0, s2, 4, roof, ex); v(c[1][0], b.h, c[1][1], s2, 0, s2, 4, roof, ex); v(c[2][0], b.h, c[2][1], s2, s2, s2, 4, roof, ex);
+        v(c[0][0], b.h, c[0][1], 0, 0, s2, 4, roof, ex); v(c[2][0], b.h, c[2][1], s2, s2, s2, 4, roof, ex); v(c[3][0], b.h, c[3][1], 0, s2, s2, 4, roof, ex);
+      }
+      const fogA = cam.D + 0.2, fogB = cam.D + 2.2;
+      const drawTowers = (mir, refl) => {
+        if (!k) return;
+        gl.useProgram(P.p); GL.buf('cityTw', data.subarray(0, k * STRIDE), false, true);
+        attrib(P, 'pos', 3, 0); attrib(P, 'fuv', 3, 3); attrib(P, 'face', 1, 6); attrib(P, 'col', 3, 7); attrib(P, 'ex', 4, 10);
+        GL.set(P, camU(cam, W, H, { mir, refl, t: opt.t, fogA, fogB, sumi: sumi ? 1 : 0 }));
+        gl.drawArrays(gl.TRIANGLES, 0, k);
+        for (const n of ['pos', 'fuv', 'face', 'col', 'ex']) if (P.a[n] >= 0) gl.disableVertexAttribArray(P.a[n]);
+      };
+      gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+      gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL);
+      if (!sumi) { drawTowers(-1, 0.3); gl.clear(gl.DEPTH_BUFFER_BIT); }       // отражения в мокром асфальте
+      // земля
+      gl.disable(gl.DEPTH_TEST);
+      gl.useProgram(PG.p); GL.buf('cityGround');
+      const lp = PG.a.pos; gl.enableVertexAttribArray(lp); gl.vertexAttribPointer(lp, 3, gl.FLOAT, false, 0, 0);
+      const twU = new Float32Array(MAXP * 4), tcU = new Float32Array(MAXP * 3);
+      list.forEach((b, i) => { twU[i * 4] = b.x; twU[i * 4 + 1] = b.z; twU[i * 4 + 2] = b.glow; twU[i * 4 + 3] = 0; const cc = b.tr ? T.ALERT : b.col; tcU[i * 3] = cc[0] / 255; tcU[i * 3 + 1] = cc[1] / 255; tcU[i * 3 + 2] = cc[2] / 255; });
+      const rings = new Float32Array(6); (opt.rings || []).slice(0, 6).forEach((r, i) => rings[i] = r);
+      const pc = T.THEMES.sumi.C.bg, pn = parseInt(pc.slice(1), 16);
+      GL.set(PG, camU(cam, W, H, { t: opt.t, rmax: opt.rmax || 1.5, rings, mode: opt.grid === 'square' ? 1 : 0, step0: opt.step || 0.2, sumi: sumi ? 1 : 0,
+        tw: twU, tc: tcU, n: list.length, fogA, fogB, paper: [(pn >> 16) / 255, ((pn >> 8) & 255) / 255, (pn & 255) / 255] }));
+      gl.drawArrays(gl.TRIANGLES, 0, PG.nGround); gl.disableVertexAttribArray(lp);
+      // башни (в SUMI вместо них — бамбук кистью поверх, 2D)
+      if (!(sumi && opt.noTowers)) { gl.enable(gl.DEPTH_TEST); gl.clear(gl.DEPTH_BUFFER_BIT); drawTowers(1, 0); }
+      gl.disable(gl.DEPTH_TEST);
+      GL.draw(g, 0, 0, W, H);
+      return true;
+    },
+  };
+})();
+
 // выноска-карточка у цели (Scope и City)
 BU.card = (g, p, e, u, W, H, top) => {
   const sg = T.pct(e.rs), bw = u * 15, bh = u * 8.2;
@@ -294,14 +460,13 @@ T.views.push({
     const ringR = db => { const P = [[-45, 0.22], [-60, 0.42], [-70, 0.68], [-80, 0.96], [-90, 1.24], [-100, 1.5]];
       if (db >= P[0][0]) return P[0][1]; for (let i = 1; i < P.length; i++) if (db >= P[i][0]) { const a = P[i - 1], b = P[i]; return b[1] + (a[1] - b[1]) * (db - b[0]) / (a[0] - b[0]); } return P[P.length - 1][1]; };
     const ring = (r, col, lw) => { g.beginPath(); for (let i = 0; i <= 96; i++) { const a = i / 96 * T.TAU, q = c.p(Math.cos(a) * r, 0, Math.sin(a) * r); i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); } g.strokeStyle = col; g.lineWidth = lw; g.stroke(); };
-    g.lineWidth = 1; g.strokeStyle = 'rgba(32,50,64,.55)'; g.beginPath();
-    for (let a = 0; a < 360; a += 30) { const r = a * Math.PI / 180, p0 = c.p(Math.cos(r) * 0.1, 0, Math.sin(r) * 0.1), p1 = c.p(Math.cos(r) * RMAX, 0, Math.sin(r) * RMAX); g.moveTo(p0[0], p0[1]); g.lineTo(p1[0], p1[1]); }
-    g.stroke();
-    RINGS.forEach(([db], i) => ring(ringR(db), i === 3 ? 'rgba(62,230,255,.35)' : 'rgba(90,112,128,.4)', 1));
-    ring(RMAX, 'rgba(62,230,255,.5)', 1.4);
-    for (const [db, name] of [...RINGS, [-127, 'ALL']]) {             // подписи колец — на ближней стороне
-      const r = db < -100 ? RMAX : ringR(db), a = -c.yaw - Math.PI / 2 + 0.22, q = c.p(Math.cos(a) * r, 0, Math.sin(a) * r);
-      T.txt(g, name + (db > -100 ? '  ' + db : ''), q[0] + u * 0.3, q[1] - u * 0.3, u * 0.66, db === -90 || db < -100 ? T.C.acc : T.C.dim);
+    const useGL = BU.glCity.ok();                         // видеокарта: земля и башни шейдером; 2D — запасной путь
+    if (!useGL) {
+      g.lineWidth = 1; g.strokeStyle = 'rgba(32,50,64,.55)'; g.beginPath();
+      for (let a = 0; a < 360; a += 30) { const r = a * Math.PI / 180, p0 = c.p(Math.cos(r) * 0.1, 0, Math.sin(r) * 0.1), p1 = c.p(Math.cos(r) * RMAX, 0, Math.sin(r) * RMAX); g.moveTo(p0[0], p0[1]); g.lineTo(p1[0], p1[1]); }
+      g.stroke();
+      RINGS.forEach(([db], i) => ring(ringR(db), i === 3 ? 'rgba(62,230,255,.35)' : 'rgba(90,112,128,.4)', 1));
+      ring(RMAX, 'rgba(62,230,255,.5)', 1.4);
     }
     const list = BU.list(), rank = [...list].sort((a, b) => b.rs - a.rs);
     const SZ = { computer: 0.09, TV: 0.1, tv: 0.1, phone: 0.065, audio: 0.06, watch: 0.05, band: 0.045, tracker: 0.045, sensor: 0.05 };
@@ -329,6 +494,15 @@ T.views.push({
       const far = c.p(Math.sin(c.yaw) * 1.7, 0, Math.cos(c.yaw) * 1.7);     // за дальним краем колец
       T.ink.mountains(g, w, Math.max(y0 + u * 8, far[1] - u * 0.5), u);
     }
+    if (useGL) BU.glCity.render(g, c, w, h, towers.map(tw => {
+      const e = tw.e, tr = BU.tr(e);
+      return { x: tw.x, z: tw.z, sx: tw.s, sz: tw.s, h: Math.max(0.01, tw.hh), col: BU.rgb(e, 0.35 + 0.65 * tw.sg), roof: tr ? T.ALERT : T.heatRGB(0.55 + 0.45 * tw.sg),
+        seed: T.hash(e.id) % 997, glow: tw.sg, tr, sel: e.id === this.sel };
+    }), { t, rings: RINGS.map(([db]) => ringR(db)), rmax: RMAX, grid: 'radial', noTowers: true });
+    for (const [db, name] of [...RINGS, [-127, 'ALL']]) {             // подписи колец — на ближней стороне
+      const r = db < -100 ? RMAX : ringR(db), a = -c.yaw - Math.PI / 2 + 0.22, q = c.p(Math.cos(a) * r, 0, Math.sin(a) * r);
+      T.txt(g, name + (db > -100 ? '  ' + db : ''), q[0] + u * 0.3, q[1] - u * 0.3, u * 0.66, db === -90 || db < -100 ? T.C.acc : T.C.dim);
+    }
     for (const tw of towers) {
       const { e, x, z, s, hh, sg } = tw, tr = BU.tr(e), fog = T.clamp(1.2 - (tw.d + 1) * 0.3, 0.3, 1) * T.clamp(e.h);
       if (ink) {                                           // бамбук: выше и больше колен — сильнее сигнал
@@ -340,6 +514,14 @@ T.views.push({
         continue;
       }
       const col = BU.rgb(e, 0.35 + 0.65 * sg);
+      if (useGL) {                                         // башню нарисовала видеокарта — здесь только касания и подписи
+        const top = c.p(x, hh, z), bot = c.p(x, 0, z);
+        T.hits.circle(top[0], top[1], Math.max(u * 1.6, top[2] * s * 1.2), { k: 'dev', id: e.id });
+        T.hits.rect(Math.min(top[0], bot[0]) - top[2] * s, top[1], top[2] * s * 2, Math.max(4, bot[1] - top[1]), { k: 'dev', id: e.id });
+        if (e.id === this.sel) selP = { p: top, e };
+        else if (this.sel == null && rank.indexOf(e) < 5) labels.push([top, e]);
+        continue;
+      }
       const P = [[-s, -s], [s, -s], [s, s], [-s, s]].map(([a, b]) => [c.p(x + a, 0, z + b), c.p(x + a, hh, z + b)]);
       // боковые грани: видимые (обход по часовой на экране), дальние раньше
       const faces = [0, 1, 2, 3].map(i => { const j = (i + 1) % 4; return { i, j, d: (P[i][0][3] + P[j][0][3]) / 2 }; }).sort((a, b) => b.d - a.d);

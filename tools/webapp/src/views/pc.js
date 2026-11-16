@@ -160,7 +160,8 @@
       const cam = this.cam;
       this.drag.tick(dt); if (this.drag.idle() && !this.sel) cam.yaw += dt * 0.07;
       cam.frame(w / 2, a.y + a.h * 0.64, Math.min(w, a.h * 1.7) * 1.05);
-      T.floorGrid(g, cam, 1.4, 0.233);
+      const GC = T.bleUI && T.bleUI.glCity, useGL = GC && GC.ok();   // видеокарта (общий город с Bluetooth); 2D — запасной путь
+      if (!useGL) T.floorGrid(g, cam, 1.4, 0.233);
       this.dust.tick(dt);
       const now = new Set(), list = p.city || [];
       const maxMB = Math.max(300, ...list.map(r => r[2]));
@@ -181,11 +182,16 @@
       }
       items.sort((A, B) => B.d - A.d);
       const tops = [];
+      if (useGL) GC.render(g, cam, w, h, items.filter(it => it.e.w > 0.002).map(it => {
+        const e = it.e, base = T.heatRGB(0.3 + 0.6 * Math.min(1, e.cpu / 50)), hot = e.cpu > 50;
+        return { x: it.x, z: it.z, sx: e.w, sz: e.w, h: Math.max(0.01, e.h), col: hot ? T.ALERT : base, roof: e.fg ? T.heatRGB(1) : hot ? T.ALERT : base,
+          seed: T.hash(e.name) % 997, glow: Math.min(1, e.cpu / 40), tr: hot, sel: this.sel === e.name };
+      }), { t, rmax: 1.45, grid: 'square', step: 0.233 });
       for (const it of items) {
         const e = it.e, base = T.heatRGB(0.3 + 0.6 * Math.min(1, e.cpu / 50));
         const roof = e.fg ? T.C.hot : e.cpu > 50 ? T.C.alert : T.rgb(base, 0.95);
         const fog = T.clamp(1.15 - (it.d + 1) * 0.25, 0.35, 1);
-        const r = box(g, cam, it.x, it.z, e.w, e.w, e.h, roof, e.cpu > 50 ? T.ALERT : base, this.sel === e.name ? T.C.hot : T.rgb(base, 0.5), fog);
+        const r = useGL ? { top: cam.p(it.x, e.h, it.z) } : box(g, cam, it.x, it.z, e.w, e.w, e.h, roof, e.cpu > 50 ? T.ALERT : base, this.sel === e.name ? T.C.hot : T.rgb(base, 0.5), fog);
         tops.push({ e, r });
         const pr = cam.p(it.x, e.h * 0.5, it.z);
         T.hits.circle(pr[0], pr[1], Math.max(u * 1.6, e.w * pr[2] * 1.4), { app: e.name });
