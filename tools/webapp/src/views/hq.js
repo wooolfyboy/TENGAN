@@ -14,9 +14,9 @@ const E = Object.assign({}, PAL.denko);
 const K = () => T.theme === 'kurenai';
 const orA = a => `rgba(${E.orRGB},${a})`;
 // шрифты фиксированные: штаб выглядит одинаково при любой теме
-const RAJ = "Rajdhani,'Arial Narrow',sans-serif", ANTON = "Anton,Rajdhani,'Arial Narrow',sans-serif", SPM = "'Space Mono','JetBrains Mono',ui-monospace,monospace";
+const RAJ = "'Exo 2','Arial Narrow',sans-serif", ANTON = "Oswald,'Arial Narrow',sans-serif", SPM = "'JetBrains Mono',ui-monospace,monospace";   // имена исторические: заголовки DENKO / KURENAI, текст
 const JP = () => T.SEAL_FONT, FT = () => K() ? ANTON : RAJ, FM = () => K() ? SPM : T.FM, FC = () => T.FC;
-// Anton — одно начертание: «жирность» ему не нужна (иначе браузер дорисует ложный жирный)
+// Oswald у нас одно начертание на все веса — «жирность» ему не нужна
 const font = (g, px, f, w = '') => { g.font = `${f === ANTON ? '' : w}${px}px ${f}`; };
 const tx = (g, s, x, y, px, col, f = FM(), al = 'left', w = '') => { font(g, px, f, w); g.fillStyle = col; g.textAlign = al; g.textBaseline = 'alphabetic'; g.fillText(s, x, y); };
 // «жирный» японский: системный шрифт печати один, толщину добираем обводкой

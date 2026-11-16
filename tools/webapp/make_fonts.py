@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Шрифты палки для планшета: урезать до нужных символов и встроить в CSS.
+"""Шрифты интерфейса для планшета: урезать до нужных символов и встроить в CSS.
 
-  Rajdhani SemiBold  — заголовки и крупные числа (как на экране палки)
-  Share Tech Mono    — текст HUD
-  JetBrains Mono     — кириллица (названия треков, сети с русскими именами)
+  JetBrains Mono     — весь текст (обе темы)
+  Exo 2              — заголовки и крупные числа, тема DENKO
+  Oswald             — заголовки и крупные числа, тема KURENAI
+  У всех трёх латиница и кириллица из одной семьи — при смене языка ничего не прыгает.
   IPAGothic          — только два знака печати 天眼 (IPA Font License; системный шрифт
                        fonts-ipafont-gothic, в репозиторий не кладём — нужен лишь при пересборке)
 
@@ -43,23 +44,25 @@ def woff2(path, text):
     return base64.b64encode(buf.getvalue()).decode()
 
 
-def face(family, weight, data):
-    return ("@font-face{font-family:'%s';font-weight:%s;font-style:normal;font-display:block;"
-            "src:url(data:font/woff2;base64,%s) format('woff2')}" % (family, weight, data))
+def face(family, weight, data, adjust=None):
+    # adjust — size-adjust: шрифт рисуется в этой доле от заданного размера (и в CSS, и на холстах),
+    # чтобы новые шрифты занимали столько же места, сколько прежние, и раскладка не поехала
+    sa = ";size-adjust:%s" % adjust if adjust else ""
+    return ("@font-face{font-family:'%s';font-weight:%s;font-style:normal;font-display:block%s;"
+            "src:url(data:font/woff2;base64,%s) format('woff2')}" % (family, weight, sa, data))
 
 
 def main():
+    # Одна семья на латиницу и кириллицу — при смене языка ничего не прыгает:
+    #   текст (обе темы) — JetBrains Mono; заголовки и цифры: DENKO — Exo 2, KURENAI — Oswald
+    T = ASCII + EXTRA + CYR
+    F = lambda n: os.path.join(FONTS, n)
     parts = [
-        face("Rajdhani", 600, woff2(os.path.join(FONTS, "Rajdhani-SemiBold.ttf"), ASCII + EXTRA)),
-        face("Share Tech Mono", 400, woff2(os.path.join(FONTS, "ShareTechMono-Regular.ttf"), ASCII + EXTRA)),
-        face("JetBrains Mono", 500, woff2(os.path.join(FONTS, "JetBrainsMono-Medium.ttf"), ASCII + EXTRA + CYR)),
-        # тема KURENAI 紅: рубленые цифры и заголовки (Anton), моноширинный текст (Space Mono)
-        face("Anton", 400, woff2(os.path.join(FONTS, "Anton-Regular.ttf"), ASCII + EXTRA)),
-        face("Space Mono", 400, woff2(os.path.join(FONTS, "SpaceMono-Regular.ttf"), ASCII + EXTRA)),
-        face("Space Mono", 700, woff2(os.path.join(FONTS, "SpaceMono-Bold.ttf"), ASCII + EXTRA)),
-        # русская версия: кириллица для заголовков и крупных надписей (Play — в стеке шрифтов сразу за Rajdhani/Anton;
-        # латиница остаётся прежней, браузер берёт из Play только русские буквы)
-        face("Play", 700, woff2(os.path.join(FONTS, "Play-Bold.ttf"), CYR + "«»№")),
+        face("JetBrains Mono", "100 550", woff2(F("JetBrainsMono-Medium.ttf"), T), "90%"),
+        face("JetBrains Mono", "551 900", woff2(F("JetBrainsMono-SemiBold.ttf"), T), "90%"),
+        face("Exo 2", "100 650", woff2(F("Exo2-SemiBold.ttf"), T), "87%"),
+        face("Exo 2", "651 900", woff2(F("Exo2-Bold.ttf"), T), "87%"),
+        face("Oswald", "100 900", woff2(F("Oswald-SemiBold.ttf"), T), "92%"),
     ]
     if os.path.exists(IPA):
         parts.append(face("Tengan Seal", 400, woff2(IPA, SEAL_TEXT)))

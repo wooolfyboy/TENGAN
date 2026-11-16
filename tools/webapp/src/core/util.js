@@ -4,9 +4,9 @@ const T = window.T = { views: [] };
 // цвета — ровно как на палке
 T.C = { bg: '#05080d', acc: '#3ee6ff', hot: '#ebfaff', alert: '#ff7a1a', label: '#96afc0', dim: '#5a7080', line: '#203240', panel: '#0e2a34',
   steel: '#96afc0' };
-T.FT = "Rajdhani,Play,'Arial Narrow',sans-serif";                      // заголовки, крупные числа
-T.FM = "'Share Tech Mono','JetBrains Mono',ui-monospace,monospace"; // текст HUD
-T.FC = "'JetBrains Mono','Share Tech Mono',ui-monospace,monospace"; // где может быть кириллица
+T.FT = "'Exo 2','Arial Narrow',sans-serif";                              // заголовки, крупные числа
+T.FM = "'JetBrains Mono',ui-monospace,monospace";                 // текст HUD
+T.FC = "'JetBrains Mono',ui-monospace,monospace";                 // где может быть кириллица
 T.TAU = Math.PI * 2;
 T.clamp = (v, a = 0, b = 1) => v < a ? a : v > b ? b : v;
 T.lerp = (a, b, k) => a + (b - a) * k;
