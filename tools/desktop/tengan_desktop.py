@@ -976,6 +976,15 @@ def serve(app, port=PORT):
 def main():
     import webview
     import overlay
+    if os.environ.get("TENGAN_SELFTEST"):
+        # CI: проверяем, что PyInstaller упаковал всё нужное (окно, его движок, монитор, оповещения),
+        # не запуская сам интерфейс — на headless-машине у Chromium нет GPU и он падает не по нашей вине.
+        import overlay_html, events                     # noqa: F401
+        if sys.platform.startswith("linux"):
+            import webview.platforms.qt                 # noqa: F401  (движок окна на Linux — Qt WebEngine)
+        print("selftest OK: webview + window engine + modules import", flush=True)
+        log("selftest OK")
+        return
     log("=== TENGAN desktop ===")
     if not overlay.single_instance(PORT):
         log("уже запущено — показал окно первой копии")
