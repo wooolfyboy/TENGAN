@@ -182,7 +182,15 @@ T.views.push({
     try { this.frame2(dt, t); } finally { T.theme = th; }
   },
   frame2(dt, t) {
-    const { g, w, h } = this.cv; T.hits.clear();
+    // полоса вкладок NERV/DOMAIN сверху: сцена сдвигается под неё (касания — тоже)
+    const off = document.body.classList.contains('hassubs') ? 44 : 0, o = this.cv;
+    o.g.fillStyle = this.sub === 1 ? D.bg : E.bg; o.g.fillRect(0, 0, o.w, off);
+    o.g.save(); o.g.translate(0, off);
+    try { this.frame3(dt, t, o.g, o.w, o.h - off); } finally { o.g.restore(); }
+    if (off) for (const q of T.hits.list) q.y += off;
+  },
+  frame3(dt, t, g, w, h) {
+    T.hits.clear();
     const now = performance.now(), u = Math.min(w / 96, h / 60), m = u * 0.8;
     this.sweep = (this.sweep + dt * 1.6) % T.TAU;
     this.track(now, t); this.wfTick(dt); this.actTick(dt, t);
@@ -662,7 +670,7 @@ T.views.push({
     if (T.GL && T.GL.ok && !eyeFail) {
       if (!EYE) { EYE = T.GL.prog(EYE_FS()); if (!EYE) eyeFail = true; }
       if (EYE) {
-        T.GL.begin(S0, S0, 0.8);
+        T.GL.begin(S0, S0, 0.65);
         T.GL.quad(EYE, { t, open: 0.3 + 0.1 * this.redV, red: this.redV, flare: fl, look: this.look });
         T.GL.draw(g, cx - S0 / 2, cy - S0 / 2, S0, S0);
       }
