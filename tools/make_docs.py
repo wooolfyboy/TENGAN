@@ -2,8 +2,9 @@
 """Картинки для README (docs/): гифки и галерея — из кадров симулятора.
 Экран палки — пиксели, поэтому увеличиваем ровно вдвое «по пикселю» (NEAREST): чётко, без мыла.
 
-    SIM_ANIM=1 bash tools/sim/build.sh && python3 tools/make_docs.py              # тема DENKO
-    SIM_THEME=1 bash tools/sim/build.sh && python3 tools/make_docs.py sumi       # галерея SUMI
+    SIM_ANIM=1 bash tools/sim/build.sh && python3 tools/make_docs.py              # тема DENKO: гифки + галерея (EN)
+    SIM_LANG=ru bash tools/sim/build.sh && python3 tools/make_docs.py ru          # галерея на русском
+    SIM_THEME=kurenai bash tools/sim/build.sh && python3 tools/make_docs.py kurenai   # галерея KURENAI (+ ru)
 """
 import sys
 import glob, os
@@ -60,18 +61,29 @@ def gallery(items, name, cols=3, scale=1, bg=BG, line=(18, 48, 58), ink=(127, 15
     print("%-22s %dx%d  %4d KB" % (name, W, H, os.path.getsize(os.path.join(DOCS, name)) // 1024))
 
 
-SCREENS = [("01_menu", "главное меню"), ("13_ble_city", "Bluetooth · City (3D)"), ("12_ble_scope", "Bluetooth · Scope"),
-           ("16_ble_detail", "Bluetooth · подробности"), ("22_wifi_channels", "Wi-Fi · каналы"), ("25_wifi_find", "Wi-Fi · Find"),
-           ("30_subghz_spectrum", "Sub-GHz · спектр + водопад"), ("40b_sound_terrain", "Sound · Terrain (3D)"), ("45b_sound_xy_pc", "Sound · XY по звуку ноута"),
-           ("71_pc_overview", "PC · монитор ноутбука"), ("73_pc_media", "PC · что играет"), ("60_web", "Web · подключение телефона"),
-           ("50_gallery_tesseract", "Gallery · тессеракт"), ("53_gallery_pendulum", "Gallery · двойной маятник"), ("08_power_hold", "выключение"),
-           ("54b_gallery_sky_stars", "Gallery · Sky — небо сейчас"), ("55_gallery_globe", "Gallery · Globe — МКС"), ("54_gallery_sky", "Gallery · Sky — созвездия")]
+# (кадр симулятора, подпись EN, подпись RU)
+SCREENS = [("01_menu", "main menu", "главное меню"), ("13_ble_city", "Bluetooth · City (3D)", "Bluetooth · Город (3D)"),
+           ("12_ble_scope", "Bluetooth · Scope", "Bluetooth · Радар"), ("16_ble_detail", "Bluetooth · device details", "Bluetooth · подробности"),
+           ("22_wifi_channels", "Wi-Fi · channels", "Wi-Fi · каналы"), ("25_wifi_find", "Wi-Fi · Find", "Wi-Fi · Поиск"),
+           ("30_subghz_spectrum", "Sub-GHz · spectrum + waterfall", "Sub-GHz · спектр + водопад"),
+           ("40b_sound_terrain", "Sound · Terrain (3D)", "Звук · Рельеф (3D)"), ("45b_sound_xy_pc", "Sound · XY from PC audio", "Звук · XY по звуку ноута"),
+           ("71_pc_overview", "PC · laptop monitor", "ПК · монитор ноутбука"), ("73_pc_media", "PC · now playing", "ПК · что играет"),
+           ("60_web", "Web · connect a phone", "Web · подключение телефона"), ("50_gallery_tesseract", "Gallery · tesseract", "Галерея · тессеракт"),
+           ("53_gallery_pendulum", "Gallery · double pendulum", "Галерея · двойной маятник"), ("08_power_hold", "power off", "выключение"),
+           ("54b_gallery_sky_stars", "Gallery · Sky — the sky now", "Галерея · Небо сейчас"), ("55_gallery_globe", "Gallery · Globe — ISS", "Галерея · Глобус — МКС"),
+           ("54_gallery_sky", "Gallery · Sky — constellations", "Галерея · Небо — созвездия")]
 
-if "sumi" in sys.argv:                                 # та же галерея в теме SUMI (бумага и тушь)
-    gallery(SCREENS, "screens_sumi.png", bg=(236, 228, 212), line=(201, 191, 174), ink=(74, 67, 59))
+# python3 tools/make_docs.py [kurenai] [ru] — галерея в теме KURENAI и/или с подписями (и экранами) на русском;
+# без аргументов — ещё и гифки. Экраны на русском: SIM_LANG=ru bash tools/sim/build.sh.
+RU = "ru" in sys.argv
+items = [(f, ru if RU else en) for f, en, ru in SCREENS]
+name = "screens" + ("_kurenai" if "kurenai" in sys.argv else "") + ("_ru" if RU else "") + ".png"
+if "kurenai" in sys.argv:
+    gallery(items, name, bg=(10, 4, 4), line=(70, 22, 22), ink=(170, 140, 130))
 else:
-    gif("anim_boot", "boot.gif", 40, hold_last=12)
-    gif("anim_city", "city.gif", 50)
-    gif("anim_tess", "tesseract.gif", 40)
-    gif("anim_off", "shutdown.gif", 40, hold_last=6)
-    gallery(SCREENS, "screens.png")
+    if not RU:
+        gif("anim_boot", "boot.gif", 40, hold_last=12)
+        gif("anim_city", "city.gif", 50)
+        gif("anim_tess", "tesseract.gif", 40)
+        gif("anim_off", "shutdown.gif", 40, hold_last=6)
+    gallery(items, name)
