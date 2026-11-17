@@ -39,7 +39,7 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- GPS: небо и глобус по месту, где ты сейчас; координаты уходят и на палку -->
+    <!-- GPS: sky and globe for your current location; coordinates are also sent to the stick -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />

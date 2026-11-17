@@ -1,4 +1,4 @@
-/* TENGAN HUD — токены прошивки (core/theme.cpp), шрифты палки встроены (fonts.css) */
+/* TENGAN HUD: tokens from the firmware (core/theme.cpp), fonts embedded (fonts.css) */
 :root{--accrgb:62,230,255;--panelrgb:14,42,52;--bgrgb:5,8,13;--bg:#05080d;--panel:#0e2a34;--line:#203240;--acc:#3ee6ff;--hot:#ebfaff;--label:#96afc0;--steel:#96afc0;--dim:#5a7080;--alert:#ff7a1a;
   --ft:'Exo 2','Arial Narrow',sans-serif;--f:'JetBrains Mono',ui-monospace,monospace;--fc:'JetBrains Mono',ui-monospace,monospace;
   --bar:58px;--subs:44px;color-scheme:dark}
@@ -32,7 +32,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--hot);font:16px/1
 .view{position:absolute;inset:0}
 .stage{position:absolute;inset:0;min-width:0;min-height:0}
 .stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
-/* смена раздела: строка развёртки сверху вниз, как на палке */
+/* section change: a scan line sweeps top to bottom, as on the stick */
 #wipe{position:fixed;left:0;right:0;top:0;height:3px;background:var(--hot);box-shadow:0 0 18px var(--acc),0 -2px 0 var(--acc),0 2px 0 var(--acc);opacity:0;pointer-events:none;z-index:6}
 #wipe.go{animation:wipe .38s cubic-bezier(.2,.7,.3,1)}
 @keyframes wipe{0%{opacity:1;transform:translateY(var(--bar))}90%{opacity:1}100%{opacity:0;transform:translateY(100vh)}}
@@ -45,7 +45,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--hot);font:16px/1
 @media (max-width:1400px){#radios{display:none}#nav button{padding:8px 8px 7px;font-size:16px}}
 @media (max-width:760px){.logo .nm{font-size:20px}#nav button{padding:7px 9px 6px;font-size:15px}#clock{display:none}}
 @media (prefers-reduced-motion:reduce){#wipe.go{animation:none}}
-/* ---- Settings: пульт управления палкой (DOM, обе темы — через токены) ---- */
+/* ---- Settings: stick remote control (DOM, both themes via tokens) ---- */
 .setv{overflow:auto;-webkit-user-select:none}
 .set-wrap{display:grid;grid-template-columns:minmax(180px,22%) 1fr;gap:18px;padding:22px max(18px,env(safe-area-inset-right)) 28px max(18px,env(safe-area-inset-left));min-height:100%;box-sizing:border-box}
 .set-tabs{display:flex;flex-direction:column;gap:6px;position:sticky;top:0;align-self:start}
@@ -81,7 +81,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--hot);font:16px/1
 .set-toast.on{opacity:1;transform:translate(-50%,0)}
 .set-toast.bad{border-color:var(--alert);color:var(--alert)}
 @media (max-width:760px){.set-wrap{grid-template-columns:1fr}.set-tabs{flex-direction:row;flex-wrap:wrap;position:static}.set-tabs button{padding:9px 11px;font-size:15px}}
-/* окно «назвать устройство» */
+/* "name the device" dialog */
 .lbl-dlg h3{margin:0 0 4px;font:600 24px/1 var(--ft);color:var(--acc);letter-spacing:.05em}
 .lbl-sub{margin:0 0 14px;color:var(--dim);font-size:13px;letter-spacing:.04em;text-transform:uppercase}
 .lbl-dlg input{width:100%;box-sizing:border-box;padding:14px 16px;background:rgba(var(--bgrgb),.6);border:1px solid var(--acc);color:var(--hot);font:500 22px/1.2 var(--fc);outline:none;-webkit-user-select:text;user-select:text}
@@ -90,7 +90,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--hot);font:16px/1
 .lbl-btns button{padding:12px 18px;background:transparent;color:var(--label);border:1px solid rgba(var(--accrgb),.3);font:600 17px/1 var(--ft);letter-spacing:.08em;cursor:pointer}
 .lbl-btns button.pri{background:var(--acc);color:var(--bg);border-color:var(--acc)}
 #linkTxt{max-width:11em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-/* штаб: кнопка и панель настроек тревог (стиль по теме: DENKO — оранжевый NERV, KURENAI — чёрно-белый) */
+/* HQ: alert settings button and panel (DENKO: orange NERV, KURENAI: black and white) */
 .hq-gear{position:absolute;top:6px;right:16px;z-index:3;height:32px;padding:0 14px;background:#0b0603;color:#ffb347;border:1px solid #ff8c1a;font:600 15px/1 var(--ft);letter-spacing:.12em;cursor:pointer}
 .hq-gear .kj,.hq-al .kj{font:400 1em/1 'Tengan Seal',sans-serif;letter-spacing:.05em}
 .hq-gear:hover{background:#ff8c1a;color:#000}
@@ -109,7 +109,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--hot);font:16px/1
 .hq-al .f{display:flex;justify-content:space-between;align-items:center;padding:10px 12px}.hq-al .msg{color:#69ff6e;font-size:12px}
 .hq-al .rst{padding:8px 12px;background:none;color:#ff2a1f;border:1px solid #ff2a1f}
 
-/* ===== тема KURENAI 紅: чёрный / белый / красный, без свечения; выбранное — белая скошенная плашка ===== */
+/* ===== KURENAI 紅 theme: black / white / red, no glow; selected = white slanted plate ===== */
 html.kurenai{--accrgb:229,38,47;--panelrgb:30,30,30;--bgrgb:11,11,11;--bg:#0b0b0b;--panel:#151515;--line:#3a3a3a;--acc:#e5262f;--hot:#f4f1ea;--label:#bdb9b0;--steel:#bdb9b0;--dim:#8a8a8a;--alert:#ff3b30;
   --ft:Oswald,'Arial Narrow',sans-serif;--f:'JetBrains Mono',ui-monospace,monospace}
 html.kurenai #bar{background:#f4f1ea;color:#0b0b0b}

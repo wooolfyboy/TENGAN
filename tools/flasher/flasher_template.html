@@ -42,7 +42,7 @@ __ESPTOOL__
 </script>
 <script type="module">
 const { ESPLoader, Transport } = window.__esptool;
-const TX = __JS_TEXT__;                       // тексты страницы на двух языках
+const TX = __JS_TEXT__;                       // page texts in both languages
 let LG = 'en';
 try { LG = localStorage.getItem('lang') || ((navigator.language || '').toLowerCase().startsWith('ru') ? 'ru' : 'en'); } catch (e) {}
 let T = TX[LG];
@@ -77,8 +77,8 @@ $('go').onclick = async () => {
     log('chip: ' + chip + '\n');
     if (!/ESP32-S3/i.test(chip)) throw new Error(T.wrongchip + ' (' + chip + ')');
     st(T.write);
-    // общий образ = загрузчик (0x0) + таблица разделов (0x8000) + [настройки 0x9000..0xE000] + otadata (0xE000) + программа (0x10000).
-    // Область настроек (NVS) пропускаем — иначе прошивка сбросила бы настройки устройства.
+    // combined image = bootloader (0x0) + partition table (0x8000) + [settings 0x9000..0xE000] + otadata (0xE000) + app (0x10000).
+    // Skip the settings area (NVS), otherwise flashing would wipe the device settings.
     const full = atob(FW);
     const parts = [{ data: full.slice(0, 0x9000), address: 0x0 }, { data: full.slice(0xE000), address: 0xE000 }];
     const sizes = parts.map(x => x.data.length), total = sizes[0] + sizes[1];
