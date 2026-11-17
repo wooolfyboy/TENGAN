@@ -1,6 +1,6 @@
 // ============================================================
-//  subghz_screens.cpp — экраны раздела Sub-GHz: SPECTRUM · MONITOR · SENSORS
-//  Все экраны собраны из компонентов core/ui.h по общей сетке.
+//  subghz_screens.cpp — Sub-GHz screens: SPECTRUM · MONITOR · SENSORS
+//  All screens are built from core/ui.h components on a common grid.
 // ============================================================
 #include "subghz/subghz_model.h"
 #include "core/lang.h"
@@ -10,7 +10,7 @@
 #include "core/theme.h"
 #include "core/ui.h"
 
-// «водопад»: v = dBm + 120; -110 почти чёрный … -40 белый
+// waterfall: v = dBm + 120; -110 almost black … -40 white
 static uint16_t wfColor(int v) {
   float x = constrain((v - 10) / 70.0f, 0.0f, 1.0f);
   if (x < 0.08f) return C_BG();
@@ -18,7 +18,7 @@ static uint16_t wfColor(int v) {
 }
 
 // ============================================================
-//  SPECTRUM — развёртка ±2 МГц и «водопад»
+//  SPECTRUM — ±2 MHz sweep and waterfall
 // ============================================================
 void drawSpectrum() {
   int W = spr.width();
@@ -36,7 +36,7 @@ void drawSpectrum() {
   uiFrame(pl, pt, pr - pl + 1, pb - pt + 1, UI_LINE());
   for (int db = -100; db <= -50; db += 10)
     for (int x = pl + 4; x < pr - 3; x += 4) spr.drawPixel(x, py(db), UI_LINE());
-  // пики — тускло, текущий уровень — ярко и «раскаляется» по силе
+  // peaks dim, current level bright and "heats up" with strength
   for (int i = 1; i < SP_N; i++) spr.drawLine(px(i - 1), py(g_spPeak[i - 1]), px(i), py(g_spPeak[i]), UI_DIM());
   for (int i = 0; i < SP_N; i++) {
     int x = px(i), y = py(g_spCur[i]);
@@ -44,12 +44,12 @@ void drawSpectrum() {
   }
   for (int i = 1; i < SP_N; i++)
     spr.drawLine(px(i - 1), py(g_spCur[i - 1]), px(i), py(g_spCur[i]), heat(max(g_spCur[i - 1], g_spCur[i]) + 10));
-  // маркер максимума
+  // max marker
   int mx = px(mi), my = py(g_spCur[mi]);
   for (int y = pt + 2; y < pb; y += 3) spr.drawPixel(mx, y, C_ACC());
   spr.fillTriangle(mx, my - 3, mx - 4, my - 9, mx + 4, my - 9, C_ACC());
 
-  // «водопад»: новые строки сверху
+  // waterfall: new rows on top
   int wt = pb + 4, wh = UI_BOTTOM - wt - 8;
   for (int r = 0; r < g_wfCount && r < wh; r++) {
     int row = (g_wfHead - 1 - r + WF_ROWS) % WF_ROWS;
@@ -58,7 +58,7 @@ void drawSpectrum() {
       if (g_wf) spr.drawFastHLine(x0, wt + r, x1 - x0, wfColor(g_wf[row][i]));
     }
   }
-  // ось частот
+  // frequency axis
   spr.setTextColor(UI_DIM());
   snprintf(buf, sizeof(buf), "%.2f", BANDS[g_band].lo);
   spr.setTextDatum(TL_DATUM); txt(buf, pl, UI_BOTTOM - 6, 1);
@@ -71,7 +71,7 @@ void drawSpectrum() {
 }
 
 // ============================================================
-//  MONITOR — одна частота, ловим всплески
+//  MONITOR — one frequency, catching bursts
 // ============================================================
 void drawMonitor(uint32_t now) {
   int W = spr.width();
@@ -82,7 +82,7 @@ void drawMonitor(uint32_t now) {
   char title[48]; snprintf(title, sizeof(title), L("Monitor %.2f", "Монитор %.2f"), BANDS[g_band].mon);
   uiHeader(title, buf, g_burst);
 
-  // лента сигнала (~6 с), линия шума и порог срабатывания
+  // signal strip (~6 s), noise line and trigger threshold
   int gx = UI_M + 4, gy = UI_TOP, gw = W - 2 * UI_M - 8, gh = 62;
   uiFrame(gx, gy, gw, gh, UI_LINE());
   auto yy = [&](int db) { int c = constrain(db, -115, -35); return gy + gh - 3 - (c + 115) * (gh - 6) / 80; };
@@ -98,7 +98,7 @@ void drawMonitor(uint32_t now) {
   spr.setTextColor(UI_DIM());
   txt(buf, gx + 5, gy + 3, 1);
 
-  // журнал всплесков
+  // burst log
   int ly = gy + gh + 6;
   snprintf(buf, sizeof(buf), "%lu", (unsigned long)g_events);
   spr.setTextDatum(TL_DATUM);
@@ -143,8 +143,8 @@ void drawCcMissing() {
 }
 
 // ============================================================
-//  SENSORS — кто передаёт на частоте: уличные термометры, звонки, пульты
-//  сверху таблица, снизу — форма последней посылки (анализатор)
+//  SENSORS — who transmits on the frequency: outdoor thermometers, bells, remotes
+//  table on top, shape of the last packet (analyzer) below
 // ============================================================
 static void agoStr(char* b, size_t n, uint32_t ms) {
   uint32_t s = ms / 1000;
@@ -153,7 +153,7 @@ static void agoStr(char* b, size_t n, uint32_t ms) {
   else snprintf(b, n, L("%luh", "%luч"), (unsigned long)(s / 3600));
 }
 
-// короткое имя протокола для таблицы
+// short protocol name for the table
 static void shortName(const SensRec& r, char* b, size_t n) {
   const char* p = r.proto;
   if (!strncmp(p, "LaCrosse-", 9)) p = "LaCrosse";
@@ -180,7 +180,7 @@ static void drawPulseTrain(int x0, int y0, int w, int h) {
   }
   const OokInfo& I = L.info;
   bool sensor = strcmp(I.cls, "sensor") == 0;
-  // подпись: модуляция, биты, длительности; у датчика — протокол, у пульта — только отпечаток
+  // caption: modulation, bits, durations; sensor: protocol, remote: fingerprint only
   if (sensor) snprintf(buf, sizeof buf, "%s %db  P%u/%u G%u/%u", I.mod, I.bits, I.shortW, I.longW, I.shortG, I.longG ? I.longG : I.syncG);
   else snprintf(buf, sizeof buf, "%s %db  P%u/%u  #%04X", I.mod, I.bits, I.shortW, I.longW, I.hash);
   spr.setTextColor(UI_LABEL());
@@ -191,7 +191,7 @@ static void drawPulseTrain(int x0, int y0, int w, int h) {
   spr.setTextDatum(TR_DATUM);
   spr.setTextColor(sensor ? C_ACC() : C_HOT());
   txt(cls, x0 + w - 6, y0 + 4, 1);
-  // сама посылка: «меандр» — вверху несущая, внизу тишина
+  // the packet itself: square wave, carrier on top, silence at the bottom
   uint32_t tot = 0;
   for (int i = 0; i < L.ptN * 2; i++) tot += L.pt[i];
   if (!tot) return;
@@ -208,7 +208,7 @@ static void drawPulseTrain(int x0, int y0, int w, int h) {
     if (!(i & 1)) for (int yy = hiY + 2; yy < loY; yy += 2) spr.drawFastHLine(prevX, yy, max(1, x - prevX), scale565(col, 18));
     prevX = x; prevY = y;
   }
-  if (!sensor) {                                 // дальше не рисуем: по рисунку пульт не повторить
+  if (!sensor) {                                 // no more drawing: a remote can't be replayed from the picture
     spr.setTextColor(UI_DIM()); spr.setTextDatum(TL_DATUM);
     txt("...", px0 + pw + 3, loY - 7, 1);
   }
@@ -236,7 +236,7 @@ void drawSensors(uint32_t now) {
     snprintf(buf, sizeof buf, L("%lu PACKETS  ·  %lu NOISE", "%lu ПОСЫЛОК  ·  %lu ШУМ"), (unsigned long)g_sensPackets, (unsigned long)g_sensNoise);
     txt(buf, W / 2, top + 66, 1);
   }
-  int shown = n > rows ? rows - 1 : n;             // не влезли — последняя строка «+N»
+  int shown = n > rows ? rows - 1 : n;             // didn't fit: the last row is "+N"
   for (int k = 0; k < shown; k++) {
     const SensRec& r = g_sens[idx[k]];
     int y = top + k * rowH;
@@ -247,7 +247,7 @@ void drawSensors(uint32_t now) {
     shortName(r, buf, sizeof buf);
     spr.setTextColor(old ? UI_DIM() : UI_LABEL());
     txt(buf, UI_M + 4, y + 4, 1);
-    // температура / кнопка
+    // temperature / button
     spr.setTextDatum(TR_DATUM);
     if (r.kind == OOK_REMOTE) {
       spr.setTextColor(old ? UI_DIM() : C_HOT());
@@ -262,14 +262,14 @@ void drawSensors(uint32_t now) {
       spr.setTextDatum(TL_DATUM); txt("C", 168, y + 4, 1);
       if (r.h >= 0) { snprintf(buf, sizeof buf, "%d%%", r.h); spr.setTextDatum(TR_DATUM); spr.setTextColor(old ? UI_DIM() : C_ACC()); txt(buf, 212, y, 2); }
     }
-    // батарейка: контур, внутри заливка (разряжена — тревожный цвет)
+    // battery: outline, fill inside (low = alert color)
     if (r.bat >= 0) {
       int bx = 220, by = y + 4;
       uint16_t bc = r.bat ? UI_DIM() : C_ALERT();
       spr.drawRect(bx, by, 11, 7, bc); spr.drawFastVLine(bx + 11, by + 2, 3, bc);
       spr.fillRect(bx + 2, by + 2, r.bat ? 7 : 2, 3, bc);
     }
-    // сила сигнала — полоска
+    // signal strength bar
     int len = constrain((r.rssi + 110) * 30 / 70, 1, 30);
     spr.fillRect(238, y + 5, 30, 5, UI_LINE());
     spr.fillRect(238, y + 5, len, 5, old ? UI_DIM() : heat(r.rssi + 10));

@@ -1,10 +1,9 @@
 // ============================================================
-//  cc1101.cpp — минимальный драйвер CC1101: только приём и RSSI.
-//  Передача (STX) не используется вообще.
+//  cc1101.cpp — minimal CC1101 driver: receive and RSSI only (no TX).
 //
-//  CC1101 делит линии SPI с экраном. Библиотека экрана настраивает SPI
-//  только «на запись», поэтому перед каждым обменом включаем чтение
-//  (SET_BUS_READ_MODE), а экран при следующей отрисовке вернёт своё.
+//  The CC1101 shares the SPI bus with the display. The display library sets SPI
+//  up for writing only, so before each transfer we enable read mode
+//  (SET_BUS_READ_MODE); the display restores its own mode on the next draw.
 // ============================================================
 #include <SPI.h>
 #include "subghz/cc1101.h"
@@ -14,11 +13,11 @@ uint8_t g_ccVersion = 0;
 static SPISettings g_ccSet(4000000, MSBFIRST, SPI_MODE0);
 static SPIClass* g_ccSpi = nullptr;
 
-// ---------- низкий уровень ----------
+// ---------- low level ----------
 static bool ccSel() {
   digitalWrite(CC_CS, LOW);
   uint32_t t = micros();
-  while (digitalRead(CC_MISO)) if (micros() - t > 3000) return false;   // ждём готовности
+  while (digitalRead(CC_MISO)) if (micros() - t > 3000) return false;   // wait until ready
   return true;
 }
 static void ccBegin() { g_ccSpi->beginTransaction(g_ccSet); SET_BUS_READ_MODE; }
@@ -35,7 +34,7 @@ void ccWrite(uint8_t a, uint8_t v) {
   g_ccSpi->transfer(a); g_ccSpi->transfer(v);
   ccEnd();
 }
-uint8_t ccReadStatus(uint8_t a) {            // регистры состояния 0x30..0x3D
+uint8_t ccReadStatus(uint8_t a) {            // status registers 0x30..0x3D
   ccBegin(); ccSel();
   g_ccSpi->transfer(a | 0xC0);
   uint8_t v = g_ccSpi->transfer(0);
@@ -60,28 +59,27 @@ void ccSetFreq(float mhz) {
   ccWrite(0x0D, (f >> 16) & 0xFF);
   ccWrite(0x0E, (f >> 8) & 0xFF);
   ccWrite(0x0F, f & 0xFF);
-  // нижняя часть каждого диапазона требует другой настройки VCO (как в библиотеке ELECHOUSE)
+  // the lower part of each band needs different VCO tuning (as in ELECHOUSE lib)
   bool low = (mhz < 322.88f) || (mhz >= 378 && mhz < 430.5f) || (mhz >= 779 && mhz < 861);
   ccWrite(0x2E, low ? 0x0B : 0x09);          // TEST0
 }
 
-// ширина полосы приёма: 0x?5 в MDMCFG4; F5 ≈ 58 кГц, A5 ≈ 270 кГц
+// RX bandwidth: 0x?5 in MDMCFG4; F5 ≈ 58 kHz, A5 ≈ 270 kHz
 void ccSetBw(uint8_t mdmcfg4) { ccWrite(0x10, mdmcfg4); }
 
 bool ccInit() {
   g_ccSpi = &tft.getSPIinstance();
   pinMode(CC_CS, OUTPUT); digitalWrite(CC_CS, HIGH);
   pinMode(CC_SW1, OUTPUT); pinMode(CC_SW0, OUTPUT);
-  // сброс
   ccStrobe(0x30);                              // SRES
   delay(2);
   uint8_t part = ccReadStatus(0x30), ver = ccReadStatus(0x31);
   g_ccVersion = ver;
   if (part != 0x00 || (ver != 0x14 && ver != 0x04 && ver != 0x07)) return false;
 
-  // приём OOK/ASK, без пакетов — нам нужен только уровень сигнала
+  // OOK/ASK receive, no packets: we only need signal level
   static const uint8_t cfg[][2] = {
-    {0x00, 0x2E}, {0x01, 0x2E}, {0x02, 0x2E},    // GDO — высокий импеданс (MISO свободен)
+    {0x00, 0x2E}, {0x01, 0x2E}, {0x02, 0x2E},    // GDO pins high-impedance (MISO stays free)
     {0x03, 0x47}, {0x08, 0x32}, {0x0B, 0x06}, {0x0C, 0x00},
     {0x10, 0xF5}, {0x11, 0x93}, {0x12, 0x30}, {0x13, 0x22}, {0x14, 0xF8},
     {0x15, 0x15}, {0x16, 0x07}, {0x17, 0x30}, {0x18, 0x18},
@@ -97,17 +95,17 @@ bool ccInit() {
 
 void ccSleep() {
   ccStrobe(0x36);                              // SIDLE
-  ccStrobe(0x39);                              // SPWD — сон
+  ccStrobe(0x39);                              // SPWD: power down
 }
 
 
 int ccMeasure(float mhz) {
   ccStrobe(0x36);                              // SIDLE
   ccSetFreq(mhz);
-  ccStrobe(0x34);                              // SRX (с автокалибровкой)
+  ccStrobe(0x34);                              // SRX (with auto-calibration)
   uint32_t t = micros();
-  while ((ccReadStatus(0x35) & 0x1F) != 0x0D && micros() - t < 2000) {}   // ждём RX
-  delayMicroseconds(250);                      // RSSI устанавливается
+  while ((ccReadStatus(0x35) & 0x1F) != 0x0D && micros() - t < 2000) {}   // wait for RX state
+  delayMicroseconds(250);                      // RSSI settles
   return ccRssi();
 }
 

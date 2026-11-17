@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
 """
-TENGAN desktop — трей, всплывашки и виджет поверх всех окон.
+TENGAN desktop - tray, popups and widget above all windows.
 
-  Tray     — значок у часов (pystray): штаб / виджет / всплывашки / стиль / угол / режим / выход.
-  Popups   — одно маленькое окно без рамки поверх всех; в нём стопка до 3 плашек (стиль темы DENKO / KURENAI),
-             окно подгоняется по высоте стопки и прячется, когда плашки ушли. Клик — открыть штаб.
-  Widget   — окошко без рамки поверх всех (мини-радар, активность, температура, пульт, карта);
-             таскается мышкой, помнит место и размер; прозрачность и «сквозные клики» — через Win32.
-  SseFeed  — в режиме Wi-Fi приложение само слушает поток палки (порт 81) для «мозга» оповещений.
+  Tray    - system tray icon (pystray): HQ / widget / popups / style / corner / mode / quit.
+  Popups  - one small frameless always-on-top window with a stack of up to 3 cards (DENKO / KURENAI);
+            it resizes to the stack and hides when empty. Click opens HQ.
+  Widget  - frameless always-on-top window (mini radar, activity, temperature, remote, card);
+            draggable, remembers position and size; opacity and click-through via Win32.
+  SseFeed - in Wi-Fi mode the app listens to the stick's event stream (port 81) itself.
 
-Всё, что зависит от Windows / pystray / pywebview, импортируется лениво — модуль грузится и на Linux.
+Windows / pystray / pywebview imports are lazy, so the module also loads on Linux.
 """
 import json
 import os
@@ -23,8 +23,8 @@ from overlay_html import POPUP_HTML, WIDGET_HTML
 
 IS_WIN = os.name == "nt"
 IS_MAC = sys.platform == "darwin"
-# Перетаскивание виджета: macOS — родной easy_drag pywebview; Windows — системное (DRAG_JS + WM_NCLBUTTONDOWN);
-# Linux — .pywebview-drag-region (easy_drag на Qt ставит фильтр событий на всё приложение и роняет его, SIGSEGV).
+# Widget drag: macOS uses pywebview easy_drag; Windows uses the system drag (DRAG_JS + WM_NCLBUTTONDOWN);
+# Linux uses .pywebview-drag-region (easy_drag on Qt installs an app-wide event filter and crashes with SIGSEGV).
 HERE = os.path.dirname(os.path.abspath(__file__))
 POP_W = 380
 
@@ -33,7 +33,7 @@ def log(*a):
     print(time.strftime("%H:%M:%S"), "[overlay]", *a, flush=True)
 
 
-# ---------- Win32: прозрачность, сквозные клики, «не в панели задач» ----------
+# ---------- Win32: opacity, click-through, hide from taskbar ----------
 GWL_EXSTYLE = -20
 WS_EX_LAYERED = 0x00080000
 WS_EX_TRANSPARENT = 0x00000020
@@ -43,7 +43,7 @@ LWA_ALPHA = 0x2
 
 
 def hwnd_of(win):
-    """HWND окна pywebview на Windows (бэкенд WinForms: window.native — это Form)."""
+    """HWND of a pywebview window on Windows (WinForms backend: window.native is a Form)."""
     try:
         return int(win.native.Handle.ToInt64())
     except Exception:
@@ -62,7 +62,7 @@ def win_style(win, opacity=None, clickthrough=None, tool=True):
         u.GetWindowLongW.restype = ctypes.c_long
         ex = u.GetWindowLongW(h, GWL_EXSTYLE)
         if tool:
-            ex |= WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE        # не в панели задач / Alt-Tab, не крадёт фокус
+            ex |= WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE        # not in taskbar / Alt-Tab, never takes focus
         layered = (opacity is not None and opacity < 0.999) or bool(clickthrough)
         ex = (ex | WS_EX_LAYERED) if layered else (ex & ~WS_EX_LAYERED)
         if clickthrough is not None:
@@ -83,7 +83,7 @@ addEventListener('mousemove',function(e){if(!d||!(e.buttons&1))return;
  if(Math.abs(e.screenX-d[0])+Math.abs(e.screenY-d[1])<3)return;d=null;
  var a=window.pywebview&&window.pywebview.api;if(a&&a.widget_drag)a.widget_drag()},true)})();"""
 
-# меню виджета по правому клику — чтобы он жил сам по себе: открыть штаб, скрыть, выйти из программы
+# widget right-click menu, so it works standalone: open HQ, hide, quit
 MENU_JS = """(function(){if(window.__tgMenu)return;window.__tgMenu=1;
 var T={en:['Open HQ','Hide widget (F3 brings it back)','Quit TENGAN'],ru:['Открыть штаб','Скрыть виджет (вернуть — F3)','Выйти из TENGAN']};
 var A=['widget_open','widget_hide','widget_quit'],m=null;
@@ -101,12 +101,12 @@ addEventListener('contextmenu',function(e){e.preventDefault();close();
 addEventListener('mousedown',function(e){if(m&&!m.contains(e.target))close()},true);
 addEventListener('keydown',function(e){if(e.key==='Escape')close()})})();"""
 
-PARK = -32000                      # «стоянка» окна плашек за краем экрана (Windows)
+PARK = -32000                      # popup window "parking" spot off-screen (Windows)
 
 
 def work_area():
-    """Рабочая область главного экрана (без панели задач) в логических пикселях — в них pywebview двигает окна.
-    Windows: SPI_GETWORKAREA отдаёт физические пиксели (процесс DPI-aware) — делим на масштаб экрана."""
+    """Main screen work area (minus taskbar) in logical pixels, which pywebview uses to move windows.
+    Windows: SPI_GETWORKAREA returns physical pixels (DPI-aware process), so divide by the screen scale."""
     if IS_WIN:
         try:
             import ctypes
@@ -135,7 +135,7 @@ def screen_size():
 
 
 # ============================================================
-#  Всплывашки
+#  Popups
 # ============================================================
 class _PopupApi:
     def __init__(self, owner):
@@ -156,8 +156,8 @@ class Popups:
         self.pending = []
         self.visible = False
         self.lock = threading.Lock()
-        # Windows: окно не прячем, а держим за краем экрана — у скрытого при создании окна WebView2 так и не
-        # начинал рисовать (пустая серая плашка). Показать = подвинуть на место, спрятать = увести обратно.
+        # Windows: park the window off-screen instead of hiding it; WebView2 never rendered in a window created
+        # hidden (blank grey card). Show = move into place, hide = move back out.
         kw = dict(x=PARK, y=PARK, hidden=False) if IS_WIN else dict(hidden=True)
         self.win = webview.create_window("TENGAN alert", html=POPUP_HTML, width=POP_W, height=120, frameless=True, easy_drag=False,
                                          on_top=True, resizable=False, focus=False, **kw,
@@ -196,7 +196,7 @@ class Popups:
             return
         L, T, R, B = work_area()
         corner = self.app.engine.prefs.get("corner", "br")
-        m = 12                                             # отступ от края рабочей области (она уже без панели задач)
+        m = 12                                             # margin from the work-area edge (taskbar already excluded)
         x = R - POP_W - m if corner in ("br", "tr") else L + m
         y = B - h - m if corner in ("br", "bl") else T + m
         try:
@@ -212,7 +212,7 @@ class Popups:
 
 
 # ============================================================
-#  Виджет
+#  Widget
 # ============================================================
 class _WidgetApi:
     def __init__(self, owner):
@@ -240,12 +240,12 @@ class Widget:
         W, H = screen_size()
         x = r[0] if r[0] is not None else W - 340
         y = r[1] if r[1] is not None else 80
-        if not (-100 <= x <= W - 120 and -20 <= y <= H - 80):       # место за пределами экрана (сменился монитор) — в угол
+        if not (-100 <= x <= W - 120 and -20 <= y <= H - 80):       # off-screen (monitor changed): reset to corner
             x, y = W - 340, 80
         self.ready = False
         self.shown = bool(p.get("widget"))
-        # Windows: не прячем окно, а уводим за край экрана (PARK) — у окна, созданного скрытым, WebView2 не рисует,
-        # и включённый потом виджет не появлялся. Показать = вернуть на место.
+        # Windows: park the window off-screen (PARK) instead of hiding it; WebView2 does not render in a window
+        # created hidden, so a widget enabled later never appeared. Show = move back.
         if IS_WIN:
             kw = dict(x=int(x) if self.shown else PARK, y=int(y) if self.shown else PARK, hidden=False)
         else:
@@ -265,9 +265,9 @@ class Widget:
     def _loaded(self):
         self.ready = True
         try:
-            # Windows: таскает сама система (как за заголовок обычного окна) — плавно; запрос уходит один раз,
-            # когда кнопка зажата и мышь сдвинулась на 3+ px, поэтому клик и двойной клик (штаб) работают как раньше.
-            # Linux: перетаскивание pywebview за .pywebview-drag-region.
+            # Windows: the OS drags (like a title bar), which is smooth; the request is sent once, when the button
+            # is down and the mouse moved 3+ px, so click and double-click (HQ) still work.
+            # Linux: pywebview drags by .pywebview-drag-region.
             self.win.evaluate_js(MENU_JS)
             if IS_WIN:
                 self.win.evaluate_js(DRAG_JS)
@@ -278,8 +278,8 @@ class Widget:
         self.apply_style()
 
     def native_drag(self):
-        """Системное перетаскивание (как за заголовок окна). Захват мыши держит WebView2 в потоке окна —
-        отпустить его можно только оттуда, поэтому оба вызова уходят в поток формы (BeginInvoke)."""
+        """System drag (like a title bar). WebView2 holds the mouse capture in the window thread and it can only
+        be released there, so both calls go to the form thread (BeginInvoke)."""
         h = hwnd_of(self.win)
         if not (IS_WIN and h):
             return
@@ -290,7 +290,7 @@ class Widget:
             u.ReleaseCapture()
             u.SendMessageW(h, 0x00A1, 2, 0)            # WM_NCLBUTTONDOWN, HTCAPTION
         try:
-            from System import Action                  # pythonnet — на нём работает окно pywebview на Windows
+            from System import Action                  # pythonnet: pywebview windows run on it on Windows
             self.win.native.BeginInvoke(Action(go))
         except Exception as e:
             log("widget drag:", e)
@@ -309,7 +309,7 @@ class Widget:
                 pass
 
     def _moved(self, x, y):
-        if not self.shown or x <= PARK // 2:           # уехал «на стоянку» — это не новое место виджета
+        if not self.shown or x <= PARK // 2:           # parked: not a new widget position
             return
         self._rect[0], self._rect[1] = x, y
         self._save_later()
@@ -353,7 +353,7 @@ class Widget:
 
 
 def os_notify(title, text):
-    """Системное уведомление на macOS (AppleScript) и Linux (notify-send)."""
+    """Native notification on macOS (AppleScript) and Linux (notify-send)."""
     try:
         if IS_MAC:
             esc = lambda x: (x or "").replace("\\", "\\\\").replace('"', '\\"')
@@ -368,13 +368,13 @@ def os_notify(title, text):
 
 
 # ============================================================
-#  Трей
+#  Tray
 # ============================================================
 class Tray:
     def __init__(self, app):
         self.app = app
         self.icon = None
-        if os.environ.get("TENGAN_NO_TRAY"):             # CI / headless: трей не нужен
+        if os.environ.get("TENGAN_NO_TRAY"):             # CI / headless: no tray needed
             return
         try:
             import pystray
@@ -388,7 +388,7 @@ class Tray:
         a = app
         p = lambda k: (lambda item: bool(a.engine.prefs.get(k)))
         radio = lambda k, v: (lambda item: a.engine.prefs.get(k) == v)
-        T = lambda k: (lambda item: a.t(k))                 # подписи на языке окна (язык TENGAN может прийти позже)
+        T = lambda k: (lambda item: a.t(k))                 # labels in the window language (it may arrive later)
         L2 = lambda en, ru: (lambda item: ru if a.lang == "ru" else en)
         self.icon = pystray.Icon("TENGAN", img, "TENGAN Desktop", menu=M(
             I(T("tray_open"), lambda: a.show_main(), default=True),
@@ -409,7 +409,7 @@ class Tray:
             I(T("tray_quit"), lambda: a.quit()),
         ))
         if IS_MAC:
-            # macOS: значок живёт в цикле Cocoa, который запускает окно (webview.start) — без своего потока
+            # macOS: the icon lives in the Cocoa loop started by webview.start, no own thread
             self.icon.run_detached()
         else:
             def _run():
@@ -427,7 +427,7 @@ class Tray:
                 pass
 
     def notify(self, title, text):
-        if not IS_WIN:                                   # macOS / Linux: системные уведомления надёжнее, чем через трей
+        if not IS_WIN:                                   # macOS / Linux: native notifications are more reliable than the tray
             return os_notify(title, text)
         if self.icon:
             try:
@@ -446,7 +446,7 @@ class Tray:
 
 
 # ============================================================
-#  Wi-Fi: свой поток событий палки (SSE, порт 81) для «мозга» оповещений
+#  Wi-Fi: own stick event stream (SSE, port 81) for the alert engine
 # ============================================================
 class SseFeed:
     WANT = "ble,ir,nfc,sens,wx"
@@ -494,12 +494,12 @@ class SseFeed:
                 time.sleep(0.1)
 
 
-# ---------- один экземпляр программы ----------
+# ---------- single instance ----------
 _mutex = None
 
 
 def single_instance(port):
-    """True — мы первые. Иначе просим уже запущенную показать окно и выходим."""
+    """True if we are first; otherwise ask the running instance to show its window and exit."""
     global _mutex
     if IS_WIN:
         try:

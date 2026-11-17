@@ -1,11 +1,10 @@
 // ============================================================
-//  pc_city.cpp — раздел PC › City: город процессов ноутбука.
-//  Каждая программа (все её процессы вместе) — башня:
-//    высота — сколько процессора ест,  ширина — сколько памяти,
-//    белая крыша — программа активного окна, оранжевая — ест > 50% CPU.
-//  Места на площади закрепляются за программой, пока она в списке;
-//  новые «вырастают», ушедшие опускаются. Камера сама облетает город,
-//  нажатие колеса — прожектор на следующую башню.
+//  pc_city.cpp — PC › City section: the laptop's process city.
+//  Each program (all its processes together) is a tower:
+//    height = CPU use, width = memory,
+//    white roof = active-window program, orange = over 50% CPU.
+//  A program keeps its plot while it is listed; new ones "grow", gone ones sink.
+//  The camera orbits on its own; a wheel click moves the spotlight to the next tower.
 // ============================================================
 #include <algorithm>
 #include "core/lang.h"
@@ -40,7 +39,7 @@ void pcCityNext() {                          // нажатие: следующа
   s_sel = order[k % n];
 }
 
-// «PP\tимя,cpu*10,МБ,активна\t...»
+// "PP\tname,cpu*10,MB,active\t..."
 void pcCityLine(char* s) {
   for (auto& t : s_tw) t.alive = false;
   char* save = nullptr;
@@ -74,7 +73,7 @@ void pcCityLine(char* s) {
   s_cityT = millis();
 }
 
-// для планшета: [[имя,cpu,МБ,активна,место],...]
+// for the tablet: [[name,cpu,MB,active,slot],...]
 void pcCityJson(String& o) {
   o += '[';
   bool first = true;
@@ -103,14 +102,14 @@ void drawPcCity(uint32_t now) {
     float vy = y * cp + zr * sp, vz = -y * sp + zr * cp;
     d = dist + vz; sx = cx + xr * F / d; syy = cyS - vy * F / d;
   };
-  // площадь и сетка улиц
+  // plaza and street grid
   const float half = 1.0f, step = 2 * half / CITY_GRID;
   for (int k = 0; k <= CITY_GRID; k++) {
     float a = -half + k * step, x0, y0, x1, y1, d;
     proj(a, 0, -half, x0, y0, d); proj(a, 0, half, x1, y1, d); spr.drawLine(x0, y0, x1, y1, UI_LINE());
     proj(-half, 0, a, x0, y0, d); proj(half, 0, a, x1, y1, d); spr.drawLine(x0, y0, x1, y1, UI_LINE());
   }
-  // анимация и порядок рисования (дальние раньше)
+  // animation and draw order (far ones first)
   struct D { int i; float depth; };
   D order[CITY_MAX]; int n = 0;
   float maxRam = 1;
@@ -155,7 +154,7 @@ void drawPcCity(uint32_t now) {
       spr.fillCircle(px, py, 2, C_HOT());
     }
   }
-  // подписи трёх самых занятых
+  // labels for the three busiest
   int top[3] = { -1, -1, -1 };
   for (int i = 0; i < CITY_MAX; i++) {
     if (!s_tw[i].alive) continue;
@@ -174,7 +173,7 @@ void drawPcCity(uint32_t now) {
     spr.setTextColor(t.cpu > 50 ? C_ALERT() : C_HOT());
     txt(t.name, (int)sx, y, 1);
   }
-  // справа: прожектор или итоги
+  // right side: spotlight or totals
   const int px = W - 104;
   char buf[32];
   spr.setTextDatum(TL_DATUM);

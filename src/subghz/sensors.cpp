@@ -1,6 +1,6 @@
 // ============================================================
-//  sensors.cpp — таблица датчиков 433 МГц и анализатор (без железа:
-//  этот файл собирает и симулятор). Приём — sens_rx.cpp.
+//  sensors.cpp — 433 MHz sensor table and analyzer (hardware-free:
+//  the simulator builds it too). Reception is in sens_rx.cpp.
 // ============================================================
 #include "subghz/sensors.h"
 #include "core/timeutil.h"
@@ -10,7 +10,7 @@ int      g_sensN = 0;
 SensLast g_sensLast;
 uint32_t g_sensGen = 0, g_sensPackets = 0, g_sensNoise = 0;
 
-static const uint32_t OUTSIDE_MS = 10 * 60 * 1000;   // «за окном» — слышали в последние 10 минут
+static const uint32_t OUTSIDE_MS = 10 * 60 * 1000;   // "outside" = heard within the last 10 minutes
 
 void sensClear() { g_sensN = 0; g_sensLast = SensLast(); g_sensGen++; }
 
@@ -20,7 +20,7 @@ static void upsert(const OokMsg& m, int rssi, uint32_t now) {
     if (g_sens[i].proto == m.proto && g_sens[i].id == m.id && g_sens[i].ch == m.ch) { k = i; break; }
   if (k < 0) {
     if (g_sensN < SENS_MAX) k = g_sensN++;
-    else {                                          // место кончилось — забываем самый давний
+    else {                                          // table full: drop the oldest
       k = 0;
       for (int i = 1; i < g_sensN; i++) if (msSince(now, g_sens[i].lastMs) > msSince(now, g_sens[k].lastMs)) k = i;
     }
@@ -45,11 +45,11 @@ void sensFeed(const OokTrain& T, int rssi, uint32_t now) {
   g_sensPackets++;
   SensLast& L = g_sensLast;
   L.valid = true; L.info = info; L.rssi = (int8_t)constrain(rssi, -127, 0); L.ms = now;
-  // рисунок посылки: у датчиков — целиком (до 48 пар), у остального — только начало
+  // packet drawing: whole for sensors (up to 48 pairs), only the start for the rest
   int lim = strcmp(info.cls, "sensor") == 0 ? SENS_PT : 12;
   int np = T.n < lim ? T.n : lim;
   for (int i = 0; i < np; i++) { L.pt[i * 2] = T.p[i]; L.pt[i * 2 + 1] = T.g[i]; }
-  if (np && L.pt[np * 2 - 1] > 4000) L.pt[np * 2 - 1] = 4000;   // хвост — не бесконечная тишина
+  if (np && L.pt[np * 2 - 1] > 4000) L.pt[np * 2 - 1] = 4000;   // tail: not endless silence
   L.ptN = np;
   uint32_t d = 0; for (int i = 0; i < T.n; i++) d += T.p[i] + (i < T.n - 1 ? T.g[i] : 0);
   L.durUs = d;
@@ -71,7 +71,7 @@ bool sensOutside(float& t, int& h, const char*& src, uint32_t now) {
 int sensSorted(uint8_t* idx, int max, uint32_t now) {
   int n = 0;
   for (int i = 0; i < g_sensN && n < max; i++) idx[n++] = i;
-  auto rank = [&](const SensRec& s) {             // термодатчики выше пультов, внутри — по силе сигнала
+  auto rank = [&](const SensRec& s) {             // thermometers rank above remotes, then by signal strength
     return (s.kind == OOK_REMOTE ? 0 : 1000) + s.rssi + 128 - (msSince(now, s.lastMs) > OUTSIDE_MS ? 500 : 0);
   };
   for (int a = 0; a < n; a++)

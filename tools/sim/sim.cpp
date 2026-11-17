@@ -1,10 +1,10 @@
 #include <string>
 // ============================================================
-//  sim.cpp — симулятор экрана палки на компьютере.
+//  sim.cpp — simulator of the stick screen on a PC.
 //
-//  Компилирует НАСТОЯЩИЙ код рисования (src/core, *_screens.cpp, меню),
-//  подставляет правдоподобные данные и сохраняет каждый экран в картинку.
-//  Радио, кнопок и железа тут нет. Запуск: tools/sim/build.sh
+//  Builds the REAL drawing code (src/core, *_screens.cpp, menu),
+//  feeds it plausible data and saves each screen as an image.
+//  No radio, buttons or hardware here. Run: tools/sim/build.sh
 // ============================================================
 #include <map>
 #include <vector>
@@ -39,13 +39,13 @@
 
 SPIClass SPI;
 TwoWire Wire;
-static uint32_t s_now = 3 * 3600000 + 14 * 60000 + 32000;   // «время работы» 3:14:32
+static uint32_t s_now = 3 * 3600000 + 14 * 60000 + 32000;   // "uptime" 3:14:32
 uint32_t millis() { return s_now; }
 uint32_t micros() { return s_now * 1000; }
 
 void drawSettings();
 
-// ---------- состояние Bluetooth (в прошивке — ble_core.cpp) ----------
+// ---------- Bluetooth state (firmware: ble_core.cpp) ----------
 volatile int g_mode = 0;
 bool  g_bleActive = true;
 int   g_lastCount = 23, g_lastRaw = 31, g_sensCount = 2;
@@ -57,12 +57,12 @@ int      g_top = 0;
 bool     g_detail = false;
 int8_t   g_spark[SPARK_N];
 int      g_sparkN = 0;
-// «чёрный ящик» (в прошивке — core/crumb.cpp)
+// "black box" (firmware: core/crumb.cpp)
 void crumb(const char*) {}
 bool crumbWasCrash() { return false; }
 const char* crumbLastStep() { return ""; }
 const char* crumbLastReason() { return ""; }
-// приложение для компьютера по USB (в прошивке — web/web.cpp): в симуляторе только запоминаем строки
+// PC app over USB (firmware: web/web.cpp): the sim only stores the lines
 std::string g_simLinkLines;
 void webLinkLine(char* s) { g_simLinkLines += s; g_simLinkLines += '\n'; }
 void webLinkPump() {}
@@ -78,7 +78,7 @@ void audioWebTick(uint32_t) {}
 void audioWebStop() {}
 void wifiRadioOff() {}
 
-// ---------- датчики 433 (в прошивке — sens_rx.cpp): посылки собираем сами и кормим настоящий разбор ----------
+// ---------- 433 sensors (firmware: sens_rx.cpp): we build the bursts and feed them to the real parser ----------
 void sensRxStart() {}
 void sensRxStop() {}
 void sensRxTick(uint32_t, int) {}
@@ -88,18 +88,18 @@ static void trAdd(int p, int g) { if (s_tr.n < OOK_MAXP) { s_tr.p[s_tr.n] = p; s
 static void trBits(const uint8_t* b, int nbits, int p0, int g0, int p1, int g1) {
   for (int i = 0; i < nbits; i++) { bool one = b[i >> 3] & (0x80 >> (i & 7)); trAdd(one ? p1 : p0, one ? g1 : g0); }
 }
-static void simNexus(uint8_t id, int ch, float t, int hum) {         // 36 бит PPM, 12 повторов
+static void simNexus(uint8_t id, int ch, float t, int hum) {         // 36-bit PPM, 12 repeats
   int raw = (int)lroundf(t * 10) & 0xFFF;
   uint8_t b[5] = { id, (uint8_t)(0x80 | ((ch - 1) << 4) | (raw >> 8)), (uint8_t)raw, (uint8_t)(0xF0 | (hum >> 4)), (uint8_t)(hum << 4) };
   s_tr.n = 0;
   for (int r = 0; r < 12; r++) { trBits(b, 36, 500, 1000, 500, 2000); trAdd(500, r == 11 ? 30000 : 4000); }
 }
-static uint8_t simDigest(const uint8_t* m, int bytes) {               // LaCrosse: lfsr 0x31 / 0xf4, отражённый
+static uint8_t simDigest(const uint8_t* m, int bytes) {               // LaCrosse: lfsr 0x31 / 0xf4, reflected
   uint8_t sum = 0, key = 0xF4;
   for (int k = bytes - 1; k >= 0; --k) for (int i = 0; i < 8; ++i) { if ((m[k] >> i) & 1) sum ^= key; key = (key & 0x80) ? (key << 1) ^ 0x31 : key << 1; }
   return sum;
 }
-static void simTx141(uint8_t id, int ch, float t, int hum) {         // 40 бит PWM, преамбула 4×833, 12 повторов
+static void simTx141(uint8_t id, int ch, float t, int hum) {         // 40-bit PWM, 4×833 preamble, 12 repeats
   int raw = (int)lroundf(t * 10) + 500;
   uint8_t b[5] = { id, (uint8_t)(((ch - 1) << 4) | (raw >> 8)), (uint8_t)raw, (uint8_t)hum, 0 };
   b[4] = simDigest(b, 4);
@@ -107,14 +107,14 @@ static void simTx141(uint8_t id, int ch, float t, int hum) {         // 40 би�
   for (int r = 0; r < 12; r++) { for (int k = 0; k < 4; k++) trAdd(833, 833); trBits(b, 40, 208, 417, 417, 208); }
   s_tr.g[s_tr.n - 1] = 30000;
 }
-static void simBell() {                                               // звонок EV1527: 24 бита, 6 повторов
+static void simBell() {                                               // EV1527 doorbell: 24 bits, 6 repeats
   uint8_t b[3] = { 0x5C, 0x3A, 0x91 };
   s_tr.n = 0;
   for (int r = 0; r < 6; r++) { trAdd(350, 10850); trBits(b, 24, 350, 1050, 1050, 350); }
   s_tr.g[s_tr.n - 1] = 30000;
 }
 
-// ---------- состояние Sub-GHz (в прошивке — subghz.cpp) ----------
+// ---------- Sub-GHz state (firmware: subghz.cpp) ----------
 int  g_gMode = 0, g_band = 1;
 bool g_ccOk = true, g_ccTried = true;
 uint8_t g_ccVersion = 0x14;
@@ -131,7 +131,7 @@ uint32_t g_events = 3;
 Burst    g_ev[EV_N];
 int      g_evN = 0;
 
-// ---------- звук (в прошивке — audio.cpp) ----------
+// ---------- sound (firmware: audio.cpp) ----------
 AudioView g_au;
 bool  g_micOk = true;
 MicDiag g_micDiag = { 4, 0, 0, 37, 0, false };
@@ -158,7 +158,7 @@ void audioPcFrame(float level, int hz, const uint8_t* bands, const int8_t* wave,
   memcpy(g_auXY, xy, sizeof(g_auXY)); g_auXYStereo = stereo;
 }
 
-// ---------- разделы для меню (в прошивке — свои файлы) ----------
+// ---------- menu sections (firmware: own files) ----------
 static void noop() {}
 static void noopI(int) {}
 static void noopT(uint32_t) {}
@@ -210,42 +210,42 @@ const Section irSection = { "IR", 230, 90, 120, iconRemote, irSub, noop, noop,
 const Section nfcSection = { "NFC", 120, 230, 160, iconCard, nfcSub, noop, noop,
   0, nullptr, nullptr, nullptr, nullptr, noop, noopI, noBack, noopT, drawNfc };
 
-// ---------- ИК: синтетические пачки разных пультов (проверка разбора) ----------
+// ---------- IR: synthetic bursts from various remotes (parser check) ----------
 static std::vector<uint16_t> irDist(uint32_t hm, uint32_t hs, const std::vector<uint8_t>& bytes, int bits, uint32_t mk, uint32_t one, uint32_t zero, bool lsb) {
   std::vector<uint16_t> d = { (uint16_t)hm, (uint16_t)hs };
   for (int b = 0; b < bits; b++) {
     int bit = lsb ? (bytes[b / 8] >> (b % 8)) & 1 : (bytes[b / 8] >> (7 - b % 8)) & 1;
-    d.push_back(mk + 40); d.push_back(bit ? one - 40 : zero - 40);   // приёмник удлиняет вспышки
+    d.push_back(mk + 40); d.push_back(bit ? one - 40 : zero - 40);   // the receiver stretches marks
   }
   d.push_back(mk);
   return d;
 }
-static std::vector<uint16_t> runs(const std::vector<uint8_t>& h, uint32_t unit) {   // полубиты -> длительности (с первой вспышки)
+static std::vector<uint16_t> runs(const std::vector<uint8_t>& h, uint32_t unit) {   // half-bits -> durations (from the first mark)
   std::vector<uint16_t> d; int i = 0;
   while (i < (int)h.size() && h[i] == 0) i++;
   while (i < (int)h.size()) { int j = i; while (j < (int)h.size() && h[j] == h[i]) j++; d.push_back((j - i) * unit); i = j; }
-  if (d.size() % 2 == 0) d.pop_back();                      // хвостовая пауза не видна
+  if (d.size() % 2 == 0) d.pop_back();                      // the trailing gap is not visible
   return d;
 }
 static void irTestAll(bool verbose) {
   std::vector<std::vector<uint16_t>> f;
   f.push_back(irDist(9000, 4500, { 0x04, 0xFB, 0x08, 0xF7 }, 32, 560, 1690, 560, true));        // LG TV, power
   f.push_back(irDist(4500, 4500, { 0x07, 0x07, 0x02, 0xFD }, 32, 560, 1690, 560, true));        // Samsung TV
-  { std::vector<uint16_t> d = { 2400, 600 }; uint32_t v = 0x15 | (1 << 7);                       // Sony TV 12 бит
+  { std::vector<uint16_t> d = { 2400, 600 }; uint32_t v = 0x15 | (1 << 7);                       // Sony TV 12 bits
     for (int b = 0; b < 12; b++) { d.push_back((v >> b) & 1 ? 1200 : 600); if (b < 11) d.push_back(600); } f.push_back(d); }
   { std::vector<uint8_t> h; uint16_t v = 0x3000 | (0 << 6) | 0x0C;                              // RC5 Philips TV, cmd 12
     for (int b = 13; b >= 0; b--) { int bit = (v >> b) & 1; h.push_back(bit ? 0 : 1); h.push_back(bit ? 1 : 0); }
     f.push_back(runs(h, 889)); }
-  { std::vector<uint8_t> h = { 1, 1, 1, 1, 1, 1, 0, 0 };                                         // RC6: лидер 6+2 полубитов по 444
-    h.push_back(1); h.push_back(0);                                                               // старт 1
-    for (int b = 0; b < 3; b++) { h.push_back(0); h.push_back(1); }                               // режим 0
-    h.push_back(0); h.push_back(0); h.push_back(1); h.push_back(1);                               // прицеп (toggle 0)
+  { std::vector<uint8_t> h = { 1, 1, 1, 1, 1, 1, 0, 0 };                                         // RC6: leader 6+2 half-bits of 444
+    h.push_back(1); h.push_back(0);                                                               // start 1
+    for (int b = 0; b < 3; b++) { h.push_back(0); h.push_back(1); }                               // mode 0
+    h.push_back(0); h.push_back(0); h.push_back(1); h.push_back(1);                               // trailer (toggle 0)
     uint16_t v = 0x000C;
     for (int b = 15; b >= 0; b--) { int bit = (v >> b) & 1; h.push_back(bit); h.push_back(!bit); }
     auto d = runs(h, 444); d[0] = 2666; d[1] = 889; f.push_back(d); }
   f.push_back(irDist(3456, 1728, { 0x02, 0x20, 0xE0, 0x04, 0x3D, 0xBD }, 48, 432, 1296, 432, true));   // Panasonic
-  f.push_back(irDist(8500, 4250, { 0x88, 0x00, 0x34, 0x70 }, 28, 550, 1600, 550, false));          // LG кондиционер
-  { std::vector<uint16_t> d = { 3100, 1600 }; for (int i = 0; i < 139; i++) d.push_back(i % 2 ? (i % 7 < 3 ? 1150 : 400) : 450); f.push_back(d); }   // «кондиционер»
+  f.push_back(irDist(8500, 4250, { 0x88, 0x00, 0x34, 0x70 }, 28, 550, 1600, 550, false));          // LG air conditioner
+  { std::vector<uint16_t> d = { 3100, 1600 }; for (int i = 0; i < 139; i++) d.push_back(i % 2 ? (i % 7 < 3 ? 1150 : 400) : 450); f.push_back(d); }   // "air conditioner"
   f.push_back(irDist(9000, 4500, { 0xEE, 0x87, 0x0C, 0x5A }, 32, 560, 1690, 560, true));          // Apple
   for (auto& d : f) {
     IrCode c;
@@ -254,11 +254,11 @@ static void irTestAll(bool verbose) {
                         (unsigned long)c.addr, (unsigned long)c.cmd, c.bits, ok ? irBrand(c) : "");
   }
   for (size_t i = 0; i < f.size(); i++) { s_now += 1500; irFeed(f[i].data(), (int)f[i].size(), s_now); }
-  s_now += 1500; irFeed(f[0].data(), (int)f[0].size(), s_now);                                   // снова LG — последняя
-  { uint16_t r[] = { 9000, 2250, 560 }; s_now += 110; irFeed(r, 3, s_now); }                     // держат кнопку
+  s_now += 1500; irFeed(f[0].data(), (int)f[0].size(), s_now);                                   // LG again - the last one
+  { uint16_t r[] = { 9000, 2250, 560 }; s_now += 110; irFeed(r, 3, s_now); }                     // button held
 }
 
-// ---------- вывод ----------
+// ---------- output ----------
 static const char* s_outDir = "out";
 static std::vector<Blip> blipsAnim;
 static void snap(const char* name) {
@@ -279,7 +279,7 @@ static void snap(const char* name) {
   printf("  %s\n", name);
 }
 
-// ---------- данные ----------
+// ---------- data ----------
 static float noise(int i) { return ((i * 2654435761u) >> 24) / 255.0f; }
 
 static Ent mkEnt(const char* name, uint8_t type, uint8_t cat, int rssi, uint16_t cid) {
@@ -378,10 +378,10 @@ int main(int argc, char** argv) {
   spr.createSprite(320, 170);
   settingsBegin();
   if (getenv("SIM_THEME") && !strcmp(getenv("SIM_THEME"), "kurenai")) { g_theme = THEME_KURENAI; themeChanged(); }   // SIM_THEME=kurenai bash build.sh
-  g_langAsk = false; g_lang = (getenv("SIM_LANG") && !strcmp(getenv("SIM_LANG"), "ru")) ? 1 : 0;   // SIM_LANG=ru — язык интерфейса
+  g_langAsk = false; g_lang = (getenv("SIM_LANG") && !strcmp(getenv("SIM_LANG"), "ru")) ? 1 : 0;   // SIM_LANG=ru - UI language
   g_bat.ok = true; g_bat.soc = 87; g_bat.mv = 3980; g_bat.ma = -132; g_bat.tte = 250; g_bat.chgOk = true;
   fillBle(); fillWifi(); fillSub();
-  { String j; settingsJson(j);                            // то же, что палка отдаёт планшету по /api/settings
+  { String j; settingsJson(j);                            // same as the stick serves the tablet at /api/settings
     FILE* f = fopen((std::string(getenv("SIM_OUT") ? getenv("SIM_OUT") : "tools/sim/out") + "/settings.json").c_str(), "w");
     if (f) { fputs(j.c_str(), f); fclose(f); }
     String r; settingsSetKey("ledbr", "70", r); printf("set ledbr: %s\n", r.c_str());
@@ -389,12 +389,12 @@ int main(int argc, char** argv) {
 
   { const uint32_t ts[] = { 250, 600, 1000, 1300, 1680, 1950, 2200 };
     for (int i = 0; i < 7; i++) { char nm[32]; snprintf(nm, sizeof nm, "00_boot_%04u", (unsigned)ts[i]); bootFrame(ts[i]); snap(nm); } }
-  { int lg = g_lang;                            // первое включение: выбор языка
+  { int lg = g_lang;                            // first boot: language choice
     g_langAsk = true; g_lang = 0; navDraw(s_now); snap("00l_lang_pick_en");
     navRotate(+1); navDraw(s_now + 400);           snap("00l_lang_pick_ru");
     navClick(); g_langAsk = false; g_lang = lg; }
   navBegin(); navDraw(s_now);                    snap("01_menu");
-  g_lang ^= 1; navDraw(s_now);                   snap("01b_menu_other_lang");   // язык меняется на лету
+  g_lang ^= 1; navDraw(s_now);                   snap("01b_menu_other_lang");   // language switches on the fly
   g_lang ^= 1;
   g_powerHold = 1500; drawPowerHold();           snap("08_power_hold"); g_powerHold = 0;
   { const uint32_t ts[] = { 300, 760, 1000, 1250, 1400 };
@@ -414,8 +414,8 @@ int main(int argc, char** argv) {
       navClick(); if (p == 0) for (int k = 0; k < 5; k++) navClick(); navDraw(s_now); snap(pg[p]); navBack();
     } }
   navBack();
-  // Settings › Alerts (тревоги штаба): из главного меню — последняя карточка
-  navBegin(); navRotate(-1); navClick(); navClick(); navClick(); navDraw(s_now); snap("06a0_set_language");   // Настройки › Общие › «Язык»
+  // Settings › Alerts: last card of the main menu
+  navBegin(); navRotate(-1); navClick(); navClick(); navClick(); navDraw(s_now); snap("06a0_set_language");   // Settings › General › Language
   navBack(); navBack();
   navBegin(); navRotate(-1); navClick(); navDraw(s_now); snap("06s_settings_pages");
   for (int k = 0; k < 5; k++) navRotate(+1);
@@ -472,7 +472,7 @@ int main(int argc, char** argv) {
   drawFind(s_now);           snap("25_wifi_find");
   g_uiPages = 0;
 
-  // звук: «голос» с пиком около 1.2 кГц и гармониками
+  // sound: a "voice" peaking near 1.2 kHz with harmonics
   g_au.level = -38; g_au.peak = -31; g_au.domHz = 1187; g_au.energy = 0.45f;
   for (int k = 0; k < AU_BANDS; k++) {
     float x = k / (float)AU_BANDS;
@@ -485,7 +485,7 @@ int main(int argc, char** argv) {
   g_uiPages = 6; g_uiPage = 0;
   drawAuBars(s_now);         snap("40_sound_bars");
   g_uiPages = 0;
-  for (int f = 0; f < 30; f++) {                        // «горы»: прокрутить историю
+  for (int f = 0; f < 30; f++) {                        // "mountains": scroll the history
     for (int k = 0; k < AU_BANDS; k++) g_au.bands[k] = constrain(0.15f + 0.7f * expf(-(k - 4 - (f % 7)) * (k - 4 - (f % 7)) / 12.0f) * (0.5f + 0.5f * sinf(f * 0.5f + k * 0.2f)) + noise(k + f) * 0.1f, 0.0f, 1.0f);
     drawTerrain(s_now + f * 50);
   }
@@ -515,7 +515,7 @@ int main(int argc, char** argv) {
     for (int f = 0; f < 3; f++) drawSky(s_now + f * 40);   snap("54_gallery_sky");
     skyClick(); drawSky(s_now);                           snap("54b_gallery_sky_stars"); skyClick(); skyClick();
     for (int f = 0; f < 60; f++) drawGlobe(s_now + f * 40); snap("55_gallery_globe"); }
-  { // радиопогода: подставные значения (расчёт на палке — wxUpdate)
+  { // radio weather: fake values (the stick computes them in wxUpdate)
     WxState& w = g_wx; w.ok = true; w.cond = "rain"; w.clouds = 0.62f; w.wind = 0.35f; w.rain = 0.55f; w.storm = 0.4f;
     w.ble = 31; w.turn = 9; w.sub = 3; w.subPk = -61; w.subOk = true; w.snd = -38; w.pk = -24; w.sndOk = true; w.trend = 0.5f;
     w.histN = WX_HIST; for (int i = 0; i < WX_HIST; i++) { w.hist[i][0] = 0.3f + 0.3f * i / WX_HIST + 0.05f * sinf(i * 0.5f); w.hist[i][1] = (i % 13 < 3) ? 0.6f : 0.08f; }
@@ -528,10 +528,10 @@ int main(int argc, char** argv) {
   { uint8_t qr[29 * 29]; for (int i = 0; i < 29 * 29; i++) qr[i] = (noise(i) > 0.5f) || ((i % 29 < 7 || i % 29 > 21) && (i / 29 < 7) && !((i % 29 == 1 || i % 29 == 5 || i % 29 == 23 || i % 29 == 27) && i / 29 > 0 && i / 29 < 6));
     WebView v = { "TENGAN-3F2A", "48213907", "192.168.4.1", 1, 214, true, "sub-ghz" };
     drawWebScreen(v, qr, 29); snap("60_web"); }
-  { WebLink l = { 1, "BLE  WX  ", 3400, 0 };              // планшет подключён: живая картинка
+  { WebLink l = { 1, "BLE  WX  ", 3400, 0 };              // tablet connected: live picture
     char nm[32];
     for (int f = 0; f < 48; f++) { drawWebLink(l, 2000 + f * 70); snprintf(nm, sizeof nm, "anim_link_%03d", f); snap(nm); } }
-  { // IR и NFC (разбор — настоящий код, данные синтетические)
+  { // IR and NFC (real parsing code, synthetic data)
     g_ir.on = g_ir.ok = true;
     drawIr(s_now);                                       snap("80_ir_idle");
     uint32_t keep = s_now;
@@ -554,7 +554,7 @@ int main(int argc, char** argv) {
     mem[p++] = 0x51; mem[p++] = 0x01; mem[p++] = (uint8_t)(sizeof(txtr) - 1); mem[p++] = 'T';
     memcpy(mem + p, txtr, sizeof(txtr) - 1); p += sizeof(txtr) - 1;
     mem[1] = (uint8_t)(p - 2); mem[p++] = 0xFE;
-    mem[2] = 0x91;                                           // первая запись: MB, SR, TNF=1 (не последняя)
+    mem[2] = 0x91;                                           // first record: MB, SR, TNF=1 (not the last)
     nfcParseNdef(mem, p, t); nfcClassify(t, 0x0F); nfcCommit(t, s_now - 200);
     printf("nfc: %s / %s / ndef=%d [%s] [%s]\n", t.fam, t.hint, t.nNdef, t.ndef[0], t.nNdef > 1 ? t.ndef[1] : "");
     g_nfc.lastSeen = s_now;
@@ -567,7 +567,7 @@ int main(int argc, char** argv) {
     { String j; char u[24]; nfcUidMasked(b, u, sizeof u, true); printf("nfc uid: %s\n", u); }
     g_nfc.state = NFC_NOREADER; drawNfc(s_now);          snap("85_nfc_noreader"); g_nfc.state = NFC_SCAN; }
   drawPcWaiting(s_now);      snap("70_pc_waiting");
-  for (int i = 0; i < 60; i++) {                        // минута «настоящих» строк с ноутбука
+  for (int i = 0; i < 60; i++) {                        // a minute of "real" lines from the laptop
     char ln[300];
     float cpu = 18 + 14 * sinf(i * 0.25f) + noise(i) * 10 + (i > 44 ? 40 : 0);
     snprintf(ln, sizeof ln, "PC cpu=%.1f freq=2.80 c=%d,%d,%d,%d,%d,%d,%d,%d ram=%.1f ramu=%.1f ramt=16.0 dsk=71 dr=1.2 dw=0.4 nd=%d nu=46 up=11520 top=chrome host=WOLF-LAPTOP bat=78 plug=0\n",
@@ -586,7 +586,7 @@ int main(int argc, char** argv) {
   Serial.feed("PV vol=42 mute=0\n"); pcPoll(0); g_pc.volT = s_now;
   g_pcLastCmd = 1; g_pcLastCmdMs = s_now - 120;
   Serial.feed("PM\t1\t63\t215\tSpotify\tГруппа крови (Remastered 2024 Edition)\tКино\n"); pcPoll(0); g_pc.trkT = s_now;
-  g_pc.trkT = 0; g_pcLastCmdMs = 0; g_pc.volT = 0; drawPcMedia(300); snap("73_pc_media");   // бегущая строка — с начала
+  g_pc.trkT = 0; g_pcLastCmdMs = 0; g_pc.volT = 0; drawPcMedia(300); snap("73_pc_media");   // marquee starts from the beginning
   Serial.feed("PM\n"); pcPoll(0); g_pc.trkT = s_now;
   drawPcMedia(s_now);        snap("74_pc_media_idle");
   g_uiPages = 2; g_uiPage = 0;
@@ -608,7 +608,7 @@ int main(int argc, char** argv) {
     w.tOk = sensOutside(t, h, src, s_now); if (w.tOk) { w.temp = t; w.hum = h; w.tsrc = src; }
     drawWeather(s_now);      snap("56e_gallery_weather_temp");
     String o; wxJson(o); printf("wx json tail: %s\n", o.c_str() + (o.length() > 60 ? o.length() - 60 : 0)); }
-  if (getenv("SIM_ANIM")) {                              // кадры для гифок README (tools/make_docs.py)
+  if (getenv("SIM_ANIM")) {                              // frames for README GIFs (tools/make_docs.py)
     char nm[48];
     for (int f = 0; f * 40 <= 2700; f++) { bootFrame(f * 40); snprintf(nm, sizeof nm, "anim_boot_%03d", f); snap(nm); }
     for (int f = 0; f < 60; f++) { drawCity(blipsAnim, s_now + 4000 + f * 50); snprintf(nm, sizeof nm, "anim_city_%03d", f); snap(nm); }

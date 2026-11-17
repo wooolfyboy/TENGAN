@@ -1,5 +1,5 @@
 // ============================================================
-//  pc.cpp — раздел PC: приём строк с ноутбука по USB и сам раздел
+//  pc.cpp — PC section: receives laptop lines over USB, plus the section UI
 // ============================================================
 #include "core/timeutil.h"
 #include "core/lang.h"
@@ -31,7 +31,7 @@ static void parseList(const char* v, uint8_t* out, int& n) {
   }
 }
 
-static void parseVol(char* s) {                      // "PV vol=35 mute=0" — громкость ноута
+static void parseVol(char* s) {                      // "PV vol=35 mute=0" — laptop volume
   char* save = nullptr;
   for (char* tok = strtok_r(s + 3, " ", &save); tok; tok = strtok_r(nullptr, " ", &save)) {
     if (!strncmp(tok, "vol=", 4))  g_pc.vol = constrain(atoi(tok + 4), 0, 100);
@@ -40,8 +40,8 @@ static void parseVol(char* s) {                      // "PV vol=35 mute=0" — �
   g_pc.volT = millis();
 }
 
-// "PM\t<играет 0/1>\t<поз>\t<длит>\t<прил.>\t<название>\t<исполнитель>" (поля через TAB:
-// в названиях бывают пробелы). Пустое "PM" — ничего не играет.
+// "PM\t<playing 0/1>\t<pos>\t<dur>\t<app>\t<title>\t<artist>" (TAB-separated fields:
+// titles contain spaces). A bare "PM" means nothing is playing.
 static void copyField(char* dst, size_t cap, const char* src) { strncpy(dst, src ? src : "", cap - 1); dst[cap - 1] = 0; }
 static void parseMedia(char* s) {
   PcStat& p = g_pc;
@@ -59,7 +59,7 @@ static void parseMedia(char* s) {
   copyField(p.artist, sizeof(p.artist), n > 6 ? f[6] : "");
 }
 
-// "PA <громкость*10> <частота> <32 полосы hex> <64 отсчёта hex> <64 пары L,R hex> <стерео 0/1>"
+// "PA <volume*10> <freq> <32 bands hex> <64 samples hex> <64 L,R pairs hex> <stereo 0/1>"
 static int hexv(char c) { return c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 : c >= 'A' && c <= 'F' ? c - 'A' + 10 : 0; }
 static bool unhex(const char* h, uint8_t* out, int n) {
   if ((int)strlen(h) < n * 2) return false;
@@ -77,13 +77,13 @@ static void parseAudio(char* s) {
 }
 
 static void parseLine(char* s) {
-  if (s[0] == '@') { webLinkLine(s); return; }      // приложение для компьютера (web.cpp, «@…»)
+  if (s[0] == '@') { webLinkLine(s); return; }      // PC app (web.cpp, "@…")
   if (!strncmp(s, "PA ", 3)) { parseAudio(s); return; }
-  if (!strncmp(s, "TLE\t", 4)) { satFromLine(s); return; }   // орбиты спутников с ноутбука
-  if (!strncmp(s, "PP\t", 3)) { pcCityLine(s); return; }      // программы для города процессов
+  if (!strncmp(s, "TLE\t", 4)) { satFromLine(s); return; }   // satellite orbits from the laptop
+  if (!strncmp(s, "PP\t", 3)) { pcCityLine(s); return; }      // programs for the process city
   if (!strncmp(s, "PV ", 3)) { parseVol(s); return; }
   if (!strncmp(s, "PM", 2) && (s[2] == '\t' || s[2] == 0)) { parseMedia(s); return; }
-  if (strncmp(s, "PC ", 3) != 0) return;            // не наша строка — пропускаем
+  if (strncmp(s, "PC ", 3) != 0) return;            // not ours - skip
   PcStat& p = g_pc;
   uint32_t ts = 0; long tz = 0;
   char* save = nullptr;
@@ -112,7 +112,7 @@ static void parseLine(char* s) {
     else if (!strcmp(k, "ts"))   ts = strtoul(v, nullptr, 10);
     else if (!strcmp(k, "tz"))   tz = atol(v);
   }
-  if (ts > 1700000000) astroSetTime(ts, (int32_t)tz);    // точное время — для неба и спутников
+  if (ts > 1700000000) astroSetTime(ts, (int32_t)tz);    // exact time, for sky and satellites
   p.have = true;
   p.t = millis();
   if (p.histN < PC_HIST) { p.cpuH[p.histN] = p.cpu; p.ramH[p.histN] = p.ram; p.histN++; }
@@ -123,28 +123,28 @@ static void parseLine(char* s) {
 }
 
 void pcPoll(uint32_t) {
-  int budget = 2048;                                 // не застревать, если данных много (звук ноута — ~15 КБ/с)
+  int budget = 2048;                                 // don't get stuck if there is a lot of data (laptop audio ~15 KB/s)
   while (Serial.available() && budget--) {
     char c = (char)Serial.read();
     if (c == '\n' || c == '\r') {
       if (s_len) { s_line[s_len] = 0; parseLine(s_line); s_len = 0; }
     } else if (s_len < sizeof(s_line) - 1) s_line[s_len++] = c;
-    else s_len = 0;                                  // слишком длинная строка — мусор
+    else s_len = 0;                                  // line too long - garbage
   }
 }
 
-// «связи нет» — только после 10 с тишины (Windows иногда притормаживает отправку)
+// "no link" only after 10 s of silence (Windows sometimes delays sending)
 bool pcLive(uint32_t now) { return g_pc.have && msSince(now, g_pc.t) < 10000; }
 
-// ---------- пульт: команды ноутбуку ----------
-// Программа на ноуте читает строки «KEY ...» и нажимает мультимедийные клавиши.
+// ---------- remote: commands to the laptop ----------
+// The laptop program reads "KEY ..." lines and presses media keys.
 static void pcSend(const char* cmd, int code) {
   g_pcLastCmd = code; g_pcLastCmdMs = millis();
-  if (!pcLive(millis())) return;                     // программа не запущена — некому слать
-  serOutLine(cmd);                                   // общая очередь USB: строка уходит целиком, без ожидания
+  if (!pcLive(millis())) return;                     // program not running - nobody to send to
+  serOutLine(cmd);                                   // shared USB queue: the line goes out whole, no waiting
 }
 
-// пульт с планшета (/api/pckey): только разрешённые клавиши
+// tablet remote (/api/pckey): allowed keys only
 bool pcKey(const char* name) {
   static const struct { const char* n; int code; } K[] = { { "VOLUP", 1 }, { "VOLDN", -1 }, { "PLAY", 2 }, { "MUTE", 3 }, { "NEXT", 4 }, { "PREV", 5 } };
   for (auto& k : K) if (!strcmp(name, k.n)) {
@@ -156,7 +156,7 @@ bool pcKey(const char* name) {
 }
 
 void pcSendLine(const char* s) {
-  if (!pcLive(millis())) return;                     // программа не запущена — некому слать
+  if (!pcLive(millis())) return;                     // program not running - nobody to send to
   serOutLine(s);
 }
 
@@ -168,23 +168,23 @@ static void pcSubtitle(char* out, size_t n) {
 static void pcEnter() { g_pcPage = 0; }
 static void pcLeave() {}
 static void pcClick() {
-  if (g_pcPage == 3) pcSend("KEY PLAY", 2);          // на странице музыки — пауза/играть
-  else if (g_pcPage == 2) pcCityNext();             // город — прожектор на следующую башню
-  // на обзоре и ядрах у нажатия нет действия (страницы листает колесо)
+  if (g_pcPage == 3) pcSend("KEY PLAY", 2);          // on the music page: pause/play
+  else if (g_pcPage == 2) pcCityNext();             // city: spotlight to the next tower
+  // overview and cores: click does nothing (the wheel flips pages)
 }
 static void pcRotate(int dir) {
-  if (g_pcPage == 3) { pcSend(dir > 0 ? "KEY VOLUP" : "KEY VOLDN", dir > 0 ? 1 : -1); return; }   // колесо = громкость
+  if (g_pcPage == 3) { pcSend(dir > 0 ? "KEY VOLUP" : "KEY VOLDN", dir > 0 ? 1 : -1); return; }   // wheel = volume
   static uint32_t last = 0;
   if (millis() - last < 150) return;
   last = millis();
   g_pcPage = (g_pcPage + dir + PC_PAGES) % PC_PAGES;
 }
-static bool pcBack() {                               // со страницы музыки боковая — на обзор, а не из раздела
+static bool pcBack() {                               // side button on the music page goes to overview, not out of the section
   if (g_pcPage == 3) { g_pcPage = 0; return true; }
   return false;
 }
 static void pcDraw(uint32_t now) {
-  g_uiPages = pcLive(now) ? PC_PAGES : 0; g_uiPage = g_pcPage;   // точки-страницы (у раздела нет подменю)
+  g_uiPages = pcLive(now) ? PC_PAGES : 0; g_uiPage = g_pcPage;   // page dots (the section has no submenu)
   if (!pcLive(now)) drawPcWaiting(now);
   else if (g_pcPage == 0) drawPc(now);
   else if (g_pcPage == 1) drawPcCores(now);
@@ -199,7 +199,7 @@ const Section pcSection = {
   pcClick, pcRotate, pcBack, nullptr, pcDraw,
 };
 
-// ---------- для планшета (поток SSE, раз в секунду) ----------
+// ---------- for the tablet (SSE stream, once a second) ----------
 // {"live":1,"host":..,"cpu":..,"c":[..],"ram":..,"ru":..,"rt":..,"disk":..,"dr":..,"dw":..,"nd":..,"nu":..,
 //  "bat":..,"plug":..,"up":..,"top":..,"trk":{...},"city":[...]}
 void pcStreamJson(String& o) {
@@ -221,7 +221,7 @@ void pcStreamJson(String& o) {
   o += ",\"vol\":"; o += p.vol; o += ",\"mute\":"; o += p.mute ? 1 : 0;
   if (p.trk) {
     int pos = p.pos;
-    if (pos >= 0 && p.playing) pos += msSince(now, p.trkT) / 1000;   // досчитываем, как экран Media
+    if (pos >= 0 && p.playing) pos += msSince(now, p.trkT) / 1000;   // extrapolate like the Media screen
     if (p.dur > 0 && pos > p.dur) pos = p.dur;
     o += ",\"trk\":{\"t\":"; jsonStr(o, p.title); o += ",\"a\":"; jsonStr(o, p.artist);
     o += ",\"app\":"; jsonStr(o, p.app); o += ",\"play\":"; o += p.playing ? 1 : 0;
