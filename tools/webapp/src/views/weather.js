@@ -53,17 +53,17 @@
   ` + T.GL.NOISE + `
   vec2 fragCss(){ return vec2(gl_FragCoord.x, res.y-gl_FragCoord.y)/res*css; }
   void main(){
-    vec2 p=fragCss(); float H=css.y, y=p.y/H;                 // 0 — верх, 1 — горизонт
+    vec2 p=fragCss(); float H=css.y, y=p.y/H;                 // 0 = top, 1 = horizon
     vec2 q=p/H;
     vec3 col; float dark=1.-storm*.5;
     col=mix(vec3(.02,.03,.05),vec3(.055,.13,.19)*dark,y*y);
-    // светило: ночью луна, днём — мягкое свечение
+    // sun/moon: moon at night, soft glow by day
     float sd=length(p-sun.xy);
     col+=vec3(.7,.9,1.)*(smoothstep(sun.z*.8,sun.z*.75,sd)*.85*night + exp(-sd/(sun.z*3.))*.10);
-    // звёзды сквозь просветы
+    // stars through gaps
     vec2 sc=floor(p/(u*1.7)); float hs=hash(sc), hs2=hash(sc+3.1);
     float star=step(.93,hs)*smoothstep(.10,.0,length(fract(p/(u*1.7))-.5-(vec2(hs,hs2)-.5)*.6))*(.55+.45*sin(t*1.3+hs*60.))*(.4+(hs-.93)*8.6)*smoothstep(.85,.4,y);
-    // облака: три слоя, ближние крупнее и быстрее
+    // clouds: three layers, nearer ones larger and faster
     float cover=0., light=0.;
     for(int i=0;i<3;i++){
       float fi=float(i), sc2=1.6-fi*.45;
@@ -72,16 +72,16 @@
       float thr=mix(.78,.28,clouds)-fi*.03;
       float prof=smoothstep(.0,.15,y)*smoothstep(1.,.45,y-fi*.12);
       float a=smoothstep(thr,thr+.22,d)*prof*(.55+fi*.2);
-      float lt=clamp((fbm(uv-vec2(0.,.06))-fbm(uv))*4.+.5,0.,1.);   // верх облака светлее
+      float lt=clamp((fbm(uv-vec2(0.,.06))-fbm(uv))*4.+.5,0.,1.);   // cloud top is lighter
       vec3 cc=mix(vec3(.05,.09,.12)*dark,vec3(.30,.44,.52)*(.6+.4*dark),lt);
       cc+=vec3(.45,.60,.70)*flash*(.25+.45*lt);
       col=mix(col,cc,a);
       cover=max(cover,a);
     }
     col+=vec3(.92,.98,1.)*star*(1.-cover)*clamp(1.-clouds*1.1,0.,1.)*.8;
-    // свечение города у горизонта
+    // city glow at the horizon
     col+=vec3(.15,.6,.75)*exp(-length(vec2((p.x/css.x-.5)*1.4,1.-y))*3.)*(.10+.06*(1.-clouds));
-    // дождь: косые штрихи, два слоя
+    // rain: slanted streaks, two layers
     if(rain>.01){
       for(int k=0;k<2;k++){
         float fk=float(k), cw=u*(.9-fk*.35);
@@ -95,7 +95,7 @@
         }
       }
     }
-    // вспышка молнии — всё небо
+    // lightning flash: whole sky
     col+=vec3(.20,.28,.34)*flash*.45;
     gl_FragColor=vec4(col,1.);
   }`;

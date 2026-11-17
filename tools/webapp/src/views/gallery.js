@@ -87,21 +87,21 @@ T.galGL = (() => {
     float day=smoothstep(-.10,.14,lit);
     float term=exp(-abs(lit)*22.);
     float limb=.55+.45*n.z;
-    float cl=smoothstep(.55,.85,fbm(uv*vec2(14.,9.)+vec2(t*.004,0.))+.08*sin(lat*3.));   // облака
+    float cl=smoothstep(.55,.85,fbm(uv*vec2(14.,9.)+vec2(t*.004,0.))+.08*sin(lat*3.));   // clouds
     vec3 col; float al=smoothstep(1.,.992,r);
     vec3 ocean=mix(vec3(.01,.05,.09),vec3(.02,.14,.22),day);
     vec3 grd=mix(vec3(.03,.10,.12),mix(vec3(.08,.32,.36),vec3(.30,.70,.72),det),day);
     col=mix(ocean,grd,m)*limb;
     float spec=pow(max(dot(reflect(-normalize(sun),n),vec3(0,0,1)),0.),36.)*(1.-m)*day;
     col+=vec3(.55,.9,1.)*spec*.7;
-    // огни ночной стороны: суша, крупные пятна + мелкие точки
+    // night-side lights: land, large patches + small dots
     vec2 cell=floor(uv*vec2(900.,450.)); float h=hash(cell);
     float city=step(.93,h)*smoothstep(.55,.8,fbm(uv*vec2(60.,30.)+3.))*m;
     col+=vec3(.55,.95,1.)*city*(1.-day)*(.6+.4*sin(t*2.+h*40.));
     col+=vec3(.25,.75,.85)*smoothstep(.62,.9,fbm(uv*vec2(30.,15.)+7.))*m*(1.-day)*.18;
-    col+=vec3(.20,.75,.95)*term*.35;                       // полоса рассвета
+    col+=vec3(.20,.75,.95)*term*.35;                       // terminator glow
     col=mix(col,vec3(.55,.75,.85)*(.25+.75*day),cl*.45);
-    col+=vec3(.15,.6,.9)*pow(1.-n.z,3.)*(.3+.7*day);       // атмосфера по краю
+    col+=vec3(.15,.6,.9)*pow(1.-n.z,3.)*(.3+.7*day);       // atmosphere at the limb
     gl_FragColor=vec4(col*al,al);
   }`;
   G.globe = (g, cx, cy, R, l0, b0, sun, t) => {
@@ -122,7 +122,7 @@ T.galGL = (() => {
     float sd=sin(alt)*sl+cos(alt)*cl*cos(az), dec=asin(clamp(sd,-1.,1.));
     float ha=atan(-sin(az)*cos(alt), sin(alt)*cl-cos(alt)*sl*cos(az)), ra=lst-ha;
     vec3 dir=vec3(cos(dec)*cos(ra),cos(dec)*sin(ra),sin(dec));
-    // галактика: широта b и близость к центру Галактики (Стрелец)
+    // galaxy: latitude b and closeness to the Galactic center (Sagittarius)
     float gp=27.128*D2R, gr=192.859*D2R, cr=266.405*D2R, cd=-28.936*D2R;
     float sb=sin(dec)*sin(gp)+cos(dec)*cos(gp)*cos(ra-gr);
     float cgc=sin(dec)*sin(cd)+cos(dec)*cos(cd)*cos(ra-cr);
@@ -131,17 +131,17 @@ T.galGL = (() => {
     float band=exp(-pow(bb/(.16+.06*f),2.))*(.35+.65*smoothstep(-.6,1.,cgc))*(.5+.9*f);
     float rift=exp(-pow((bb+.02)/.035,2.))*smoothstep(.3,.9,cgc)*smoothstep(.4,.7,f2);
     band=max(0.,band-rift*.55);
-    // фоновые звёзды (слабые, мерцают)
+    // background stars (faint, twinkling)
     vec2 sp=vec2(ra*cos(dec),dec)*58.; vec2 id=floor(sp), fr=fract(sp)-.5;
     float h=hash(id), h2=hash(id+7.3);
     vec2 off=vec2(h,h2)-.5; float sd2=length(fr-off*.6);
     float star=step(.82,h)*smoothstep(.09,.0,sd2)*(.5+.5*sin(t*(1.5+h2*3.)+h*30.))*(h-.82)*5.;
-    float ext=smoothstep(0.,.25,alt);                       // у горизонта гаснет
+    float ext=smoothstep(0.,.25,alt);                       // fades near the horizon
     float tw=smoothstep(.2,.9,1.-r*r);
     vec3 sky0=mix(mix(vec3(.04,.12,.17),vec3(.06,.20,.28),day),vec3(.02,.05,.09),night);
     vec3 sky1=mix(mix(vec3(.02,.07,.11),vec3(.03,.10,.15),day),vec3(.01,.03,.06),night);
     vec3 col=mix(sky1,sky0,r*r);
-    // сумерки: зарево со стороны Солнца
+    // twilight: glow on the Sun side
     float da=abs(mod(az-sunAz+PI,2.*PI)-PI);
     float tw2=clamp(1.-abs(sunAlt*57.3+5.)/13.,0.,1.);
     col+=vec3(.15,.55,.75)*tw2*exp(-da*1.4)*smoothstep(.2,1.,r)*.55;
@@ -190,7 +190,7 @@ T.galGL = (() => {
   void main(){
     vec2 p=fragCss(); vec2 d2=(p-cen)/K1; d2.y=-d2.y;
     vec3 ro=vec3(0.), rd=normalize(vec3(d2,1.));
-    mat3 M=rz(Bb)*rx(Aa), Mi=rx(-Aa)*rz(-Bb);     // мир -> тело тора
+    mat3 M=rz(Bb)*rx(Aa), Mi=rx(-Aa)*rz(-Bb);     // world -> torus body
     vec3 c0=vec3(0.,0.,K2);
     float tt=K2-3.4, md=9.;
     vec3 q; bool hit=false;
@@ -205,15 +205,15 @@ T.galGL = (() => {
     }
     vec2 e=vec2(.002,0.);
     vec3 n=normalize(vec3(sdT(q+e.xyy)-sdT(q-e.xyy),sdT(q+e.yxy)-sdT(q-e.yxy),sdT(q+e.yyx)-sdT(q-e.yyx)));
-    vec3 nw=M*n;                                  // нормаль в мире
+    vec3 nw=M*n;                                  // normal in world space
     vec3 L=normalize(vec3(0.,.7071,-.7071));
     float lam=max(0.,dot(nw,L)), fres=pow(1.-max(0.,dot(nw,-rd)),3.);
     float th=atan(q.y,length(q.xz)-2.1), ph=atan(q.z,q.x);
-    vec2 g=vec2(ph*120./6.2832+th*.95, th*30./6.2832);   // те же 120×30 «точек»
+    vec2 g=vec2(ph*120./6.2832+th*.95, th*30./6.2832);   // same 120×30 dots
     vec2 f=fract(g)-.5; float dot0=smoothstep(.36,.14,length(f));
     float depth=clamp((K2+3.2-tt)/6.4,0.,1.);
     vec3 base=mix(vec3(.02,.08,.11),vec3(.05,.22,.28),lam);
-    vec3 r=reflect(rd,nw); float env=smoothstep(.0,.08,r.y)*.25+exp(-abs(r.y)*18.)*.6;   // «горизонт» в отражении
+    vec3 r=reflect(rd,nw); float env=smoothstep(.0,.08,r.y)*.25+exp(-abs(r.y)*18.)*.6;   // "horizon" in the reflection
     vec3 hot=mix(vec3(.15,.55,.7),vec3(.85,1.,1.),lam*lam);
     vec3 col=base+vec3(.2,.75,.9)*env*.35+hot*dot0*(.25+1.2*lam)*(.4+.6*depth)+vec3(.25,.85,1.)*fres*.8;
     gl_FragColor=vec4(col,1.);

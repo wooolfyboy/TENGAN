@@ -12,7 +12,7 @@ uniform vec4 cam; uniform vec4 prj; uniform vec2 vp; uniform vec4 geo; uniform f
 varying vec3 wp; varying float vd; varying float vh; varying vec2 vg;
 void main(){
   float z=geo.z+(gr.y+zoff)*geo.w, y=hh*hs;
-  float x=(geo.x+gr.x*geo.y)*(fitw>0.?fitw*max(.2,prj.x+z*cam.z):1.+spread*abs(gr.y+zoff));   // fitw: каждый ряд во всю ширину кадра
+  float x=(geo.x+gr.x*geo.y)*(fitw>0.?fitw*max(.2,prj.x+z*cam.z):1.+spread*abs(gr.y+zoff));   // fitw: each row spans the full frame width
   float x1=x*cam.x-z*cam.y, z1=x*cam.y+z*cam.x;
   float y2=y*cam.z+z1*cam.w, z2=-y*cam.w+z1*cam.z, d=max(.05,prj.x+z2);
   vec2 s=vec2(prj.z+x1*prj.y/d, prj.w-y2*prj.y/d);

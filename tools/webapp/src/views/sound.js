@@ -169,7 +169,7 @@ void main(){
     col+=vec3(st)*.8;
     vec3 sc=mix(cAcc,cHot,smoothstep(-.3,1.,(p.y-sun.y)/sun.z));
     float disk=smoothstep(1.,.985,d);
-    float below=(sun.y-p.y)/sun.z;   // нижняя половина солнца режется полосами
+    float below=(sun.y-p.y)/sun.z;   // lower half of the sun is cut by stripes
     if(below>0.){ float band=fract(below*6.); disk*=step(below*.55,band); }
     col=mix(col,sc,disk*step(hy,p.y));
     col+=cAcc*exp(-d*1.6)*(.35+lv*.5);
