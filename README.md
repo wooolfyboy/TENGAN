@@ -10,16 +10,16 @@ Bluetooth · Wi-Fi · Sub-GHz · IR · NFC · sound · PC monitor turned into a 
 on the LilyGO T-Embed CC1101 Plus, on a tablet (TENGAN Tablet) and on a computer (TENGAN Desktop).<br>
 **Receive only.** TENGAN never transmits on the air and never writes to cards.
 
-[![release](https://img.shields.io/github/v/release/wolfyboy1488/lilygostuff?include_prereleases&style=flat-square&color=3fd9ff&label=release)](https://github.com/wolfyboy1488/lilygostuff/releases/latest)
-[![build](https://img.shields.io/github/actions/workflow/status/wolfyboy1488/lilygostuff/build.yml?style=flat-square&label=build)](https://github.com/wolfyboy1488/lilygostuff/actions/workflows/build.yml)
-[![license](https://img.shields.io/github/license/wolfyboy1488/lilygostuff?style=flat-square&color=7f97a3)](LICENSE)
+[![release](https://img.shields.io/github/v/release/wolfyboy1488/TENGAN?include_prereleases&style=flat-square&color=3fd9ff&label=release)](https://github.com/wolfyboy1488/TENGAN/releases/latest)
+[![build](https://img.shields.io/github/actions/workflow/status/wolfyboy1488/TENGAN/build.yml?style=flat-square&label=build)](https://github.com/wolfyboy1488/TENGAN/actions/workflows/build.yml)
+[![license](https://img.shields.io/github/license/wolfyboy1488/TENGAN?style=flat-square&color=7f97a3)](LICENSE)
 ![ESP32-S3](https://img.shields.io/badge/ESP32--S3-T--Embed%20CC1101%20Plus-3fd9ff?style=flat-square)
 ![receive only](https://img.shields.io/badge/RF-receive%20only-7f97a3?style=flat-square)
 ![languages](https://img.shields.io/badge/lang-EN%20%C2%B7%20RU-02090b?style=flat-square&labelColor=7f97a3)
 ![style](https://img.shields.io/badge/theme-DENKO-02090b?style=flat-square&labelColor=3fd9ff)
 ![style](https://img.shields.io/badge/theme-KURENAI-0b0b0b?style=flat-square&labelColor=e5262f)
 
-[**Download**](https://github.com/wolfyboy1488/lilygostuff/releases/latest) ·
+[**Download**](https://github.com/wolfyboy1488/TENGAN/releases/latest) ·
 [What you need](#-what-you-need) ·
 [Quick start](#-quick-start) ·
 [Sections](#-sections) ·
@@ -74,7 +74,7 @@ on the LilyGO T-Embed CC1101 Plus, on a tablet (TENGAN Tablet) and on a computer
 <tr>
 <td width="55%">
 
-1. Download the flasher from [**Releases**](https://github.com/wolfyboy1488/lilygostuff/releases/latest):
+1. Download the flasher from [**Releases**](https://github.com/wolfyboy1488/TENGAN/releases/latest):
    **`flash_tengan.html`** — one firmware for English and Russian.
 2. Connect the T-Embed to your computer with a USB cable and open the file in **Chrome** or **Edge**.
 3. Press **Install firmware**, pick *USB JTAG/serial debug unit* and **Connect**.

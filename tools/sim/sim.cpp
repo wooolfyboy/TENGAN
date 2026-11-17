@@ -494,7 +494,7 @@ int main(int argc, char** argv) {
   drawLevel(s_now);          snap("42_sound_level");
   drawWave(s_now);           snap("43_sound_scope");
   drawXY(s_now);             snap("44b_sound_xy_mic");
-  { FILE* f = fopen("/tmp/claude-0/-home-user-lilygostuff/c5b88f80-222b-5b59-9742-a02655fa5cbd/scratchpad/pa_line.txt", "r");
+  { FILE* f = fopen(getenv("SIM_PA_LINE") ? getenv("SIM_PA_LINE") : "tools/sim/pa_line.txt", "r");   // sample PC-audio line (build.sh sets the path)
     if (f) { static char ln[1200]; size_t n = fread(ln, 1, sizeof(ln) - 1, f); ln[n] = 0; fclose(f);
       Serial.feed(ln); pcPoll(0);
       for (int k = 0; k < 4; k++) drawXY(s_now);

@@ -30,7 +30,7 @@ SRC=(
 )
 g++ -O1 -std=gnu++17 -w -I"$SIM/stubs" -I"$WORK/tftlib" -I"$ROOT/src" $DEFS "${SRC[@]}" -o "$WORK/sim"
 rm -f "$OUT"/*.ppm "$OUT"/*.png
-"$WORK/sim" "$OUT"
+SIM_PA_LINE="$SIM/pa_line.txt" "$WORK/sim" "$OUT"
 python3 - "$OUT" <<'PY'
 import sys, glob, os
 from PIL import Image
