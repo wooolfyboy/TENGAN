@@ -109,7 +109,10 @@ jobs:
             | **tengan_firmware_ota.bin** | Wireless update: Web section on the device → open the page → Update. |
             | **tengan_tablet.apk** | TENGAN Tablet for Android. Copy it to the tablet, open it and allow installation. |
             | **tengan_desktop.exe** | TENGAN Desktop for Windows: the dashboard and PC monitor, over USB or Wi-Fi. |
+            | **TENGAN-Desktop-mac.zip**, **TENGAN-Desktop-linux-x86_64.AppImage** | TENGAN Desktop for macOS and Linux — *experimental*: built and smoke-tested automatically, not yet tested on real hardware. Reports welcome. |
             | **TENGAN-tech-doc-en.pdf**, **TENGAN-tech-doc-ru.pdf** | Technical documentation: architecture, protocols, algorithms, build. |
+
+            The EXE is not code-signed, so Windows SmartScreen may warn at first start: *More info → Run anyway*.
 
             ## Установка
 
@@ -122,7 +125,10 @@ jobs:
             | **tengan_firmware_ota.bin** | Обновление по Wi-Fi: раздел «Веб» на устройстве → открыть страницу → «Обновление». |
             | **tengan_tablet.apk** | TENGAN Tablet для Android. Скопируйте на планшет, откройте и разрешите установку. |
             | **tengan_desktop.exe** | TENGAN Desktop для Windows: панель управления и монитор ПК, по USB или Wi-Fi. |
+            | **TENGAN-Desktop-mac.zip**, **TENGAN-Desktop-linux-x86_64.AppImage** | TENGAN Desktop для macOS и Linux — *экспериментально*: собирается и проходит пробный запуск автоматически, на реальных компьютерах ещё не проверялся. Будем рады отзывам. |
             | **TENGAN-tech-doc-en.pdf**, **TENGAN-tech-doc-ru.pdf** | Техническая документация: архитектура, протоколы, алгоритмы, сборка. |
+
+            EXE не подписан, поэтому при первом запуске SmartScreen может предупредить: *«Подробнее» → «Выполнить в любом случае»*.
 
 
   # Technical documentation PDFs (docs/tech/en, docs/tech/ru): pandoc -> HTML -> headless Chrome.
