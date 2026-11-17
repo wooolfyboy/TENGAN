@@ -63,6 +63,7 @@
   widget, opacity, clickthrough, widget_rect, tray`). HTTP окна: `/__app/prefs`, `/__app/prefs_set?k=&v=<json>`,
   `/__app/test_popup`, `/__app/show`.
 
-Не проверено на Windows (здесь нет Windows): сами окна pywebview поверх всех, `focus=False`,
+Проверено на Windows автором (17.11.2026): мини-виджет поверх всех окон показывается и обновляется.
+Ещё не проверено на Windows: окна pywebview поверх всех (всплывашки), `focus=False`,
 отмена закрытия (`closing` → `False`), WebView2 в слоистом окне (прозрачность), трей pystray,
 системные уведомления. Логика «мозга» и страницы плашек/виджета проверены тестами и в headless Chromium.
