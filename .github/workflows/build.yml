@@ -5,11 +5,25 @@
 # (тег создастся сам на собранном коммите).
 name: build
 
+# Правки только текста и картинок (README, docs/, лицензии) сборку не запускают — экономим минуты Actions.
+# На тег v* сборка идёт всегда (фильтр путей для тегов не действует).
 on:
   push:
     branches: ['**']
     tags: ['v*']
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
+      - 'fonts/*.txt'
+      - '.gitignore'
   pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
+      - 'fonts/*.txt'
+      - '.gitignore'
   workflow_dispatch:
     inputs:
       release_tag:
