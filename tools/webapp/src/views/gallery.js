@@ -656,7 +656,7 @@ T.views.push({
         y += u * 0.4;
         if (y < py + ph - u * 2) {
           const sats = A.sats();
-          T.txt(g, sats.length ? 'SATELLITES' : 'NO ORBITS · TENGAN DESKTOP SENDS THEM', px + u, y, u * 0.75, T.C.acc); y += u * 1.4;
+          T.txt(g, sats.length ? 'SATELLITES' : 'NO ORBITS · TENGEN DESKTOP SENDS THEM', px + u, y, u * 0.75, T.C.acc); y += u * 1.4;
           for (const sat of sats) { const up = satsUp.find(q => q[0] === sat.name); row(sat.name, up ? 'UP ' + Math.round(up[1]) + '°' : 'below', up ? T.C.hot : T.C.dim); }
         }
         if (card) {
@@ -803,7 +803,7 @@ T.views.push({
         let y = py + u * 2;
         if (!fs) {
           T.txt(g, 'NO ORBITS YET', px + u, y + u, u * 1.4, T.C.hot, 't');
-          T.txt(g, 'ORBITS COME FROM TENGAN DESKTOP', px + u, y + u * 2.6, u * 0.75, T.C.label);
+          T.txt(g, 'ORBITS COME FROM TENGEN DESKTOP', px + u, y + u * 2.6, u * 0.75, T.C.label);
           T.txt(g, 'ONCE — THEN IT WORKS OFFLINE', px + u, y + u * 3.8, u * 0.75, T.C.label);
           return;
         }

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Demo popup and widget pages with made-up data (view in a browser without TENGAN).
+"""Demo popup and widget pages with made-up data (view in a browser without TENGEN).
 
     python3 tools/desktop/render_preview.py <dir>
 Writes popup_<theme>_<lang>.html and widget_<theme>_<lang>.html (themes denko / kurenai, langs en / ru).
@@ -11,7 +11,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from overlay_html import POPUP_HTML, WIDGET_HTML  # noqa: E402
 from events import Engine  # noqa: E402
-from tengan_desktop import note_title  # noqa: E402
+from tengen_desktop import note_title  # noqa: E402
 
 NOTES = [dict(kind="new", kj="接近警告", title="NEW DEVICE NEARBY", text="JBL TUNE770NC · -52 dBm", sev="alert"),
          dict(kind="ir", kj="赤外線", title="REMOTE", text="Samsung TV · NEC 0x07", sev="info"),

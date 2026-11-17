@@ -92,7 +92,7 @@ T.views.push({
     const render = () => {
       const items = S.cfgItems;
       pan.innerHTML = `<div class="h"><span>// ${T.tr('ALERTS')} · <b class="kj">警報設定</b></span><button class="x" aria-label="${T.tr('close')}">✕</button></div>` +
-        (items ? items.map(row).join('') : `<div class="r"><div class="n"><b>${T.tr('NO ALERT SETTINGS ON THE DEVICE')}</b><i>${T.tr('update TENGAN firmware (1.8.2+) · defaults are used')}</i></div></div>`) +
+        (items ? items.map(row).join('') : `<div class="r"><div class="n"><b>${T.tr('NO ALERT SETTINGS ON THE DEVICE')}</b><i>${T.tr('update TENGEN firmware (1.8.2+) · defaults are used')}</i></div></div>`) +
         `<div class="f"><span class="msg"></span><button class="rst">${T.tr('RESET TO DEFAULTS')}</button></div>`;
       pan.querySelector('.x').onclick = close;
       const msg = t => { const m = pan.querySelector('.msg'); if (m) m.textContent = T.tr(t); };
@@ -200,7 +200,7 @@ T.views.push({
     const bw = tw0 + u * 13.5;
     g.strokeStyle = E.or; g.lineWidth = u * 0.12; g.strokeRect(cx, y, bw, h);
     jp(g, '天眼司令室', cx + u * 0.7, y + h * 0.8, h * 0.72, E.or, 'left', 0.05);
-    tx(g, 'TENGAN HQ', cx + tw0 + u * 1.6, y + h * 0.45, u * 1.5, E.or2, FT(), 'left', '600 ');
+    tx(g, 'TENGEN HQ', cx + tw0 + u * 1.6, y + h * 0.45, u * 1.5, E.or2, FT(), 'left', '600 ');
     tx(g, 'PASSIVE MONITOR · ' + (T.VERSION || ''), cx + tw0 + u * 1.6, y + h * 0.75, u * 0.7, E.or);
     cx += bw + u;
     // clock on the right
@@ -432,7 +432,7 @@ T.views.push({
         raw.forEach((v, i) => { const nx = xx + ww * v / tot, yy = i % 2 ? yl : yh; g.lineTo(xx, yy); g.lineTo(nx, yy); xx = nx; });
         g.stroke();
       }
-    } else tx(g, 'POINT A REMOTE AT TENGAN', bx + u * 0.5, by + u * 2.8, u * 0.7, E.dim);
+    } else tx(g, 'POINT A REMOTE AT TENGEN', bx + u * 0.5, by + u * 2.8, u * 0.7, E.dim);
     T.hits.rect(bx, by, bw, bh, { go: 'probe' });
     // NFC
     by += bh + u * 0.6;
@@ -444,7 +444,7 @@ T.views.push({
     if (N) {
       g.font = `600 ${u * 1.5}px ${FT()}`; tx(g, T.fit(g, String(N.fam || 'CARD').toUpperCase(), bw - u), bx + u * 0.5, by + u * 2.9, u * 1.5, E.or2, FT(), 'left', '600 ');
       g.font = `500 ${u * 0.62}px ${FC()}`; tx(g, T.fit(g, (N.hint ? N.hint + ' · ' : '') + 'UID ' + (N.uid || '—') + (N.sak ? ' · SAK ' + N.sak : ''), bw - u), bx + u * 0.5, by + u * 4, u * 0.62, E.txt, FC(), 'left', '500 ');
-    } else tx(g, 'TOUCH A CARD TO TENGAN', bx + u * 0.5, by + u * 2.8, u * 0.7, E.dim);
+    } else tx(g, 'TOUCH A CARD TO TENGEN', bx + u * 0.5, by + u * 2.8, u * 0.7, E.dim);
     T.hits.rect(bx, by, bw, bh, { go: 'probe' });
     // PC
     const p = S.pc, py = y + h - u * 0.7;

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the desktop app into a single dist/tengan_desktop.exe (Windows, CI).
+"""Build the desktop app into a single dist/tengen_desktop.exe (Windows, CI).
 
     pip install -r tools/desktop/requirements.txt pyinstaller
     python tools/desktop/build_exe.py
@@ -10,8 +10,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 args = [
     sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "--onefile", "--windowed",
-    "--name", "tengan_desktop",
-    "--icon", os.path.join(HERE, "tengan.ico"),          # app icon (file, taskbar, window)
+    "--name", "tengen_desktop",
+    "--icon", os.path.join(HERE, "tengen.ico"),          # app icon (file, taskbar, window)
     "--distpath", os.path.join(ROOT, "dist"),
     "--workpath", os.path.join(ROOT, "build", "pyi"),
     "--specpath", os.path.join(ROOT, "build", "pyi"),
@@ -31,8 +31,8 @@ args = [
     "--hidden-import", "overlay_html",
     "--collect-submodules", "pystray",
     "--hidden-import", "PIL.Image",
-    "--add-data", os.path.join(HERE, "tengan.ico") + os.pathsep + ".",   # tray icon bundled inside the exe
-    os.path.join(HERE, "tengan_desktop.py"),
+    "--add-data", os.path.join(HERE, "tengen.ico") + os.pathsep + ".",   # tray icon bundled inside the exe
+    os.path.join(HERE, "tengen_desktop.py"),
 ]
 print(" ".join(args), flush=True)
 sys.exit(subprocess.call(args))

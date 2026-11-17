@@ -14,7 +14,7 @@ T.boot = (first) => {
   let t0 = 0;
   const seg = (t, a, b) => t <= a ? 0 : t >= b ? 1 : (t - a) / (b - a), eo = x => 1 - Math.pow(1 - T.clamp(x), 3);
   const BL = [[35, 72], [80, 38], [140, 88], [200, 55], [250, 80], [310, 30], [335, 64]];
-  const POOL = 'ABCDEFGHKLMNPRSTVXZ0123456789', TITLE = 'TENGAN', SUB = '// ENVIRONMENT ANALYZER';
+  const POOL = 'ABCDEFGHKLMNPRSTVXZ0123456789', TITLE = 'TENGEN', SUB = '// ENVIRONMENT ANALYZER';
   const hash = x => { x ^= x >>> 16; x = Math.imul(x, 0x7feb352d); x ^= x >>> 15; x = Math.imul(x, 0x846ca68b); x ^= x >>> 16; return x >>> 0; };
   const end = () => { phase = 'done'; T.app.hold = false; box.classList.add('done'); setTimeout(() => box.remove(), 400); };
   let phase = 'launch', L = null;
@@ -70,7 +70,7 @@ T.boot = (first) => {
     phase = 'launch';
     L = { t0: now, bar: 0, step: 0, mounted: 0, warm: 0, stepT: now,
       steps: [
-        ['LINK', 'connecting to TENGAN', () => T.Stream.mode === 'live' || T.Stream.mode === 'poll'],
+        ['LINK', 'connecting to TENGEN', () => T.Stream.mode === 'live' || T.Stream.mode === 'poll'],
         ['DEVICE', 'device status', () => !!T.S.st],
         ['RADIO', needBle ? 'Bluetooth' : 'section radio', () => !needBle || (T.S.ble && T.S.ble.on)],
         ['DATA', 'first data', () => !needBle || T.S.dev.size > 0],

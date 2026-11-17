@@ -1,14 +1,14 @@
-# Applications: tablet page, TENGAN Tablet, TENGAN Desktop, installer
+# Applications: tablet page, TENGEN Tablet, TENGEN Desktop, installer
 
-TENGAN (the device, "the stick") has a small screen and one wheel. Everything bigger is done by four
+TENGEN (the device, "the stick") has a small screen and one wheel. Everything bigger is done by four
 programs that live outside the firmware:
 
 | Program | Where it runs | Source | Delivered as |
 |---|---|---|---|
 | **Tablet page** (HQ, city, sound, settings...) | any browser, inside the two apps below | `tools/webapp/` | gzip inside the firmware (`src/web/tablet_page.h`) |
-| **TENGAN Tablet** | Android | `app/` | `tengan_tablet.apk` (release asset) |
-| **TENGAN Desktop** + PC monitor | Windows, macOS, Linux | `tools/desktop/`, `tools/pc_monitor/` | `tengan_desktop.exe`, `.app` zip, AppImage |
-| **Installer** | Chrome / Edge (Web Serial) | `tools/flasher/` | `flash_tengan.html`, one file |
+| **TENGEN Tablet** | Android | `app/` | `tengen_tablet.apk` (release asset) |
+| **TENGEN Desktop** + PC monitor | Windows, macOS, Linux | `tools/desktop/`, `tools/pc_monitor/` | `tengen_desktop.exe`, `.app` zip, AppImage |
+| **Installer** | Chrome / Edge (Web Serial) | `tools/flasher/` | `flash_tengen.html`, one file |
 
 All of them speak the same protocol with the device (HTTP `/api/*`, SSE stream on port 81, or the same
 JSON over a USB cable with `@`-lines); the protocol itself is described in the protocols chapter. This chapter
@@ -19,7 +19,7 @@ is about how the programs are built and why they are built that way.
                                                       │ served by the device as /, /full, /tablet
         ┌─────────────────────────────────────────────┼───────────────────────────────┐
         ▼                                             ▼                               ▼
-  browser on a phone/tablet                  TENGAN Tablet (Capacitor)        TENGAN Desktop (pywebview)
+  browser on a phone/tablet                  TENGEN Tablet (Capacitor)        TENGEN Desktop (pywebview)
   http://192.168.4.1/                        own copy + self-update           page comes over USB (@G) or
                                              from the stick (/api/pagever)    http://192.168.4.1/full (Wi-Fi)
 ```
@@ -157,7 +157,7 @@ Streams, in order of preference:
    the device switches radios on only for what is watched.
 2. **Polling** `/api/*` if SSE does not open within 5 s: every 125 ms, one request at a time (the next one only
    after the previous answer); the stick gets `?tab=` to choose radios. After 8 s it tries SSE again.
-3. **USB bridge** inside TENGAN Desktop: `window.TenganUSB` (`want / api / poll`). `fetch()` of `/api/...` is
+3. **USB bridge** inside TENGEN Desktop: `window.TengenUSB` (`want / api / poll`). `fetch()` of `/api/...` is
    replaced so the page does not notice the cable.
 
 `core/store.js` (`S`) keeps the last data and does the smoothing: `T.steady(deadband, tau)` ignores jitter
@@ -215,14 +215,14 @@ single theme.
 | `debug` | show FPS and update status |
 | `shot` | for README images: all effects on, no FPS counter, no adaptation |
 
-## 2. TENGAN Tablet (`app/`)
+## 2. TENGEN Tablet (`app/`)
 
 An Android shell around the same page. Capacitor 7.6.10, plugin `@capacitor/geolocation` 7.1.8, `minSdk 23`,
-`targetSdk 35`, application id `dev.tengan.app`. The shell exists because a browser cannot do what the app does:
+`targetSdk 35`, application id `dev.tengen.app`. The shell exists because a browser cannot do what the app does:
 
 - **The page loads from the app itself** (`capacitor.config.json`: `androidScheme: http`, `cleartext: true`,
   `allowMixedContent`), so it can call `http://192.168.4.1` without mixed-content or origin trouble (the stick
-  also answers with `Access-Control-Allow-Origin: *`). With the tablet connected to the TENGAN Wi-Fi there is no
+  also answers with `Access-Control-Allow-Origin: *`). With the tablet connected to the TENGEN Wi-Fi there is no
   internet and none is needed.
 - **Screen stays on**, immersive full screen (`MainActivity.java`).
 - **GPS** (`core/gps.js`, only when `T.native`): `watchPosition` with high accuracy (`timeout 30000`,
@@ -249,16 +249,16 @@ when the artwork changes.
 
 ### 2.2 APK signing through secrets
 
-Updates install over an old version only if the signature is the same, so releases are signed with one TENGAN
+Updates install over an old version only if the signature is the same, so releases are signed with one TENGEN
 key that is **not in the repository**:
 
 | Secret | Content |
 |---|---|
-| `TENGAN_KEYSTORE_B64` | the PKCS12 keystore, base64 |
-| `TENGAN_KEYSTORE_PASSWORD` | its password (the key password is the same) |
+| `TENGEN_KEYSTORE_B64` | the PKCS12 keystore, base64 |
+| `TENGEN_KEYSTORE_PASSWORD` | its password (the key password is the same) |
 
-The CI step decodes the keystore to `$RUNNER_TEMP/tengan.p12` and exports its path as `TENGAN_KEYSTORE`.
-`app/android/app/build.gradle` signs with alias `tengan` when `TENGAN_KEYSTORE`, the password and the file all
+The CI step decodes the keystore to `$RUNNER_TEMP/tengen.p12` and exports its path as `TENGEN_KEYSTORE`.
+`app/android/app/build.gradle` signs with alias `tengan` (kept from before the rename: the key inside the .p12 was not regenerated) when `TENGEN_KEYSTORE`, the password and the file all
 exist; otherwise it uses Android's debug key. Rules: a **release** (tag `v*` or manual `release_tag`) with no
 keystore secret fails the job; a normal push or a fork only warns, and gets a throwaway-signed APK that works
 but will not update over the official one (Android sees a different app).
@@ -282,22 +282,22 @@ The "current" version is the `pagever.txt` of the downloaded copy, or the one bu
 hash check means a half-downloaded or corrupted page is never activated. After an APK update
 (`lastUpdateTime` changed) the downloaded copy is forgotten, because the new APK may carry a page newer than the
 stick's. The status (`start`, `check`, `same xxxxxx`, `download`, `updated`, `bad hash`, `no stick: ...`) is
-exposed to the page by the `TenganUpdate` plugin (`status()`, `check()`); with `?debug` it appears in the header
+exposed to the page by the `TengenUpdate` plugin (`status()`, `check()`); with `?debug` it appears in the header
 as `UPD ...`, and Settings > Actions has a "check now" button.
 
-## 3. TENGAN Desktop (`tools/desktop`, `tools/pc_monitor`)
+## 3. TENGEN Desktop (`tools/desktop`, `tools/pc_monitor`)
 
 One program: the HQ window (the same page) + the PC monitor + tray, popups and widget. Python, window by
 **pywebview** (Windows: WebView2 / WinForms, macOS: WebKit, Linux: Qt WebEngine through PySide6, forced with
-`PYWEBVIEW_GUI=qt`). User data lives in `%APPDATA%\TENGAN`, `~/Library/Application Support/TENGAN` or
-`~/.config/TENGAN`: `desktop.json` (settings, key `alerts` holds popup / widget / window preferences),
+`PYWEBVIEW_GUI=qt`). User data lives in `%APPDATA%\TENGEN`, `~/Library/Application Support/TENGEN` or
+`~/.config/TENGEN`: `desktop.json` (settings, key `alerts` holds popup / widget / window preferences),
 `desktop.log`, `webview/` (browser storage).
 
 ### 3.1 Files
 
 | File | Role |
 |---|---|
-| `tengan_desktop.py` | `Link` (USB), `Monitor`, local HTTP server, launcher, `App`, window setup |
+| `tengen_desktop.py` | `Link` (USB), `Monitor`, local HTTP server, launcher, `App`, window setup |
 | `events.py` | alert "brain" without windows or libraries: `Engine.feed / pop / snapshot` |
 | `overlay.py` | popups, widget, tray (`pystray`), `SseFeed`, single instance, Win32 helpers |
 | `overlay_html.py` | HTML of popups and widget (DENKO / KURENAI, EN / RU) |
@@ -428,18 +428,18 @@ quiet hours, IR / NFC / 433 MHz / temperature / battery / link events, settings 
 
 | Target | Script | Result |
 |---|---|---|
-| Windows | `build_exe.py` (PyInstaller `--onefile --windowed`, icon, hidden imports for `pc_monitor`, `events`, `overlay`, `pycaw`, `winrt`...) | `dist/tengan_desktop.exe`, in `build.yml` (job `desktop`, `windows-latest`) |
-| macOS | `build_xplat.py mac` | `.app`, zipped with `ditto` -> `TENGAN-Desktop-mac.zip` |
-| Linux | `build_xplat.py linux` (onedir, Qt pruned: no QML, translations, unneeded Qt libraries, Chromium locales except en-US and ru) | AppImage `TENGAN-Desktop-linux-x86_64.AppImage` |
+| Windows | `build_exe.py` (PyInstaller `--onefile --windowed`, icon, hidden imports for `pc_monitor`, `events`, `overlay`, `pycaw`, `winrt`...) | `dist/tengen_desktop.exe`, in `build.yml` (job `desktop`, `windows-latest`) |
+| macOS | `build_xplat.py mac` | `.app`, zipped with `ditto` -> `TENGEN-Desktop-mac.zip` |
+| Linux | `build_xplat.py linux` (onedir, Qt pruned: no QML, translations, unneeded Qt libraries, Chromium locales except en-US and ru) | AppImage `TENGEN-Desktop-linux-x86_64.AppImage` |
 
 macOS and Linux are in a separate workflow, `desktop-xplat.yml`, started by hand (a macOS minute costs ten),
 with `release_tag` to attach the files to a release. Both run `py_compile` and `test_events.py`; the Linux
-build runs a self-test (`TENGAN_SELFTEST=1`: imports the window engine and modules) and a 25 s smoke run under
-`xvfb`; macOS gets the smoke run too (`TENGAN_NO_TRAY=1`).
+build runs a self-test (`TENGEN_SELFTEST=1`: imports the window engine and modules) and a 25 s smoke run under
+`xvfb`; macOS gets the smoke run too (`TENGEN_NO_TRAY=1`).
 
 ## 4. The installer (`tools/flasher`)
 
-`flash_tengan.html` is **one file** that holds the firmware and the flashing library, so the user opens it in
+`flash_tengen.html` is **one file** that holds the firmware and the flashing library, so the user opens it in
 Chrome or Edge, presses **Install firmware**, picks the device and waits about a minute. No addresses, no
 files. It uses Web Serial and **esptool-js 0.5.4** (Apache License 2.0, `esptool-js.LICENSE`; the license text is embedded in the page).
 
@@ -448,10 +448,10 @@ files. It uses Web Serial and **esptool-js 0.5.4** (Apache License 2.0, `esptool
 CI step "Make image and installer" first merges the full image with `esptool.py merge_bin`:
 
 ```
-0x0 bootloader.bin   0x8000 partitions.bin   0xe000 boot_app0.bin   0x10000 firmware.bin   ->  tengan_full_0x0.bin
+0x0 bootloader.bin   0x8000 partitions.bin   0xe000 boot_app0.bin   0x10000 firmware.bin   ->  tengen_full_0x0.bin
 ```
 
-then `python tools/flasher/make_flasher.py dist/tengan_full_0x0.bin dist/flash_tengan.html <tag>`:
+then `python tools/flasher/make_flasher.py dist/tengen_full_0x0.bin dist/flash_tengen.html <tag>`:
 
 - takes `flasher_template.html` and fills placeholders: fonts (the same JetBrains Mono and Exo 2 as the tablet,
   taken from `fonts.css`), both languages' texts, the esptool-js bundle, and the firmware as **base64**;
@@ -480,8 +480,8 @@ theme, labels, alerts), so a normal update keeps them. Other details: `eraseAll:
 start that application.
 
 Flow in the page: port filter `usbVendorId 0x303A` (Espressif) -> `ESPLoader.main()` -> must report
-**ESP32-S3**, otherwise "this is not a TENGAN board" -> `writeFlash` with a progress bar -> `loader.after()`
-(hard reset) -> "Done, unplug the cable and plug it back in". Errors: port busy (close TENGAN Desktop and other
+**ESP32-S3**, otherwise "this is not a TENGEN board" -> `writeFlash` with a progress bar -> `loader.after()`
+(hard reset) -> "Done, unplug the cable and plug it back in". Errors: port busy (close TENGEN Desktop and other
 serial tools: only one program can own the port) or a message with the technical log below.
 
 Wireless updates and rollback are a different path (OTA through the Web section; the new firmware is tried

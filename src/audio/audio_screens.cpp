@@ -405,7 +405,7 @@ void drawXY(uint32_t now) {
 void drawPcAudioWait(uint32_t now) {
   spr.fillSprite(C_BG());
   uiHeader(L("Sound", "Звук"), src(L("waiting", "ожидание")));
-  uiEmpty(L("waiting for computer audio", "жду звук с компьютера"), L("run TENGAN Desktop on the computer", "запустите TENGAN Desktop на компьютере"));
+  uiEmpty(L("waiting for computer audio", "жду звук с компьютера"), L("run TENGEN Desktop on the computer", "запустите TENGEN Desktop на компьютере"));
   uiFooter(L("wheel: screens", "колесо: экраны"), L("side: back", "кнопка: назад"));
   present();
   (void)now;

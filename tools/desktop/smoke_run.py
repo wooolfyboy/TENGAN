@@ -8,9 +8,9 @@ import os, signal, subprocess, sys, tempfile, time
 
 exe, secs = sys.argv[1], float(sys.argv[2]) if len(sys.argv) > 2 else 25
 if sys.platform == "darwin":
-    logdir = os.path.expanduser("~/Library/Application Support/TENGAN")
+    logdir = os.path.expanduser("~/Library/Application Support/TENGEN")
 else:
-    logdir = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config"), "TENGAN")
+    logdir = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config"), "TENGEN")
 log = os.path.join(logdir, "desktop.log")
 if os.path.exists(log):
     os.remove(log)

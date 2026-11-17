@@ -1,4 +1,4 @@
-# TENGAN Desktop для Linux: окно на Qt WebEngine (PySide6) + монитор ПК
+# TENGEN Desktop для Linux: окно на Qt WebEngine (PySide6) + монитор ПК
 pywebview>=5.0
 QtPy
 PySide6

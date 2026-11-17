@@ -526,7 +526,7 @@ int main(int argc, char** argv) {
     drawWeather(s_now);                                  snap("56c_gallery_weather_clear");
     wxTurn(1); drawWeather(s_now);                       snap("56d_gallery_weather_chart"); wxTurn(1); }
   { uint8_t qr[29 * 29]; for (int i = 0; i < 29 * 29; i++) qr[i] = (noise(i) > 0.5f) || ((i % 29 < 7 || i % 29 > 21) && (i / 29 < 7) && !((i % 29 == 1 || i % 29 == 5 || i % 29 == 23 || i % 29 == 27) && i / 29 > 0 && i / 29 < 6));
-    WebView v = { "TENGAN-3F2A", "48213907", "192.168.4.1", 1, 214, true, "sub-ghz" };
+    WebView v = { "TENGEN-3F2A", "48213907", "192.168.4.1", 1, 214, true, "sub-ghz" };
     drawWebScreen(v, qr, 29); snap("60_web"); }
   { WebLink l = { 1, "BLE  WX  ", 3400, 0 };              // tablet connected: live picture
     char nm[32];
@@ -546,7 +546,7 @@ int main(int argc, char** argv) {
     nfcClassify(c, -1); nfcCommit(c, s_now - 60000);
     NfcCard t; memset(&t, 0, sizeof t);
     uint8_t u2[7] = { 0x04, 0xA2, 0x5B, 0x1A, 0x9C, 0x70, 0x80 }; memcpy(t.uid, u2, 7); t.uidLen = 7; t.atqa = 0x0044; t.sak = 0x00;
-    const char url[] = "tengan.dev/hello";
+    const char url[] = "tengen.dev/hello";
     uint8_t mem[64] = { 0x03, 0, 0xD1, 0x01, (uint8_t)(sizeof(url)), 'U', 0x04 };
     memcpy(mem + 7, url, sizeof(url) - 1);
     int p = 7 + sizeof(url) - 1;

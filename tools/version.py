@@ -1,4 +1,4 @@
-# TENGAN version — single source: the VERSION file in the repo root.
+# TENGEN version — single source: the VERSION file in the repo root.
 # PlatformIO runs this before the build: writes src/core/version.h (only if changed).
 # build.py uses the same version for the tablet page, and the app for its versionName.
 import os

@@ -1,6 +1,6 @@
 # Build and CI
 
-This section describes how every part of TENGAN is built locally and in GitHub Actions, and what a release contains. Parts: firmware (PlatformIO), the tablet page, the Android APK, TENGAN Desktop, the single-file installer and the screen simulator.
+This section describes how every part of TENGEN is built locally and in GitHub Actions, and what a release contains. Parts: firmware (PlatformIO), the tablet page, the Android APK, TENGEN Desktop, the single-file installer and the screen simulator.
 
 ## Versioning
 
@@ -36,7 +36,7 @@ One firmware serves both languages; the language is chosen on the device (`L("En
 A single USB image for address `0x0` is merged from four parts (the same command CI runs):
 
 ```bash
-esptool --chip esp32s3 merge-bin -o tengan_full_0x0.bin \
+esptool --chip esp32s3 merge-bin -o tengen_full_0x0.bin \
   0x0 bootloader.bin 0x8000 partitions.bin 0xe000 boot_app0.bin 0x10000 firmware.bin
 ```
 
@@ -55,9 +55,9 @@ python3 tools/webapp/mock.py page.html 8090 [ru] [kurenai]              # test w
 
 Important: `tablet_page.h` is committed. After changing anything in `tools/webapp/src` or `tools/webapp/i18n/ru.json` you must run `build.py` and commit the result, otherwise CI fails at "Tablet page is up to date". UI text is written in English; Russian comes from `tools/webapp/i18n/ru.json` embedded in the page. Fonts (`fonts.css`, WOFF2 in base64) are regenerated only by `tools/webapp/make_fonts.py` (needs `fonttools`, `brotli`); CI does not rebuild them.
 
-### Android APK (TENGAN Tablet)
+### Android APK (TENGEN Tablet)
 
-`app/` is a Capacitor 7 project (`@capacitor/android`, `@capacitor/core`, `@capacitor/geolocation`, all 7.x pinned in `app/package.json`; app id `dev.tengan.app`, `minSdk 23`, `compileSdk`/`targetSdk 35`). The app shows the same page as `/full` on the device and adds GPS.
+`app/` is a Capacitor 7 project (`@capacitor/android`, `@capacitor/core`, `@capacitor/geolocation`, all 7.x pinned in `app/package.json`; app id `dev.tengen.app`, `minSdk 23`, `compileSdk`/`targetSdk 35`). The app shows the same page as `/full` on the device and adds GPS.
 
 ```bash
 cd app
@@ -69,25 +69,25 @@ cd android && ./gradlew assembleRelease
 
 Needs Node 22 and JDK 21 (what CI uses). Signing:
 
-- With env variables `TENGAN_KEYSTORE` (path to a PKCS12 file) and `TENGAN_KEYSTORE_PASSWORD`, the release is signed with the TENGAN key (alias `tengan`, the same password for store and key).
+- With env variables `TENGEN_KEYSTORE` (path to a PKCS12 file) and `TENGEN_KEYSTORE_PASSWORD`, the release is signed with the TENGEN key (alias `tengan` (kept from before the rename: the key inside the .p12 was not regenerated), the same password for store and key).
 - Without them (fork, your own build) the Android debug key is used. The APK works, but Android treats it as a different app: it does not install as an update over the official APK.
 
-### TENGAN Desktop
+### TENGEN Desktop
 
 `tools/desktop` is Python with pywebview; it also includes the PC monitor from `tools/pc_monitor`.
 
 | Platform | Install | Build | Result |
 |---|---|---|---|
-| Windows | `pip install -r tools/desktop/requirements.txt pyinstaller` | `python tools/desktop/build_exe.py` | `dist/tengan_desktop.exe` (PyInstaller `--onefile --windowed`, icon and tray icon from `tengan.ico`) |
-| macOS | `requirements-mac.txt` (pywebview with Cocoa/WebKit) | `python tools/desktop/build_xplat.py mac` | `dist/TENGAN-Desktop-mac.zip` with `TENGAN Desktop.app` |
-| Linux | `requirements-linux.txt` (pywebview + PySide6/Qt WebEngine, sounddevice, python-xlib) | `python tools/desktop/build_xplat.py linux` | `dist/tengan_desktop/` (onedir); CI packs it into an AppImage |
+| Windows | `pip install -r tools/desktop/requirements.txt pyinstaller` | `python tools/desktop/build_exe.py` | `dist/tengen_desktop.exe` (PyInstaller `--onefile --windowed`, icon and tray icon from `tengen.ico`) |
+| macOS | `requirements-mac.txt` (pywebview with Cocoa/WebKit) | `python tools/desktop/build_xplat.py mac` | `dist/TENGEN-Desktop-mac.zip` with `TENGEN Desktop.app` |
+| Linux | `requirements-linux.txt` (pywebview + PySide6/Qt WebEngine, sounddevice, python-xlib) | `python tools/desktop/build_xplat.py linux` | `dist/tengen_desktop/` (onedir); CI packs it into an AppImage |
 
 On Linux `build_xplat.py` also prunes what the window does not need from the Qt bundle (QML, translations, Chromium locales other than en-US/ru, Qt libraries no remaining binary links to) to keep the size down. Tests: `python tools/desktop/test_events.py`; `tools/desktop/smoke_run.py <exe> [seconds]` starts the built app and checks `desktop.log` for a startup crash (the usual cause is a module PyInstaller missed).
 
 ### Single-file installer
 
 ```bash
-python tools/flasher/make_flasher.py tengan_full_0x0.bin flash_tengan.html vX.Y
+python tools/flasher/make_flasher.py tengen_full_0x0.bin flash_tengen.html vX.Y
 ```
 
 `make_flasher.py` fills `tools/flasher/flasher_template.html` with the firmware image (base64) and the bundled `esptool-js-0.5.4.bundle.js`. The page has English and Russian text (by browser language, with a switch) and writes everything except the NVS area (`0x9000..0xE000`), so device settings survive. It works in Chrome/Edge (Web Serial).
@@ -137,28 +137,28 @@ firmware (ubuntu-latest)
 2. `pip install platformio "esptool==4.8.1"`.
 3. `python tools/webapp/build.py --check`: the committed `tablet_page.h` must match the sources.
 4. `pio run`.
-5. Merge `dist/tengan_full_0x0.bin` (see above), copy `firmware.bin` to `dist/tengan_firmware_ota.bin`, build `dist/flash_tengan.html`.
+5. Merge `dist/tengen_full_0x0.bin` (see above), copy `firmware.bin` to `dist/tengen_firmware_ota.bin`, build `dist/flash_tengen.html`.
 6. Size budgets (the job fails if exceeded; raise the limit deliberately when growth is intended):
 
 | File | Limit, bytes | Note in the workflow |
 |---|---|---|
-| `dist/tengan_firmware_ota.bin` | 2 830 000 | 2.69 MB on v2.0-test5 |
-| `dist/flash_tengan.html` | 4 150 000 | 3.94 MB |
+| `dist/tengen_firmware_ota.bin` | 2 830 000 | 2.69 MB on v2.0-test5 |
+| `dist/flash_tengen.html` | 4 150 000 | 3.94 MB |
 | tablet page gzip (`src/web/tablet_page.h`, counted as number of `0x..` bytes) | 231 000 | |
 
 7. Upload artifact `firmware-<sha>` (`dist/*`).
 8. Release step (see below).
 
-**android** (needs `firmware`, so the release already exists): Node 22, JDK 21 (Temurin), `npm ci` and `npm run sync` in `app/`, signing key, `./gradlew --no-daemon assembleRelease`, copy to `dist/tengan_tablet.apk`, artifact `tablet-apk-<sha>`, attach to the release.
+**android** (needs `firmware`, so the release already exists): Node 22, JDK 21 (Temurin), `npm ci` and `npm run sync` in `app/`, signing key, `./gradlew --no-daemon assembleRelease`, copy to `dist/tengen_tablet.apk`, artifact `tablet-apk-<sha>`, attach to the release.
 
-Signing (secrets `TENGAN_KEYSTORE_B64`, `TENGAN_KEYSTORE_PASSWORD`): the base64 PKCS12 key is decoded to `$RUNNER_TEMP/tengan.p12` and its path is exported as `TENGAN_KEYSTORE`. If the secret is absent:
+Signing (secrets `TENGEN_KEYSTORE_B64`, `TENGEN_KEYSTORE_PASSWORD`): the base64 PKCS12 key is decoded to `$RUNNER_TEMP/tengen.p12` and its path is exported as `TENGEN_KEYSTORE`. If the secret is absent:
 
-- on a release (tag or `release_tag` set) the job fails with an error: a release APK must be signed with the TENGAN key, otherwise users could not update over it;
+- on a release (tag or `release_tag` set) the job fails with an error: a release APK must be signed with the TENGEN key, otherwise users could not update over it;
 - otherwise it only warns and signs with a throwaway debug key.
 
 `APP_VERSION_CODE` is `github.run_number`, which grows monotonically, so each new build can be installed over the previous one.
 
-**desktop** (Windows, needs `firmware`): installs `tools/desktop/requirements.txt` and PyInstaller, checks that `webview, serial, psutil, tengan_desktop` import, runs `tools/desktop/build_exe.py`, artifact `desktop-exe-<sha>`, attaches `dist/tengan_desktop.exe` to the release.
+**desktop** (Windows, needs `firmware`): installs `tools/desktop/requirements.txt` and PyInstaller, checks that `webview, serial, psutil, tengen_desktop` import, runs `tools/desktop/build_exe.py`, artifact `desktop-exe-<sha>`, attaches `dist/tengen_desktop.exe` to the release.
 
 ### Releases
 
@@ -167,29 +167,29 @@ A release is created by the `firmware` job in either of two ways:
 1. Push a tag `v*` (for example `v2.0`).
 2. Actions, build, Run workflow, `release_tag = v1.1`. The tag is created on the built commit (`target_commitish: github.sha`).
 
-The release is named `TENGAN <tag>`, notes are generated automatically (`generate_release_notes`) and a bilingual EN/RU install table is added to the body. Files are added by three jobs to the same tag.
+The release is named `TENGEN <tag>`, notes are generated automatically (`generate_release_notes`) and a bilingual EN/RU install table is added to the body. Files are added by three jobs to the same tag.
 
 | File | Added by | Purpose |
 |---|---|---|
-| `flash_tengan.html` | firmware | Easiest install: open in Chrome/Edge, press Install firmware |
-| `tengan_full_0x0.bin` | firmware | Full USB image for address 0x0 (esptool, esptool-js) |
-| `tengan_firmware_ota.bin` | firmware | Wireless update from the device's Web section |
-| `tengan_tablet.apk` | android | TENGAN Tablet for Android |
-| `tengan_desktop.exe` | desktop | TENGAN Desktop for Windows |
-| `TENGAN-Desktop-mac.zip` | desktop-xplat (manual) | TENGAN Desktop for macOS |
-| `TENGAN-Desktop-linux-x86_64.AppImage` | desktop-xplat (manual) | TENGAN Desktop for Linux |
+| `flash_tengen.html` | firmware | Easiest install: open in Chrome/Edge, press Install firmware |
+| `tengen_full_0x0.bin` | firmware | Full USB image for address 0x0 (esptool, esptool-js) |
+| `tengen_firmware_ota.bin` | firmware | Wireless update from the device's Web section |
+| `tengen_tablet.apk` | android | TENGEN Tablet for Android |
+| `tengen_desktop.exe` | desktop | TENGEN Desktop for Windows |
+| `TENGEN-Desktop-mac.zip` | desktop-xplat (manual) | TENGEN Desktop for macOS |
+| `TENGEN-Desktop-linux-x86_64.AppImage` | desktop-xplat (manual) | TENGEN Desktop for Linux |
 
 ### `desktop-xplat.yml` ("desktop-xplat")
 
 Only `workflow_dispatch` (input `release_tag`; if set, the files are attached to that existing release). It never runs on push: a macOS minute counts as 10 minutes of the Actions limit (the workflow comment), so the builds are made on demand, for a release. Both jobs have `timeout-minutes: 40`.
 
-- **mac** (`macos-latest`): install `requirements-mac.txt` and PyInstaller; `py_compile` of the Python files and `test_events.py`; `build_xplat.py mac`; smoke run for 25 s (`TENGAN_NO_TRAY=1`); artifact `desktop-mac-<sha>`; release step uploads `TENGAN-Desktop-mac.zip`.
-- **linux** (`ubuntu-22.04`): installs system libraries for Qt WebEngine, audio, AppImage and Xvfb; `requirements-linux.txt`; the same logic tests; `build_xplat.py linux`; self-test of the packaged binary (`TENGAN_SELFTEST=1`, offscreen Qt: exit code 0 and `selftest OK` in `~/.config/TENGAN/desktop.log`); smoke run under `xvfb-run`; packing into an AppImage with `appimagetool` (downloaded in the job; `AppRun` and `.desktop` file generated); artifact `desktop-linux-<sha>`; release step uploads `TENGAN-Desktop-linux-x86_64.AppImage`.
+- **mac** (`macos-latest`): install `requirements-mac.txt` and PyInstaller; `py_compile` of the Python files and `test_events.py`; `build_xplat.py mac`; smoke run for 25 s (`TENGEN_NO_TRAY=1`); artifact `desktop-mac-<sha>`; release step uploads `TENGEN-Desktop-mac.zip`.
+- **linux** (`ubuntu-22.04`): installs system libraries for Qt WebEngine, audio, AppImage and Xvfb; `requirements-linux.txt`; the same logic tests; `build_xplat.py linux`; self-test of the packaged binary (`TENGEN_SELFTEST=1`, offscreen Qt: exit code 0 and `selftest OK` in `~/.config/TENGEN/desktop.log`); smoke run under `xvfb-run`; packing into an AppImage with `appimagetool` (downloaded in the job; `AppRun` and `.desktop` file generated); artifact `desktop-linux-<sha>`; release step uploads `TENGEN-Desktop-linux-x86_64.AppImage`.
 
 ## Release checklist
 
 1. Set the version in `VERSION`; make sure `build.py --check` passes (tablet page rebuilt and committed).
 2. Run the `build` workflow with `release_tag`, or push a tag `v*`.
-3. Make sure the `TENGAN_KEYSTORE_*` secrets are set (otherwise the android job fails on a release).
+3. Make sure the `TENGEN_KEYSTORE_*` secrets are set (otherwise the android job fails on a release).
 4. Optionally run `desktop-xplat` with the same `release_tag` to add the macOS and Linux builds.
 5. If a size budget fails, check what grew; raise the limit in `build.yml` only on purpose.

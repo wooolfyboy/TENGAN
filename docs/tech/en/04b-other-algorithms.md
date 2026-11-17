@@ -66,7 +66,7 @@ The Terrain screen has its own second normalisation (`s_trTop`, decay 0.985 per 
 
 ### 1.4 Laptop audio over USB
 
-With TENGAN Desktop / `pc_monitor.py` running, the laptop can supply its own speaker output ("what is playing") instead of the microphone. The heavy work is done on the laptop:
+With TENGEN Desktop / `pc_monitor.py` running, the laptop can supply its own speaker output ("what is playing") instead of the microphone. The heavy work is done on the laptop:
 
 1. While the Sound section is open the stick sends `AUD ON` every 1.5 s (`AUD OFF` when it no longer wants it).
 2. The laptop captures loopback audio, runs an FFT (2048 points, 30 frames/s), and sends the **finished** frame as one text line: `PA <level×10> <Hz> <32 bands hex> <64 wave samples hex> <64 L,R pairs hex> <stereo 0/1>` (format commented in `src/pc/pc.cpp`, produced by `Analyzer.frame()` in `pc_monitor.py`). The band edges are the same 60 Hz..8 kHz log scale as on the stick, so frequency labels match; the laptop does its own AGC (48 dB window, floor −60 dB).

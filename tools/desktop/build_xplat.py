@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Build TENGAN Desktop for macOS or Linux (on that OS; CI: .github/workflows/desktop-xplat.yml).
+"""Build TENGEN Desktop for macOS or Linux (on that OS; CI: .github/workflows/desktop-xplat.yml).
 
     pip install -r tools/desktop/requirements-mac.txt pyinstaller      # or requirements-linux.txt
-    python tools/desktop/build_xplat.py mac      ->  dist/TENGAN-Desktop-mac.zip  (contains "TENGAN Desktop.app")
-    python tools/desktop/build_xplat.py linux    ->  dist/tengan_desktop (onedir; CI packs it into an AppImage)
+    python tools/desktop/build_xplat.py mac      ->  dist/TENGEN-Desktop-mac.zip  (contains "TENGEN Desktop.app")
+    python tools/desktop/build_xplat.py linux    ->  dist/tengen_desktop (onedir; CI packs it into an AppImage)
 
 Windows build: tools/desktop/build_exe.py.
 """
@@ -16,15 +16,15 @@ BUILD = os.path.join(ROOT, "build", "pyi-xplat")
 
 
 def icons():
-    """Make .icns (macOS) and a 256 px .png (Linux) from tengan.ico."""
+    """Make .icns (macOS) and a 256 px .png (Linux) from tengen.ico."""
     from PIL import Image
     os.makedirs(BUILD, exist_ok=True)
-    im = Image.open(os.path.join(HERE, "tengan.ico"))
+    im = Image.open(os.path.join(HERE, "tengen.ico"))
     im.size = max(im.info.get("sizes", [im.size]))
     im = im.convert("RGBA").resize((512, 512), Image.LANCZOS)
-    png = os.path.join(BUILD, "tengan.png")
+    png = os.path.join(BUILD, "tengen.png")
     im.resize((256, 256), Image.LANCZOS).save(png)
-    icns = os.path.join(BUILD, "tengan.icns")
+    icns = os.path.join(BUILD, "tengen.icns")
     im.save(icns, sizes=[(16, 16), (32, 32), (64, 64), (128, 128), (256, 256), (512, 512)])
     return png, icns
 
@@ -38,7 +38,7 @@ def common():
         "--hidden-import", "overlay", "--hidden-import", "overlay_html",
         "--collect-submodules", "webview", "--collect-data", "webview",
         "--collect-submodules", "serial", "--collect-submodules", "pystray", "--hidden-import", "PIL.Image",
-        "--add-data", os.path.join(HERE, "tengan.ico") + os.pathsep + ".",
+        "--add-data", os.path.join(HERE, "tengen.ico") + os.pathsep + ".",
     ]
 
 
@@ -92,14 +92,14 @@ def main():
     png, icns = icons()
     os.makedirs(DIST, exist_ok=True)
     if target == "mac":
-        args = common() + ["--windowed", "--name", "TENGAN Desktop", "--icon", icns,
-                           "--osx-bundle-identifier", "app.tengan.desktop",
-                           os.path.join(HERE, "tengan_desktop.py")]
+        args = common() + ["--windowed", "--name", "TENGEN Desktop", "--icon", icns,
+                           "--osx-bundle-identifier", "app.tengen.desktop",
+                           os.path.join(HERE, "tengen_desktop.py")]
         print(" ".join(args), flush=True)
         if subprocess.call(args):
             sys.exit(1)
-        app = os.path.join(DIST, "TENGAN Desktop.app")
-        out = os.path.join(DIST, "TENGAN-Desktop-mac.zip")
+        app = os.path.join(DIST, "TENGEN Desktop.app")
+        out = os.path.join(DIST, "TENGEN-Desktop-mac.zip")
         if os.path.exists(out):
             os.remove(out)
         # ditto keeps .app permissions/attributes (plain zip breaks signing and launch)
@@ -113,14 +113,14 @@ def main():
         hidden = []
         for m in qt:
             hidden += ["--hidden-import", "PySide6." + m, "--hidden-import", "qtpy." + m]
-        args = common() + ["--onedir", "--strip", "--name", "tengan_desktop", "--hidden-import", "sounddevice",
+        args = common() + ["--onedir", "--strip", "--name", "tengen_desktop", "--hidden-import", "sounddevice",
                            "--exclude-module", "qtpy.tests", "--exclude-module", "PySide6.QtDataVisualization"] + hidden + [
-                           os.path.join(HERE, "tengan_desktop.py")]
+                           os.path.join(HERE, "tengen_desktop.py")]
         print(" ".join(args), flush=True)
         if subprocess.call(args):
             sys.exit(1)
-        prune_qt(os.path.join(DIST, "tengan_desktop"))
-        shutil.copy(png, os.path.join(DIST, "tengan.png"))
+        prune_qt(os.path.join(DIST, "tengen_desktop"))
+        shutil.copy(png, os.path.join(DIST, "tengen.png"))
 
 
 if __name__ == "__main__":

@@ -54,7 +54,7 @@ T.onLang.push(() => {
   if (T.Stream && T.Stream.mode) T.Stream.setLink(T.Stream.mode);
   for (const v of T.views) if (v.root && v.onLang) v.onLang();
 });
-document.getElementById('upd').onclick = () => { const UP = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.TenganUpdate; if (UP) UP.check().catch(() => {}); };
+document.getElementById('upd').onclick = () => { const UP = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.TengenUpdate; if (UP) UP.check().catch(() => {}); };
 document.getElementById('fs').onclick = () => {
   const d = document.documentElement;
   if (document.fullscreenElement) document.exitFullscreen(); else (d.requestFullscreen || d.webkitRequestFullscreen).call(d);
@@ -99,7 +99,7 @@ const loop = now => {
     if (!document.hidden && !SHOT) App.adapt(fps);
     document.getElementById('fps').textContent = fps + ' FPS' + (T.RS < 1 ? ' · ' + Math.round(T.RS * 100) + '%' : '') + (T.Q.bloom ? '' : ' · LITE');
     // app: page update state from the stick (diagnostics); tap = check now
-    const UP = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.TenganUpdate;
+    const UP = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.TengenUpdate;
     if (UP) UP.status().then(r => { T.updStatus = r.status; const el = document.getElementById('upd'); if (el) el.textContent = 'UPD ' + r.status; }).catch(() => {});
     fpsN = 0; fpsT = 0;
   }

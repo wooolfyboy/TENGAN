@@ -1,4 +1,4 @@
-// ---- TENGAN HUD for the tablet: firmware tokens (core/theme.cpp) and brushes ----
+// ---- TENGEN HUD for the tablet: firmware tokens (core/theme.cpp) and brushes ----
 // Same HUD as on the stick, plus depth, glow and particles.
 const T = window.T = { views: [] };
 // colors exactly as on the stick
@@ -38,8 +38,8 @@ T.hex8 = (h, signed) => {
   return a;
 };
 T.el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
-// inside the tablet app (Capacitor): the page is local, the stick is reached by its address on the TENGAN network
-T.VERSION = '@@VERSION@@';                               // TENGAN version (build.py fills it from the VERSION file)
+// inside the tablet app (Capacitor): the page is local, the stick is reached by its address on the TENGEN network
+T.VERSION = '@@VERSION@@';                               // TENGEN version (build.py fills it from the VERSION file)
 T.native = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 T.STICK = '192.168.4.1';
 T.stickHost = () => (new URLSearchParams(location.search).get('host') || (T.native ? T.STICK : location.hostname || T.STICK)).replace(/:\d+$/, '');   // host without port: SSE uses its own port
@@ -147,9 +147,9 @@ T.bigNum = (g, v, x, y, px, col, unit, al = 'left') => {
   T.txt(g, s, x0, y, px, col, 't');
   if (unit) T.txt(g, unit, x0 + w + px * 0.1, y - px * 0.04, px * 0.22, T.C.dim);
 };
-// 天眼 seal drawn as vectors: color fill with the glyphs cut out in the background color (font Tengan Seal,
+// 天眼 seal drawn as vectors: color fill with the glyphs cut out in the background color (font Tengen Seal,
 // two IPAGothic glyphs in fonts.css). Sharp at any size. Returns the width.
-T.SEAL_FONT = "'Tengan Seal','Noto Sans CJK JP','Noto Sans JP',sans-serif";
+T.SEAL_FONT = "'Tengen Seal','Noto Sans CJK JP','Noto Sans JP',sans-serif";
 T.drawSeal = (g, x, y, h, col = T.C.seal || T.C.acc, bg = T.C.bg) => {
   const w = h * 0.56, c = h * 0.1;
   T.cutPath(g, x, y, w, h, c); g.fillStyle = col; g.fill();

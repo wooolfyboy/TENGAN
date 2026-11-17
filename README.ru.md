@@ -1,29 +1,29 @@
 <div align="center">
 
-<img src="docs/boot.gif" width="640" alt="TENGAN — анимация включения">
+<img src="docs/boot.gif" width="640" alt="TENGEN — анимация включения">
 
-# TENGAN 天眼
+# TENGEN 天眼
 
 **Увидеть невидимый радиоэфир вокруг — и чтобы это было красиво.**
 
 Bluetooth · Wi-Fi · Sub-GHz · ИК · NFC · звук · монитор ПК — живой «тактический» интерфейс<br>
-на LilyGO T-Embed CC1101 Plus, на планшете (TENGAN Tablet) и на компьютере (TENGAN Desktop).<br>
-**Только приём.** TENGAN ничего не передаёт в эфир и ничего не записывает на карты.
+на LilyGO T-Embed CC1101 Plus, на планшете (TENGEN Tablet) и на компьютере (TENGEN Desktop).<br>
+**Только приём.** TENGEN ничего не передаёт в эфир и ничего не записывает на карты.
 
-[![release](https://img.shields.io/github/v/release/wooolfyboy/TENGAN?include_prereleases&style=flat-square&color=3fd9ff&label=release)](https://github.com/wooolfyboy/TENGAN/releases/latest)
-[![build](https://img.shields.io/github/actions/workflow/status/wooolfyboy/TENGAN/build.yml?style=flat-square&label=build)](https://github.com/wooolfyboy/TENGAN/actions/workflows/build.yml)
-[![license](https://img.shields.io/github/license/wooolfyboy/TENGAN?style=flat-square&color=7f97a3)](LICENSE)
+[![release](https://img.shields.io/github/v/release/wooolfyboy/TENGEN?include_prereleases&style=flat-square&color=3fd9ff&label=release)](https://github.com/wooolfyboy/TENGEN/releases/latest)
+[![build](https://img.shields.io/github/actions/workflow/status/wooolfyboy/TENGEN/build.yml?style=flat-square&label=build)](https://github.com/wooolfyboy/TENGEN/actions/workflows/build.yml)
+[![license](https://img.shields.io/github/license/wooolfyboy/TENGEN?style=flat-square&color=7f97a3)](LICENSE)
 ![ESP32-S3](https://img.shields.io/badge/ESP32--S3-T--Embed%20CC1101%20Plus-3fd9ff?style=flat-square)
 ![receive only](https://img.shields.io/badge/RF-receive%20only-7f97a3?style=flat-square)
 ![languages](https://img.shields.io/badge/lang-RU%20%C2%B7%20EN-02090b?style=flat-square&labelColor=7f97a3)
 ![style](https://img.shields.io/badge/theme-DENKO-02090b?style=flat-square&labelColor=3fd9ff)
 ![style](https://img.shields.io/badge/theme-KURENAI-0b0b0b?style=flat-square&labelColor=e5262f)
 
-[**Скачать**](https://github.com/wooolfyboy/TENGAN/releases/latest) ·
+[**Скачать**](https://github.com/wooolfyboy/TENGEN/releases/latest) ·
 [Что нужно](#-что-нужно) ·
 [Быстрый старт](#-быстрый-старт) ·
 [Разделы](#-разделы) ·
-[Планшет и компьютер](#-tengan-tablet-и-tengan-desktop) ·
+[Планшет и компьютер](#-tengen-tablet-и-tengen-desktop) ·
 [Вопросы](#-вопросы-и-ответы) ·
 [Сборка](#-сборка-из-исходников) ·
 [**English**](README.md)
@@ -32,12 +32,12 @@ Bluetooth · Wi-Fi · Sub-GHz · ИК · NFC · звук · монитор ПК 
 
 ---
 
-> **天眼 (тэнган)** — по-японски «небесное око»: взгляд, которому видно скрытое и далёкое.
-> TENGAN показывает то, чего не видно глазам: радиоэфир вокруг — телефоны, наушники, роутеры,
+> **天眼 (тэнгэн)** — по-японски «небесное око»: взгляд, которому видно скрытое и далёкое.
+> TENGEN показывает то, чего не видно глазам: радиоэфир вокруг — телефоны, наушники, роутеры,
 > пульты, брелоки, уличные датчики, карты.
 
 <div align="center">
-<img src="docs/tablet_hq_ru.jpg" width="100%" alt="Штаб TENGAN на планшете — все источники на одном экране">
+<img src="docs/tablet_hq_ru.jpg" width="100%" alt="Штаб TENGEN на планшете — все источники на одном экране">
 <br><sub><b>Штаб</b> на планшете: радиогоризонт, тревоги, датчики, звук, пульты и карты на одном экране. Палка присылает числа — рисует планшет.</sub>
 </div>
 
@@ -56,7 +56,7 @@ Bluetooth · Wi-Fi · Sub-GHz · ИК · NFC · звук · монитор ПК 
 | ⚙️ | **Настройки** | общие, по разделам и **тревоги**; одинаковые на устройстве, планшете и компьютере |
 
 <div align="center">
-<img src="docs/screens_ru.png" width="100%" alt="Экраны TENGAN">
+<img src="docs/screens_ru.png" width="100%" alt="Экраны TENGEN">
 <br><sub>Экран устройства 320×170, увеличен вдвое. Все картинки — настоящий код рисования, снятый в симуляторе.</sub>
 </div>
 
@@ -66,7 +66,7 @@ Bluetooth · Wi-Fi · Sub-GHz · ИК · NFC · звук · монитор ПК 
 |---|---|
 | **Устройство** | **LilyGO T-Embed CC1101 Plus** (ESP32-S3, экран 320×170, колесо, CC1101, ИК, NFC PN532, микрофон, динамик, светодиоды, аккумулятор). Подойдёт и T-Embed CC1101 без Plus — без раздела NFC |
 | **Для установки** | компьютер с **Chrome** или **Edge** и кабель USB-C — ничего ставить не нужно |
-| **По желанию** | планшет или телефон на Android (TENGAN Tablet), любой браузер в той же Wi-Fi или компьютер с TENGAN Desktop (Windows, macOS, Linux) |
+| **По желанию** | планшет или телефон на Android (TENGEN Tablet), любой браузер в той же Wi-Fi или компьютер с TENGEN Desktop (Windows, macOS, Linux) |
 
 ## 🚀 Быстрый старт
 
@@ -74,11 +74,11 @@ Bluetooth · Wi-Fi · Sub-GHz · ИК · NFC · звук · монитор ПК 
 <tr>
 <td width="55%">
 
-1. Скачай прошивальщик со страницы [**Releases**](https://github.com/wooolfyboy/TENGAN/releases/latest):
-   **`flash_tengan.html`** — одна прошивка для русского и английского.
+1. Скачай прошивальщик со страницы [**Releases**](https://github.com/wooolfyboy/TENGEN/releases/latest):
+   **`flash_tengen.html`** — одна прошивка для русского и английского.
 2. Подключи T-Embed к компьютеру USB-кабелем и открой файл в **Chrome** или **Edge**.
 3. Нажми **«Установить прошивку»**, выбери в списке *USB JTAG/serial debug unit* и нажми **«Подключиться»**.
-4. Когда появится **«Готово»**, переподключи кабель. При первом включении TENGAN спросит язык: **English** или **Русский**.
+4. Когда появится **«Готово»**, переподключи кабель. При первом включении TENGEN спросит язык: **English** или **Русский**.
 
 Прошивка уже внутри файла — ни адресов, ни выбора файлов. Настройки при перепрошивке **сохраняются**.
 
@@ -122,7 +122,7 @@ Bluetooth · Wi-Fi · Sub-GHz · ИК · NFC · звук · монитор ПК 
 | **Погода** | BLE-термометры: Xiaomi (PVVX/ATC), BTHome, Govee, Qingping, SwitchBot, Ruuvi |
 
 <details>
-<summary><b>Как TENGAN понимает, что это за устройство</b></summary>
+<summary><b>Как TENGEN понимает, что это за устройство</b></summary>
 
 - **Тип** (телефон, компьютер, аудио, часы, ТВ, трекер, маячок, датчик…) — по тому, что устройство само рассылает:
   имя, Appearance, сервисы, сообщения Apple (AirPods, AirTag, iPhone…).
@@ -158,7 +158,7 @@ Bluetooth · Wi-Fi · Sub-GHz · ИК · NFC · звук · монитор ПК 
 
 ### 🔦 ИК · NFC
 
-- **ИК — «чей пульт?»**: направь пульт на TENGAN и нажми кнопку. Протокол (NEC, Samsung, Sony, RC5/RC6, LG…),
+- **ИК — «чей пульт?»**: направь пульт на TENGEN и нажми кнопку. Протокол (NEC, Samsung, Sony, RC5/RC6, LG…),
   вероятная марка, адрес и код кнопки, форма сигнала, история нажатий.
 - **NFC — «что за карта?»**: приложи карту или метку. Тип (MIFARE, NTAG, DESFire, FeliCa…), подсказка
   («транспортная карта», «метка»), открытые записи меток. **У банковских карт номер и имя не читаются** —
@@ -167,7 +167,7 @@ Bluetooth · Wi-Fi · Sub-GHz · ИК · NFC · звук · монитор ПК 
 ### 🎙 Звук
 
 Спектр 32 полос, 3D-рельеф, «реактор», шумомер, осциллограф и фигуры X-Y.
-**Источник** — Настройки › Звук › Источник: авто / микрофон / ПК. С TENGAN Desktop экраны рисуются по звуку,
+**Источник** — Настройки › Звук › Источник: авто / микрофон / ПК. С TENGEN Desktop экраны рисуются по звуку,
 который играет на компьютере — чисто, без микрофона.
 
 ### 🛰 Штаб
@@ -189,42 +189,42 @@ Bluetooth · Wi-Fi · Sub-GHz · ИК · NFC · звук · монитор ПК 
 **Погода** — «радиопогода»: облака из устройств вокруг, дождь из посылок 433 МГц, гроза от громкого звука,
 плюс температура с уличного датчика.
 
-<sub>Город — Настройки › Общие › Город (или GPS планшета). Точное время и орбиты приходят от TENGAN Desktop;
+<sub>Город — Настройки › Общие › Город (или GPS планшета). Точное время и орбиты приходят от TENGEN Desktop;
 устройство их запоминает и дальше считает само, без интернета.</sub>
 
-## 📱 TENGAN Tablet и TENGAN Desktop
+## 📱 TENGEN Tablet и TENGEN Desktop
 
 <div align="center">
-<img src="docs/tablet_sections_ru.jpg" width="100%" alt="TENGAN Tablet — город Bluetooth, каналы Wi-Fi, спектр Sub-GHz, звук, ПК, галерея">
+<img src="docs/tablet_sections_ru.jpg" width="100%" alt="TENGEN Tablet — город Bluetooth, каналы Wi-Fi, спектр Sub-GHz, звук, ПК, галерея">
 </div>
 
 Все разделы в полном разрешении экрана: объёмный радар, 3D-город, хребты Wi-Fi, водопад Sub-GHz в глубину,
-звуковой рельеф, штаб, галерея. TENGAN передаёт только числа, всю графику рисует планшет или компьютер —
+звуковой рельеф, штаб, галерея. TENGEN передаёт только числа, всю графику рисует планшет или компьютер —
 60 кадров в секунду, без интернета. Страница приходит **с самого устройства**, поэтому всегда совпадает
 с прошивкой и сама обновляется вместе с ней.
 
 
 | | Как подключиться |
 |---|---|
-| **Браузер** (телефон, планшет, компьютер) | на TENGAN открой раздел **Web** → отсканируй QR или подключись к сети `TENGAN-XXXX` → `192.168.4.1`. Выбор: **LITE** (лёгкая страница для телефона) или **FULL** (полная сцена) |
-| **TENGAN Tablet** (Android, `tengan_tablet.apk`) | та же сцена во весь экран, плюс **GPS**: небо и глобус считаются по твоим координатам. Установка: скопируй APK на планшет, открой, разреши установку |
-| **TENGAN Desktop** (Windows `tengan_desktop.exe`; macOS / Linux — ниже) | штаб и все разделы в окне **по USB-кабелю** (интернет на компьютере остаётся) или по Wi-Fi TENGAN. Внутри — монитор ПК: нагрузка, что играет, громкость, звук для раздела «Звук», точное время и орбиты спутников |
+| **Браузер** (телефон, планшет, компьютер) | на TENGEN открой раздел **Web** → отсканируй QR или подключись к сети `TENGEN-XXXX` → `192.168.4.1`. Выбор: **LITE** (лёгкая страница для телефона) или **FULL** (полная сцена) |
+| **TENGEN Tablet** (Android, `tengen_tablet.apk`) | та же сцена во весь экран, плюс **GPS**: небо и глобус считаются по твоим координатам. Установка: скопируй APK на планшет, открой, разреши установку |
+| **TENGEN Desktop** (Windows `tengen_desktop.exe`; macOS / Linux — ниже) | штаб и все разделы в окне **по USB-кабелю** (интернет на компьютере остаётся) или по Wi-Fi TENGEN. Внутри — монитор ПК: нагрузка, что играет, громкость, звук для раздела «Звук», точное время и орбиты спутников |
 
 <div align="center">
-<img src="docs/desktop_pc_ru.jpg" width="100%" alt="TENGAN Desktop — монитор ПК">
-<br><sub>TENGAN Desktop на ноутбуке: раздел ПК — нагрузка, память, сеть, батарея, что играет.</sub>
+<img src="docs/desktop_pc_ru.jpg" width="100%" alt="TENGEN Desktop — монитор ПК">
+<br><sub>TENGEN Desktop на ноутбуке: раздел ПК — нагрузка, память, сеть, батарея, что играет.</sub>
 </div>
 
 <details>
-<summary><b>TENGAN Desktop: подробности</b></summary>
+<summary><b>TENGEN Desktop: подробности</b></summary>
 
-- Запуск: подключи TENGAN кабелем и запусти `tengan_desktop.exe` — устройство само откроет раздел Web.
+- Запуск: подключи TENGEN кабелем и запусти `tengen_desktop.exe` — устройство само откроет раздел Web.
   Режимы: **USB**, **Wi-Fi**, **Авто** (последний выбор запоминается). F11 — во весь экран, F2 — выбор режима.
 - **Настройки**: F2 → **⚙ Оповещения и виджет** — плашки, виджет поверх окон и окно: масштаб интерфейса (80–150%),
   открывать во весь экран, запуск вместе с системой (сразу в трей). Размер и место окна запоминаются.
 - Название трека берётся из системной панели Windows «Сейчас воспроизводится»; если приложение туда его
   не сообщает — из заголовка окна (Spotify, вкладка YouTube).
-- Журнал программы: `%APPDATA%\TENGAN\desktop.log`.
+- Журнал программы: `%APPDATA%\TENGEN\desktop.log`.
 - EXE не подписан (для этого нужен платный сертификат), поэтому при первом запуске SmartScreen может написать
   «Система Windows защитила ваш компьютер» — нажми **«Подробнее» → «Выполнить в любом случае»**.
 - Старый консольный монитор `pc_monitor_windows.zip` ещё лежит в релизах, но больше не нужен.
@@ -234,9 +234,9 @@ Bluetooth · Wi-Fi · Sub-GHz · ИК · NFC · звук · монитор ПК 
 <details>
 <summary><b>macOS и Linux (сборки сообщества, не проверены на реальном устройстве)</b></summary>
 
-В релизах есть ещё **`TENGAN-Desktop-mac.zip`** (Apple Silicon) и
-**`TENGAN-Desktop-linux-x86_64.AppImage`**. Они собираются и проходят пробный запуск автоматически, но с
-настоящим TENGAN их ещё никто не запускал — отзывы приветствуются.
+В релизах есть ещё **`TENGEN-Desktop-mac.zip`** (Apple Silicon) и
+**`TENGEN-Desktop-linux-x86_64.AppImage`**. Они собираются и проходят пробный запуск автоматически, но с
+настоящим TENGEN их ещё никто не запускал — отзывы приветствуются.
 
 | | macOS | Linux |
 |---|---|---|
@@ -247,20 +247,20 @@ Bluetooth · Wi-Fi · Sub-GHz · ИК · NFC · звук · монитор ПК 
 | Звук компьютера для раздела «Звук» | ❌ (macOS не отдаёт звук колонок) | ✅ монитор PulseAudio / PipeWire |
 | Всплывашки, виджет, трей | ✅ (уведомления — системные) | ✅ (`notify-send`; трею нужен AppIndicator или X11) |
 
-- **macOS:** распакуй и перенеси **TENGAN Desktop.app** в «Программы». Приложение не подписано Apple,
+- **macOS:** распакуй и перенеси **TENGEN Desktop.app** в «Программы». Приложение не подписано Apple,
   поэтому первый раз открой его так: **правый клик → «Открыть» → «Открыть»**. Порт устройства —
-  `/dev/cu.usbmodem…`. Журнал: `~/Library/Application Support/TENGAN/desktop.log`.
-- **Linux:** `chmod +x TENGAN-Desktop-linux-x86_64.AppImage` и запусти. Для доступа к USB-порту нужна
+  `/dev/cu.usbmodem…`. Журнал: `~/Library/Application Support/TENGEN/desktop.log`.
+- **Linux:** `chmod +x TENGEN-Desktop-linux-x86_64.AppImage` и запусти. Для доступа к USB-порту нужна
   группа `dialout`: `sudo usermod -aG dialout $USER`, затем перезайди в систему (программа сама подскажет,
   если доступа нет). По желанию: `sudo apt install playerctl` (название трека и медиа-кнопки), `libfuse2`
-  (запуск AppImage на новых дистрибутивах), `libportaudio2` (звук компьютера). Журнал: `~/.config/TENGAN/desktop.log`.
+  (запуск AppImage на новых дистрибутивах), `libportaudio2` (звук компьютера). Журнал: `~/.config/TENGEN/desktop.log`.
 
 </details>
 
 <details>
 <summary><b>Обновление по Wi-Fi и откат</b></summary>
 
-Раздел Web → страница → вкладка **Update** принимает `tengan_full_0x0.bin` и `tengan_firmware_ota.bin`
+Раздел Web → страница → вкладка **Update** принимает `tengen_full_0x0.bin` и `tengen_firmware_ota.bin`
 из релиза. Новая прошивка пишется во второй слот и считается пробной: если она не проработает
 15 секунд, загрузчик **сам вернёт старую**.
 
@@ -281,12 +281,12 @@ Bluetooth · Wi-Fi · Sub-GHz · ИК · NFC · звук · монитор ПК 
 
 ## 🔒 Приватность, принцип «только приём» и ответственное использование
 
-- TENGAN **ничего не передаёт** в эфир: CC1101 и ИК никогда не включаются на передачу, NFC только читает.
+- TENGEN **ничего не передаёт** в эфир: CC1101 и ИК никогда не включаются на передачу, NFC только читает.
   Единственное, что излучает устройство, — его собственная точка Wi-Fi для планшета, когда открыт раздел Web.
 - Показывается только то, что устройства и так рассылают всем вокруг. Содержимое Wi-Fi-пакетов не читается,
   коды пультов не сохраняются, у банковских карт номер и имя не читаются.
 - Всё работает **без интернета** и без облака: данные не покидают устройство и твой планшет/компьютер.
-- TENGAN — чтобы смотреть на радиоэфир вокруг, а не вмешиваться в него. Законы о радиоприёме и частной жизни в
+- TENGEN — чтобы смотреть на радиоэфир вокруг, а не вмешиваться в него. Законы о радиоприёме и частной жизни в
   разных странах разные: пользуйся там и так, где это законно, и уважай чужую приватность.
 
 ## ❓ Вопросы и ответы
@@ -310,7 +310,7 @@ Bluetooth · Wi-Fi · Sub-GHz · ИК · NFC · звук · монитор ПК 
 <details>
 <summary><b>Почему много устройств «неизвестно»?</b></summary>
 
-Современные телефоны специально сообщают о себе минимум и меняют адрес. TENGAN склеивает такие адреса,
+Современные телефоны специально сообщают о себе минимум и меняют адрес. TENGEN склеивает такие адреса,
 но тип и производитель не всегда можно узнать.
 
 </details>
@@ -325,7 +325,7 @@ Bluetooth · Wi-Fi · Sub-GHz · ИК · NFC · звук · монитор ПК 
 <details>
 <summary><b>Как переключить язык?</b></summary>
 
-На устройстве: **Настройки › Язык** (English / Русский). Меняется сразу; TENGAN Tablet и TENGAN Desktop переключаются вслед за устройством.
+На устройстве: **Настройки › Язык** (English / Русский). Меняется сразу; TENGEN Tablet и TENGEN Desktop переключаются вслед за устройством.
 
 </details>
 
@@ -348,10 +348,10 @@ pio run
 Board-профиль — `boards/T_Embed_PN532.json` (из репозитория LilyGO). Общий образ для записи на `0x0`:
 
 ```bash
-esptool --chip esp32s3 merge-bin -o tengan_full_0x0.bin 0x0 bootloader.bin 0x8000 partitions.bin 0xe000 boot_app0.bin 0x10000 firmware.bin
+esptool --chip esp32s3 merge-bin -o tengen_full_0x0.bin 0x0 bootloader.bin 0x8000 partitions.bin 0xe000 boot_app0.bin 0x10000 firmware.bin
 ```
 
-Прошивальщик в одном файле: `python tools/flasher/make_flasher.py tengan_full_0x0.bin flash_tengan.html vX.Y`.
+Прошивальщик в одном файле: `python tools/flasher/make_flasher.py tengen_full_0x0.bin flash_tengen.html vX.Y`.
 
 </details>
 
@@ -366,10 +366,10 @@ esptool --chip esp32s3 merge-bin -o tengan_full_0x0.bin 0x0 bootloader.bin 0x800
 </details>
 
 <details>
-<summary><b>TENGAN Desktop и TENGAN Tablet</b></summary>
+<summary><b>TENGEN Desktop и TENGEN Tablet</b></summary>
 
 - Desktop: `tools/desktop` (Python + pywebview), сборка в один файл — `tools/desktop/build_exe.py` (PyInstaller, CI на Windows); macOS / Linux — `tools/desktop/build_xplat.py` (CI: `.github/workflows/desktop-xplat.yml`).
-- Tablet: `app/` (Capacitor, Android), APK собирается в CI. Официальные APK подписаны ключом TENGAN из секретов
+- Tablet: `app/` (Capacitor, Android), APK собирается в CI. Официальные APK подписаны ключом TENGEN из секретов
   репозитория; сборка без него (форк, своя сборка) подписывается отладочным ключом Android — работает, но ставится
   отдельным приложением, а не обновлением поверх официального.
 
@@ -395,7 +395,7 @@ src/audio/                микрофон, спектр, звук компью�
 src/web/                  точка Wi-Fi, страницы, API, OTA, связь по USB
 src/pc/  src/gallery/     монитор ПК; галерея, небо, глобус, радиопогода
 tools/webapp/             страница планшета (EN/RU)
-tools/desktop/            TENGAN Desktop
+tools/desktop/            TENGEN Desktop
 tools/flasher/            прошивальщик в одном HTML (esptool-js)
 tools/sim/                симулятор экрана
 ```
@@ -416,5 +416,5 @@ tools/sim/                симулятор экрана
 
 <div align="center">
 <br>
-<b>// TENGAN 天眼</b>
+<b>// TENGEN 天眼</b>
 </div>

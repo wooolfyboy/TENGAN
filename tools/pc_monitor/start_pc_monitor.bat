@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 cd /d "%~dp0"
-title TENGAN - PC monitor
+title TENGEN - PC monitor
 
 rem ---- 1. find Python ----
 set "PY="
@@ -38,14 +38,14 @@ if errorlevel 1 (
 rem ---- 2b. optional: pycaw, so the stick sees volume in percent ----
 %PY% -c "import pycaw" >nul 2>nul
 if errorlevel 1 (
-  echo Ставлю библиотеку pycaw ^(громкость в процентах на TENGAN^)...
+  echo Ставлю библиотеку pycaw ^(громкость в процентах на TENGEN^)...
   %PY% -m pip install --user --disable-pip-version-check pycaw >nul 2>nul
 )
 
 rem ---- 2c. optional: winrt, so the stick sees what is playing ----
 %PY% -c "import winrt.windows.media.control" >nul 2>nul
 if errorlevel 1 (
-  echo Ставлю библиотеки winrt ^(название трека на TENGAN^)...
+  echo Ставлю библиотеки winrt ^(название трека на TENGEN^)...
   %PY% -m pip install --user --disable-pip-version-check winrt-runtime winrt-Windows.Media.Control winrt-Windows.Foundation winrt-Windows.Foundation.Collections >nul 2>nul
 )
 

@@ -25,7 +25,7 @@ T.views.push({
     this.dust.draw(g, this.cam);
     T.bloom(this.cv, 0.75);
     T.hits.rect(rr.x, rr.y, rr.w, rr.h, { go: 'ble' });
-    T.header(g, m, y0, w - 2 * m, u, 'Overview', S.st ? `${S.st.name || 'TENGAN'} · up ${T.ago(S.st.up || 0)}` : 'waiting for TENGAN', !S.st);
+    T.header(g, m, y0, w - 2 * m, u, 'Overview', S.st ? `${S.st.name || 'TENGEN'} · up ${T.ago(S.st.up || 0)}` : 'waiting for TENGEN', !S.st);
     T.txt(g, '// BLE SCOPE  ›', rr.x, rr.y + u * 1, u * 0.95, T.C.acc, 't');
     // right column
     const cx = portrait ? m : rr.x + rr.w + u * 2, cw = portrait ? w - 2 * m : w - m - cx;
@@ -61,7 +61,7 @@ T.views.push({
     // stick state + device count history
     const sH = u * 6.6, sw2 = (cw - u) / 2;
     T.panel(g, cx, cy, sw2, sH, u, `rgba(${T.RGB.panel},.22)`, T.C.line);
-    T.txt(g, '// TENGAN', cx + u, cy + u * 1.5, u * 0.95, T.C.acc, 't');
+    T.txt(g, '// TENGEN', cx + u, cy + u * 1.5, u * 0.95, T.C.acc, 't');
     const s = S.st || {};
     T.txt(g, 'BAT', cx + u, cy + u * 3, u * 0.75, T.C.dim);
     T.segBar(g, cx + u * 3.4, cy + u * 2.45, sw2 - u * 8, u * 0.55, s.bat >= 0 ? s.bat / 100 : 0, 10, false, s.bat >= 0 && s.bat <= 15);

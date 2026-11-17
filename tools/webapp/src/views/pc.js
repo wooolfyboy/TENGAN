@@ -47,7 +47,7 @@
       const p = S.pc, names = ['PC', 'Cores', 'Process city', 'Media'];
       if (!p || !p.live) {
         T.header(g, m, y0, w - 2 * m, u, names[this.sub], this.wasLive ? 'PC offline' : 'waiting for PC', this.wasLive);
-        T.emptyState(g, w, h, u, this.wasLive ? 'PC OFFLINE' : 'PC', this.wasLive ? 'no data for a while · is TENGAN Desktop running?' : 'waiting for PC · run TENGAN Desktop', this.wasLive);
+        T.emptyState(g, w, h, u, this.wasLive ? 'PC OFFLINE' : 'PC', this.wasLive ? 'no data for a while · is TENGEN Desktop running?' : 'waiting for PC · run TENGEN Desktop', this.wasLive);
         T.finish(g, w, h); return;
       }
       this.wasLive = true;
@@ -248,7 +248,7 @@
       const lg = g.createRadialGradient(0, 0, 0, 0, 0, R * 0.34); lg.addColorStop(0, T.C.panel); lg.addColorStop(1, '#123a48');
       g.fillStyle = lg; g.beginPath(); g.arc(0, 0, R * 0.34, 0, T.TAU); g.fill();
       g.strokeStyle = T.C.acc; g.lineWidth = 1; g.beginPath(); g.arc(0, 0, R * 0.34, 0, T.TAU); g.stroke();
-      T.txt(g, 'TENGAN', 0, -R * 0.12, R * 0.09, T.C.acc, 't', 'center');
+      T.txt(g, 'TENGEN', 0, -R * 0.12, R * 0.09, T.C.acc, 't', 'center');
       for (let k = 0; k < 3; k++) { g.rotate(T.TAU / 3); g.fillStyle = `rgba(${T.RGB.acc},.5)`; g.fillRect(R * 0.2, -1, R * 0.1, 2); }
       g.restore();
       g.fillStyle = T.C.hot; g.beginPath(); g.arc(cx, cy, Math.max(2, R * 0.025), 0, T.TAU); g.fill();

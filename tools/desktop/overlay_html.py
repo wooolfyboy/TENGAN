@@ -90,7 +90,7 @@ body.kurenai .lv b{color:#e5262f}body.kurenai .tp{color:#f4f1ea;font-family:Oswa
 body.kurenai .bar i{background:#2a2a2a;transform:skewX(-12deg)}body.kurenai .bar i.on{background:#f4f1ea}body.kurenai .bar i.hot{background:#e5262f}
 body.kurenai .parts{color:#bdb9b0}body.kurenai .parts u{background:#e5262f}body.kurenai .parts span.off{opacity:.3}
 </style></head><body class="denko"><div id="w">
-<div id="hd"><span class="jp" id="tt">天眼</span><span>TENGAN</span><span class="sp"></span><span id="bat" class="mono"></span><i class="dot" id="lk"></i></div>
+<div id="hd"><span class="jp" id="tt">天眼</span><span>TENGEN</span><span class="sp"></span><span id="bat" class="mono"></span><i class="dot" id="lk"></i></div>
 <canvas id="rd" width="236" height="236"></canvas>
 <div id="rt">
  <div class="lv"><b class="jp" id="st">平穏</b><span class="mono" id="pc">0%</span></div>

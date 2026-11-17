@@ -1,4 +1,4 @@
-# TENGAN Desktop for macOS and Linux (the Windows build is in build.yml → tengan_desktop.exe).
+# TENGEN Desktop for macOS and Linux (the Windows build is in build.yml → tengen_desktop.exe).
 # Manual run: Actions → desktop-xplat → Run workflow (with release_tag to attach to a release).
 # With release_tag (e.g. v2.0) the files are added to that release.
 name: desktop-xplat
@@ -33,17 +33,17 @@ jobs:
       - name: Build .app
         run: python tools/desktop/build_xplat.py mac
       - name: Smoke run (start the app for 25 s, check the log)
-        run: TENGAN_NO_TRAY=1 python tools/desktop/smoke_run.py "dist/TENGAN Desktop.app/Contents/MacOS/TENGAN Desktop" 25
+        run: TENGEN_NO_TRAY=1 python tools/desktop/smoke_run.py "dist/TENGEN Desktop.app/Contents/MacOS/TENGEN Desktop" 25
       - uses: actions/upload-artifact@v5
         with:
           name: desktop-mac-${{ github.sha }}
-          path: dist/TENGAN-Desktop-mac.zip
+          path: dist/TENGEN-Desktop-mac.zip
       - name: Release
         if: inputs.release_tag != ''
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.release_tag }}
-          files: dist/TENGAN-Desktop-mac.zip
+          files: dist/TENGEN-Desktop-mac.zip
 
   linux:
     runs-on: ubuntu-22.04
@@ -69,52 +69,52 @@ jobs:
         run: python tools/desktop/build_xplat.py linux
       - name: Self-test (packaged binary imports window engine and all modules)
         env:
-          TENGAN_SELFTEST: "1"
-          TENGAN_NO_TRAY: "1"
+          TENGEN_SELFTEST: "1"
+          TENGEN_NO_TRAY: "1"
           QT_QPA_PLATFORM: offscreen
         run: |
-          LOG=~/.config/TENGAN/desktop.log
+          LOG=~/.config/TENGEN/desktop.log
           rm -f "$LOG"
-          rc=0; timeout 60 dist/tengan_desktop/tengan_desktop || rc=$?
+          rc=0; timeout 60 dist/tengen_desktop/tengen_desktop || rc=$?
           echo "exit code: $rc"; echo "--- desktop.log ---"; cat "$LOG" || true
           test "$rc" = 0 && grep -q "selftest OK" "$LOG"
       - name: Smoke run (start the app with its windows for 25 s under a virtual display)
         env:
-          TENGAN_NO_TRAY: "1"
+          TENGEN_NO_TRAY: "1"
           QTWEBENGINE_DISABLE_SANDBOX: "1"
-        run: xvfb-run -a -s "-screen 0 1280x800x24" python tools/desktop/smoke_run.py dist/tengan_desktop/tengan_desktop 25
+        run: xvfb-run -a -s "-screen 0 1280x800x24" python tools/desktop/smoke_run.py dist/tengen_desktop/tengen_desktop 25
       - name: AppImage
         run: |
           set -e
           A=build/AppDir
           rm -rf $A && mkdir -p $A/usr/bin
-          cp -r dist/tengan_desktop $A/usr/bin/tengan_desktop
-          cp dist/tengan.png $A/tengan.png
-          cat > $A/tengan-desktop.desktop <<'EOF'
+          cp -r dist/tengen_desktop $A/usr/bin/tengen_desktop
+          cp dist/tengen.png $A/tengen.png
+          cat > $A/tengen-desktop.desktop <<'EOF'
           [Desktop Entry]
           Type=Application
-          Name=TENGAN Desktop
-          Comment=TENGAN HQ and PC monitor
-          Exec=tengan_desktop
-          Icon=tengan
+          Name=TENGEN Desktop
+          Comment=TENGEN HQ and PC monitor
+          Exec=tengen_desktop
+          Icon=tengen
           Categories=Utility;
           Terminal=false
           EOF
-          sed -i 's/^          //' $A/tengan-desktop.desktop
-          printf '#!/bin/sh\nexec "$(dirname "$(readlink -f "$0")")/usr/bin/tengan_desktop/tengan_desktop" "$@"\n' > $A/AppRun
+          sed -i 's/^          //' $A/tengen-desktop.desktop
+          printf '#!/bin/sh\nexec "$(dirname "$(readlink -f "$0")")/usr/bin/tengen_desktop/tengen_desktop" "$@"\n' > $A/AppRun
           chmod +x $A/AppRun
           chmod -R a+rX $A   # PySide6 ships some dirs as 0700; others would get "Permission denied"
           curl -fsSL -o appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
           chmod +x appimagetool
-          ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 ./appimagetool $A dist/TENGAN-Desktop-linux-x86_64.AppImage
+          ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 ./appimagetool $A dist/TENGEN-Desktop-linux-x86_64.AppImage
           ls -la dist
       - uses: actions/upload-artifact@v5
         with:
           name: desktop-linux-${{ github.sha }}
-          path: dist/TENGAN-Desktop-linux-x86_64.AppImage
+          path: dist/TENGEN-Desktop-linux-x86_64.AppImage
       - name: Release
         if: inputs.release_tag != ''
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.release_tag }}
-          files: dist/TENGAN-Desktop-linux-x86_64.AppImage
+          files: dist/TENGEN-Desktop-linux-x86_64.AppImage

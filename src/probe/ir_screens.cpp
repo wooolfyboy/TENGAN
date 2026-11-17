@@ -72,7 +72,7 @@ static void drawIdle(uint32_t now) {
   spr.fillSmoothCircle(rx, cy, 5, C_HOT(), C_BG());
   spr.setTextDatum(MC_DATUM);
   spr.setTextColor(UI_LABEL());
-  txt(L("POINT ANY REMOTE AT TENGAN", "НАПРАВЬТЕ ПУЛЬТ НА TENGAN"), W / 2, 118, 1);
+  txt(L("POINT ANY REMOTE AT TENGEN", "НАПРАВЬТЕ ПУЛЬТ НА TENGEN"), W / 2, 118, 1);
   spr.setTextColor(UI_DIM());
   txt(L("PRESS A BUTTON TO SEE WHOSE REMOTE IT IS", "НАЖМИТЕ КНОПКУ - УЗНАЕМ, ЧЕЙ ЭТО ПУЛЬТ"), W / 2, 132, 1);
 }

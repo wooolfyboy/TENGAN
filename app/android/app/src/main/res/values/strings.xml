@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">TENGAN</string>
-    <string name="title_activity_main">TENGAN</string>
-    <string name="package_name">dev.tengan.app</string>
-    <string name="custom_url_scheme">dev.tengan.app</string>
+    <string name="app_name">TENGEN</string>
+    <string name="title_activity_main">TENGEN</string>
+    <string name="package_name">dev.tengen.app</string>
+    <string name="custom_url_scheme">dev.tengen.app</string>
 </resources>

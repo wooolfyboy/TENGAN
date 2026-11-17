@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-TENGAN desktop - tray, popups and widget above all windows.
+TENGEN desktop - tray, popups and widget above all windows.
 
   Tray    - system tray icon (pystray): HQ / widget / popups / style / corner / mode / quit.
   Popups  - one small frameless always-on-top window with a stack of up to 3 cards (DENKO / KURENAI);
@@ -85,7 +85,7 @@ addEventListener('mousemove',function(e){if(!d||!(e.buttons&1))return;
 
 # widget right-click menu, so it works standalone: open HQ, hide, quit
 MENU_JS = """(function(){if(window.__tgMenu)return;window.__tgMenu=1;
-var T={en:['Open HQ','Hide widget (F3 brings it back)','Quit TENGAN'],ru:['Открыть штаб','Скрыть виджет (вернуть — F3)','Выйти из TENGAN']};
+var T={en:['Open HQ','Hide widget (F3 brings it back)','Quit TENGEN'],ru:['Открыть штаб','Скрыть виджет (вернуть — F3)','Выйти из TENGEN']};
 var A=['widget_open','widget_hide','widget_quit'],m=null;
 function close(){if(m){m.remove();m=null}}
 addEventListener('contextmenu',function(e){e.preventDefault();close();
@@ -159,7 +159,7 @@ class Popups:
         # Windows: park the window off-screen instead of hiding it; WebView2 never rendered in a window created
         # hidden (blank grey card). Show = move into place, hide = move back out.
         kw = dict(x=PARK, y=PARK, hidden=False) if IS_WIN else dict(hidden=True)
-        self.win = webview.create_window("TENGAN alert", html=POPUP_HTML, width=POP_W, height=120, frameless=True, easy_drag=False,
+        self.win = webview.create_window("TENGEN alert", html=POPUP_HTML, width=POP_W, height=120, frameless=True, easy_drag=False,
                                          on_top=True, resizable=False, focus=False, **kw,
                                          background_color="#000000", js_api=_PopupApi(self))
         self.win.events.loaded += self._loaded
@@ -250,7 +250,7 @@ class Widget:
             kw = dict(x=int(x) if self.shown else PARK, y=int(y) if self.shown else PARK, hidden=False)
         else:
             kw = dict(x=int(x), y=int(y), hidden=not self.shown)
-        self.win = webview.create_window("TENGAN widget", html=WIDGET_HTML, width=int(r[2]), height=int(r[3]), **kw,
+        self.win = webview.create_window("TENGEN widget", html=WIDGET_HTML, width=int(r[2]), height=int(r[3]), **kw,
                                          frameless=True, easy_drag=IS_MAC, on_top=True, resizable=True,
                                          focus=False, min_size=(240, 150), background_color="#050302", js_api=_WidgetApi(self))
         self.win.events.loaded += self._loaded
@@ -360,7 +360,7 @@ def os_notify(title, text):
             subprocess.run(["osascript", "-e", 'display notification "%s" with title "%s"' % (esc(text) or " ", esc(title))],
                            timeout=3, capture_output=True)
             return True
-        r = subprocess.run(["notify-send", "-a", "TENGAN Desktop", title or "TENGAN", text or " "], timeout=3, capture_output=True)
+        r = subprocess.run(["notify-send", "-a", "TENGEN Desktop", title or "TENGEN", text or " "], timeout=3, capture_output=True)
         return r.returncode == 0
     except Exception as e:
         log("notify:", e)
@@ -374,7 +374,7 @@ class Tray:
     def __init__(self, app):
         self.app = app
         self.icon = None
-        if os.environ.get("TENGAN_NO_TRAY"):             # CI / headless: no tray needed
+        if os.environ.get("TENGEN_NO_TRAY"):             # CI / headless: no tray needed
             return
         try:
             import pystray
@@ -383,14 +383,14 @@ class Tray:
             log("трей недоступен:", e)
             return
         self.pystray = pystray
-        img = Image.open(os.path.join(HERE, "tengan.ico"))
+        img = Image.open(os.path.join(HERE, "tengen.ico"))
         M, I = pystray.Menu, pystray.MenuItem
         a = app
         p = lambda k: (lambda item: bool(a.engine.prefs.get(k)))
         radio = lambda k, v: (lambda item: a.engine.prefs.get(k) == v)
         T = lambda k: (lambda item: a.t(k))                 # labels in the window language (it may arrive later)
         L2 = lambda en, ru: (lambda item: ru if a.lang == "ru" else en)
-        self.icon = pystray.Icon("TENGAN", img, "TENGAN Desktop", menu=M(
+        self.icon = pystray.Icon("TENGEN", img, "TENGEN Desktop", menu=M(
             I(T("tray_open"), lambda: a.show_main(), default=True),
             M.SEPARATOR,
             I(T("tray_widget"), lambda: a.toggle_pref("widget"), checked=p("widget")),
@@ -398,7 +398,7 @@ class Tray:
             I(T("tray_native"), lambda: a.toggle_pref("native"), checked=p("native")),
             I(T("tray_click"), lambda: a.toggle_pref("clickthrough"), checked=p("clickthrough")),
             I(T("tray_style"), M(*[I(n, (lambda v: lambda: a.set_pref("style", v))(v), checked=radio("style", v), radio=True)
-                                   for n, v in ((L2("as the TENGAN theme", "как тема TENGAN"), "auto"), ("DENKO", "denko"), ("KURENAI", "kurenai"))])),
+                                   for n, v in ((L2("as the TENGEN theme", "как тема TENGEN"), "auto"), ("DENKO", "denko"), ("KURENAI", "kurenai"))])),
             I(T("tray_corner"), M(*[I(n, (lambda v: lambda: a.set_pref("corner", v))(v), checked=radio("corner", v), radio=True)
                                     for n, v in ((L2("bottom right", "справа внизу"), "br"), (L2("bottom left", "слева внизу"), "bl"),
                                                  (L2("top right", "справа вверху"), "tr"), (L2("top left", "слева вверху"), "tl"))])),
@@ -504,7 +504,7 @@ def single_instance(port):
     if IS_WIN:
         try:
             import ctypes
-            _mutex = ctypes.windll.kernel32.CreateMutexW(None, False, "TENGAN_desktop_single")
+            _mutex = ctypes.windll.kernel32.CreateMutexW(None, False, "TENGEN_desktop_single")
             if ctypes.windll.kernel32.GetLastError() != 183:      # ERROR_ALREADY_EXISTS
                 return True
         except Exception:

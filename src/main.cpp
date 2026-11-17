@@ -1,5 +1,5 @@
 // ============================================================
-//  TENGAN — radio spectrum analyzer for the LilyGO T-Embed CC1101
+//  TENGEN — radio spectrum analyzer for the LilyGO T-Embed CC1101
 //  Receive-only: Bluetooth, Wi-Fi (2.4 GHz), Sub-GHz (CC1101).
 //
 //  core/ UI, menu, input, power, battery, settings, LEDs

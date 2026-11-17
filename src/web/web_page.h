@@ -10,7 +10,7 @@
 static const char WEB_PAGE_HEAD[] PROGMEM = "<!doctype html>\n<html lang=\"";   // + "en"/"ru" (web.cpp) + WEB_PAGE
 static const char WEB_PAGE[] PROGMEM = R"HTML("><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>TENGAN</title>
+<title>TENGEN</title>
 <style>
 :root{--bg:#02090b;--panel:#071419;--line:#12303a;--acc:#3fd9ff;--hot:#eafcff;--steel:#7f97a3;--dim:#46606b;--alert:#ff8a3d;--row:#0b1f26;--hov:#0a1d24;--track:#0b2630;--accA8:rgba(63,217,255,.8);--accA2:rgba(63,217,255,.25);--onacc:#02090b;--fh:inherit}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--hot);font:14px/1.35 ui-monospace,Menlo,Consolas,monospace}
@@ -42,7 +42,7 @@ tr.cl{cursor:pointer}tr.cl:hover td{background:var(--hov)}
 .x{float:right;background:none;border:1px solid var(--line);color:var(--steel);font:inherit;padding:4px 10px;cursor:pointer}
 .empty{color:var(--steel);padding:24px 0;text-align:center}
 </style></head><body>
-<header><div class="top"><h1>// TENGAN</h1><span class="sp"></span><a href="/full" style="color:var(--acc);text-decoration:none;border:1px solid var(--line);padding:4px 10px">FULL</a><span id="bat" class="mut"></span><span id="up" class="dim"></span></div>
+<header><div class="top"><h1>// TENGEN</h1><span class="sp"></span><a href="/full" style="color:var(--acc);text-decoration:none;border:1px solid var(--line);padding:4px 10px">FULL</a><span id="bat" class="mut"></span><span id="up" class="dim"></span></div>
 <nav id="nav"></nav></header>
 <main>
 <section id="p-ov"><div class="grid">
@@ -95,7 +95,7 @@ tr.cl{cursor:pointer}tr.cl:hover td{background:var(--hov)}
 <section id="p-upd"><div class="card">
  <div class="lab" data-ru="обновление прошивки по wi-fi">firmware update over wi-fi</div>
  <div class="kv" id="u-ver" style="margin:8px 0 14px"></div>
- <div class="mut" style="margin-bottom:10px" data-ru="Выберите файл прошивки (tengan_firmware_ota_ru.bin из релиза). Устройство перезапустится само; если новая прошивка не запустится, вернётся прежняя.">Choose the firmware file (tengan_firmware_ota_en.bin from the release). The device restarts by itself; if the new firmware does not start, the previous one comes back automatically.</div>
+ <div class="mut" style="margin-bottom:10px" data-ru="Выберите файл прошивки (tengen_firmware_ota_ru.bin из релиза). Устройство перезапустится само; если новая прошивка не запустится, вернётся прежняя.">Choose the firmware file (tengen_firmware_ota_en.bin from the release). The device restarts by itself; if the new firmware does not start, the previous one comes back automatically.</div>
  <input type="file" id="u-f" accept=".bin" style="margin-bottom:10px;color:var(--steel)"><br>
  <button id="u-go" class="x" style="float:none" onclick="upload()" data-ru="ЗАГРУЗИТЬ">UPLOAD</button>
  <div class="bar" style="width:100%;height:10px;margin-top:14px"><i id="u-bar" style="width:0%"></i></div>
