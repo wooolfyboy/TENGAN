@@ -1,4 +1,4 @@
-package dev.tengan.app;
+package dev.tengen.app;
 
 import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
@@ -25,7 +25,7 @@ import java.security.MessageDigest;
 import java.util.zip.GZIPInputStream;
 import org.json.JSONObject;
 
-// TENGAN tablet app: wraps the same page as /full on the stick. Adds only what a page cannot do:
+// TENGEN tablet app: wraps the same page as /full on the stick. Adds only what a page cannot do:
 //  - keep the screen on, fullscreen without system bars;
 //  - update the page FROM THE STICK: the firmware always holds the latest page; the app compares
 //    versions (/api/pagever) and, if the stick is newer, fetches /full over the stick's Wi-Fi
@@ -35,11 +35,11 @@ public class MainActivity extends BridgeActivity {
     private static final String CAP_PREFS = "CapWebViewSettings", CAP_PATH = "serverBasePath";   // this is how Capacitor itself reads them
     private final Handler ui = new Handler(Looper.getMainLooper());
     private volatile boolean busy = false;
-    // update state; the page shows it in the header (window.TenganNative.status())
+    // update state; the page shows it in the header (window.TengenNative.status())
     static volatile String status = "start";
     static MainActivity self;
-    // plugin for the page: Capacitor.Plugins.TenganUpdate.status() / .check()
-    @CapacitorPlugin(name = "TenganUpdate")
+    // plugin for the page: Capacitor.Plugins.TengenUpdate.status() / .check()
+    @CapacitorPlugin(name = "TengenUpdate")
     public static class UpdatePlugin extends Plugin {
         @PluginMethod public void status(PluginCall call) { JSObject r = new JSObject(); r.put("status", status); call.resolve(r); }
         @PluginMethod public void check(PluginCall call) { if (self != null) self.ui.post(self::checkStickPage); call.resolve(); }
@@ -84,7 +84,7 @@ public class MainActivity extends BridgeActivity {
         try {
             PackageInfo pi = getPackageManager().getPackageInfo(getPackageName(), 0);
             String stamp = pi.lastUpdateTime + "";
-            SharedPreferences my = getSharedPreferences("tengan", MODE_PRIVATE);
+            SharedPreferences my = getSharedPreferences("tengen", MODE_PRIVATE);
             if (!stamp.equals(my.getString("apkStamp", ""))) {
                 getSharedPreferences(CAP_PREFS, MODE_PRIVATE).edit().remove(CAP_PATH).apply();
                 my.edit().putString("apkStamp", stamp).apply();
@@ -125,7 +125,7 @@ public class MainActivity extends BridgeActivity {
                 getSharedPreferences(CAP_PREFS, MODE_PRIVATE).edit().putString(CAP_PATH, path).apply();
                 status = "updated " + sha.substring(0, 6);
                 ui.post(() -> {
-                    Toast.makeText(this, "TENGAN: страница обновлена с палки", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "TENGEN: страница обновлена с палки", Toast.LENGTH_SHORT).show();
                     getBridge().setServerBasePath(path);
                 });
             } catch (Exception e) {

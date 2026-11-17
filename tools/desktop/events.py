@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-TENGAN desktop - alert/widget engine (no windows, no libraries; testable anywhere).
+TENGEN desktop - alert/widget engine (no windows, no libraries; testable anywhere).
 
 Takes the same stick events as the HQ page (ble / ir / nfc / sens / wx / st / snd) and applies the same
 rules as the tablet UI (tools/webapp/src/core/store.js): al_warm warm-up after connect, "new" = not seen
@@ -28,7 +28,7 @@ PREFS_DEF = {
     "merge_s": 2.0,                 # same-kind events within N s merge into one popup ("3 NEW DEVICES")
     "duration": 4.5,                # popup lifetime, s
     "corner": "br",                 # corner: br bl tr tl
-    "style": "auto",                # auto (follow TENGAN theme) / denko / kurenai
+    "style": "auto",                # auto (follow TENGEN theme) / denko / kurenai
     "native": False,                # native OS notifications instead of own popups
     "widget": False, "opacity": 1.0, "clickthrough": False,
     "widget_rect": None,            # [x, y, w, h]
@@ -278,7 +278,7 @@ class Engine:
         b = d.get("bat")
         if isinstance(b, int) and b >= 0:
             if self.bat is not None and self.bat > 15 >= b and not d.get("usb"):
-                self._note("battery", now, "TENGAN BATTERY LOW", "%d%%" % b, sev="alert")
+                self._note("battery", now, "TENGEN BATTERY LOW", "%d%%" % b, sev="alert")
             self.bat = b
 
     def _on_snd(self, d, now):

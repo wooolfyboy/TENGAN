@@ -1,8 +1,8 @@
 // ---- link to the stick: second port (SSE, port 81), fallback /api/* polling ----
 const Stream = T.Stream = { es: null, want: '', mode: 'off', lastMsg: 0, pollT: null };
-// the PC app (tools/desktop) sets window.TENGAN_DESKTOP; in USB mode data goes over the cable via the window.TenganUSB bridge (want / api / poll)
-const USB = window.TENGAN_DESKTOP && window.TENGAN_DESKTOP.mode === 'usb' ? window.TenganUSB : null;
-T.desktop = !!window.TENGAN_DESKTOP;
+// the PC app (tools/desktop) sets window.TENGEN_DESKTOP; in USB mode data goes over the cable via the window.TengenUSB bridge (want / api / poll)
+const USB = window.TENGEN_DESKTOP && window.TENGEN_DESKTOP.mode === 'usb' ? window.TengenUSB : null;
+T.desktop = !!window.TENGEN_DESKTOP;
 // stream events: same for Wi-Fi (SSE) and USB
 const H = {
   st: d => { S.onSt(d); T.app && T.app.status(); },
@@ -27,7 +27,7 @@ Stream.setLink = (mode) => {
   Stream.mode = mode;
   const d = document.getElementById('link'), t = document.getElementById('linkTxt');
   d.className = 'dot ' + (mode === 'live' || mode === 'usb' ? 'live' : mode === 'poll' || mode === 'usbwait' ? 'poll' : 'off');
-  t.textContent = T.tr(mode === 'live' ? 'LIVE' : mode === 'poll' ? 'POLL' : mode === 'usb' ? 'USB' : mode === 'usbwait' ? 'USB · OPEN WEB ON TENGAN' : mode === 'usboff' ? 'USB · NO DEVICE' : 'NO LINK');
+  t.textContent = T.tr(mode === 'live' ? 'LIVE' : mode === 'poll' ? 'POLL' : mode === 'usb' ? 'USB' : mode === 'usbwait' ? 'USB · OPEN WEB ON TENGEN' : mode === 'usboff' ? 'USB · NO DEVICE' : 'NO LINK');
 };
 Stream.connect = (want) => {
   Stream.want = want;
@@ -70,7 +70,7 @@ Stream.poll = (want) => {
         const m = /sm=(\d+)/.exec(want), b = /sb=(\d+)/.exec(want);
         S.onSub(await J('/api/sub?m=' + (m ? m[1] : 0) + '&b=' + (b ? b[1] : 1)));
       }
-      if (n % 16 === 1) { const i = await J('/api/info'); S.onSt({ name: 'TENGAN', up: i.up, bat: i.bat.ok ? i.bat.soc : -1, usb: i.bat.usb ? 1 : 0, cli: i.cli }); T.app.status(); }
+      if (n % 16 === 1) { const i = await J('/api/info'); S.onSt({ name: 'TENGEN', up: i.up, bat: i.bat.ok ? i.bat.soc : -1, usb: i.bat.usb ? 1 : 0, cli: i.cli }); T.app.status(); }
       Stream.lastMsg = performance.now();
     } catch (e) { Stream.setLink('off'); }
     busy = false;

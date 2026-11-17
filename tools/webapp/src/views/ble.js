@@ -332,7 +332,7 @@ T.views.push({
     if (this.sub === 0) this.scope(g, w, h, u, m, y0, portrait, dt, t);
     else if (this.sub === 1) this.city(g, w, h, u, m, y0, portrait, dt, t);
     else this.devices(g, w, h, u, m, y0, portrait, dt, t);
-    if (!S.ble) T.emptyState(g, w, h, u, 'WAITING FOR TENGAN', 'connect the tablet to the TENGAN Wi-Fi');
+    if (!S.ble) T.emptyState(g, w, h, u, 'WAITING FOR TENGEN', 'connect the tablet to the TENGEN Wi-Fi');
     else if (!n) T.emptyState(g, w, h, u, 'NO DEVICES', S.ble.on ? 'listening…' : 'bluetooth is off');
     T.finish(g, w, h);
   },

@@ -1,15 +1,15 @@
 # Protocols and wire formats
 
-TENGAN talks to the outside world over three channels: its own Wi-Fi access point (HTTP + SSE), a USB cable (text lines on the CDC serial port) and, for firmware updates, an HTTP upload. This section describes each of them as they are implemented in the code. The sources are `src/web/web.cpp`, `src/link/serout.cpp`, `src/pc/pc.cpp`, `tools/pc_monitor/pc_monitor.py`, `tools/desktop/tengan_desktop.py` and `tools/webapp/src/core/stream.js`.
+TENGEN talks to the outside world over three channels: its own Wi-Fi access point (HTTP + SSE), a USB cable (text lines on the CDC serial port) and, for firmware updates, an HTTP upload. This section describes each of them as they are implemented in the code. The sources are `src/web/web.cpp`, `src/link/serout.cpp`, `src/pc/pc.cpp`, `tools/pc_monitor/pc_monitor.py`, `tools/desktop/tengen_desktop.py` and `tools/webapp/src/core/stream.js`.
 
 ```
-                 Wi-Fi AP "TENGAN-XXXX"                       USB (CDC serial)
+                 Wi-Fi AP "TENGEN-XXXX"                       USB (CDC serial)
  phone / tablet ───────────────┐                  ┌──────────────── PC app (tools/desktop)
    :80  HTTP  /  /lite /full /api/*  /update      │                  or PC monitor (tools/pc_monitor)
    :81  SSE   /stream?want=…                      │   "@W/@Q/@G" ->   "@E/@R/@g/@X" <-
    :53  DNS   * -> 192.168.4.1                    │   "PC/PV/PM/PP/PA/TLE" ->   "KEY/AUD" <-
                                ┌──────────────────┴──┐
-                               │  TENGAN (web.cpp,   │
+                               │  TENGEN (web.cpp,   │
                                │  pc.cpp, serout.cpp)│
                                └─────────────────────┘
 ```
@@ -23,7 +23,7 @@ All of this exists only while the **Web** section is open on the device (`webSta
 | Parameter | Value |
 |---|---|
 | Mode | `WIFI_AP_STA` (the STA half is used for network scanning) |
-| SSID | `TENGAN-` + last two bytes of the MAC in hex, e.g. `TENGAN-A1B2` |
+| SSID | `TENGEN-` + last two bytes of the MAC in hex, e.g. `TENGEN-A1B2` |
 | Password | 8 digits: FNV-1a (32 bit) over the 6 MAC bytes, modulo 10^8, zero-padded; stable for a given device |
 | Channel / hidden / max clients | 6 / no / 4 (`WiFi.softAP(ssid, pass, 6, 0, 4)`) |
 | IP | `192.168.4.1` (Arduino default for softAP) |
@@ -88,7 +88,7 @@ Access-Control-Allow-Origin: *
 retry: 1500
 
 event: st
-data: {"name":"TENGAN","up":123,...}
+data: {"name":"TENGEN","up":123,...}
 ```
 
 ### Subscription: `want=`
@@ -124,7 +124,7 @@ The `pc` event is `{"live":0|1, …}`; while the PC program is silent it is just
 
 ### Client side (`tools/webapp/src/core/stream.js`)
 
-The page opens `EventSource("http://<host>:81/stream?want=…")` and registers one handler per event name; the same handler table `H` is used for USB. If the stream does not open within 5 s the page falls back to **polling** `/api/*` every 125 ms with a staggered schedule (sound every pass, BLE every 8th, `/api/info` every 16th, Wi-Fi every 40th, Sub-GHz every 2nd) and retries the real stream after 8 s. The status badge reads LIVE (SSE), POLL, USB, `USB · OPEN WEB ON TENGAN` or NO LINK. Host and port can be overridden with `?host=` and `?sse=` (used with `tools/webapp/mock.py`, which emulates the device).
+The page opens `EventSource("http://<host>:81/stream?want=…")` and registers one handler per event name; the same handler table `H` is used for USB. If the stream does not open within 5 s the page falls back to **polling** `/api/*` every 125 ms with a staggered schedule (sound every pass, BLE every 8th, `/api/info` every 16th, Wi-Fi every 40th, Sub-GHz every 2nd) and retries the real stream after 8 s. The status badge reads LIVE (SSE), POLL, USB, `USB · OPEN WEB ON TENGEN` or NO LINK. Host and port can be overridden with `?host=` and `?sse=` (used with `tools/webapp/mock.py`, which emulates the device).
 
 ## 4. USB channel between the stick and a computer
 
@@ -133,7 +133,7 @@ The stick enumerates as a USB CDC serial port (`ARDUINO_USB_CDC_ON_BOOT=1`). Bau
 The wire is **text lines** ending in `\n`. Two programs may sit on the other end, and they speak the same protocol family:
 
 - `tools/pc_monitor/pc_monitor.py` - a console program (laptop monitor), started with `start_pc_monitor.bat`;
-- `tools/desktop/tengan_desktop.py` - the desktop app (window with the FULL page + the same monitor inside + tray, popups, widget). Only one of them can own the port.
+- `tools/desktop/tengen_desktop.py` - the desktop app (window with the FULL page + the same monitor inside + tray, popups, widget). Only one of them can own the port.
 
 The device parses incoming lines in `src/pc/pc.cpp` (`pcPoll()` reads at most 2048 bytes per loop pass; the line buffer is 1024 bytes, a longer line is dropped as garbage). Lines starting with `@` go to `webLinkLine()` in `web.cpp` (the app protocol); the rest belong to the monitor protocol.
 
@@ -193,7 +193,7 @@ Behaviour:
 
 ### 4.3 How the desktop app presents it
 
-`tools/desktop/tengan_desktop.py` runs a local HTTP server on `127.0.0.1:47321` (a fixed port, so that the page's `localStorage` survives) and a `Link` object that owns the serial port (a "keeper" thread reconnects on cable loss). In **USB mode** the window opens `http://127.0.0.1:47321/full`: the page was fetched with `@G` and the app injects a small bridge `window.TENGAN_DESKTOP={mode:'usb'}` plus `window.TenganUSB`:
+`tools/desktop/tengen_desktop.py` runs a local HTTP server on `127.0.0.1:47321` (a fixed port, so that the page's `localStorage` survives) and a `Link` object that owns the serial port (a "keeper" thread reconnects on cable loss). In **USB mode** the window opens `http://127.0.0.1:47321/full`: the page was fetched with `@G` and the app injects a small bridge `window.TENGEN_DESKTOP={mode:'usb'}` plus `window.TengenUSB`:
 
 | Local route | Maps to |
 |---|---|
@@ -209,8 +209,8 @@ Web section -> `/lite` page -> **Update** tab. The file is sent with `POST /upda
 
 Accepted files (names from the release workflow `.github/workflows/build.yml`):
 
-- `tengan_firmware_ota.bin` - the plain application image (`firmware.bin`);
-- `tengan_full_0x0.bin` - the merged image for USB flashing at address 0x0.
+- `tengen_firmware_ota.bin` - the plain application image (`firmware.bin`);
+- `tengen_full_0x0.bin` - the merged image for USB flashing at address 0x0.
 
 How the handler tells them apart: it buffers the first `0x8002` bytes. If the bytes at `0x8000` are `AA 50` (the partition table magic), the file is a merged image, and everything up to `0x10000` (bootloader, partition table) is skipped; the application is written from there. Otherwise the buffered head is written as is. The first byte of the written data must be `0xE9` (ESP image magic), otherwise "not an ESP32 firmware file". Files below 32 KB are rejected ("file is too small").
 
@@ -233,7 +233,7 @@ The tablet app is a single HTML page that is **stored inside the firmware**, so 
 4. It saves `index.html` and `pagever.txt` into the app's private storage (`stickpage`), points Capacitor's `serverBasePath` at it, and reloads the WebView. No Internet is needed, only the stick's Wi-Fi.
 5. After an APK update the downloaded page is forgotten, because the APK may be newer than the stick.
 
-The page shows the state in its header through the `TenganUpdate` plugin (`status` / `check`): `same`, `download`, `updated`, `bad hash`, `no stick`. A new APK is required only when the native shell itself changes. The desktop app in USB mode gets the same page differently: via `@G` (section 4.2), with the same SHA-256 check.
+The page shows the state in its header through the `TengenUpdate` plugin (`status` / `check`): `same`, `download`, `updated`, `bad hash`, `no stick`. A new APK is required only when the native shell itself changes. The desktop app in USB mode gets the same page differently: via `@G` (section 4.2), with the same SHA-256 check.
 
 ## 7. Persistent storage (NVS)
 

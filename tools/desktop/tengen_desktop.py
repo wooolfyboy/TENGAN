@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-TENGAN desktop app (Windows, macOS, Linux).
+TENGEN desktop app (Windows, macOS, Linux).
 
 One window with the stick's HQ page (same FULL page as on the tablet) plus the PC monitor
 (tools/pc_monitor), in one program over one USB cable.
@@ -31,17 +31,39 @@ import urllib.parse
 import urllib.request
 from collections import deque
 
-APP_NAME = "TENGAN Desktop"
+APP_NAME = "TENGEN Desktop"
 PORT = 47321                       # fixed page address so per-origin tablet settings (tabs) persist
 STICK_URL = "http://192.168.4.1/full"
 
 # ---------- log location (a windowed app has no stdout) ----------
-if os.name == "nt":                                   # Windows: %APPDATA%\TENGAN
-    APPDIR = os.path.join(os.environ.get("APPDATA") or os.path.expanduser("~"), "TENGAN")
-elif sys.platform == "darwin":                        # macOS: ~/Library/Application Support/TENGAN
-    APPDIR = os.path.join(os.path.expanduser("~"), "Library", "Application Support", "TENGAN")
-else:                                                 # Linux: ~/.config/TENGAN
-    APPDIR = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.join(os.path.expanduser("~"), ".config"), "TENGAN")
+if os.name == "nt":                                   # Windows: %APPDATA%\TENGEN
+    APPDIR = os.path.join(os.environ.get("APPDATA") or os.path.expanduser("~"), "TENGEN")
+elif sys.platform == "darwin":                        # macOS: ~/Library/Application Support/TENGEN
+    APPDIR = os.path.join(os.path.expanduser("~"), "Library", "Application Support", "TENGEN")
+else:                                                 # Linux: ~/.config/TENGEN
+    APPDIR = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.join(os.path.expanduser("~"), ".config"), "TENGEN")
+
+# Migration from the pre-rename name (TENGAN -> TENGEN): old settings folder is moved to the new one
+# if the new one does not exist yet. Never raises; messages go to the log once it is open.
+_MIGRATE_MSGS = []
+
+
+def _migrate_appdir():
+    old = os.path.join(os.path.dirname(APPDIR), "TENGAN")
+    try:
+        if os.path.isdir(old) and not os.path.exists(APPDIR) and os.path.normcase(old) != os.path.normcase(APPDIR):
+            try:
+                os.rename(old, APPDIR)
+                _MIGRATE_MSGS.append("settings folder moved: %s -> %s" % (old, APPDIR))
+            except Exception:
+                import shutil
+                shutil.copytree(old, APPDIR)
+                _MIGRATE_MSGS.append("settings folder copied: %s -> %s" % (old, APPDIR))
+    except Exception as e:
+        _MIGRATE_MSGS.append("settings migration failed: %r" % (e,))
+
+
+_migrate_appdir()
 os.makedirs(APPDIR, exist_ok=True)
 if sys.platform.startswith("linux"):
     os.environ.setdefault("PYWEBVIEW_GUI", "qt")        # Qt WebEngine window (packs reliably with PyInstaller)
@@ -62,21 +84,21 @@ def log(*a):
     print(time.strftime("%H:%M:%S"), *a, flush=True)
 
 
-# ---------- window language: last known TENGAN firmware language, else the OS language ----------
+# ---------- window language: last known TENGEN firmware language, else the OS language ----------
 TX = {
     "en": {
-        "sub": "desktop · HQ and PC monitor", "usb_s": "over the cable · internet stays on", "wifi_s": "via the TENGAN access point",
-        "auto": "AUTO", "auto_s": "USB if TENGAN is on the cable", "hint": "F11 — full screen · F2 — back to this screen · F3 — widget · open Web on TENGAN",
+        "sub": "desktop · HQ and PC monitor", "usb_s": "over the cable · internet stays on", "wifi_s": "via the TENGEN access point",
+        "auto": "AUTO", "auto_s": "USB if TENGEN is on the cable", "hint": "F11 — full screen · F2 — back to this screen · F3 — widget · open Web on TENGEN",
         "countdown": "starting {m} in {n} s · or pick another", "wait": "please wait…",
-        "wifi_open": "opening 192.168.4.1 — the computer must be on the TENGAN Wi-Fi",
-        "usb_find": "looking for TENGAN on USB…", "usb_find2": "looking for TENGAN on USB… connect it with a cable and turn it on",
-        "usb_none": "TENGAN not found on USB — check the cable (or choose Wi-Fi)",
-        "usb_load": "loading HQ from TENGAN… {p}%", "failed": "failed: {e}", "no_page": "no page",
-        "not_on_usb": "TENGAN is not on USB",
-        "no_answer": "TENGAN does not answer — is firmware v1.8-test4 or newer installed? Is the old PC monitor closed?",
-        "no_send": "TENGAN did not send the page", "partial": "the page arrived incomplete ({a} of {b})",
+        "wifi_open": "opening 192.168.4.1 — the computer must be on the TENGEN Wi-Fi",
+        "usb_find": "looking for TENGEN on USB…", "usb_find2": "looking for TENGEN on USB… connect it with a cable and turn it on",
+        "usb_none": "TENGEN not found on USB — check the cable (or choose Wi-Fi)",
+        "usb_load": "loading HQ from TENGEN… {p}%", "failed": "failed: {e}", "no_page": "no page",
+        "not_on_usb": "TENGEN is not on USB",
+        "no_answer": "TENGEN does not answer — is firmware v1.8-test4 or newer installed? Is the old PC monitor closed?",
+        "no_send": "TENGEN did not send the page", "partial": "the page arrived incomplete ({a} of {b})",
         "pp_btn": "⚙ ALERTS & WIDGET", "pp_h": "ALERTS <b>警報</b> · WIDGET",
-        "pp_hint": "Near / new / tracker thresholds are shared with TENGAN and the tablet (HQ → ⚙ ALERTS). Here: what to show on this computer and how.",
+        "pp_hint": "Near / new / tracker thresholds are shared with TENGEN and the tablet (HQ → ⚙ ALERTS). Here: what to show on this computer and how.",
         "pp_test": "TEST POPUP", "pp_done": "DONE",
         "tray_open": "Open HQ", "tray_widget": "Widget on top", "tray_popups": "Popup alerts", "tray_native": "System notifications instead of popups",
         "usb_perm": "no access to {p} — Linux: run `sudo usermod -aG dialout $USER`, then log out and back in",
@@ -84,18 +106,18 @@ TX = {
         "tray_quit": "Quit", "test_text": "this is how an alert looks",
     },
     "ru": {
-        "sub": "desktop · штаб и монитор ПК", "usb_s": "по кабелю · интернет остаётся", "wifi_s": "через точку доступа TENGAN",
-        "auto": "АВТО", "auto_s": "USB, если TENGAN на кабеле", "hint": "F11 — во весь экран · F2 — снова этот выбор · F3 — виджет · на TENGAN открой раздел Web",
+        "sub": "desktop · штаб и монитор ПК", "usb_s": "по кабелю · интернет остаётся", "wifi_s": "через точку доступа TENGEN",
+        "auto": "АВТО", "auto_s": "USB, если TENGEN на кабеле", "hint": "F11 — во весь экран · F2 — снова этот выбор · F3 — виджет · на TENGEN открой раздел Web",
         "countdown": "запуск: {m} через {n} с · или выбери другой", "wait": "подожди…",
-        "wifi_open": "открываю 192.168.4.1 — компьютер должен быть подключён к Wi-Fi TENGAN",
-        "usb_find": "ищу TENGAN на USB…", "usb_find2": "ищу TENGAN на USB… подключи кабелем и включи",
-        "usb_none": "TENGAN не найден на USB — проверь кабель (или выбери Wi-Fi)",
-        "usb_load": "загружаю штаб с TENGAN… {p}%", "failed": "не вышло: {e}", "no_page": "нет страницы",
-        "not_on_usb": "TENGAN не на USB",
-        "no_answer": "TENGAN не отвечает — на нём прошивка v1.8-test4 или новее? Старый монитор ПК закрыт?",
-        "no_send": "TENGAN не прислал страницу", "partial": "страница пришла не целиком ({a} из {b})",
+        "wifi_open": "открываю 192.168.4.1 — компьютер должен быть подключён к Wi-Fi TENGEN",
+        "usb_find": "ищу TENGEN на USB…", "usb_find2": "ищу TENGEN на USB… подключи кабелем и включи",
+        "usb_none": "TENGEN не найден на USB — проверь кабель (или выбери Wi-Fi)",
+        "usb_load": "загружаю штаб с TENGEN… {p}%", "failed": "не вышло: {e}", "no_page": "нет страницы",
+        "not_on_usb": "TENGEN не на USB",
+        "no_answer": "TENGEN не отвечает — на нём прошивка v1.8-test4 или новее? Старый монитор ПК закрыт?",
+        "no_send": "TENGEN не прислал страницу", "partial": "страница пришла не целиком ({a} из {b})",
         "pp_btn": "⚙ ОПОВЕЩЕНИЯ И ВИДЖЕТ", "pp_h": "ОПОВЕЩЕНИЯ <b>警報</b> · ВИДЖЕТ",
-        "pp_hint": "Пороги «близко», «новое» и трекеры — общие с TENGAN и планшетом (штаб → ⚙ ALERTS). Здесь — что и как показывать на этом компьютере.",
+        "pp_hint": "Пороги «близко», «новое» и трекеры — общие с TENGEN и планшетом (штаб → ⚙ ALERTS). Здесь — что и как показывать на этом компьютере.",
         "pp_test": "ПРОВЕРИТЬ ПЛАШКУ", "pp_done": "ГОТОВО",
         "tray_open": "Открыть штаб", "tray_widget": "Виджет поверх окон", "tray_popups": "Всплывающие оповещения", "tray_native": "Системные уведомления вместо плашек",
         "usb_perm": "нет доступа к {p} — Linux: выполни `sudo usermod -aG dialout $USER` и перезайди в систему",
@@ -111,7 +133,7 @@ PP_TX = {
         "h_pop": "Popups", "h_kinds": "What to show", "h_quiet": "Quiet hours", "h_widget": "Widget", "h_window": "Window",
         "rows": {"popups": ["Show alerts", "a card in the screen corner, above all windows"],
                  "native": ["Windows notifications instead", "regular system ones, in the notification center"],
-                 "style": ["Style", "follows the TENGAN theme, or fixed"], "corner": ["Screen corner", ""],
+                 "style": ["Style", "follows the TENGEN theme, or fixed"], "corner": ["Screen corner", ""],
                  "duration": ["Shown for, s", ""], "per_min": ["At most per minute", "alarms may exceed the limit (up to twice)"],
                  "quiet": ["Enable", "no popups during these hours"], "quiet_from": ["From (hour)", ""], "quiet_to": ["To (hour)", ""],
                  "quiet_trackers": ["Still show a nearby tracker", ""],
@@ -121,18 +143,18 @@ PP_TX = {
                  "start_full": ["Open full screen", "like F11; the window size and position are remembered anyway"],
                  "zoom": ["Interface scale", "everything in the window bigger or smaller"],
                  "autostart": ["Start with the system", "when you sign in"], "start_tray": ["…straight to the tray", "no window at autostart — only the icon by the clock"]},
-        "styles": [["auto", "as the TENGAN theme"], ["denko", "DENKO"], ["kurenai", "KURENAI"]],
+        "styles": [["auto", "as the TENGEN theme"], ["denko", "DENKO"], ["kurenai", "KURENAI"]],
         "corners": [["br", "bottom right"], ["bl", "bottom left"], ["tr", "top right"], ["tl", "top left"]],
-        "kinds": {"new": ["New device nearby", "per the TENGAN alert thresholds"], "tracker": ["Tracker nearby", "AirTag and similar tags"],
+        "kinds": {"new": ["New device nearby", "per the TENGEN alert thresholds"], "tracker": ["Tracker nearby", "AirTag and similar tags"],
                   "ir": ["Remote", "which remote and which button"], "nfc": ["NFC card / tag", "card type"],
                   "sensor": ["New 433 MHz sensor", "thermometer, doorbell, gate remote"], "temp": ["Outdoor temperature", "if it changed by 1° or more"],
-                  "battery": ["TENGAN battery", "below 15%"], "link": ["Link to TENGAN", "lost / restored"]},
+                  "battery": ["TENGEN battery", "below 15%"], "link": ["Link to TENGEN", "lost / restored"]},
     },
     "ru": {
         "h_pop": "Всплывающие плашки", "h_kinds": "Что показывать", "h_quiet": "Тихие часы", "h_widget": "Виджет", "h_window": "Окно",
         "rows": {"popups": ["Показывать оповещения", "плашка в углу экрана поверх всех окон"],
                  "native": ["Уведомления Windows вместо плашек", "обычные системные, в центре уведомлений"],
-                 "style": ["Стиль", "как тема TENGAN или всегда один"], "corner": ["Угол экрана", ""],
+                 "style": ["Стиль", "как тема TENGEN или всегда один"], "corner": ["Угол экрана", ""],
                  "duration": ["Сколько висит, с", ""], "per_min": ["Не больше в минуту", "тревоги могут пройти сверх лимита (не больше двойного)"],
                  "quiet": ["Включить", "в эти часы плашек нет"], "quiet_from": ["С (час)", ""], "quiet_to": ["До (час)", ""],
                  "quiet_trackers": ["Трекер рядом — всё равно показать", ""],
@@ -142,19 +164,19 @@ PP_TX = {
                  "start_full": ["Открывать во весь экран", "как F11; размер и место окна запоминаются и так"],
                  "zoom": ["Масштаб интерфейса", "всё в окне крупнее или мельче"],
                  "autostart": ["Запускать вместе с системой", "при входе в систему"], "start_tray": ["…сразу в трей", "при автозапуске без окна — только значок у часов"]},
-        "styles": [["auto", "как тема TENGAN"], ["denko", "DENKO"], ["kurenai", "KURENAI"]],
+        "styles": [["auto", "как тема TENGEN"], ["denko", "DENKO"], ["kurenai", "KURENAI"]],
         "corners": [["br", "справа внизу"], ["bl", "слева внизу"], ["tr", "справа вверху"], ["tl", "слева вверху"]],
-        "kinds": {"new": ["Новое устройство рядом", "по порогам тревог TENGAN"], "tracker": ["Трекер рядом", "AirTag и похожие метки"],
+        "kinds": {"new": ["Новое устройство рядом", "по порогам тревог TENGEN"], "tracker": ["Трекер рядом", "AirTag и похожие метки"],
                   "ir": ["Пульт", "кто и какую кнопку нажал"], "nfc": ["Карта / метка NFC", "тип карты"],
                   "sensor": ["Новый датчик 433 МГц", "термометр, звонок, пульт ворот"], "temp": ["Температура за окном", "если изменилась на 1° и больше"],
-                  "battery": ["Батарея TENGAN", "ниже 15%"], "link": ["Связь с TENGAN", "пропала / вернулась"]},
+                  "battery": ["Батарея TENGEN", "ниже 15%"], "link": ["Связь с TENGEN", "пропала / вернулась"]},
     },
 }
 
 # alert titles (events.py writes English): Russian translations for the Russian window
 NOTE_RU = {"TRACKER NEARBY": "ТРЕКЕР РЯДОМ", "NEW DEVICE NEARBY": "НОВОЕ УСТРОЙСТВО РЯДОМ", "REMOTE": "ПУЛЬТ", "CARD": "КАРТА",
            "433 REMOTE / BELL": "ПУЛЬТ / ЗВОНОК 433", "NEW 433 SENSOR": "НОВЫЙ ДАТЧИК 433", "OUTSIDE": "ЗА ОКНОМ",
-           "TENGAN BATTERY LOW": "TENGAN: БАТАРЕЯ РАЗРЯЖЕНА", "LINK LOST": "СВЯЗЬ С TENGAN ПРОПАЛА", "LINK RESTORED": "СВЯЗЬ С TENGAN ВЕРНУЛАСЬ",
+           "TENGEN BATTERY LOW": "TENGEN: БАТАРЕЯ РАЗРЯЖЕНА", "LINK LOST": "СВЯЗЬ С TENGEN ПРОПАЛА", "LINK RESTORED": "СВЯЗЬ С TENGEN ВЕРНУЛАСЬ",
            "TEST · NEW DEVICE NEARBY": "ПРОВЕРКА · НОВОЕ УСТРОЙСТВО РЯДОМ"}
 
 
@@ -204,7 +226,8 @@ def cfg_load():
         return {}
 
 
-AUTOSTART_NAME = "TENGAN Desktop"
+AUTOSTART_NAME = "TENGEN Desktop"
+OLD_AUTOSTART_NAME = "TENGAN Desktop"      # pre-rename entry names, removed by autostart_migrate()
 
 
 def autostart_cmd():
@@ -217,8 +240,40 @@ def autostart_cmd():
 
 def _autostart_file():
     if sys.platform == "darwin":
+        return os.path.expanduser("~/Library/LaunchAgents/app.tengen.desktop.plist")
+    return os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config"), "autostart", "tengen-desktop.desktop")
+
+
+def _old_autostart_file():
+    if sys.platform == "darwin":
         return os.path.expanduser("~/Library/LaunchAgents/app.tengan.desktop.plist")
     return os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config"), "autostart", "tengan-desktop.desktop")
+
+
+def autostart_migrate():
+    """If the old (TENGAN) autostart entry exists: remove it and create the new one. Never raises."""
+    try:
+        had = False
+        if os.name == "nt":
+            import winreg
+            try:
+                with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run", 0,
+                                    winreg.KEY_SET_VALUE | winreg.KEY_QUERY_VALUE) as k:
+                    winreg.QueryValueEx(k, OLD_AUTOSTART_NAME)
+                    had = True
+                    winreg.DeleteValue(k, OLD_AUTOSTART_NAME)
+            except FileNotFoundError:
+                pass
+        else:
+            f = _old_autostart_file()
+            if os.path.exists(f):
+                had = True
+                os.remove(f)
+        if had:
+            ok = autostart_set(True)
+            log("автозапуск: старая запись TENGAN удалена, новая TENGEN %s" % ("создана" if ok else "НЕ создана"))
+    except Exception as e:
+        log("автозапуск (миграция):", e)
 
 
 def autostart_get():
@@ -259,11 +314,11 @@ def autostart_set(on):
                     args = "".join("<string>%s</string>" % a.replace("&", "&amp;").replace("<", "&lt;") for a in cmd)
                     body = ('<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" '
                             '"http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict>'
-                            '<key>Label</key><string>app.tengan.desktop</string>'
+                            '<key>Label</key><string>app.tengen.desktop</string>'
                             '<key>ProgramArguments</key><array>%s</array><key>RunAtLoad</key><true/></dict></plist>\n' % args)
                 else:
                     q = " ".join('"%s"' % a.replace('"', '\\"') if " " in a else a for a in cmd)
-                    body = ("[Desktop Entry]\nType=Application\nName=TENGAN Desktop\nExec=%s\n"
+                    body = ("[Desktop Entry]\nType=Application\nName=TENGEN Desktop\nExec=%s\n"
                             "X-GNOME-Autostart-enabled=true\nTerminal=false\n" % q)
                 with open(f, "w", encoding="utf-8") as fh:
                     fh.write(body)
@@ -314,7 +369,7 @@ class Link:
         self.extra = ""                # extra subscriptions for alerts/widget (even if HQ is on another tab)
         self.page_q = ""               # the page's own subscription
         self.on_port = None            # PC monitor: port opened / lost
-        self.dev_lang = None           # TENGAN firmware language (from the st event)
+        self.dev_lang = None           # TENGEN firmware language (from the st event)
         self.stop = False
         threading.Thread(target=self._keeper, daemon=True).start()
 
@@ -332,7 +387,7 @@ class Link:
                         p.timeout = 0.2
                         self.port, self.port_name = p, name
                         self.perm_err = ""
-                        log("USB: TENGAN на", name)
+                        log("USB: TENGEN на", name)
                         threading.Thread(target=self._reader, args=(p,), daemon=True).start()
                         if self.on_port:
                             self.on_port(p)
@@ -618,9 +673,9 @@ class Monitor:
 #  Window pages: mode picker and HQ (local server on 127.0.0.1)
 # ============================================================
 BRIDGE = """<script>
-window.TENGAN_DESKTOP={mode:'usb'};
+window.TENGEN_DESKTOP={mode:'usb'};
 (function(){var f=window.fetch.bind(window);var t=function(u){return f(u,{cache:'no-store'}).then(function(r){return r.text()})};
-window.TenganUSB={want:function(q){return t('/__link/want?q='+encodeURIComponent(q))},
+window.TengenUSB={want:function(q){return t('/__link/want?q='+encodeURIComponent(q))},
  api:function(p){return t('/__link/api?p='+encodeURIComponent(p))},
  poll:function(){return t('/__link/poll')}};})();
 </script>"""
@@ -670,9 +725,9 @@ class JsApi:
         return bool(self._app.engine.prefs.get("widget"))
 
 
-LAUNCHER = """<!doctype html><html lang="%LANG%"><head><meta charset="utf-8"><title>TENGAN Desktop</title>
+LAUNCHER = """<!doctype html><html lang="%LANG%"><head><meta charset="utf-8"><title>TENGEN Desktop</title>
 <style>
-:root{--bg:#000;--acc:#fff;--hot:#fff;--dim:#8a8a8a;--line:#2e2e2e}  /* строгий чёрно-белый старт: тема TENGAN ещё не известна */
+:root{--bg:#000;--acc:#fff;--hot:#fff;--dim:#8a8a8a;--line:#2e2e2e}  /* строгий чёрно-белый старт: тема TENGEN ещё не известна */
 html,body{margin:0;height:100%;background:var(--bg);color:var(--hot);font:16px/1.4 'JetBrains Mono','Cascadia Mono',Consolas,monospace}
 .w{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px}
 h1{margin:0;font-family:'Exo 2','Segoe UI',sans-serif;font-weight:600;letter-spacing:.3em;font-size:40px}h1 b{color:var(--acc)}
@@ -702,7 +757,7 @@ button:hover,button.on{border-color:var(--acc);box-shadow:0 0 18px rgba(255,255,
 .ppb{display:flex;gap:10px;margin:22px 0 40px}
 .ppb button{min-width:0;padding:10px 18px;font-size:13px}
 </style></head><body><div class="w">
-<h1>TENGAN <b>天眼</b></h1><div class="sub">%SUB%</div>
+<h1>TENGEN <b>天眼</b></h1><div class="sub">%SUB%</div>
 <div class="row">
 <button data-m="usb">USB<small>%USB_S%</small></button>
 <button data-m="wifi">WI-FI<small>%WIFI_S%</small></button>
@@ -777,7 +832,7 @@ class App:
         self.mode_on = ""              # mode HQ is really running in: usb / wifi
         self.popups = self.widget = self.tray = self.sse = None
         self.quitting = False
-        self.hq_style = "denko"        # TENGAN theme (st.theme): denko / kurenai; popups and widget follow it
+        self.hq_style = "denko"        # TENGEN theme (st.theme): denko / kurenai; popups and widget follow it
         self.ev_t = 0.0                # time of the last stick event
         link.on_event = self.on_stick_event
         self.window = None
@@ -982,7 +1037,7 @@ class App:
             pass
 
     def ticker(self):
-        """5 times a second: show ready popups, update the widget; every 30 s fetch alert settings from TENGAN.
+        """5 times a second: show ready popups, update the widget; every 30 s fetch alert settings from TENGEN.
         Popup style follows the device theme (st event)."""
         last_cfg = 0.0
         while not self.quitting:
@@ -1113,7 +1168,7 @@ def serve(app, port=PORT):
 def main():
     import webview
     import overlay
-    if os.environ.get("TENGAN_SELFTEST"):
+    if os.environ.get("TENGEN_SELFTEST"):
         # CI: check PyInstaller packed everything (window, its engine, monitor, alerts) without starting the UI;
         # on a headless box Chromium has no GPU and crashes through no fault of ours.
         import overlay_html, events                     # noqa: F401
@@ -1122,7 +1177,10 @@ def main():
         print("selftest OK: webview + window engine + modules import", flush=True)
         log("selftest OK")
         return
-    log("=== TENGAN desktop ===")
+    log("=== TENGEN desktop ===")
+    for m in _MIGRATE_MSGS:
+        log("миграция:", m)
+    autostart_migrate()
     if not overlay.single_instance(PORT):
         log("уже запущено — показал окно первой копии")
         return

@@ -1,14 +1,14 @@
-# Приложения: страница планшета, TENGAN Tablet, TENGAN Desktop, установщик
+# Приложения: страница планшета, TENGEN Tablet, TENGEN Desktop, установщик
 
-У TENGAN (устройства, «палки») маленький экран и одно колесо. Всё, что требует больше места, делают четыре
+У TENGEN (устройства, «палки») маленький экран и одно колесо. Всё, что требует больше места, делают четыре
 программы вне прошивки:
 
 | Программа | Где работает | Исходники | Как поставляется |
 |---|---|---|---|
 | **Страница планшета** (штаб, город, звук, настройки...) | любой браузер, внутри двух приложений ниже | `tools/webapp/` | gzip внутри прошивки (`src/web/tablet_page.h`) |
-| **TENGAN Tablet** | Android | `app/` | `tengan_tablet.apk` (файл релиза) |
-| **TENGAN Desktop** + монитор ПК | Windows, macOS, Linux | `tools/desktop/`, `tools/pc_monitor/` | `tengan_desktop.exe`, zip с `.app`, AppImage |
-| **Установщик** | Chrome / Edge (Web Serial) | `tools/flasher/` | `flash_tengan.html`, один файл |
+| **TENGEN Tablet** | Android | `app/` | `tengen_tablet.apk` (файл релиза) |
+| **TENGEN Desktop** + монитор ПК | Windows, macOS, Linux | `tools/desktop/`, `tools/pc_monitor/` | `tengen_desktop.exe`, zip с `.app`, AppImage |
+| **Установщик** | Chrome / Edge (Web Serial) | `tools/flasher/` | `flash_tengen.html`, один файл |
 
 Все они говорят с устройством на одном протоколе (HTTP `/api/*`, поток SSE на порту 81 или тот же JSON по
 USB-кабелю в строках с `@`); сам протокол описан в главе о протоколах. Эта глава — о том, как программы
@@ -19,7 +19,7 @@ USB-кабелю в строках с `@`); сам протокол описан
                                                       │ устройство отдаёт его как /, /full, /tablet
         ┌─────────────────────────────────────────────┼───────────────────────────────┐
         ▼                                             ▼                               ▼
-  браузер на телефоне/планшете               TENGAN Tablet (Capacitor)        TENGAN Desktop (pywebview)
+  браузер на телефоне/планшете               TENGEN Tablet (Capacitor)        TENGEN Desktop (pywebview)
   http://192.168.4.1/                        своя копия + самообновление      страница приходит по USB (@G) или
                                              с палки (/api/pagever)           http://192.168.4.1/full (Wi-Fi)
 ```
@@ -159,7 +159,7 @@ APK, mock-сервера и тестов, не трогая прошивку.
    устройство включает радио только под то, что смотрят.
 2. **Опрос** `/api/*`, если SSE не открылся за 5 с: каждые 125 мс, по одному запросу (следующий только после
    ответа на предыдущий); палка получает `?tab=`, чтобы выбрать радио. Через 8 с снова пробует SSE.
-3. **USB-мост** внутри TENGAN Desktop: `window.TenganUSB` (`want / api / poll`). `fetch()` на `/api/...` подменён,
+3. **USB-мост** внутри TENGEN Desktop: `window.TengenUSB` (`want / api / poll`). `fetch()` на `/api/...` подменён,
    так что страница кабеля не замечает.
 
 `core/store.js` (`S`) хранит последние данные и сглаживает их: `T.steady(мёртвая_зона, tau)` игнорирует дрожь
@@ -219,16 +219,16 @@ WebGL): шапка с зарядом, вкладки Overview, Bluetooth, Wi-Fi,
 | `debug` | показывать FPS и состояние обновления |
 | `shot` | для картинок README: все эффекты, без счётчика FPS и без адаптации |
 
-## 2. TENGAN Tablet (`app/`)
+## 2. TENGEN Tablet (`app/`)
 
 Оболочка Android вокруг той же страницы. Capacitor 7.6.10, плагин `@capacitor/geolocation` 7.1.8, `minSdk 23`,
-`targetSdk 35`, идентификатор `dev.tengan.app`. Оболочка нужна потому, что браузер не умеет того, что умеет
+`targetSdk 35`, идентификатор `dev.tengen.app`. Оболочка нужна потому, что браузер не умеет того, что умеет
 приложение:
 
 - **Страница загружается из самого приложения** (`capacitor.config.json`: `androidScheme: http`,
   `cleartext: true`, `allowMixedContent`), поэтому может обращаться к `http://192.168.4.1` без проблем со
   смешанным контентом и origin (палка к тому же отвечает `Access-Control-Allow-Origin: *`). Когда планшет в
-  Wi-Fi TENGAN, интернета нет, и он не нужен.
+  Wi-Fi TENGEN, интернета нет, и он не нужен.
 - **Экран не гаснет**, полноэкранный режим без системных панелей (`MainActivity.java`).
 - **GPS** (`core/gps.js`, только при `T.native`): `watchPosition` с высокой точностью (`timeout 30000`,
   `maximumAge 15000`). Страница считает небо и глобус по этим координатам, и палка тоже их получает
@@ -255,15 +255,15 @@ APK. `versionCode` берётся из номера запуска CI (`APP_VERS
 ### 2.2 Подпись APK через секреты
 
 Обновление ставится поверх старой версии, только если подпись та же, поэтому релизы подписываются одним ключом
-TENGAN, которого **нет в репозитории**:
+TENGEN, которого **нет в репозитории**:
 
 | Секрет | Содержимое |
 |---|---|
-| `TENGAN_KEYSTORE_B64` | хранилище PKCS12 в base64 |
-| `TENGAN_KEYSTORE_PASSWORD` | его пароль (пароль ключа такой же) |
+| `TENGEN_KEYSTORE_B64` | хранилище PKCS12 в base64 |
+| `TENGEN_KEYSTORE_PASSWORD` | его пароль (пароль ключа такой же) |
 
-Шаг CI декодирует хранилище в `$RUNNER_TEMP/tengan.p12` и экспортирует путь как `TENGAN_KEYSTORE`.
-`app/android/app/build.gradle` подписывает ключом с алиасом `tengan`, когда есть `TENGAN_KEYSTORE`, пароль и
+Шаг CI декодирует хранилище в `$RUNNER_TEMP/tengen.p12` и экспортирует путь как `TENGEN_KEYSTORE`.
+`app/android/app/build.gradle` подписывает ключом с алиасом `tengen`, когда есть `TENGEN_KEYSTORE`, пароль и
 файл; иначе берёт отладочный ключ Android. Правила: **релиз** (тег `v*` или ручной `release_tag`) без секрета
 валит задачу; обычный пуш или форк только предупреждает и получает APK с одноразовой подписью: он работает, но
 поверх официального не встанет (для Android это другое приложение).
@@ -287,22 +287,22 @@ TENGAN, которого **нет в репозитории**:
 гарантирует, что недокачанная или повреждённая страница не включится. После обновления APK
 (изменился `lastUpdateTime`) скачанная копия забывается: в новом APK страница может быть новее, чем на палке.
 Состояние (`start`, `check`, `same xxxxxx`, `download`, `updated`, `bad hash`, `no stick: ...`) страница
-получает через плагин `TenganUpdate` (`status()`, `check()`); с `?debug` оно видно в шапке как `UPD ...`, а в
+получает через плагин `TengenUpdate` (`status()`, `check()`); с `?debug` оно видно в шапке как `UPD ...`, а в
 Settings > Actions есть кнопка «проверить сейчас».
 
-## 3. TENGAN Desktop (`tools/desktop`, `tools/pc_monitor`)
+## 3. TENGEN Desktop (`tools/desktop`, `tools/pc_monitor`)
 
 Одна программа: окно штаба (та же страница) + монитор ПК + трей, всплывашки и виджет. Python, окно на
 **pywebview** (Windows: WebView2 / WinForms, macOS: WebKit, Linux: Qt WebEngine через PySide6, включается
-`PYWEBVIEW_GUI=qt`). Данные пользователя лежат в `%APPDATA%\TENGAN`, `~/Library/Application Support/TENGAN`
-или `~/.config/TENGAN`: `desktop.json` (настройки; ключ `alerts` хранит параметры всплывашек, виджета и окна),
+`PYWEBVIEW_GUI=qt`). Данные пользователя лежат в `%APPDATA%\TENGEN`, `~/Library/Application Support/TENGEN`
+или `~/.config/TENGEN`: `desktop.json` (настройки; ключ `alerts` хранит параметры всплывашек, виджета и окна),
 `desktop.log`, `webview/` (хранилище браузера).
 
 ### 3.1 Файлы
 
 | Файл | Роль |
 |---|---|
-| `tengan_desktop.py` | `Link` (USB), `Monitor`, локальный HTTP-сервер, стартовое окно, `App`, создание окна |
+| `tengen_desktop.py` | `Link` (USB), `Monitor`, локальный HTTP-сервер, стартовое окно, `App`, создание окна |
 | `events.py` | «мозг» оповещений без окон и библиотек: `Engine.feed / pop / snapshot` |
 | `overlay.py` | всплывашки, виджет, трей (`pystray`), `SseFeed`, единственный экземпляр, помощники Win32 |
 | `overlay_html.py` | HTML всплывашек и виджета (DENKO / KURENAI, EN / RU) |
@@ -438,18 +438,18 @@ Wi-Fi страница окна и поток оповещений занима�
 
 | Цель | Скрипт | Результат |
 |---|---|---|
-| Windows | `build_exe.py` (PyInstaller `--onefile --windowed`, иконка, скрытые импорты `pc_monitor`, `events`, `overlay`, `pycaw`, `winrt`...) | `dist/tengan_desktop.exe`, в `build.yml` (задача `desktop`, `windows-latest`) |
-| macOS | `build_xplat.py mac` | `.app`, упаковывается `ditto` -> `TENGAN-Desktop-mac.zip` |
-| Linux | `build_xplat.py linux` (onedir, Qt урезан: без QML, переводов, ненужных библиотек Qt и локалей Chromium, кроме en-US и ru) | AppImage `TENGAN-Desktop-linux-x86_64.AppImage` |
+| Windows | `build_exe.py` (PyInstaller `--onefile --windowed`, иконка, скрытые импорты `pc_monitor`, `events`, `overlay`, `pycaw`, `winrt`...) | `dist/tengen_desktop.exe`, в `build.yml` (задача `desktop`, `windows-latest`) |
+| macOS | `build_xplat.py mac` | `.app`, упаковывается `ditto` -> `TENGEN-Desktop-mac.zip` |
+| Linux | `build_xplat.py linux` (onedir, Qt урезан: без QML, переводов, ненужных библиотек Qt и локалей Chromium, кроме en-US и ru) | AppImage `TENGEN-Desktop-linux-x86_64.AppImage` |
 
 macOS и Linux — отдельный workflow `desktop-xplat.yml`, запускается вручную (минута macOS стоит десять), с
 `release_tag` файлы прикрепляются к релизу. Оба прогоняют `py_compile` и `test_events.py`; сборка Linux
-выполняет самопроверку (`TENGAN_SELFTEST=1`: импорт движка окна и модулей) и 25-секундный дымовой запуск под
-`xvfb`; для macOS тоже есть дымовой запуск (`TENGAN_NO_TRAY=1`).
+выполняет самопроверку (`TENGEN_SELFTEST=1`: импорт движка окна и модулей) и 25-секундный дымовой запуск под
+`xvfb`; для macOS тоже есть дымовой запуск (`TENGEN_NO_TRAY=1`).
 
 ## 4. Установщик (`tools/flasher`)
 
-`flash_tengan.html` — **один файл**, в котором лежат и прошивка, и библиотека прошивки: пользователь открывает
+`flash_tengen.html` — **один файл**, в котором лежат и прошивка, и библиотека прошивки: пользователь открывает
 его в Chrome или Edge, нажимает **«Установить прошивку»**, выбирает устройство и ждёт около минуты. Ни адресов,
 ни файлов. Используется Web Serial и **esptool-js 0.5.4** (Apache License 2.0, `esptool-js.LICENSE`; текст
 лицензии встроен в страницу).
@@ -459,10 +459,10 @@ macOS и Linux — отдельный workflow `desktop-xplat.yml`, запуск
 Шаг CI «Make image and installer» сначала склеивает полный образ `esptool.py merge_bin`:
 
 ```
-0x0 bootloader.bin   0x8000 partitions.bin   0xe000 boot_app0.bin   0x10000 firmware.bin   ->  tengan_full_0x0.bin
+0x0 bootloader.bin   0x8000 partitions.bin   0xe000 boot_app0.bin   0x10000 firmware.bin   ->  tengen_full_0x0.bin
 ```
 
-затем `python tools/flasher/make_flasher.py dist/tengan_full_0x0.bin dist/flash_tengan.html <тег>`:
+затем `python tools/flasher/make_flasher.py dist/tengen_full_0x0.bin dist/flash_tengen.html <тег>`:
 
 - берёт `flasher_template.html` и подставляет: шрифты (те же JetBrains Mono и Exo 2, что на планшете, из
   `fonts.css`), тексты обоих языков, пакет esptool-js и прошивку в **base64**;
@@ -491,8 +491,8 @@ macOS и Linux — отдельный workflow `desktop-xplat.yml`, запуск
 (`boot_app0`) вместе с приложением по адресу `0x10000` заставляет загрузчик запускать именно это приложение.
 
 Ход на странице: фильтр порта `usbVendorId 0x303A` (Espressif) -> `ESPLoader.main()` -> чип должен оказаться
-**ESP32-S3**, иначе «это не плата TENGAN» -> `writeFlash` со шкалой прогресса -> `loader.after()` (аппаратный
-сброс) -> «Готово, отключите кабель и подключите снова». Ошибки: порт занят (закрыть TENGAN Desktop и другие
+**ESP32-S3**, иначе «это не плата TENGEN» -> `writeFlash` со шкалой прогресса -> `loader.after()` (аппаратный
+сброс) -> «Готово, отключите кабель и подключите снова». Ошибки: порт занят (закрыть TENGEN Desktop и другие
 программы для порта: одним портом владеет только одна программа) либо сообщение с техническим журналом ниже.
 
 Обновление по воздуху и откат — другой путь (OTA через раздел «Веб»; новая прошивка проходит пробный запуск, и

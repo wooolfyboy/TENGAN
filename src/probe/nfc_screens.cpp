@@ -57,7 +57,7 @@ static void drawIdle(uint32_t now) {
   card(x, cy - 26, 88, 54, scale565(UI_LABEL(), 50 + (int)(slide * 50)), UI_PANEL(), true, false);
   spr.setTextDatum(MC_DATUM);
   spr.setTextColor(UI_LABEL());
-  txt(L("TOUCH A CARD TO TENGAN", "ПРИЛОЖИТЕ КАРТУ К TENGAN"), W / 2, 122, 1);
+  txt(L("TOUCH A CARD TO TENGEN", "ПРИЛОЖИТЕ КАРТУ К TENGEN"), W / 2, 122, 1);
   spr.setTextColor(UI_DIM());
   txt(L("READ ONLY: CARD TYPE AND PUBLIC TAG DATA", "ТОЛЬКО ЧТЕНИЕ: ТИП КАРТЫ И ОТКРЫТЫЕ ДАННЫЕ"), W / 2, 136, 1);
 }

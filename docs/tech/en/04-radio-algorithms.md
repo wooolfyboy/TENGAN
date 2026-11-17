@@ -1,6 +1,6 @@
 # Radio sections: algorithms
 
-This part describes how the radio sections of TENGAN turn raw radio events into what the screen shows. Everything here is **receive only**: Bluetooth never connects, Wi-Fi never transmits (passive scan, promiscuous listening), the CC1101 is never put into transmit (the `STX` strobe is not used), the IR LED (GPIO 2) is held low, and NFC only reads what a card announces to everybody.
+This part describes how the radio sections of TENGEN turn raw radio events into what the screen shows. Everything here is **receive only**: Bluetooth never connects, Wi-Fi never transmits (passive scan, promiscuous listening), the CC1101 is never put into transmit (the `STX` strobe is not used), the IR LED (GPIO 2) is held low, and NFC only reads what a card announces to everybody.
 
 | Section | Code | Hardware | Data in | Data out |
 |---|---|---|---|---|
@@ -64,7 +64,7 @@ The best candidate is kept. UUIDs used by any brand (`FD6F` contact tracing, `FE
 
 ### Address kinds and merging rotating MACs
 
-Phones and many accessories periodically change their random address, so counting MACs overcounts devices. TENGAN groups addresses into one **physical device** (`Ent`).
+Phones and many accessories periodically change their random address, so counting MACs overcounts devices. TENGEN groups addresses into one **physical device** (`Ent`).
 
 Address kind comes from the type bit and the two top bits of the address: public; random static (`11`); resolvable private, i.e. rotating (`01`); non-resolvable (`00`). Rotating and non-resolvable ones are candidates for merging (`rnd`).
 

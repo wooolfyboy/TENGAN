@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TENGAN seal (天眼) for the splash: a vertical "hanko" — filled rectangle with the
+"""TENGEN seal (天眼) for the splash: a vertical "hanko" — filled rectangle with the
 glyphs "cut out" (background). Output: 1-bit image src/core/seal.h.
 Font: IPAGothic (IPA Font License v1.0), used only to rasterize the two glyphs.
 
@@ -28,7 +28,7 @@ for y in range(H):
             bits.append(acc); acc = n = 0
     if n:
         bits.append(acc << (8 - n))
-print("// АВТОМАТИЧЕСКИ СГЕНЕРИРОВАНО tools/gen_seal.py: печать 天眼 (TENGAN) для заставки.")
+print("// АВТОМАТИЧЕСКИ СГЕНЕРИРОВАНО tools/gen_seal.py: печать 天眼 (TENGEN) для заставки.")
 print("// Иероглифы отрисованы шрифтом IPAGothic (IPA Font License v1.0).")
 print("#pragma once\n#include <stdint.h>\n")
 print("static const int SEAL_W = %d, SEAL_H = %d;   // 1 — заливка печати, 0 — вырезанный знак" % (W, H))

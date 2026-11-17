@@ -68,7 +68,7 @@ static const SetDef DEFS[S_NUM] = {
   { LP("Wheel clicks", "Щелчки колеса"), LP("click on every wheel step", "щелчок на каждый шаг колеса"),   P_GENERAL, "clicks",     K_BOOL },
   { LP("City", "Город"), LP("for the sky map and satellites", "для карты неба и спутников"),  P_GENERAL, "city",       K_ENUM },
   { LP("Battery", "Батарея"), "",                            P_GENERAL, "battery",    K_INFO },
-  { LP("Version", "Версия"), LP("TENGAN firmware", "прошивка TENGAN"),             P_GENERAL, "version",    K_INFO },
+  { LP("Version", "Версия"), LP("TENGEN firmware", "прошивка TENGEN"),             P_GENERAL, "version",    K_INFO },
   { LP("Range", "Дальность"), LP("ignore weaker devices", "не считать слабые устройства"),       P_BLE,     "ble_range",  K_ENUM },
   { LP("LED events", "Вспышки"), LP("LEDs flash when the count jumps", "светодиоды мигают при скачке"),    P_BLE,     "ble_ledev",  K_RANGE, 0, 30, 1, "" },
   { LP("Finder ticks", "Тики поиска"), LP("ticks on the nearest screen", "тики на экране «ближайшее»"),     P_BLE,     "ble_ticks",  K_BOOL },

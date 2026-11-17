@@ -339,10 +339,10 @@ void drawGlobe(uint32_t now) {
   if (!timeOk) {
     spr.setTextColor(C_ALERT()); txt(L("TIME UNKNOWN", "ВРЕМЯ НЕИЗВЕСТНО"), px, UI_TOP + 4, 2);
     spr.setTextColor(UI_LABEL()); txt(L("CONNECT ONCE TO", "ОДИН РАЗ ПОДКЛЮЧИТЕ"), px, UI_TOP + 26, 1);
-    txt(L("TENGAN DESKTOP OR TABLET", "TENGAN DESKTOP ИЛИ ПЛАНШЕТ"), px, UI_TOP + 38, 1);
+    txt(L("TENGEN DESKTOP OR TABLET", "TENGEN DESKTOP ИЛИ ПЛАНШЕТ"), px, UI_TOP + 38, 1);
   } else if (g_nSats == 0) {
     spr.setTextColor(C_ALERT()); txt(L("NO ORBITS", "НЕТ ОРБИТ"), px, UI_TOP + 4, 2);
-    spr.setTextColor(UI_LABEL()); txt(L("TENGAN DESKTOP LOADS THEM:", "ИХ ЗАГРУЖАЕТ TENGAN DESKTOP:"), px, UI_TOP + 26, 1);
+    spr.setTextColor(UI_LABEL()); txt(L("TENGEN DESKTOP LOADS THEM:", "ИХ ЗАГРУЖАЕТ TENGEN DESKTOP:"), px, UI_TOP + 26, 1);
     txt(L("START IT ON THE COMPUTER", "ЗАПУСТИТЕ ЕГО НА КОМПЬЮТЕРЕ"), px, UI_TOP + 38, 1);
     txt(L("(NEEDS INTERNET ONCE)", "(НУЖЕН ИНТЕРНЕТ ОДИН РАЗ)"), px, UI_TOP + 50, 1);
   } else if (spOk[si]) {

@@ -66,7 +66,7 @@ def build(lang="en"):
     html = re.sub(r"/\*@INLINE ([^*]+?)\*/", inline, html)
     html = html.replace("/*@DATA*/", data_js())
     ver = open(os.path.join(HERE, "..", "..", "VERSION")).read().strip()
-    html = html.replace("@@VERSION@@", ver)                      # TENGAN version (VERSION file)
+    html = html.replace("@@VERSION@@", ver)                      # TENGEN version (VERSION file)
     # dictionary is always embedded; start language is 'en' (the page switches to the device language at once)
     assert "/*@LANG*/'en'" in html and "/*@DICT*/null" in html
     d = json.dumps(json.load(open(os.path.join(DICT_DIR, "ru.json"), encoding="utf-8")), ensure_ascii=False, separators=(",", ":"))
@@ -100,7 +100,7 @@ def main():
         html = build(langs[0])
         out = arg("--html")
         open(out, "w", encoding="utf-8").write(html)
-        # page version next to it: the app compares it with TENGAN (/api/pagever)
+        # page version next to it: the app compares it with TENGEN (/api/pagever)
         open(os.path.join(os.path.dirname(os.path.abspath(out)), "pagever.txt"), "w").write(hashlib.sha256(html.encode("utf-8")).hexdigest())
         if "--only-html" in sys.argv:                  # dev: leave the firmware alone
             print("tablet[%s]: %d КБ HTML" % (langs[0], len(html) // 1024)); return

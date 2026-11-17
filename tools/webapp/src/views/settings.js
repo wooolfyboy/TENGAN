@@ -1,4 +1,4 @@
-// ---- TENGAN SETTINGS FROM THE TABLET: control panel ----
+// ---- TENGEN SETTINGS FROM THE TABLET: control panel ----
 // Everything the device turns with the wheel in Settings is here by finger. The device supplies the list
 // (/api/settings: pages, items, type, options, value); the tablet only draws and sends changes (/api/set).
 // A value changes at once (optimistic) and rolls back on error. Plain DOM, not canvas: no frame cost.
@@ -34,7 +34,7 @@
       const d = this.data;
       if (!d || !d.pages || !d.pages.length) {
         this.tabs.innerHTML = '';
-        this.body.innerHTML = `<div class="set-empty"><b>${T.tr('NO LINK')}</b><span>${T.tr('settings are stored on TENGAN · open Web on the device and connect')}</span></div>`;
+        this.body.innerHTML = `<div class="set-empty"><b>${T.tr('NO LINK')}</b><span>${T.tr('settings are stored on TENGEN · open Web on the device and connect')}</span></div>`;
         return;
       }
       if (this.page >= d.pages.length) this.page = 0;
@@ -103,13 +103,13 @@
     renderActions() {
       const tg = (k, on) => `<button class="tgl ${on ? 'on' : ''}" data-a="${k}"><i></i><span>${T.tr(on ? 'ON' : 'OFF')}</span></button>`;
       const row = (name, hint, ctl) => `<div class="set-row"><div class="set-name"><b>${esc(T.tr(name))}</b><span>${esc(T.tr(hint))}</span></div>${ctl}</div>`;
-      const UP = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.TenganUpdate;
+      const UP = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.TengenUpdate;
       this.body.innerHTML = `<h2 class="set-h"><span class="kj">動</span>// ${T.tr('Actions')}</h2>` +
-        row('Device screen', "turn TENGAN's display off to save battery", tg('screen', this.screenOn)) +
+        row('Device screen', "turn TENGEN's display off to save battery", tg('screen', this.screenOn)) +
         row('LEDs', 'turn the LED strip off now', `<div class="chips"><button data-a="leds">${T.tr('OFF')}</button></div>`) +
         `<h2 class="set-h">// ${T.tr('This screen')}</h2>` +
         row('Show FPS', 'frame rate in the top bar', tg('fps', T.showFps)) +
-        (UP ? row('App update', 'the app takes new screens from TENGAN · tap to check now', `<div class="chips"><button data-a="upd">${esc(T.tr(T.updStatus || 'check'))}</button></div>`) : '');
+        (UP ? row('App update', 'the app takes new screens from TENGEN · tap to check now', `<div class="chips"><button data-a="upd">${esc(T.tr(T.updStatus || 'check'))}</button></div>`) : '');
       this.body.querySelector('[data-a=screen]').onclick = () => {
         const v = this.screenOn ? 0 : 1;
         api(`/api/act?a=screen&v=${v}`).then(r => { if (!r.ok) throw new Error(r.err || 'refused'); this.screenOn = !!v; this.renderActions(); this.toast(v ? 'device screen on' : 'device screen off'); })

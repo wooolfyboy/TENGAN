@@ -1,8 +1,8 @@
 {
-  "name": "tengan-app",
+  "name": "tengen-app",
   "version": "1.0.0",
   "private": true,
-  "description": "TENGAN 天眼 — приложение для планшета (Android): та же страница, что /full на палке, плюс GPS",
+  "description": "TENGEN 天眼 — приложение для планшета (Android): та же страница, что /full на палке, плюс GPS",
   "scripts": {
     "web": "mkdir -p www && python3 ../tools/webapp/build.py --html www/index.html --only-html",
     "sync": "npm run web && npx cap sync android"

@@ -103,7 +103,7 @@ All GPIO numbers are ESP32-S3 GPIO numbers.
 - GPIO 1, captured by the ESP32 RMT peripheral at 1 us resolution (`rmtInit(..., 1000000)`), 4 memory
   blocks (192 symbols) with a fallback to 2 blocks.
 - Glitch filter: pulses shorter than 3 us are noise; 12 ms of silence ends a burst.
-- The IR LED on GPIO 2 is driven LOW and never modulated: TENGAN does not transmit IR.
+- The IR LED on GPIO 2 is driven LOW and never modulated: TENGEN does not transmit IR.
 
 ### 3.4 PN532 (NFC, Plus version only)
 
@@ -170,7 +170,7 @@ is driven LOW and latched with `gpio_hold_en` through deep sleep.
 
 The display and the CC1101 sit on the same three lines (SCLK 11, MOSI 9, MISO 10) and differ only by chip
 select (display GPIO 41, CC1101 GPIO 12). The SD card (GPIO 13) and the nRF24 (GPIO 44) on the board also
-share the bus; TENGAN does not use them but drives their CS lines HIGH at startup so they never respond.
+share the bus; TENGEN does not use them but drives their CS lines HIGH at startup so they never respond.
 
 Rules that make sharing work:
 

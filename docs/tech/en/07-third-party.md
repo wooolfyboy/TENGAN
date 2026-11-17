@@ -57,9 +57,9 @@ Details:
 
 | Component | Where | Role | License |
 |---|---|---|---|
-| [esptool-js](https://github.com/espressif/esptool-js) 0.5.4 (c) Espressif | `tools/flasher/esptool-js-0.5.4.bundle.js`, `esptool-js.LICENSE` | Flashing over Web Serial inside `flash_tengan.html` | Apache 2.0 |
-| esptool 4.8.1 | installed by CI (`pip`) | Merging `tengan_full_0x0.bin` | not stored in the repository |
-| pywebview | `tools/desktop/requirements*.txt` | Window of TENGAN Desktop (macOS: system WebKit via pyobjc; Linux: Qt WebEngine via PySide6/QtPy) | see the project |
+| [esptool-js](https://github.com/espressif/esptool-js) 0.5.4 (c) Espressif | `tools/flasher/esptool-js-0.5.4.bundle.js`, `esptool-js.LICENSE` | Flashing over Web Serial inside `flash_tengen.html` | Apache 2.0 |
+| esptool 4.8.1 | installed by CI (`pip`) | Merging `tengen_full_0x0.bin` | not stored in the repository |
+| pywebview | `tools/desktop/requirements*.txt` | Window of TENGEN Desktop (macOS: system WebKit via pyobjc; Linux: Qt WebEngine via PySide6/QtPy) | see the project |
 | PyInstaller | installed in CI | Packaging Desktop | see the project |
 | Other Desktop libraries | `requirements*.txt` | pyserial, psutil, pystray, Pillow; Windows: pycaw, comtypes, numpy, PyAudioWPatch, winrt-*; Linux: PySide6, QtPy, python-xlib, numpy, sounddevice | see each project |
 | Capacitor 7.6.10 (`@capacitor/android`, `@capacitor/core`), `@capacitor/geolocation` 7.1.8, `@capacitor/cli` | `app/package.json` | Android app shell and GPS | see the project |
@@ -71,10 +71,10 @@ The README lists only licenses that are stated in the repository files (MIT for 
 
 ## Receive-only principle and responsible use
 
-TENGAN is built to look at the radio environment, not to interfere with it:
+TENGEN is built to look at the radio environment, not to interfere with it:
 
 - It transmits nothing on the air: the CC1101 and IR are never switched to transmit, NFC only reads. The only emission is the device's own Wi-Fi access point for the tablet while the Web section is open.
 - It shows only what devices already broadcast to everyone around. Wi-Fi packet contents are not read, remote-control codes are not stored, bank card numbers and holder names are not read.
 - It works offline: no cloud, data stays on the device and on your tablet or computer. The one network request is on the PC side: the PC monitor downloads orbit elements from CelesTrak for the Globe.
-- Laws on radio reception and privacy differ between countries. Use TENGAN where and how it is legal and respect other people's privacy.
+- Laws on radio reception and privacy differ between countries. Use TENGEN where and how it is legal and respect other people's privacy.
 - Limits worth knowing: with a single antenna the device can only tell "closer / farther"; meters are a rough estimate from signal strength; the angle on the radar is for visual clarity; 5 GHz networks are not visible (ESP32-S3 is 2.4 GHz only); modern phones rotate addresses and broadcast little, so many devices stay "unknown".

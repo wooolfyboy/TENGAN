@@ -57,9 +57,9 @@
 
 | Компонент | Где | Роль | Лицензия |
 |---|---|---|---|
-| [esptool-js](https://github.com/espressif/esptool-js) 0.5.4 (c) Espressif | `tools/flasher/esptool-js-0.5.4.bundle.js`, `esptool-js.LICENSE` | Прошивка через Web Serial внутри `flash_tengan.html` | Apache 2.0 |
-| esptool 4.8.1 | ставится в CI (`pip`) | Склейка `tengan_full_0x0.bin` | в репозитории не хранится |
-| pywebview | `tools/desktop/requirements*.txt` | Окно TENGAN Desktop (macOS: системный WebKit через pyobjc; Linux: Qt WebEngine через PySide6/QtPy) | см. проект |
+| [esptool-js](https://github.com/espressif/esptool-js) 0.5.4 (c) Espressif | `tools/flasher/esptool-js-0.5.4.bundle.js`, `esptool-js.LICENSE` | Прошивка через Web Serial внутри `flash_tengen.html` | Apache 2.0 |
+| esptool 4.8.1 | ставится в CI (`pip`) | Склейка `tengen_full_0x0.bin` | в репозитории не хранится |
+| pywebview | `tools/desktop/requirements*.txt` | Окно TENGEN Desktop (macOS: системный WebKit через pyobjc; Linux: Qt WebEngine через PySide6/QtPy) | см. проект |
 | PyInstaller | ставится в CI | Упаковка Desktop | см. проект |
 | Прочие библиотеки Desktop | `requirements*.txt` | pyserial, psutil, pystray, Pillow; Windows: pycaw, comtypes, numpy, PyAudioWPatch, winrt-*; Linux: PySide6, QtPy, python-xlib, numpy, sounddevice | см. каждый проект |
 | Capacitor 7.6.10 (`@capacitor/android`, `@capacitor/core`), `@capacitor/geolocation` 7.1.8, `@capacitor/cli` | `app/package.json` | Оболочка Android-приложения и GPS | см. проект |
@@ -71,10 +71,10 @@
 
 ## Принцип «только приём» и ответственное использование
 
-TENGAN сделан, чтобы смотреть на радиообстановку, а не вмешиваться в неё:
+TENGEN сделан, чтобы смотреть на радиообстановку, а не вмешиваться в неё:
 
 - Он ничего не передаёт в эфир: CC1101 и ИК никогда не переключаются на передачу, NFC только читает. Единственное излучение — собственная точка доступа Wi-Fi для планшета, пока открыт раздел «Веб».
 - Он показывает только то, что устройства и так вещают всем вокруг. Содержимое пакетов Wi-Fi не читается, коды пультов не сохраняются, номера и имена держателей банковских карт не считываются.
 - Всё работает офлайн: без облака, данные остаются на устройстве и на вашем планшете или компьютере. Единственный сетевой запрос — на стороне ПК: монитор ПК скачивает элементы орбит с CelesTrak для Globe.
-- Законы о приёме радиосигналов и о приватности отличаются в разных странах. Используйте TENGAN там и так, как это законно, и уважайте чужую приватность.
+- Законы о приёме радиосигналов и о приватности отличаются в разных странах. Используйте TENGEN там и так, как это законно, и уважайте чужую приватность.
 - Ограничения: с одной антенной устройство различает только «ближе / дальше»; метры — грубая оценка по уровню сигнала; угол на радаре нужен для наглядности; сети 5 ГГц не видны (ESP32-S3 работает только на 2,4 ГГц); современные телефоны меняют адреса и почти ничего не вещают, поэтому многие устройства остаются «неизвестными».

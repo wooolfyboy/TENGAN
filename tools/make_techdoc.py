@@ -7,7 +7,7 @@ Needs: pandoc and a Chrome/Chromium binary (CHROME env var, or found on PATH / i
 import glob, os, shutil, subprocess, sys, tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TITLES = {"en": "TENGAN 天眼 — Technical documentation", "ru": "TENGAN 天眼 — Техническая документация"}
+TITLES = {"en": "TENGEN 天眼 — Technical documentation", "ru": "TENGEN 天眼 — Техническая документация"}
 CSS = """
 @page { size: A4; margin: 18mm 16mm; }
 body { font-family: 'DejaVu Sans', 'Liberation Sans', sans-serif; font-size: 10pt; line-height: 1.45; color: #111; }

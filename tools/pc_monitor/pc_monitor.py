@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-TENGAN laptop monitor.
+TENGEN laptop monitor.
 
-Once a second it reads CPU, memory, disk, network and battery and sends them to TENGAN over USB
-(shown in the PC section). TENGAN sends back remote commands (Media page in PC):
+Once a second it reads CPU, memory, disk, network and battery and sends them to TENGEN over USB
+(shown in the PC section). TENGEN sends back remote commands (Media page in PC):
 KEY VOLUP / VOLDN / PLAY / NEXT / PREV / MUTE, which the program turns into media key presses.
 
-PC sound: while the Sound section is open on TENGAN it sends "AUD ON"; the program captures what plays
+PC sound: while the Sound section is open on TENGEN it sends "AUD ON"; the program captures what plays
 on the speakers/headphones (not the microphone), computes the spectrum and sends ~30 "PA ..." lines per second.
 
 Run by double-clicking start_pc_monitor.bat (it installs everything). Stop: close the window or Ctrl+C.
@@ -402,7 +402,7 @@ def window_track():
 
 def unix_track():
     """macOS: AppleScript (Spotify / Music); Linux: playerctl (MPRIS: any player or browser).
-    Return a "PM ..." line for TENGAN, "PM\\n" (nothing playing) or None (method unavailable)."""
+    Return a "PM ..." line for TENGEN, "PM\\n" (nothing playing) or None (method unavailable)."""
     def pm(playing, pos, dur, app, title, artist):
         title, artist = screen_text(title, 90), screen_text(artist, 70)
         if not title and not artist:
@@ -592,14 +592,14 @@ def send(port, data):
 # Needs numpy and PyAudioWPatch (installed by start_pc_monitor.bat). Without them everything
 # else works and the stick just shows sound from its own microphone.
 class Analyzer:
-    """Sound frame (int16 as float32, shape (N, channels)) -> "PA ..." line for TENGAN:
+    """Sound frame (int16 as float32, shape (N, channels)) -> "PA ..." line for TENGEN:
     level, 32 spectrum bands, waveform and XY. Same for Windows and Linux."""
     def __init__(self, np, rate, ch, nfft):
         self.np, self.rate, self.ch, self.NFFT = np, rate, ch, nfft
         self.mono = np.zeros(nfft, dtype=np.float32)
         self.win = np.hanning(nfft).astype(np.float32)
         self.freqs = np.fft.rfftfreq(nfft, 1.0 / rate)
-        edges = np.geomspace(60, min(8000, rate / 2 - 1), 33)     # same as the TENGAN mic, so the frequency labels match
+        edges = np.geomspace(60, min(8000, rate / 2 - 1), 33)     # same as the TENGEN mic, so the frequency labels match
         self.idx = [(max(1, int(np.searchsorted(self.freqs, edges[k]))), max(1, int(np.searchsorted(self.freqs, edges[k + 1])))) for k in range(32)]
         self.top = -40.0
         self.gain = 120.0 / 8000.0
@@ -651,7 +651,7 @@ class AudioTap:
         self.want_until = time.time() + 4.0
         if first:
             say("")
-            say("     [звук] TENGAN просит звук компьютера — начинаю слушать колонки")
+            say("     [звук] TENGEN просит звук компьютера — начинаю слушать колонки")
         if self.thread is None or not self.thread.is_alive():
             self.thread = threading.Thread(target=self._run, daemon=True)
             self.thread.start()
@@ -659,7 +659,7 @@ class AudioTap:
     def stop(self):
         if time.time() < self.want_until:
             say("")
-            say("     [звук] на TENGAN закрыт раздел «Звук» — перестаю слушать")
+            say("     [звук] на TENGEN закрыт раздел «Звук» — перестаю слушать")
         self.want_until = 0.0
 
     def _run(self):
@@ -669,7 +669,7 @@ class AudioTap:
             if not self.err_shown:
                 self.err_shown = True
                 say("")
-                say("     [звук] на macOS звук колонок недоступен — TENGAN покажет свой микрофон.")
+                say("     [звук] на macOS звук колонок недоступен — TENGEN покажет свой микрофон.")
             return
         try:
             import numpy as np
@@ -755,7 +755,7 @@ class AudioTap:
             if not self.err_shown:
                 self.err_shown = True
                 say("")
-                say("     [звук] нет библиотек для звука компьютера (%s). TENGAN покажет свой микрофон." % e)
+                say("     [звук] нет библиотек для звука компьютера (%s). TENGEN покажет свой микрофон." % e)
             return
         sink = (run_cmd(["pactl", "get-default-sink"]) or "").strip()
         if sink:
@@ -821,7 +821,7 @@ class Orbits:
         got = []
         for name, num in SATS:
             url = "https://celestrak.org/NORAD/elements/gp.php?CATNR=%d&FORMAT=TLE" % num
-            req = urllib.request.Request(url, headers={"User-Agent": "tengan-pc-monitor"})
+            req = urllib.request.Request(url, headers={"User-Agent": "tengen-pc-monitor"})
             with urllib.request.urlopen(req, timeout=15) as r:
                 rows = [x.strip() for x in r.read().decode("ascii", "ignore").splitlines() if x.strip()]
             l1 = next((x for x in rows if x.startswith("1 ")), None)
@@ -877,8 +877,8 @@ def main():
     if len(sys.argv) > 2 and sys.argv[1] == "--port":
         forced = sys.argv[2]
     say("=" * 56)
-    say("  TENGAN — монитор ноутбука")
-    say("  Окно не закрывай: пока оно открыто, TENGAN получает данные.")
+    say("  TENGEN — монитор ноутбука")
+    say("  Окно не закрывай: пока оно открыто, TENGEN получает данные.")
     say("  Остановить — закрыть окно (или Ctrl+C).")
     say("=" * 56)
     col = Collector()
@@ -903,7 +903,7 @@ def main():
             if not name:
                 if not warned:
                     say("")
-                    say("[..] Ищу TENGAN... Подключи устройство к компьютеру USB-кабелем и включи.")
+                    say("[..] Ищу TENGEN... Подключи устройство к компьютеру USB-кабелем и включи.")
                     say("     (Ищу дальше сама — ничего нажимать не надо.)")
                     warned = True
                 time.sleep(2)
@@ -911,7 +911,7 @@ def main():
             try:
                 port = open_port(name)
                 say("")
-                say("[OK] TENGAN найден: %s. Отправляю данные. Открой на устройстве раздел ПК." % name)
+                say("[OK] TENGEN найден: %s. Отправляю данные. Открой на устройстве раздел ПК." % name)
                 say("     Колесо громкости: в разделе PC прокрути колесом до страницы Media.")
                 warned = False
                 tap.port = port
@@ -952,7 +952,7 @@ def main():
             sys.stdout.flush()
         except Exception:
             say("")
-            say("[..] Связь с TENGAN пропала (кабель отключили?). Жду, когда вернётся...")
+            say("[..] Связь с TENGEN пропала (кабель отключили?). Жду, когда вернётся...")
             tap.port = None
             try:
                 port.close()

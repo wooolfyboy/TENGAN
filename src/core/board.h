@@ -4,7 +4,7 @@
 #pragma once
 
 // Device name (splash, main menu, power-off screen); change it here.
-#define DEVICE_NAME "TENGAN"            // 天眼 "heavenly eye": sees the invisible
+#define DEVICE_NAME "TENGEN"            // 天眼 "heavenly eye": sees the invisible
 #include <Arduino.h>
 
 #define BOARD_PWR_EN 15     // peripheral power (CC1101, LEDs, ...)

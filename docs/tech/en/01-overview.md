@@ -1,9 +1,9 @@
 # Overview and architecture
 
-TENGAN is a receive-only radio "spectrum viewer" for the LilyGO T-Embed CC1101 (ESP32-S3). The
+TENGEN is a receive-only radio "spectrum viewer" for the LilyGO T-Embed CC1101 (ESP32-S3). The
 device (the "stick") listens to Bluetooth, Wi-Fi (2.4 GHz), Sub-GHz (CC1101), IR, NFC and sound, shows the
-result on its own 320x170 screen and, in parallel, streams the same data to a tablet (TENGAN Tablet),
-a phone browser or a computer (TENGAN Desktop). All heavy drawing in the "HQ" view happens on the
+result on its own 320x170 screen and, in parallel, streams the same data to a tablet (TENGEN Tablet),
+a phone browser or a computer (TENGEN Desktop). All heavy drawing in the "HQ" view happens on the
 tablet or computer; the stick only sends numbers.
 
 This section describes the big picture: who talks to whom, what the main loop does, how the device saves
@@ -37,7 +37,7 @@ power, how a crash is diagnosed, and how the code is organised. Pin-level detail
                                    |                     |
                     +--------------+------+    +---------+----------------+
                     | tablet / phone      |    | computer                 |
-                    | TENGAN Tablet (APK) |    | TENGAN Desktop           |
+                    | TENGEN Tablet (APK) |    | TENGEN Desktop           |
                     | or any browser      |    | (pywebview) + PC monitor |
                     | page = tablet_page.h|    | same page, USB instead   |
                     +---------------------+    | of Wi-Fi                 |
@@ -48,7 +48,7 @@ Key facts:
 
 - **One page, two transports.** The tablet page (`src/web/tablet_page.h`, a gzip blob generated from
   `tools/webapp/`) is stored in the firmware. A tablet fetches it over HTTP and then opens an SSE stream
-  on port 81 (`/stream?want=ble,wifi,snd,...`). TENGAN Desktop asks for the same page over USB (`@G`) and
+  on port 81 (`/stream?want=ble,wifi,snd,...`). TENGEN Desktop asks for the same page over USB (`@G`) and
   receives the same JSON events as `@E <event> <json>` lines. On the firmware side the USB link is just a
   third "SSE client" (`USB_SLOT` in `src/web/web.cpp`; `SSE_NET = 2` Wi-Fi tablets + 1 USB client).
 - **The stick is the data source, the client is the renderer.** The stick sends compact JSON (arrays, not
@@ -180,7 +180,7 @@ change (`settingsAutosave`) and on power-off.
 
 ## 5. Principle: the radio works only inside its own section
 
-TENGAN's radios, microphone and CC1101 are **off in the main menu**. A section turns on what it needs in
+TENGEN's radios, microphone and CC1101 are **off in the main menu**. A section turns on what it needs in
 `enter()` and turns it off in `leave()`. This saves battery and removes interference: the ESP32-S3 has one
 2.4 GHz radio shared by Bluetooth and Wi-Fi.
 
@@ -206,7 +206,7 @@ stations) and then decides per client subscription what to run (`webTick()` in `
 - The Wi-Fi network scan under an active AP goes one channel at a time (90 ms per channel) so the AP does
   not disappear for the clients.
 
-TENGAN never transmits: CC1101 is never put into TX (no `STX`), the IR LED pin is held LOW, the PN532 only
+TENGEN never transmits: CC1101 is never put into TX (no `STX`), the IR LED pin is held LOW, the PN532 only
 reads, Wi-Fi capture is passive and payloads are not read. The only emission is the stick's own access
 point while Web is open.
 
@@ -281,13 +281,13 @@ src/link/               USB output queue (serout)
 src/pc/                 PC section: lines from the PC monitor, media control, process "city"
 src/gallery/            Gallery, sky/planetarium, satellites (SGP4), radio weather
 tools/webapp/           tablet page sources (HTML/CSS/JS), build.py -> src/web/tablet_page.h, mock server
-tools/desktop/          TENGAN Desktop (Python, pywebview), widget/overlay, builders
+tools/desktop/          TENGEN Desktop (Python, pywebview), widget/overlay, builders
 tools/pc_monitor/       stand-alone laptop monitor script
 tools/flasher/          single-file browser installer (esptool-js)
 tools/sim/              PC simulator: compiles the real drawing code and renders screens to images
 tools/ook_test/         tests for the OOK decoders
 tools/gen_*.py          generators for databases and data headers (btdb, ouidb, astro, seal, fonts)
-app/                    TENGAN Tablet: Capacitor wrapper for Android
+app/                    TENGEN Tablet: Capacitor wrapper for Android
 .github/workflows/      CI: firmware + installer, APK, desktop builds, releases
 docs/                   screenshots, README assets; docs/tech/ = this documentation (en/, ru/)
 ```

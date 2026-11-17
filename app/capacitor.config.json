@@ -1,6 +1,6 @@
 {
-  "appId": "dev.tengan.app",
-  "appName": "TENGAN",
+  "appId": "dev.tengen.app",
+  "appName": "TENGEN",
   "webDir": "www",
   "server": {
     "androidScheme": "http",

@@ -114,8 +114,8 @@
   V.weather = function (g, w, h, L, dt, t) {
     const { u, m, top, bot } = L, d = S.wx, s = S.wxs;
     if (!d || !d.ok) {
-      T.emptyState(g, w, h, u, 'WEATHER', 'waiting for TENGAN');
-      return { status: 'radio weather', hint: 'open Web on TENGAN', right: 'radio weather' };
+      T.emptyState(g, w, h, u, 'WEATHER', 'waiting for TENGEN');
+      return { status: 'radio weather', hint: 'open Web on TENGEN', right: 'radio weather' };
     }
     const hz = top + (bot - top) * 0.82;                       // horizon
     const night = (() => { const hh = new Date().getHours(); return hh < 6 || hh >= 20; })();

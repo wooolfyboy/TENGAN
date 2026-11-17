@@ -58,7 +58,7 @@ def main():
         face("Oswald", "100 900", woff2(F("Oswald-SemiBold.ttf"), T), "92%"),
     ]
     if os.path.exists(IPA):
-        parts.append(face("Tengan Seal", 400, woff2(IPA, SEAL_TEXT)))
+        parts.append(face("Tengen Seal", 400, woff2(IPA, SEAL_TEXT)))
     else:
         print("нет %s — печать 天眼 останется системным шрифтом" % IPA)
     css = "/* АВТОМАТИЧЕСКИ СГЕНЕРИРОВАНО tools/webapp/make_fonts.py — шрифты OFL; печать 天眼 — IPAGothic (IPA Font License), см. fonts/ */\n" + "\n".join(parts) + "\n"
