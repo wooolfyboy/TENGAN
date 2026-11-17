@@ -85,7 +85,7 @@ addEventListener('mousemove',function(e){if(!d||!(e.buttons&1))return;
 
 # меню виджета по правому клику — чтобы он жил сам по себе: открыть штаб, скрыть, выйти из программы
 MENU_JS = """(function(){if(window.__tgMenu)return;window.__tgMenu=1;
-var T={en:['Open HQ','Hide widget','Quit TENGAN'],ru:['Открыть штаб','Скрыть виджет','Выйти из TENGAN']};
+var T={en:['Open HQ','Hide widget (F3 brings it back)','Quit TENGAN'],ru:['Открыть штаб','Скрыть виджет (вернуть — F3)','Выйти из TENGAN']};
 var A=['widget_open','widget_hide','widget_quit'],m=null;
 function close(){if(m){m.remove();m=null}}
 addEventListener('contextmenu',function(e){e.preventDefault();close();

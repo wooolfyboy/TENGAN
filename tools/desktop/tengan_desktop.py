@@ -71,7 +71,7 @@ def log(*a):
 TX = {
     "en": {
         "sub": "desktop · HQ and PC monitor", "usb_s": "over the cable · internet stays on", "wifi_s": "via the TENGAN access point",
-        "auto": "AUTO", "auto_s": "USB if TENGAN is on the cable", "hint": "F11 — full screen · F2 — back to this screen · open Web on TENGAN",
+        "auto": "AUTO", "auto_s": "USB if TENGAN is on the cable", "hint": "F11 — full screen · F2 — back to this screen · F3 — widget · open Web on TENGAN",
         "countdown": "starting {m} in {n} s · or pick another", "wait": "please wait…",
         "wifi_open": "opening 192.168.4.1 — the computer must be on the TENGAN Wi-Fi",
         "usb_find": "looking for TENGAN on USB…", "usb_find2": "looking for TENGAN on USB… connect it with a cable and turn it on",
@@ -90,7 +90,7 @@ TX = {
     },
     "ru": {
         "sub": "desktop · штаб и монитор ПК", "usb_s": "по кабелю · интернет остаётся", "wifi_s": "через точку доступа TENGAN",
-        "auto": "АВТО", "auto_s": "USB, если TENGAN на кабеле", "hint": "F11 — во весь экран · F2 — снова этот выбор · на TENGAN открой раздел Web",
+        "auto": "АВТО", "auto_s": "USB, если TENGAN на кабеле", "hint": "F11 — во весь экран · F2 — снова этот выбор · F3 — виджет · на TENGAN открой раздел Web",
         "countdown": "запуск: {m} через {n} с · или выбери другой", "wait": "подожди…",
         "wifi_open": "открываю 192.168.4.1 — компьютер должен быть подключён к Wi-Fi TENGAN",
         "usb_find": "ищу TENGAN на USB…", "usb_find2": "ищу TENGAN на USB… подключи кабелем и включи",
@@ -632,9 +632,23 @@ window.TenganUSB={want:function(q){return t('/__link/want?q='+encodeURIComponent
 
 # F11 / F2 — через мост pywebview (он есть на любой странице окна, и на странице палки по Wi-Fi)
 KEYS = """(function(){if(window.__tgKeys)return;window.__tgKeys=1;
-document.addEventListener('keydown',function(e){var a=window.pywebview&&window.pywebview.api;if(!a)return;
+function api(){return window.pywebview&&window.pywebview.api}
+// кнопка виджета: язычок у правого края окна (F3 — то же самое)
+var b=document.createElement('div');b.id='__tgw';b.title='%WT%';b.textContent='\u25F0';
+b.style.cssText='position:fixed;right:0;top:50%;transform:translateY(-50%);z-index:2147483647;width:22px;height:46px;'+
+ 'display:flex;align-items:center;justify-content:center;font:14px/1 sans-serif;cursor:pointer;user-select:none;'+
+ 'background:rgba(0,0,0,.6);color:#bbb;border:1px solid rgba(255,255,255,.3);border-right:0;border-radius:6px 0 0 6px;opacity:.45;transition:opacity .15s';
+function paint(on){b.style.color=on?'#fff':'#bbb';b.style.borderColor=on?'rgba(255,255,255,.85)':'rgba(255,255,255,.3)'}
+b.onmouseenter=function(){b.style.opacity=1};b.onmouseleave=function(){b.style.opacity=.45};
+function tog(){var a=api();if(a&&a.widget_toggle)a.widget_toggle().then(paint)}
+b.onclick=tog;
+function add(){if(document.body&&!document.getElementById('__tgw'))document.body.appendChild(b);var a=api();if(a&&a.widget_state)a.widget_state().then(paint)}
+if(document.body)add();else document.addEventListener('DOMContentLoaded',add);
+window.addEventListener('pywebviewready',add);
+document.addEventListener('keydown',function(e){var a=api();if(!a)return;
  if(e.key==='F11'){e.preventDefault();a.fullscreen();}
  if(e.key==='F2'){e.preventDefault();a.home();}
+ if(e.key==='F3'){e.preventDefault();tog();}
 });})();"""
 
 
@@ -650,6 +664,15 @@ class JsApi:
 
     def home(self):
         self._app.launcher()
+
+    def widget_toggle(self):
+        """Кнопка ◰ / F3 в окне: показать или спрятать виджет. Возвращает новое состояние."""
+        on = not bool(self._app.engine.prefs.get("widget"))
+        self._app.set_pref("widget", on)
+        return on
+
+    def widget_state(self):
+        return bool(self._app.engine.prefs.get("widget"))
 
 
 LAUNCHER = """<!doctype html><html lang="%LANG%"><head><meta charset="utf-8"><title>TENGAN Desktop</title>
@@ -1189,7 +1212,8 @@ def main():
 
     def on_loaded():
         try:
-            win.evaluate_js(KEYS)             # F11 / F2 и на странице палки (режим Wi-Fi)
+            wt = "Виджет поверх окон — F3" if app.lang == "ru" else "Widget on top — F3"
+            win.evaluate_js(KEYS.replace("%WT%", wt))   # F11 / F2 / F3 и кнопка виджета — и на странице палки (Wi-Fi)
             if float(app.engine.prefs.get("zoom", 1) or 1) != 1:
                 win.evaluate_js(zoom_js(app.engine.prefs.get("zoom")))
         except Exception:
