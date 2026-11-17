@@ -25,8 +25,8 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
       - name: Install
@@ -39,7 +39,7 @@ jobs:
         run: python tools/desktop/build_xplat.py mac
       - name: Smoke run (start the app for 25 s, check the log)
         run: TENGAN_NO_TRAY=1 python tools/desktop/smoke_run.py "dist/TENGAN Desktop.app/Contents/MacOS/TENGAN Desktop" 25
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: desktop-mac-${{ github.sha }}
           path: dist/TENGAN-Desktop-mac.zip
@@ -54,8 +54,8 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
       - name: System libraries (Qt WebEngine, audio, AppImage)
@@ -113,7 +113,7 @@ jobs:
           chmod +x appimagetool
           ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 ./appimagetool $A dist/TENGAN-Desktop-linux-x86_64.AppImage
           ls -la dist
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: desktop-linux-${{ github.sha }}
           path: dist/TENGAN-Desktop-linux-x86_64.AppImage
