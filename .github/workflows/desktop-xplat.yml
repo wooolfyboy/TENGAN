@@ -1,15 +1,11 @@
 # TENGAN Desktop для macOS и Linux (Windows-версия собирается в build.yml → tengan_desktop.exe).
-# Собирается при изменениях в tools/desktop/** или tools/pc_monitor/**; вручную — Run workflow.
+# Запуск вручную: Actions → desktop-xplat → Run workflow (к релизу — с release_tag).
 # С release_tag (например v2.0) файлы добавляются в этот релиз.
 name: desktop-xplat
 
+# Только вручную (Actions → desktop-xplat → Run workflow) и к релизу: сборка на macOS считается за 10 минут
+# лимита Actions, поэтому на каждый пуш не запускается.
 on:
-  push:
-    branches: ['**']
-    paths:
-      - 'tools/desktop/**'
-      - 'tools/pc_monitor/**'
-      - '.github/workflows/desktop-xplat.yml'
   workflow_dispatch:
     inputs:
       release_tag:

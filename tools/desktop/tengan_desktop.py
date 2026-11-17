@@ -1172,10 +1172,15 @@ def main():
             log("не включилось:", name, e)
 
     def on_closing():
-        # крестик — в трей (палка и монитор ПК работают дальше); выход — из меню трея
-        if app.tray and app.tray.icon and app.engine.prefs.get("tray", True) and not app.quitting:
-            win.hide()
-            return False
+        # крестик (и «Закрыть окно» на панели задач) — только прячет окно, если программа должна жить дальше:
+        # есть значок в трее (и так настроено) или включён виджет — он самостоятельный, как настоящий виджет.
+        # Выход — из меню трея или из меню виджета (правый клик).
+        if not app.quitting:
+            tray_ok = app.tray and app.tray.icon and app.engine.prefs.get("tray", True)
+            widget_on = app.widget and app.engine.prefs.get("widget")
+            if tray_ok or widget_on:
+                win.hide()
+                return False
         app.quit()
     win.events.closing += on_closing
     threading.Thread(target=app.ticker, daemon=True).start()

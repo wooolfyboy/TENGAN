@@ -83,6 +83,24 @@ addEventListener('mousemove',function(e){if(!d||!(e.buttons&1))return;
  if(Math.abs(e.screenX-d[0])+Math.abs(e.screenY-d[1])<3)return;d=null;
  var a=window.pywebview&&window.pywebview.api;if(a&&a.widget_drag)a.widget_drag()},true)})();"""
 
+# меню виджета по правому клику — чтобы он жил сам по себе: открыть штаб, скрыть, выйти из программы
+MENU_JS = """(function(){if(window.__tgMenu)return;window.__tgMenu=1;
+var T={en:['Open HQ','Hide widget','Quit TENGAN'],ru:['Открыть штаб','Скрыть виджет','Выйти из TENGAN']};
+var A=['widget_open','widget_hide','widget_quit'],m=null;
+function close(){if(m){m.remove();m=null}}
+addEventListener('contextmenu',function(e){e.preventDefault();close();
+ var t=T[window.LANG==='ru'?'ru':'en'],c=getComputedStyle(document.body).color;
+ m=document.createElement('div');m.style.cssText='position:fixed;z-index:99;min-width:150px;background:#050302;border:1px solid '+c+
+  ';font:12px/1 Consolas,monospace;letter-spacing:.06em;color:'+c+';box-shadow:0 4px 18px #000;padding:3px 0';
+ t.forEach(function(s,i){var b=document.createElement('div');b.textContent=s;b.style.cssText='padding:8px 12px;cursor:pointer;white-space:nowrap';
+  b.onmouseenter=function(){b.style.background='rgba(255,255,255,.12)'};b.onmouseleave=function(){b.style.background=''};
+  b.onmousedown=function(ev){ev.stopPropagation()};
+  b.onclick=function(){close();var a=window.pywebview&&window.pywebview.api;if(a&&a[A[i]])a[A[i]]()};m.appendChild(b)});
+ document.body.appendChild(m);
+ m.style.left=Math.max(0,Math.min(e.clientX,innerWidth-m.offsetWidth-2))+'px';m.style.top=Math.max(0,Math.min(e.clientY,innerHeight-m.offsetHeight-2))+'px'},true);
+addEventListener('mousedown',function(e){if(m&&!m.contains(e.target))close()},true);
+addEventListener('keydown',function(e){if(e.key==='Escape')close()})})();"""
+
 PARK = -32000                      # «стоянка» окна плашек за краем экрана (Windows)
 
 
@@ -206,6 +224,12 @@ class _WidgetApi:
     def widget_drag(self):
         self._o.native_drag()
 
+    def widget_hide(self):
+        self._o.app.set_pref("widget", False)
+
+    def widget_quit(self):
+        threading.Thread(target=self._o.app.quit, daemon=True).start()
+
 
 class Widget:
     def __init__(self, app):
@@ -236,6 +260,7 @@ class Widget:
             # Windows: таскает сама система (как за заголовок обычного окна) — плавно; запрос уходит один раз,
             # когда кнопка зажата и мышь сдвинулась на 3+ px, поэтому клик и двойной клик (штаб) работают как раньше.
             # Linux: перетаскивание pywebview за .pywebview-drag-region.
+            self.win.evaluate_js(MENU_JS)
             if IS_WIN:
                 self.win.evaluate_js(DRAG_JS)
             elif not IS_MAC:
