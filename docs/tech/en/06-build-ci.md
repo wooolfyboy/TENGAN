@@ -69,7 +69,7 @@ cd android && ./gradlew assembleRelease
 
 Needs Node 22 and JDK 21 (what CI uses). Signing:
 
-- With env variables `TENGEN_KEYSTORE` (path to a PKCS12 file) and `TENGEN_KEYSTORE_PASSWORD`, the release is signed with the TENGEN key (alias `tengen`, the same password for store and key).
+- With env variables `TENGEN_KEYSTORE` (path to a PKCS12 file) and `TENGEN_KEYSTORE_PASSWORD`, the release is signed with the TENGEN key (alias `tengan` (kept from before the rename: the key inside the .p12 was not regenerated), the same password for store and key).
 - Without them (fork, your own build) the Android debug key is used. The APK works, but Android treats it as a different app: it does not install as an update over the official APK.
 
 ### TENGEN Desktop

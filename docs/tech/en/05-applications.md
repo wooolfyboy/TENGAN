@@ -258,7 +258,7 @@ key that is **not in the repository**:
 | `TENGEN_KEYSTORE_PASSWORD` | its password (the key password is the same) |
 
 The CI step decodes the keystore to `$RUNNER_TEMP/tengen.p12` and exports its path as `TENGEN_KEYSTORE`.
-`app/android/app/build.gradle` signs with alias `tengen` when `TENGEN_KEYSTORE`, the password and the file all
+`app/android/app/build.gradle` signs with alias `tengan` (kept from before the rename: the key inside the .p12 was not regenerated) when `TENGEN_KEYSTORE`, the password and the file all
 exist; otherwise it uses Android's debug key. Rules: a **release** (tag `v*` or manual `release_tag`) with no
 keystore secret fails the job; a normal push or a fork only warns, and gets a throwaway-signed APK that works
 but will not update over the official one (Android sees a different app).
