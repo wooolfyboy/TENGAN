@@ -10,7 +10,9 @@ Bluetooth · Wi-Fi · Sub-GHz · ИК · NFC · звук · монитор ПК 
 на экране устройства, на планшете (TENGAN Tablet) и на компьютере (TENGAN Desktop).<br>
 **Только приём.** TENGAN ничего не передаёт в эфир и ничего не записывает на карты.
 
-[![build](https://github.com/wolfyboy1488/lilygostuff/actions/workflows/build.yml/badge.svg)](https://github.com/wolfyboy1488/lilygostuff/actions/workflows/build.yml)
+[![release](https://img.shields.io/github/v/release/wolfyboy1488/lilygostuff?include_prereleases&style=flat-square&color=3fd9ff&label=release)](https://github.com/wolfyboy1488/lilygostuff/releases/latest)
+[![build](https://img.shields.io/github/actions/workflow/status/wolfyboy1488/lilygostuff/build.yml?style=flat-square&label=build)](https://github.com/wolfyboy1488/lilygostuff/actions/workflows/build.yml)
+[![license](https://img.shields.io/github/license/wolfyboy1488/lilygostuff?style=flat-square&color=7f97a3)](LICENSE)
 ![ESP32-S3](https://img.shields.io/badge/ESP32--S3-T--Embed%20CC1101%20Plus-3fd9ff?style=flat-square)
 ![receive only](https://img.shields.io/badge/RF-receive%20only-7f97a3?style=flat-square)
 ![languages](https://img.shields.io/badge/lang-RU%20%C2%B7%20EN-02090b?style=flat-square&labelColor=7f97a3)
@@ -18,6 +20,7 @@ Bluetooth · Wi-Fi · Sub-GHz · ИК · NFC · звук · монитор ПК 
 ![style](https://img.shields.io/badge/theme-KURENAI-0b0b0b?style=flat-square&labelColor=e5262f)
 
 [**Скачать**](https://github.com/wolfyboy1488/lilygostuff/releases/latest) ·
+[Что нужно](#-что-нужно) ·
 [Быстрый старт](#-быстрый-старт) ·
 [Разделы](#-разделы) ·
 [Планшет и компьютер](#-tengan-tablet-и-tengan-desktop) ·
@@ -32,6 +35,11 @@ Bluetooth · Wi-Fi · Sub-GHz · ИК · NFC · звук · монитор ПК 
 > **天眼 (тэнган)** — по-японски «небесное око»: взгляд, которому видно скрытое и далёкое.
 > TENGAN показывает то, чего не видно глазам: радиоэфир вокруг — телефоны, наушники, роутеры,
 > пульты, брелоки, уличные датчики, карты.
+
+<div align="center">
+<img src="docs/tablet_hq_ru.jpg" width="100%" alt="Штаб TENGAN на планшете — все источники на одном экране">
+<br><sub><b>Штаб</b> на планшете: радиогоризонт, тревоги, датчики, звук, пульты и карты на одном экране. Палка присылает числа — рисует планшет.</sub>
+</div>
 
 ## ✨ Возможности
 
@@ -48,9 +56,17 @@ Bluetooth · Wi-Fi · Sub-GHz · ИК · NFC · звук · монитор ПК 
 | ⚙️ | **Настройки** | общие, по разделам и **тревоги**; одинаковые на устройстве, планшете и компьютере |
 
 <div align="center">
-<img src="docs/screens.png" width="100%" alt="Экраны TENGAN">
+<img src="docs/screens_ru.png" width="100%" alt="Экраны TENGAN">
 <br><sub>Экран устройства 320×170, увеличен вдвое. Все картинки — настоящий код рисования, снятый в симуляторе.</sub>
 </div>
+
+## 🧰 Что нужно
+
+| | |
+|---|---|
+| **Устройство** | **LilyGO T-Embed CC1101 Plus** (ESP32-S3, экран 320×170, колесо, CC1101, ИК, NFC PN532, микрофон, динамик, светодиоды, аккумулятор). Подойдёт и T-Embed CC1101 без Plus — без раздела NFC |
+| **Для установки** | компьютер с **Chrome** или **Edge** и кабель USB-C — ничего ставить не нужно |
+| **По желанию** | планшет или телефон на Android (TENGAN Tablet), любой браузер в той же Wi-Fi или компьютер с TENGAN Desktop (Windows, macOS, Linux) |
 
 ## 🚀 Быстрый старт
 
@@ -61,7 +77,7 @@ Bluetooth · Wi-Fi · Sub-GHz · ИК · NFC · звук · монитор ПК 
 1. Скачай прошивальщик со страницы [**Releases**](https://github.com/wolfyboy1488/lilygostuff/releases/latest):
    **`flash_tengan.html`** — одна прошивка для русского и английского.
 2. Подключи T-Embed к компьютеру USB-кабелем и открой файл в **Chrome** или **Edge**.
-3. Нажми **«Прошить»** и выбери в списке *USB JTAG/serial debug unit*.
+3. Нажми **«Установить прошивку»**, выбери в списке *USB JTAG/serial debug unit* и нажми **«Подключиться»**.
 4. Когда появится **«Готово»**, переподключи кабель. При первом включении TENGAN спросит язык: **English** или **Русский**.
 
 Прошивка уже внутри файла — ни адресов, ни выбора файлов. Настройки при перепрошивке **сохраняются**.
@@ -69,12 +85,11 @@ Bluetooth · Wi-Fi · Sub-GHz · ИК · NFC · звук · монитор ПК 
 > Дальше можно обновляться **без провода**: раздел Web → страница → вкладка **Update**.
 
 </td>
-<td width="45%"><img src="docs/flasher.png" alt="Прошивальщик в одном файле"></td>
+<td width="45%"><img src="docs/flasher_ru.png" alt="Установщик прошивки в браузере"></td>
 </tr>
 </table>
 
-**Язык** выбирается версией прошивки: русская или английская. Интерфейс устройства, планшета и программы
-на компьютере будет на этом языке.
+**Язык** выбирается на самом устройстве (Настройки › Язык) — планшет и программа на компьютере следуют за ним.
 
 ## 🕹 Управление
 
@@ -180,7 +195,7 @@ Bluetooth · Wi-Fi · Sub-GHz · ИК · NFC · звук · монитор ПК 
 ## 📱 TENGAN Tablet и TENGAN Desktop
 
 <div align="center">
-<img src="docs/tablet.jpg" width="100%" alt="TENGAN Tablet — радар Bluetooth">
+<img src="docs/tablet_sections_ru.jpg" width="100%" alt="TENGAN Tablet — город Bluetooth, каналы Wi-Fi, спектр Sub-GHz, звук, ПК, галерея">
 </div>
 
 Все разделы в полном разрешении экрана: объёмный радар, 3D-город, хребты Wi-Fi, водопад Sub-GHz в глубину,
@@ -188,13 +203,17 @@ Bluetooth · Wi-Fi · Sub-GHz · ИК · NFC · звук · монитор ПК 
 60 кадров в секунду, без интернета. Страница приходит **с самого устройства**, поэтому всегда совпадает
 с прошивкой и сама обновляется вместе с ней.
 
-<img src="docs/tablet_denko.jpg" width="100%" alt="Разделы на планшете — тема DENKO">
 
 | | Как подключиться |
 |---|---|
 | **Браузер** (телефон, планшет, компьютер) | на TENGAN открой раздел **Web** → отсканируй QR или подключись к сети `TENGAN-XXXX` → `192.168.4.1`. Выбор: **LITE** (лёгкая страница для телефона) или **FULL** (полная сцена) |
 | **TENGAN Tablet** (Android, `tengan_tablet.apk`) | та же сцена во весь экран, плюс **GPS**: небо и глобус считаются по твоим координатам. Установка: скопируй APK на планшет, открой, разреши установку |
 | **TENGAN Desktop** (Windows `tengan_desktop.exe`; macOS / Linux — ниже) | штаб и все разделы в окне **по USB-кабелю** (интернет на компьютере остаётся) или по Wi-Fi TENGAN. Внутри — монитор ПК: нагрузка, что играет, громкость, звук для раздела «Звук», точное время и орбиты спутников |
+
+<div align="center">
+<img src="docs/desktop_pc_ru.jpg" width="100%" alt="TENGAN Desktop — монитор ПК">
+<br><sub>TENGAN Desktop на ноутбуке: раздел ПК — нагрузка, память, сеть, батарея, что играет.</sub>
+</div>
 
 <details>
 <summary><b>TENGAN Desktop: подробности</b></summary>
@@ -238,7 +257,7 @@ Bluetooth · Wi-Fi · Sub-GHz · ИК · NFC · звук · монитор ПК 
 <summary><b>Обновление по Wi-Fi и откат</b></summary>
 
 Раздел Web → страница → вкладка **Update** принимает `tengan_full_0x0.bin` и `tengan_firmware_ota.bin`
-(своего языка). Новая прошивка пишется во второй слот и считается пробной: если она не проработает
+из релиза. Новая прошивка пишется во второй слот и считается пробной: если она не проработает
 15 секунд, загрузчик **сам вернёт старую**.
 
 </details>
@@ -252,17 +271,19 @@ Bluetooth · Wi-Fi · Sub-GHz · ИК · NFC · звук · монитор ПК 
 - **KURENAI 紅** — манга-панк: только чёрный, белый и алый, косые белые плашки, крупные рубленые цифры,
   без свечения — поэтому ещё и быстрее.
 
-<img src="docs/tablet_kurenai.jpg" width="100%" alt="Разделы на планшете — тема KURENAI">
+<img src="docs/tablet_kurenai_ru.jpg" width="100%" alt="Разделы на планшете — тема KURENAI">
 
-<img src="docs/screens_kurenai.png" width="100%" alt="Экраны устройства — тема KURENAI">
+<img src="docs/screens_kurenai_ru.png" width="100%" alt="Экраны устройства — тема KURENAI">
 
-## 🔒 Приватность и принцип «только приём»
+## 🔒 Приватность, принцип «только приём» и ответственное использование
 
 - TENGAN **ничего не передаёт** в эфир: CC1101 и ИК никогда не включаются на передачу, NFC только читает.
   Единственное, что излучает устройство, — его собственная точка Wi-Fi для планшета, когда открыт раздел Web.
 - Показывается только то, что устройства и так рассылают всем вокруг. Содержимое Wi-Fi-пакетов не читается,
   коды пультов не сохраняются, у банковских карт номер и имя не читаются.
 - Всё работает **без интернета** и без облака: данные не покидают устройство и твой планшет/компьютер.
+- TENGAN — инструмент, чтобы понять, как устроен радиоэфир вокруг. Законы о радиоприёме и частной жизни в
+  разных странах разные: пользуйся там и так, где это законно, и уважай чужую приватность.
 
 ## ❓ Вопросы и ответы
 

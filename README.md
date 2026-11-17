@@ -10,7 +10,9 @@ Bluetooth · Wi-Fi · Sub-GHz · IR · NFC · sound · PC monitor — one tactic
 on the device, on a tablet (TENGAN Tablet) and on a computer (TENGAN Desktop).<br>
 **Receive only.** TENGAN never transmits on the air and never writes to cards.
 
-[![build](https://github.com/wolfyboy1488/lilygostuff/actions/workflows/build.yml/badge.svg)](https://github.com/wolfyboy1488/lilygostuff/actions/workflows/build.yml)
+[![release](https://img.shields.io/github/v/release/wolfyboy1488/lilygostuff?include_prereleases&style=flat-square&color=3fd9ff&label=release)](https://github.com/wolfyboy1488/lilygostuff/releases/latest)
+[![build](https://img.shields.io/github/actions/workflow/status/wolfyboy1488/lilygostuff/build.yml?style=flat-square&label=build)](https://github.com/wolfyboy1488/lilygostuff/actions/workflows/build.yml)
+[![license](https://img.shields.io/github/license/wolfyboy1488/lilygostuff?style=flat-square&color=7f97a3)](LICENSE)
 ![ESP32-S3](https://img.shields.io/badge/ESP32--S3-T--Embed%20CC1101%20Plus-3fd9ff?style=flat-square)
 ![receive only](https://img.shields.io/badge/RF-receive%20only-7f97a3?style=flat-square)
 ![languages](https://img.shields.io/badge/lang-EN%20%C2%B7%20RU-02090b?style=flat-square&labelColor=7f97a3)
@@ -18,6 +20,7 @@ on the device, on a tablet (TENGAN Tablet) and on a computer (TENGAN Desktop).<b
 ![style](https://img.shields.io/badge/theme-KURENAI-0b0b0b?style=flat-square&labelColor=e5262f)
 
 [**Download**](https://github.com/wolfyboy1488/lilygostuff/releases/latest) ·
+[What you need](#-what-you-need) ·
 [Quick start](#-quick-start) ·
 [Sections](#-sections) ·
 [Tablet & desktop](#-tengan-tablet-and-tengan-desktop) ·
@@ -32,6 +35,11 @@ on the device, on a tablet (TENGAN Tablet) and on a computer (TENGAN Desktop).<b
 > **天眼 (tengan)** is Japanese for "heavenly eye" — the sight that sees what is hidden and far away.
 > TENGAN shows what your eyes can't: the radio world around you — phones, earbuds, routers, remotes,
 > key fobs, outdoor sensors, cards.
+
+<div align="center">
+<img src="docs/tablet_hq.jpg" width="100%" alt="TENGAN HQ on a tablet — every source on one screen">
+<br><sub><b>HQ</b> on a tablet: the radio horizon, alerts, sensors, sound, remotes and cards on one screen. The device sends numbers — the tablet draws.</sub>
+</div>
 
 ## ✨ Features
 
@@ -52,6 +60,14 @@ on the device, on a tablet (TENGAN Tablet) and on a computer (TENGAN Desktop).<b
 <br><sub>The 320×170 device screen at 2×. Every image is the real drawing code captured in the simulator.</sub>
 </div>
 
+## 🧰 What you need
+
+| | |
+|---|---|
+| **Device** | **LilyGO T-Embed CC1101 Plus** (ESP32-S3, 320×170 screen, wheel, CC1101, IR, PN532 NFC, microphone, speaker, LEDs, battery). The non-Plus T-Embed CC1101 works too, without the NFC section |
+| **To install** | a computer with **Chrome** or **Edge** and a USB-C cable — nothing to install |
+| **Optional** | an Android tablet or phone (TENGAN Tablet), any browser on the same Wi-Fi, or a computer with TENGAN Desktop (Windows, macOS, Linux) |
+
 ## 🚀 Quick start
 
 <table>
@@ -61,7 +77,7 @@ on the device, on a tablet (TENGAN Tablet) and on a computer (TENGAN Desktop).<b
 1. Download the flasher from [**Releases**](https://github.com/wolfyboy1488/lilygostuff/releases/latest):
    **`flash_tengan.html`** — one firmware for English and Russian.
 2. Connect the T-Embed to your computer with a USB cable and open the file in **Chrome** or **Edge**.
-3. Press **Flash** and pick *USB JTAG/serial debug unit*.
+3. Press **Install firmware**, pick *USB JTAG/serial debug unit* and **Connect**.
 4. When it says **Done**, reconnect the cable. At first start TENGAN asks for the language: **English** or **Русский**.
 
 The firmware is inside the file — no addresses, no file picking. Settings are **kept** when you reflash.
@@ -69,12 +85,11 @@ The firmware is inside the file — no addresses, no file picking. Settings are 
 > Later updates can go **over the air**: Web section → page → **Update** tab.
 
 </td>
-<td width="45%"><img src="docs/flasher.png" alt="Single-file flasher"></td>
+<td width="45%"><img src="docs/flasher.png" alt="Single-file flasher in the browser"></td>
 </tr>
 </table>
 
-**Language** is chosen by the firmware edition (English or Russian). The device, tablet and desktop
-interfaces all follow it.
+**Language** is chosen on the device (Settings › Language) — the tablet and desktop interfaces follow it.
 
 ## 🕹 Controls
 
@@ -180,7 +195,7 @@ the device remembers them and keeps computing on its own, offline.</sub>
 ## 📱 TENGAN Tablet and TENGAN Desktop
 
 <div align="center">
-<img src="docs/tablet.jpg" width="100%" alt="TENGAN Tablet — Bluetooth scope">
+<img src="docs/tablet_sections.jpg" width="100%" alt="TENGAN Tablet — Bluetooth city, Wi-Fi channels, Sub-GHz spectrum, sound, PC, gallery">
 </div>
 
 Every section at full screen resolution: a volumetric radar, the 3D city, Wi-Fi ridges, a deep Sub-GHz waterfall,
@@ -188,13 +203,17 @@ sound terrain, HQ, the gallery. TENGAN sends only numbers; the tablet or compute
 60 frames per second, no internet. The page is served **by the device itself**, so it always matches the
 firmware and updates together with it.
 
-<img src="docs/tablet_denko.jpg" width="100%" alt="Sections on a tablet — DENKO theme">
 
 | | How to connect |
 |---|---|
 | **Browser** (phone, tablet, computer) | open **Web** on TENGAN → scan the QR code or join `TENGAN-XXXX` → `192.168.4.1`. Choose **LITE** (a light page for phones) or **FULL** (the full scene) |
 | **TENGAN Tablet** (Android, `tengan_tablet.apk`) | the same scene full screen, plus **GPS**: sky and globe use your coordinates. Install: copy the APK to the tablet, open it, allow installation |
 | **TENGAN Desktop** (Windows `tengan_desktop.exe`; macOS / Linux — see below) | HQ and every section in a window **over the USB cable** (your computer keeps its internet) or over TENGAN's Wi-Fi. Includes the PC monitor: load, now playing, volume, PC audio for Sound, exact time and satellite orbits |
+
+<div align="center">
+<img src="docs/desktop_pc.jpg" width="100%" alt="TENGAN Desktop — PC monitor">
+<br><sub>TENGAN Desktop on a laptop: the PC section — load, memory, network, battery, now playing.</sub>
+</div>
 
 <details>
 <summary><b>TENGAN Desktop details</b></summary>
@@ -237,7 +256,7 @@ run them with a real TENGAN yet — reports are welcome.
 <details>
 <summary><b>Over-the-air updates and rollback</b></summary>
 
-Web → page → **Update** accepts `tengan_full_0x0.bin` and `tengan_firmware_ota.bin` (of your language).
+Web → page → **Update** accepts `tengan_full_0x0.bin` and `tengan_firmware_ota.bin` from the release.
 The new firmware goes to the second slot as a trial: if it does not run for 15 seconds, the bootloader
 **restores the previous one** by itself.
 
@@ -256,13 +275,15 @@ Until a screen knows the device's theme, startup is plain black and white.
 
 <img src="docs/screens_kurenai.png" width="100%" alt="Device screens — KURENAI theme">
 
-## 🔒 Privacy and the receive-only principle
+## 🔒 Privacy, the receive-only principle and responsible use
 
 - TENGAN **transmits nothing** on the air: CC1101 and IR are never switched to transmit, NFC only reads.
   The only thing the device emits is its own Wi-Fi access point for the tablet, while Web is open.
 - It shows only what devices already broadcast to everyone around. Wi-Fi packet contents are never read,
   remote codes are not stored, bank card numbers and names are not read.
 - Everything works **offline**, with no cloud: data never leaves the device and your tablet/computer.
+- TENGAN is a tool for learning how the radio world around you works. Laws on radio reception and privacy differ
+  between countries — use it where and how it is legal, and respect other people's privacy.
 
 ## ❓ FAQ
 
