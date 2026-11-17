@@ -70,7 +70,7 @@ The wire formats themselves (HTTP API, SSE events, `@`-lines, OTA) are described
 
 `src/main.cpp`, in this order:
 
-1. `crumbBoot()` - read the previous reset reason and the last logged step (see section 6).
+1. `crumbBoot()` - read the previous reset reason and the last logged step (see section 7).
 2. `checkWakeHold()` - if the board woke from deep sleep ("power off"), require the side button to be
    held for `PWR_ON_MS` = 1 s; otherwise go straight back to sleep (accidental touch in a bag).
 3. Deselect every device on the shared SPI bus (all CS pins HIGH) and raise `BOARD_PWR_EN` (GPIO 15,

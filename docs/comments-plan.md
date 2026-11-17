@@ -48,12 +48,12 @@
 ## Блоки (по ночам)
 
 - [x] **Ночь 1 — прошивка, часть A**: `src/main.cpp`, `src/core/`, `src/ble/`, `src/wifi/`, `src/link/`, `src/web/` (кроме сгенерированных `.h`).
-- [ ] **Ночь 2 — прошивка, часть B + инструменты**: `src/subghz/`, `src/audio/`, `src/probe/`, `src/pc/`, `src/gallery/`;
+- [x] **Ночь 2 — прошивка, часть B + инструменты**: `src/subghz/`, `src/audio/`, `src/probe/`, `src/pc/`, `src/gallery/`;
       `tools/*.py` (генераторы), `tools/sim/`, `tools/ook_test/`, `.github/workflows/*.yml`, `platformio.ini`.
-- [ ] **Ночь 3 — приложения**: `tools/webapp/` (src, build.py, mock.py, make_fonts.py), `tools/desktop/`, `tools/pc_monitor/`,
+- [x] **Ночь 3 — приложения**: `tools/webapp/` (src, build.py, mock.py, make_fonts.py), `tools/desktop/`, `tools/pc_monitor/`,
       `tools/flasher/make_flasher.py` и его HTML, `app/` (свои файлы: build.gradle, MainActivity, конфиги, make_icons.py).
       В конце: `git grep -nP "[а-яА-ЯёЁ]"` по коду — остаться должны только тексты интерфейса и словари.
-- [ ] **Ночь 4 — техдокументация EN + RU**: `docs/tech/en/*.md`, `docs/tech/ru/*.md` (одинаковая структура):
+- [x] **Ночь 4 — техдокументация EN + RU**: `docs/tech/en/*.md`, `docs/tech/ru/*.md` (одинаковая структура):
       1. Обзор и архитектура (палка ↔ планшет/ПК, схема потоков данных, главный цикл, режим простоя, «чёрный ящик», watchdog).
       2. Железо и пины (T-Embed CC1101 Plus: экран, CC1101, ИК, PN532, микрофон, LED, питание).
       3. Протоколы: Wi-Fi AP + HTTP API + SSE (`:81/stream`), USB-канал (`@E/@Q/@R/@G…`), OTA и откат.
@@ -75,3 +75,7 @@
 (сюда — по строке на ночь: что сделано, коммиты, что осталось)
 
 - **Ночь 1 (17.11, днём, вне расписания):** прошивка часть A — 56 файлов (`src/main.cpp`, `core/`, `ble/`, `wifi/`, `link/`, `web/`, без сгенерированных `.h` и `core/fonts/`), ≈990 строк добавлено / ≈1060 удалено. Проверка: текст без комментариев совпадает с HEAD в 55 файлах; в `web_page.h` ещё 7 JS-комментариев внутри raw-строки — сверка по токенам без `//`-комментариев совпала. `pio run` — SUCCESS. Осталось: ночи 2–4. Комментарии-примеры с кириллицей в `core/lang.h` оставлены намеренно (демонстрируют вызов макросов).
+- **Ночь 2 (17.11, днём, вне расписания):** прошивка часть B (`src/subghz`, `audio`, `probe`, `pc`, `gallery`), `tools/*.py`, `tools/sim`, `tools/ook_test`, `.github/workflows/*.yml`, `platformio.ini` — 31 + 23 файла. Проверка: C/C++ — срез комментариев, Python — AST, yml — `yaml.safe_load` и diff только `#`-строк.
+- **Ночь 3 (17.11, днём):** `tools/webapp` (JS по токенам `acorn`, Python по AST, CSS по diff), `tools/desktop`, `tools/pc_monitor`, `tools/flasher`, `app/` (свои файлы). В `build.py` страница пересобрана (`tablet_page.h`, `--check` зелёный) — комментарии в конце строк кода входили в страницу; поведение то же. Комментарии внутри GLSL-шейдеров (строковые литералы) переведены отдельно, проверка — срез `//`-комментариев.
+- **Ночь 4 (17.11, днём):** `docs/tech/{en,ru}/01…07` (8 разделов × 2 языка, структура заголовков совпадает), `tools/make_techdoc.py` (pandoc → HTML → headless Chrome → PDF; локально: EN 69 стр., RU 74 стр.), задание `techdoc` в `.github/workflows/build.yml` — PDF `TENGAN-tech-doc-en.pdf` / `-ru.pdf` прикладываются к релизу; ссылки в README. Расхождения, найденные при написании: лицензия JetBrains Mono (в `fonts/LICENSE-JetBrainsMono.txt` и README — Apache 2.0, в заголовках `src/core/fonts/JBM*.h` — SIL OFL 1.1); комментарий в `pc.h` («живые <3 с») против 10 с в `pcLive()`.
+- **Остаётся нетронутым намеренно:** русские строки интерфейса (`L(...)`, словари, `ru.json`), сообщения пользователю в `pc_monitor.py`/`tengan_desktop.py`, русские комментарии внутри строк, попадающих в сгенерированные файлы (`gen_*.py`, `build.py`, `make_fonts.py` → `fonts.css`/`tablet_page.h`), `tools/desktop/WIDGET.md`, `requirements*.txt`. Все блоки отмечены `[x]`.

@@ -125,8 +125,8 @@ All GPIO numbers are ESP32-S3 GPIO numbers.
 | Processing | task on core 1 reads 512-sample blocks (32 ms), computes level and FFT | task on core 1 plays short tones from a queue of 8 |
 
 - The microphone runs only while the Sound section is open (or a client subscribed to sound). If the left
-  channel is silent (peak below 8 over the first 1.5 s) the code restarts the stream on the right channel -
-  some units wire the PDM data to the other slot.
+  channel is silent (peak below 8 over the first 1.5 s) the code restarts the stream on the right channel
+  (a self-check: the PDM data may sit in either slot).
 - Sound output is limited to UI feedback: wheel click (2.6 kHz, 6 ms), a "Geiger counter" in the search
   screens, beeps. Volume is set by Settings > Sounds: off / quiet / loud (amplitude 2500 / 9000 of 32767).
   Nothing is recorded.
