@@ -1,5 +1,5 @@
 // ============================================================
-//  settings.cpp — настройки и их экран
+//  settings.cpp — settings storage and the settings screen
 // ============================================================
 #include <Preferences.h>
 #include "core/lang.h"
@@ -21,33 +21,33 @@ int g_range = 0;
 int g_thresh = 7;
 int g_ledBright = 50;
 int g_scrBright = 100;
-int g_dimIdx = 0;                        // по умолчанию экран не гаснет
-int g_sndIdx = 1;                        // тихие звуки интерфейса
+int g_dimIdx = 0;                        // screen never dims by default
+int g_sndIdx = 1;                        // quiet UI sounds
 int g_clickEn = 1;
-int g_theme = THEME_DENKO;                // оформление: пока одна тема — DENKO 電光 (свет, HUD)
+int g_theme = THEME_DENKO;                // theme: DENKO 電光 (HUD) by default
 int g_micEn = 1;
 int g_auSrc = 0;
 int g_city = 0;
-int g_lang = 0;                          // язык интерфейса: 0 English, 1 Русский (lang.h)
-bool g_langAsk = false;                  // язык ещё не выбран — при старте спросить (core/langpick)
+int g_lang = 0;                          // UI language: 0 English, 1 Russian (lang.h)
+bool g_langAsk = false;                  // language not chosen yet: ask at startup (core/langpick)
 int g_tzOff = 10800;
 int g_auLeds = 0;
 int g_bleTicks = 1;
 int g_wifiTicks = 1;
 int g_wRange = 0;
-// тревоги (штаб на планшете / компе): что считать «близко», «новым», тревогой и как считать активность эфира
+// alerts (HQ on tablet / PC): what counts as near, new, alarm, and how airwave activity is scored
 int g_alNear = -65, g_alNew = 1, g_alTrk = 1, g_alNewFor = 30, g_alWarm = 20, g_alSens = 5,
     g_alWarn = 60, g_alAlarm = 80, g_alCBle = 1, g_alCRf = 1, g_alCSnd = 1, g_alCPrb = 1, g_alBlink = 1, g_alPlate = 1;
 
-static int      g_setPage = 0;           // страница: общие / раздел
-static int      g_setItem = 0;           // выбранный пункт на странице
+static int      g_setPage = 0;           // page: general / section
+static int      g_setItem = 0;           // selected item on the page
 static bool     g_setDirty = false;
 static uint32_t g_setChangedMs = 0;
 static Preferences g_prefs;
 
-// все пункты настроек; page — на какой странице показывать.
-// Одна таблица на всё: экран палки (колесо) и планшет (/api/settings, /api/set) читают и меняют
-// настройки через одни и те же getVal / setVal — логика не дублируется.
+// All settings; page = which page shows the item.
+// One table for everything: the stick screen (wheel) and the tablet (/api/settings,
+// /api/set) both go through getVal / setVal, so the logic isn't duplicated.
 enum { S_THEME, S_LANG, S_SCREEN, S_DIM, S_LEDBR, S_VOLUME, S_CLICKS, S_CITY, S_BATTERY, S_VERSION,
        S_RANGE, S_LEDEV, S_BLETICK,
        S_WRANGE, S_WTICK,
@@ -56,7 +56,7 @@ enum { S_THEME, S_LANG, S_SCREEN, S_DIM, S_LEDBR, S_VOLUME, S_CLICKS, S_CITY, S_
        S_ALNEAR, S_ALNEW, S_ALTRK, S_ALNEWFOR, S_ALWARM, S_ALSENS, S_ALWARN, S_ALALARM,
        S_ALCBLE, S_ALCRF, S_ALCSND, S_ALCPRB, S_ALBLINK, S_ALPLATE, S_NUM };
 enum { P_GENERAL, P_BLE, P_WIFI, P_SUBGHZ, P_SOUND, P_ALERT, P_NUM };
-enum { K_ENUM, K_RANGE, K_BOOL, K_INFO };                 // вид пункта (для планшета)
+enum { K_ENUM, K_RANGE, K_BOOL, K_INFO };                 // item kind (for the tablet)
 struct SetDef { const char* name; const char* hint; uint8_t page; const char* key; uint8_t kind; int16_t mn, mx, step; const char* unit; };
 static const SetDef DEFS[S_NUM] = {
   { LP("Theme", "Тема"), LP("look: denko neon / kurenai red", "оформление: denko / kurenai"),   P_GENERAL, "theme",      K_ENUM },
@@ -97,16 +97,16 @@ static const char* const PAGE_NAMES[P_NUM] = { LP("General", "Общие"), "Blu
 static const char* const PAGE_IDS[P_NUM]   = { "general", "ble", "wifi", "sub", "snd", "alert" };
 static const char* const PAGE_DESCS[P_NUM] = { LP("theme, screen, LEDs, city", "тема, экран, город"), LP("range, LEDs, ticks", "дальность, вспышки"),
                                                LP("range, ticks", "дальность, тики"), LP("radio band", "диапазон"), LP("source, mic, LEDs", "источник, микрофон"), LP("near, new, levels", "рядом, новые, уровни") };
-static const int SET_ROWS = 7;           // строк на экране (список прокручивается)
+static const int SET_ROWS = 7;           // rows on screen (list scrolls)
 
-// пункты текущей страницы
+// items of the current page
 static int pageItems(int page, int* out) {
   int n = 0;
   for (int i = 0; i < S_NUM; i++) if (DEFS[i].page == page) out[n++] = i;
   return n;
 }
 
-// ---------- настройки ----------
+// ---------- settings ----------
 bool g_screenOff = false;
 void applyBrightness() {
   strip.setBrightness(g_ledBright * 255 / 100);
@@ -124,9 +124,9 @@ void loadSettings() {
   g_micEn     = g_prefs.getInt("mic", 1) ? 1 : 0;
   g_clickEn   = g_prefs.getInt("click", 1) ? 1 : 0;
   g_theme     = constrain(g_prefs.getInt("th2", THEME_DENKO), 0, THEME_N - 1);
-  { int lg = g_prefs.getInt("langv", -1);            // «langv» пишет только настоящий выбор языка (экран выбора / Настройки)
-    g_langAsk = lg < 0;                                 // нет — показать экран выбора (в т.ч. один раз после обновления с 2.0-test1..4,
-    if (lg < 0) lg = g_prefs.getInt("lang", 0);         //   где «lang» мог записаться автосохранением); старый «lang» — только подсказка
+  { int lg = g_prefs.getInt("langv", -1);            // "langv" is written only by a real language choice (picker / Settings)
+    g_langAsk = lg < 0;                                 // absent: show the picker (also once after updating from 2.0-test1..4,
+    if (lg < 0) lg = g_prefs.getInt("lang", 0);         //   where "lang" may have been written by autosave); old "lang" is only a hint
     g_lang = lg == 1 ? 1 : 0; }
   g_auLeds    = g_prefs.getInt("auled", 0) ? 1 : 0;
   g_auSrc     = constrain(g_prefs.getInt("ausrc", 0), 0, 2);
@@ -175,7 +175,7 @@ void saveSettings() {
   g_prefs.putInt("mic", g_micEn);
   g_prefs.putInt("click", g_clickEn);
   g_prefs.putInt("th2", g_theme);
-  if (!g_langAsk) { g_prefs.putInt("langv", g_lang); g_prefs.putInt("lang", g_lang); }   // пока язык не выбран — не писать: иначе автосохранение (время с ПК, GPS) съест экран выбора
+  if (!g_langAsk) { g_prefs.putInt("langv", g_lang); g_prefs.putInt("lang", g_lang); }   // don't write until a language is chosen, or autosave (PC time, GPS) would skip the picker
   g_prefs.putInt("auled", g_auLeds);
   g_prefs.putInt("ausrc", g_auSrc);
   g_prefs.putInt("city", g_city);
@@ -204,12 +204,12 @@ static int curItem() {
   return n ? ids[constrain(g_setItem, 0, n - 1)] : -1;
 }
 
-// ---------- значения пунктов: одна логика для колеса и для планшета ----------
+// ---------- item values: one logic for the wheel and the tablet ----------
 static const char* const VOL_NAMES[3] = { "off", "quiet", "loud" };
 static const char* const SRC_NAMES[3] = { "auto", "mic", "laptop" };
 static const char* const AL_NAMES[3]  = { "off", "near", "any" };
 
-static int optCount(int id) {                             // сколько вариантов у пункта-списка
+static int optCount(int id) {                             // number of options of a list item
   switch (id) {
     case S_THEME: return THEME_N;
     case S_LANG: return 2;
@@ -223,7 +223,7 @@ static int optCount(int id) {                             // сколько ва
   }
   return 0;
 }
-static void optName(int id, int i, char* out, size_t n) {   // имя варианта (как на планшете)
+static void optName(int id, int i, char* out, size_t n) {   // option name (as on the tablet)
   switch (id) {
     case S_THEME:  snprintf(out, n, "%s", i == THEME_KURENAI ? "kurenai" : "denko"); break;
     case S_LANG:   snprintf(out, n, "%s", i ? "ru" : "en"); break;
@@ -237,13 +237,13 @@ static void optName(int id, int i, char* out, size_t n) {   // имя вариа
     default: out[0] = 0;
   }
 }
-// подпись варианта для человека (экран устройства, «labels» для планшета); optName — машинное имя для /api/set
+// human-readable option label (device screen, "labels" for the tablet); optName is the machine name for /api/set
 static void optLabel(int id, int i, char* out, size_t n) {
   optName(id, i, out, n);
   if (id == S_CITY) { snprintf(out, n, "%s", i == N_CITIES ? g_gpsCity.name : LT(CITIES[i].name)); return; }
   if (id == S_LANG) { snprintf(out, n, "%s", i ? "Русский" : "English"); return; }
   if (g_lang) {
-    static const char* const MAP[][2] = {                 // машинные имена -> подписи (сами строки не зависят от языка — можно static)
+    static const char* const MAP[][2] = {                 // machine names -> labels (strings are language-independent, so static is fine)
       { "off", "выкл" }, { "quiet", "тихо" }, { "loud", "громко" }, { "auto", "авто" }, { "mic", "микрофон" },
       { "laptop", "ПК" }, { "near", "рядом" }, { "any", "все" }, { "all", "все" }, { "far", "далеко" },
       { "room", "комната" }, { "very near", "вплотную" },
@@ -252,7 +252,7 @@ static void optLabel(int id, int i, char* out, size_t n) {
     if (id == S_DIM) { char* p = strstr(out, " min"); if (p) strcpy(p, " мин"); else if ((p = strstr(out, " s"))) strcpy(p, " с"); }
   } else if (id == S_AUSRC && !strcmp(out, "laptop")) snprintf(out, n, "computer");
 }
-static int getVal(int id) {                               // индекс варианта / число / 0-1
+static int getVal(int id) {                               // option index / number / 0-1
   switch (id) {
     case S_THEME: return g_theme;          case S_LANG: return g_lang;          case S_SCREEN: return g_scrBright;   case S_DIM: return g_dimIdx;
     case S_LEDBR: return g_ledBright;      case S_VOLUME: return g_sndIdx;      case S_CLICKS: return g_clickEn;
@@ -268,7 +268,7 @@ static int getVal(int id) {                               // индекс вар
   }
   return 0;
 }
-// поставить значение: проверка границ и те же побочные действия, что при повороте колеса
+// set a value: bounds check and the same side effects as a wheel turn
 static bool setVal(int id, int v) {
   const SetDef& d = DEFS[id];
   if (d.kind == K_INFO) return false;
@@ -277,7 +277,7 @@ static bool setVal(int id, int v) {
   if (d.kind == K_RANGE) v = constrain(v, d.mn, d.mx);
   switch (id) {
     case S_THEME:   g_theme = v; themeChanged(); break;
-    case S_LANG:    g_lang = v; g_langAsk = false; break;      // тексты берутся при каждой отрисовке — меняется сразу
+    case S_LANG:    g_lang = v; g_langAsk = false; break;      // texts are fetched on every redraw, so it applies immediately
     case S_SCREEN:  g_scrBright = v; break;
     case S_DIM:     g_dimIdx = v; break;
     case S_LEDBR:   g_ledBright = v; break;
@@ -299,7 +299,7 @@ static bool setVal(int id, int v) {
     case S_ALNEWFOR:g_alNewFor = v; break;
     case S_ALWARM:  g_alWarm = v; break;
     case S_ALSENS:  g_alSens = v; break;
-    case S_ALWARN:  g_alWarn = v; if (g_alAlarm <= v) g_alAlarm = min(100, v + 5); break;          // «тревога» всегда выше «внимания»
+    case S_ALWARN:  g_alWarn = v; if (g_alAlarm <= v) g_alAlarm = min(100, v + 5); break;          // alarm is always above attention
     case S_ALALARM: g_alAlarm = v; if (g_alWarn >= v) g_alWarn = max(20, v - 5); break;
     case S_ALCBLE:  g_alCBle = v; break;
     case S_ALCRF:   g_alCRf = v; break;
@@ -310,7 +310,7 @@ static bool setVal(int id, int v) {
     default: return false;
   }
   applyBrightness();
-  if (id == S_LEDBR) ledsEvent(+1);        // показать яркость ленты
+  if (id == S_LEDBR) ledsEvent(+1);        // preview strip brightness
   settingsTouch();
   return true;
 }
@@ -321,21 +321,21 @@ void settingsAdjust(int dir) {
   const SetDef& d = DEFS[id];
   switch (d.kind) {
     case K_ENUM:
-      if (id == S_CITY) setVal(id, (getVal(id) + dir + optCount(id)) % optCount(id));   // города — по кругу
+      if (id == S_CITY) setVal(id, (getVal(id) + dir + optCount(id)) % optCount(id));   // cities wrap around
       else setVal(id, getVal(id) + dir);
       break;
     case K_BOOL:  setVal(id, dir > 0); break;
     case K_RANGE: setVal(id, getVal(id) + dir * d.step); break;
-    default: break;                        // батарея и версия — только показывают
+    default: break;                        // battery and version are display-only
   }
 }
 
-// ---------- для планшета: все пункты в JSON и смена по ключу ----------
+// ---------- for the tablet: all items as JSON, change by key ----------
 static void itemJson(int id, String& o) {
   const SetDef& d = DEFS[id];
   char b[48];
   o += "{\"k\":\""; o += d.key; o += "\",\"name\":"; jsonStr(o, LT(d.name)); o += ",\"hint\":";
-  // тема с планшета не меняется (смена из веба роняла палку) — только показываем, менять колесом на палке
+  // theme isn't changeable from the tablet (a web change crashed the stick): show only, change with the wheel
   if (id == S_THEME) { jsonStr(o, L("change it on the device: Settings › Theme", "меняется на устройстве: Настройки › Тема")); o += ",\"type\":\"info\",\"v\":"; optName(id, getVal(id), b, sizeof(b)); jsonStr(o, b); o += '}'; return; }
   if (id == S_LANG)  { jsonStr(o, L("change it on the device: Settings › Language", "меняется на устройстве: Настройки › Язык")); o += ",\"type\":\"info\",\"v\":"; optLabel(id, getVal(id), b, sizeof(b)); jsonStr(o, b); o += '}'; return; }
   jsonStr(o, LT(d.hint));
@@ -344,7 +344,7 @@ static void itemJson(int id, String& o) {
       o += ",\"type\":\"enum\",\"v\":"; optName(id, getVal(id), b, sizeof(b)); jsonStr(o, b);
       o += ",\"opts\":[";
       for (int i = 0; i < optCount(id); i++) { if (i) o += ','; optName(id, i, b, sizeof(b)); jsonStr(o, b); }
-      o += "],\"labels\":[";                               // подписи на языке прошивки (opts — машинные значения)
+      o += "],\"labels\":[";                               // labels in the firmware language (opts are machine values)
       for (int i = 0; i < optCount(id); i++) { if (i) o += ','; optLabel(id, i, b, sizeof(b)); jsonStr(o, b); }
       o += ']';
       break;
@@ -385,7 +385,7 @@ bool settingsSetKey(const char* key, const char* val, String& o) {
   else if (DEFS[id].kind == K_INFO || id == S_THEME || id == S_LANG) err = "change it on the device";
   else {
     int v = 0;
-    if (DEFS[id].kind == K_ENUM) {                        // имя варианта (без учёта регистра) или его номер
+    if (DEFS[id].kind == K_ENUM) {                        // option name (case-insensitive) or its number
       v = -1;
       char b[48];
       for (int i = 0; i < optCount(id); i++) { optName(id, i, b, sizeof(b)); if (!strcasecmp(b, val)) v = i; }
@@ -406,7 +406,7 @@ bool settingsSetKey(const char* key, const char* val, String& o) {
 
 void settingsTouch() { g_setDirty = true; g_setChangedMs = millis(); }
 
-static const char* unitLabel(const char* u) {   // единицы для экрана
+static const char* unitLabel(const char* u) {   // units for the screen
   if (g_lang && !strcmp(u, "dBm")) return "дБм";
   if (g_lang && !strcmp(u, "s")) return "с";
   return u;
@@ -472,7 +472,7 @@ void drawSettings() {
     spr.setTextDatum(MR_DATUM);
     spr.setTextColor(alert ? C_ALERT() : (sel ? C_ACC() : C_HOT()));
     txt(val, W - UI_M - 8, cy, 2);
-    if (sel && id != S_BATTERY && id != S_VERSION) {                 // стрелка «крути колесо»
+    if (sel && id != S_BATTERY && id != S_VERSION) {                 // "turn the wheel" arrow
       int vw = txtW(val, 2);
       spr.setTextColor(UI_DIM());
       txt("<", W - UI_M - 16 - vw, cy, 2);
@@ -482,7 +482,7 @@ void drawSettings() {
   present();
 }
 
-// ---------- раздел «Настройки»: подменю страниц ----------
+// ---------- Settings section: page submenu ----------
 static void setSubtitle(char* out, size_t n) { snprintf(out, n, "%s", L("general + sections", "общие и разделы")); }
 static void setEnter() { g_setPage = 0; g_setItem = 0; }
 static void setLeave() { settingsSaveNow(); }

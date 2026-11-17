@@ -1,4 +1,4 @@
-// perf.cpp — сводка замеров скорости (см. perf.h)
+// perf.cpp — rolls up speed measurements (see perf.h)
 #include "core/perf.h"
 #include <algorithm>
 

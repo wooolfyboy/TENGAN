@@ -1,6 +1,5 @@
 // ============================================================
-//  web_screen.cpp — экран раздела Web: QR-код для подключения,
-//  имя сети, пароль и адрес страницы
+//  web_screen.cpp — Web section screens: join QR, SSID, password, page URL; OTA progress; tablet-link eye animation.
 // ============================================================
 #include "web/web.h"
 #include "core/lang.h"
@@ -21,7 +20,7 @@ void drawWebScreen(const WebView& v, const uint8_t* qr, int n) {
   }
   if (v.clients) snprintf(buf, sizeof(buf), L("%d connected", "подключено: %d"), v.clients); else snprintf(buf, sizeof(buf), "%s", L("waiting", "ожидание"));
   uiHeader(L("Web", "Веб"), buf, false);
-  // QR: тёмные модули на светлом поле (так его читают камеры)
+  // QR: dark modules on a light field, as cameras expect
   int scale = n > 0 ? min(4, 116 / (n + 4)) : 3;
   int side = (n + 4) * scale, qx = UI_M + 2, qy = UI_TOP + 4;
   spr.fillRect(qx, qy, side, side, TFT_WHITE);
@@ -55,7 +54,7 @@ void drawWebScreen(const WebView& v, const uint8_t* qr, int n) {
   (void)W;
 }
 
-// загрузка прошивки по Wi-Fi: рисуем и сразу выводим (сервер в это время занят)
+// Wi-Fi firmware upload: draw and present immediately (the server is busy meanwhile)
 void drawWebOta(const WebView& v, int pct, const char* err) {
   const int W = spr.width();
   char buf[40];
@@ -87,9 +86,8 @@ void drawWebOta(const WebView& v, int pct, const char* err) {
 }
 
 // ============================================================
-//  Планшет подключён — вместо пароля живая картинка по теме:
-//   «небесный глаз» (天眼): оглядывается, кольца радужки вращаются, моргает.
-//  Колесо или нажатие — снова QR и пароль (web.cpp).
+//  Tablet connected: animated "sky eye" (天眼) instead of the password -
+//  looks around, iris rings spin, blinks. Wheel/press brings back QR and password (web.cpp).
 // ============================================================
 #include "core/settings.h"
 
@@ -101,21 +99,21 @@ static void drawEye(uint32_t now, int cx, int cy) {
   if (!blinkAt) blinkAt = now + 2500;
   if ((int32_t)(now - nextLook) > 0) { tx = random(-26, 27); ty = random(-7, 8); nextLook = now + 900 + random(2600); }
   lx = ease(lx, tx, 0.14f); ly = ease(ly, ty, 0.14f);
-  float open = 1;                                        // моргание: 260 мс, раз в 3–7 с
+  float open = 1;                                        // blink: 260 ms, every 3-7 s
   if ((int32_t)(now - blinkAt) >= 0) {
     float k = (now - blinkAt) / 260.0f;
-    if (k >= 1) { blinkAt = now + 3000 + random(4000); if (random(5) == 0) blinkAt = now + 350; }   // иногда — двойное
+    if (k >= 1) { blinkAt = now + 3000 + random(4000); if (random(5) == 0) blinkAt = now + 350; }   // sometimes a double blink
     else open = fabsf(cosf(k * PI));
   }
   const int Wh = 112, Hh = 38;
   auto lid = [&](int x) { float u = (float)(x - cx) / Wh; return Hh * open * (1 - u * u); };
-  // пульс вокруг: расходящиеся кольца
+  // pulse: expanding rings
   for (int i = 0; i < 3; i++) {
     float ph = fmodf(now / 2400.0f + i / 3.0f, 1.0f);
     int r = 46 + (int)(ph * 90);
     spr.drawEllipse(cx, cy, r * 2, r * 0.7f, scale565(C_ACC(), (int)(40 * (1 - ph))));
   }
-  // радужка: кольца, вращающиеся риски, зрачок-щель с бликом
+  // iris: rings, rotating ticks, slit pupil with a highlight
   int ix = cx + (int)lx, iy = cy + (int)ly;
   spr.fillCircle(ix, iy, 31, scale565(C_ACC(), 16));
   spr.drawCircle(ix, iy, 31, C_ACC());
@@ -125,10 +123,10 @@ static void drawEye(uint32_t now, int cx, int cy) {
     spr.drawLine(ix + cosf(a) * 25, iy + sinf(a) * 25, ix + cosf(a) * 30, iy + sinf(a) * 30, k % 3 ? scale565(C_ACC(), 70) : C_HOT());
     if (k % 2 == 0) spr.drawLine(ix + cosf(b) * 14, iy + sinf(b) * 14, ix + cosf(b) * 21, iy + sinf(b) * 21, heatV(0.5f + 0.5f * (k % 4 == 0)));
   }
-  spr.fillEllipse(ix, iy, 5, 11, C_BG());                // зрачок — вертикальная щель
+  spr.fillEllipse(ix, iy, 5, 11, C_BG());                // slit pupil
   spr.drawEllipse(ix, iy, 5, 11, C_HOT());
-  spr.fillCircle(ix + 7, iy - 9, 3, C_HOT());            // блик
-  // веки: закрашиваем всё вне миндалины и рисуем контур
+  spr.fillCircle(ix + 7, iy - 9, 3, C_HOT());            // highlight
+  // eyelids: paint over everything outside the almond shape, then draw its outline
   for (int x = cx - Wh - 2; x <= cx + Wh + 2; x++) {
     int h = (int)lid(x);
     if (h < 0) h = 0;
@@ -141,7 +139,7 @@ static void drawEye(uint32_t now, int cx, int cy) {
     spr.drawLine(px, pu, x, yu, C_ACC()); spr.drawLine(px, pd, x, yd, C_ACC());
     px = x; pu = yu; pd = yd;
   }
-  // уголки глаза — штрихи
+  // eye corner ticks
   spr.drawLine(cx - Wh - 10, cy, cx - Wh - 2, cy, C_HOT());
   spr.drawLine(cx + Wh + 2, cy, cx + Wh + 10, cy, C_HOT());
 }
@@ -152,7 +150,7 @@ void drawWebLink(const WebLink& l, uint32_t now) {
   const int W = spr.width(), H = spr.height(), cx = W / 2, cy = H / 2 - 6;
   spr.fillSprite(C_BG());
   drawEye(now, cx, cy);
-  // подпись — мелко, чтобы не мешать картинке
+  // small caption so it does not cover the picture
   char buf[48];
   float kb = l.bps / 1024.0f;
   snprintf(buf, sizeof(buf), L("APP CONNECTED  ·  %.1f KB/S", "ПРИЛОЖЕНИЕ  ·  %.1f КБ/С"), kb);

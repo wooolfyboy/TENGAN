@@ -1,5 +1,5 @@
 // ============================================================
-//  input.cpp — колесо (на прерываниях) и кнопки
+//  input.cpp — wheel (interrupt-driven) and buttons
 // ============================================================
 #include <atomic>
 #include <soc/gpio_reg.h>
@@ -9,9 +9,9 @@
 #include "core/power.h"
 #include "audio/audio.h"
 
-// --- колесо: квадратурный декодер в прерывании ---
-// таблица переходов (предыдущее состояние AB << 2 | новое) -> -1 / 0 / +1;
-// 4 перехода = один «щелчок». Дребезг даёт недопустимые переходы (0) и гасится сам.
+// --- wheel: quadrature decoder in the ISR ---
+// Transition table (prev AB << 2 | new) -> -1/0/+1; 4 transitions = one click.
+// Bounce gives invalid transitions (0) and cancels itself.
 static const int8_t TBL[16] = { 0,-1, 1, 0,  1, 0, 0,-1, -1, 0, 0, 1,  0, 1,-1, 0 };
 static volatile uint8_t s_prev = 3;
 static volatile int8_t  s_accum = 0;
@@ -37,14 +37,13 @@ void inputBegin() {
   attachInterrupt(digitalPinToInterrupt(PIN_ENC_B), encIsr, CHANGE);
 }
 
-// Боковая кнопка: коротко — на шаг назад, удержание 2 с — выключить.
-// Нажатие колеса — «выбрать» (что именно — решает раздел).
+// Side button: short press = back, hold 2 s = power off. Wheel press = select (the section decides what).
 void inputPoll() {
   static int lastEnc = HIGH;
   static uint32_t lastEncMs = 0;
   static bool userDown = false;
   static uint32_t userDownMs = 0;
-  static bool userWoke = false;          // нажатие только разбудило экран
+  static bool userWoke = false;          // the press only woke the screen
   int enc  = digitalRead(PIN_ENC_KEY);
   int user = digitalRead(PIN_USER_KEY);
   uint32_t now = millis();
@@ -52,7 +51,7 @@ void inputPoll() {
   if (enc == LOW && lastEnc == HIGH && now - lastEncMs > 250) {
     bool wasDim = powerIdle();
     powerTouch();
-    if (!wasDim) { navClick(); audioClick(); }   // первое нажатие в «сне» только будит экран
+    if (!wasDim) { navClick(); audioClick(); }   // first press while dimmed only wakes the screen
     lastEncMs = now;
   }
   lastEnc = enc;
@@ -63,7 +62,7 @@ void inputPoll() {
   for (; st > 0; st--) navRotate(+1);
   for (; st < 0; st++) navRotate(-1);
 
-  if (g_ignoreUser) {                    // после включения ждём, пока отпустят
+  if (g_ignoreUser) {                    // after power-on wait for release
     if (user == HIGH) g_ignoreUser = false;
     return;
   }
@@ -77,6 +76,6 @@ void inputPoll() {
     uint32_t held = now - userDownMs;
     userDown = false;
     g_powerHold = 0;
-    if (held >= 30 && held < PWR_SHOW_MS && !userWoke) navBack();   // короткое нажатие (30 мс — от дребезга)
+    if (held >= 30 && held < PWR_SHOW_MS && !userWoke) navBack();   // short press (30 ms debounce)
   }
 }

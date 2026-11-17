@@ -1,10 +1,7 @@
 // ============================================================
-//  battery.cpp — заряд батареи
-//
-//  Только чтение регистров, ничего не настраиваем:
-//   - BQ27220 (0x55) — «счётчик топлива»: %, напряжение, ток, время;
-//   - BQ25896 (0x6B) — зарядка: есть ли USB, идёт ли заряд.
-//  Шина I2C: SDA 8, SCL 18 (по utilities.h из репозитория LilyGO).
+//  battery.cpp — battery state, read-only (no configuration):
+//   BQ27220 (0x55) fuel gauge: %, voltage, current, time; BQ25896 (0x6B) charger: USB present, charging.
+//  I2C: SDA 8, SCL 18 (LilyGO utilities.h).
 // ============================================================
 #include <Wire.h>
 #include "core/lang.h"
@@ -49,7 +46,7 @@ static void batRead() {
     if (bq16(0x12, v)) g_bat.full = v;
   }
   uint8_t st;
-  g_bat.chgOk = i2cRead(BQ25896_ADDR, 0x0B, &st, 1);       // REG0B: статус
+  g_bat.chgOk = i2cRead(BQ25896_ADDR, 0x0B, &st, 1);       // REG0B: status
   if (g_bat.chgOk) {
     g_bat.bus = (st >> 5) & 0x07;
     g_bat.chg = (st >> 3) & 0x03;
@@ -80,7 +77,7 @@ uint16_t batColor() {
 }
 
 
-// одна строка о питании (для настроек)
+// one-line power summary (Settings)
 void batSummary(char* out, size_t n) {
   if (!g_bat.ok) { snprintf(out, n, L("battery gauge not found", "датчик батареи не найден")); return; }
   if (batCharging()) {

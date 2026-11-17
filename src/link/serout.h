@@ -1,21 +1,19 @@
 // ============================================================
-//  serout.h — всё, что палка пишет компьютеру по USB, идёт через одну очередь.
-//  Строки уходят целиком и по порядку (команды монитору ПК «KEY …», «AUD …»
-//  и поток приложения для компьютера «@E …» не перемешиваются), а запись
-//  никогда не ждёт: если компьютер не читает, очередь просто не растёт дальше.
+//  serout.h — single queue for everything written to the PC over USB.
+//  Lines go out whole and in order (PC-monitor "KEY ...", "AUD ..." and PC-app "@E ..."
+//  never interleave); writes never block: if the PC stops reading, the queue stops growing.
 // ============================================================
 #pragma once
 #include <stddef.h>
 #include <stdint.h>
 
-// поставить строку в очередь (перевод строки добавляется сам).
-// droppable — можно выкинуть, если очередь и так длинная (кадры звука, спектра).
-// false — не влезла (выкинута).
+// Queue a line (newline added). droppable: may be dropped when the queue is long
+// (audio/spectrum frames). Returns false if it did not fit.
 bool   serOutLine(const char* s, size_t n, bool droppable = false);
 bool   serOutLine(const char* s);
-// собрать строку из кусков без лишних копий: begin → part… → end
+// build a line from parts without extra copies: begin -> part... -> end
 bool   serOutBegin(size_t total, bool droppable);
 void   serOutPart(const char* s, size_t n);
 void   serOutEnd();
-size_t serOutQueued();                 // сколько байт ждёт отправки
-void   serOutPump();                   // каждый проход loop(): отдать в USB, сколько влезает
+size_t serOutQueued();                 // bytes waiting to be sent
+void   serOutPump();                   // every loop(): write as much as the port accepts

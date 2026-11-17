@@ -1,10 +1,8 @@
 // ============================================================
-//  input.h — колесо (на прерываниях) и кнопки
-//
-//  Колесо читается прерываниями: шаги не теряются, даже если основной
-//  цикл занят (например, развёрткой CC1101).
+//  input.h — wheel (interrupt-driven) and buttons.
+//  Wheel steps are not lost even if the main loop is busy (e.g. a CC1101 sweep).
 // ============================================================
 #pragma once
 
 void inputBegin();
-void inputPoll();      // раздаёт нажатия и шаги колеса в навигацию
+void inputPoll();      // dispatches presses and wheel steps to navigation

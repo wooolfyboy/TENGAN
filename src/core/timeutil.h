@@ -1,11 +1,8 @@
 // ============================================================
-//  timeutil.h — «сколько прошло» без ловушки беззнаковых чисел.
-//
-//  now берётся в начале прохода loop(), а отметка t может быть поставлена
-//  ПОЗЖЕ (пришла строка по USB, пакет Bluetooth из другой задачи). Тогда
-//  now - t для uint32_t даёт не «-3 мс», а ~4 миллиарда — и «давно не было»
-//  срабатывает на ровном месте (мигал экран «laptop stopped», пропадали
-//  устройства). msSince() в таком случае честно возвращает 0.
+//  timeutil.h — elapsed time without the unsigned-wrap trap.
+//  now is taken at the start of a loop() pass, but t may be stamped LATER (a USB line or a BLE
+//  packet from another task). Then now - t on uint32_t is ~4 billion, not -3 ms, and "long ago"
+//  fires spuriously. msSince() returns 0 in that case.
 // ============================================================
 #pragma once
 #include <stdint.h>

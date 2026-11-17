@@ -1,6 +1,6 @@
 // ============================================================
-//  jsonutil.h — строка в кавычках для JSON (веб-страница палки):
-//  кавычки и обратная косая экранируются, управляющие символы — в пробел.
+//  jsonutil.h — quoted JSON string for the device web page:
+//  quotes and backslashes are escaped, control chars become spaces.
 // ============================================================
 #pragma once
 #include <Arduino.h>

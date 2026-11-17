@@ -1,5 +1,5 @@
 // ============================================================
-//  leds.cpp — светодиодная лента
+//  leds.cpp — LED strip
 // ============================================================
 #include "core/leds.h"
 #include "core/board.h"
@@ -13,7 +13,6 @@ void ledsBegin() { strip.begin(); strip.clear(); strip.show(); }
 void ledsOff()   { strip.clear(); strip.show(); }
 void ledsEvent(int dir) { g_ledEvent = dir; g_ledStart = millis(); }
 
-// ---------- анимация светодиодной ленты ----------
 void ledsTick() {
   if (g_ledEvent == 0) return;
   uint32_t t = millis() - g_ledStart;
@@ -21,7 +20,7 @@ void ledsTick() {
   float p = (float)t / LED_DUR;                 // 0..1
   strip.clear();
   if (g_ledEvent > 0) {
-    // зелёная волна снизу вверх с хвостом
+    // green wave bottom to top with a tail
     int head = (int)(p * (WS2812_N + 4));
     for (int i = 0; i < WS2812_N; i++) {
       int d = head - i;
@@ -31,7 +30,7 @@ void ledsTick() {
       }
     }
   } else {
-    // оранжевая вспышка с общим спадом
+    // orange flash fading out
     int b = (int)(220 * (1.0f - p));
     for (int i = 0; i < WS2812_N; i++)
       strip.setPixelColor(i, strip.Color(b, b * 2 / 5, 0));

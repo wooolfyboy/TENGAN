@@ -34,7 +34,7 @@ void crumbBoot() {
 void crumbWatchdogStart() {
   esp_task_wdt_config_t cfg = { .timeout_ms = 15000, .idle_core_mask = 0, .trigger_panic = true };
   if (esp_task_wdt_reconfigure(&cfg) != ESP_OK) esp_task_wdt_init(&cfg);
-  esp_task_wdt_add(NULL);                    // текущая задача — loop() Arduino
+  esp_task_wdt_add(NULL);                    // current task = Arduino loop()
 }
 void crumbFeed() { esp_task_wdt_reset(); }
 

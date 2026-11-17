@@ -1,9 +1,9 @@
 // ============================================================
-//  menu.cpp — главное меню и навигация
+//  menu.cpp — main menu and navigation
 //
-//  Три уровня: главное меню (карточки разделов) -> подменю раздела
-//  (список экранов с живыми цифрами) -> экран. Разделы описаны
-//  таблицами Section, меню с ними работает одинаково.
+//  Three levels: main menu (section cards) -> section submenu
+//  (screens with live numbers) -> screen. Sections are Section tables
+//  and the menu treats them all alike.
 // ============================================================
 #include <ctype.h>
 #include "core/lang.h"
@@ -24,14 +24,14 @@
 #include "probe/ir.h"
 #include "probe/nfc.h"
 
-// порядок карточек в главном меню
+// card order in the main menu
 static const Section* const SECTIONS[] = { &bleSection, &wifiSection, &subghzSection, &soundSection, &irSection, &nfcSection, &webSection, &pcSection, &gallerySection, &settingsSection };
 static const int N_SECTIONS = sizeof(SECTIONS) / sizeof(SECTIONS[0]);
 
-static int  s_cur = -1;          // открытый раздел; -1 — главное меню
-static int  s_menuSel = 0;       // выбранная карточка
-static bool s_sub = false;       // показано подменю
-static int  s_subSel = 0;        // курсор в подменю
+static int  s_cur = -1;          // open section; -1 = main menu
+static int  s_menuSel = 0;       // selected card
+static bool s_sub = false;       // submenu is shown
+static int  s_subSel = 0;        // submenu cursor
 
 static const Section* cur() { return s_cur >= 0 ? SECTIONS[s_cur] : nullptr; }
 bool navActive(const Section* s) { return cur() == s; }
@@ -55,7 +55,7 @@ static void goMain() {
   s_sub = false;
 }
 
-// открыть раздел «снаружи» (например, приложение на компе подключилось по USB — открыть Web)
+// open a section from outside (e.g. the desktop app connected over USB: open Web)
 void navOpen(const Section* target) {
   if (cur() == target) return;
   int idx = -1;
@@ -67,7 +67,7 @@ void navOpen(const Section* target) {
 }
 
 void navClick() {
-  if (g_langAsk) { langPickClick(); return; }       // первое включение: сначала язык
+  if (g_langAsk) { langPickClick(); return; }       // first boot: language first
   const Section* s = cur();
   if (!s)    { enterSection(s_menuSel); return; }
   if (s_sub) { s->open(s_subSel); s_sub = false; return; }
@@ -95,7 +95,7 @@ void navBack() {
   const Section* s = cur();
   if (!s) return;
   if (!s_sub && s->nScreens > 0) {
-    if (s->back && s->back()) return;      // раздел закрыл что-то своё (например, подробности)
+    if (s->back && s->back()) return;      // the section closed something of its own (e.g. details)
     navToSub();
     return;
   }
@@ -107,7 +107,7 @@ void navTick(uint32_t now) {
   if (s && s->tick) s->tick(now);
 }
 
-// ---------- рисование ----------
+// ---------- drawing ----------
 static void drawSectionSub(const Section* s) {
   SubItem items[8];
   int n = min(s->nScreens, 8);
@@ -116,7 +116,7 @@ static void drawSectionSub(const Section* s) {
   drawSubmenu(title, C(s->r, s->g, s->b), items, n, s_subSel);
 }
 
-// подпись раздела -> крупное значение + мелкая подпись («23 devices» -> «23» / «DEVICES»)
+// section caption -> big value + small caption ("23 devices" -> "23" / "DEVICES")
 static void splitSubtitle(const char* sub, char* big, char* small, size_t n) {
   const char* colon = strchr(sub, ':');
   if (isdigit((unsigned char)sub[0])) {
@@ -135,7 +135,7 @@ static void splitSubtitle(const char* sub, char* big, char* small, size_t n) {
   utf8UpperInPlace(big); utf8UpperInPlace(small);
 }
 
-// главное меню HUD: четыре скошенные панели, сверху статус, снизу телеметрия
+// HUD main menu: cut-corner panels, status on top, telemetry below
 static void drawMainMenuHud() {
   int W = spr.width(), H = spr.height();
   uint16_t bg = C_BG(), acc = C_ACC(), steel = C(150, 150, 165), dim = C(110, 110, 125);
@@ -143,7 +143,7 @@ static void drawMainMenuHud() {
   spr.setTextDatum(TL_DATUM);
   spr.setTextColor(dim);
   txt(L("// " DEVICE_NAME " · ONLINE", "// " DEVICE_NAME " · ГОТОВ"), 8, 5, 1);
-  // заряд: «PWR 87%» и пять сегментов
+  // battery: percent and five segments
   char buf[32];
   if (g_bat.ok) {
     snprintf(buf, sizeof(buf), L("BAT %d%%", "ЗАРЯД %d%%"), g_bat.soc);
@@ -155,19 +155,19 @@ static void drawMainMenuHud() {
       spr.fillRect(W - 40 + i * 7, 5, 5, 8, on ? (g_bat.soc <= 20 ? C_ALERT() : acc) : C(40, 40, 50));
     }
   }
-  for (int x = 8; x < W - 8; x++) {                     // линия, угасающая вправо
+  for (int x = 8; x < W - 8; x++) {                     // line fading to the right
     float k = 1.0f - (float)(x - 8) / (W - 16);
     spr.drawPixel(x, 18, scale565(acc, (int)(k * 100)));
   }
 
-  // видно 5 карточек; если разделов больше — лента сдвигается за выбранной
+  // 5 cards visible; with more sections the strip scrolls with the selection
   const int VIS = min(N_SECTIONS, 5);
   const int gap = 5, cw = (W - 12 - gap * (VIS - 1)) / VIS, ch = 128, y0 = 24;
   int x0 = (W - (cw * VIS + gap * (VIS - 1))) / 2;
   static int first = 0;
   if (s_menuSel < first) first = s_menuSel;
   if (s_menuSel > first + VIS - 1) first = s_menuSel - VIS + 1;
-  if (first > 0) spr.fillTriangle(1, y0 + ch / 2, 5, y0 + ch / 2 - 5, 5, y0 + ch / 2 + 5, acc);           // есть ещё слева
+  if (first > 0) spr.fillTriangle(1, y0 + ch / 2, 5, y0 + ch / 2 - 5, 5, y0 + ch / 2 + 5, acc);           // more on the left
   if (first + VIS < N_SECTIONS) spr.fillTriangle(W - 2, y0 + ch / 2, W - 6, y0 + ch / 2 - 5, W - 6, y0 + ch / 2 + 5, acc);
   for (int i = first; i < first + VIS; i++) {
     const Section* s = SECTIONS[i];
@@ -180,7 +180,7 @@ static void drawMainMenuHud() {
     char title[40]; utf8Upper(LT(s->title), title, sizeof title);
     spr.setTextDatum(TC_DATUM);
     spr.setTextColor(sel ? C_SELFG() : steel);
-    txt(title, cx, y0 + 62, txtW(title, 2) <= cw - 4 ? 2 : txtW(title, 1) <= cw - 4 ? 1 : 8);   // длинное название — мельче
+    txt(title, cx, y0 + 62, txtW(title, 2) <= cw - 4 ? 2 : txtW(title, 1) <= cw - 4 ? 1 : 8);   // long title: smaller font
     char sub[48], big[40], small[40];
     s->subtitle(sub, sizeof(sub));
     splitSubtitle(sub, big, small, sizeof(big));
@@ -188,11 +188,11 @@ static void drawMainMenuHud() {
     spr.setTextColor(alertish ? C_ALERT() : (sel ? C_SELACC() : steel));
     { char bf[40]; fitText(big, bf, sizeof bf, cw - 4, 4); txt(bf, cx, y0 + 82, 4); }
     spr.setTextColor(sel && themeKurenai() ? UI_LINE() : dim);
-    char sm[40]; fitText(small, sm, sizeof sm, cw - 4, 8);   // сколько влезает (с учётом UTF-8)
+    char sm[40]; fitText(small, sm, sizeof sm, cw - 4, 8);   // as much as fits (UTF-8 aware)
     txt(sm, cx, y0 + 108, 8);
   }
 
-  // телеметрия: время работы
+  // telemetry: uptime
   uint32_t t = millis() / 1000;
   snprintf(buf, sizeof(buf), "T+%02lu:%02lu:%02lu", (unsigned long)(t / 3600), (unsigned long)(t / 60 % 60), (unsigned long)(t % 60));
   spr.setTextDatum(BL_DATUM);

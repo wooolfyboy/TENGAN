@@ -1,11 +1,11 @@
 // ============================================================
-//  wifi_model.cpp — данные раздела Wi-Fi и помощники без железа
-//  (их используют и логика, и экраны, и симулятор экрана на ПК)
+//  wifi_model.cpp — Wi-Fi data and hardware-free helpers
+//  (used by the logic, the screens and the PC screen simulator)
 // ============================================================
 #include <esp_wifi.h>
 #include "core/lang.h"
 #include "wifi/wifi_model.h"
-#include "wifi/ouidb.h"          // база производителей — подключается только здесь
+#include "wifi/ouidb.h"          // vendor DB, included only here
 #include "core/display.h"
 #include "core/theme.h"
 
@@ -25,7 +25,7 @@ uint32_t g_fLastHit = 0;
 bool     g_prom = false;
 int      g_hopCh = 1;
 float    g_ppsMgmt[CH_MAX + 1] = {0}, g_ppsData[CH_MAX + 1] = {0};
-float    g_noise[CH_MAX + 1] = {0};       // шум по каналам, дБм (0 = нет данных)
+float    g_noise[CH_MAX + 1] = {0};       // noise per channel, dBm (0 = no data)
 float    g_actHist[ACT_HIST_N];
 int      g_actHistN = 0;
 std::map<uint64_t, Sta> g_stas;
@@ -39,7 +39,7 @@ uint64_t macKey(const uint8_t* m) {
   return k;
 }
 
-// ---------- подписи и цвета ----------
+// ---------- labels ----------
 const char* encName(uint8_t e) {
   switch (e) {
     case WIFI_AUTH_OPEN:            return L("open", "открытая");
@@ -64,7 +64,7 @@ const char* genName(uint8_t g) {
 
 const char* ssidOr(const Ap& a) { return a.ssid[0] ? a.ssid : L("(hidden)", "(скрыта)"); }
 
-// цель для FIND: выбранная в списке сеть, иначе самая сильная
+// FIND target: the network selected in the list, else the strongest
 uint64_t findTarget() {
   if (g_wSel && g_aps.count(g_wSel)) return g_wSel;
   uint64_t best = 0; int br = -127;
@@ -83,10 +83,10 @@ float apCenter(const Ap& a) { return a.ch + a.sec * 2.0f; }
 
 float apHalf(const Ap& a)   { return a.sec ? 4.0f : 2.0f; }
 
-// насколько сеть мешает каналу k (0..1)
+// how much the network interferes with channel k (0..1)
 float interference(const Ap& a, int k) {
   float d = fabsf(apCenter(a) - k);
-  float reach = apHalf(a) + 2.0f + 1.0f;      // наша ширина 20 МГц (±2) + запас
+  float reach = apHalf(a) + 2.0f + 1.0f;      // our 20 MHz width (+-2) + margin
   return d >= reach ? 0.0f : 1.0f - d / reach;
 }
 

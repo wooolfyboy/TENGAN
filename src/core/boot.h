@@ -1,8 +1,8 @@
 // ============================================================
-//  boot.h — анимация при включении
+//  boot.h — power-on animation
 // ============================================================
 #pragma once
 #include <Arduino.h>
 
-void bootScreen();               // проиграть заставку целиком (~2.7 с)
-void bootFrame(uint32_t t);      // нарисовать кадр в момент t мс (в спрайт, без вывода)
+void bootScreen();               // play the whole splash (~2.7 s)
+void bootFrame(uint32_t t);      // draw the frame at t ms (into the sprite, no push)

@@ -1,9 +1,9 @@
 // ============================================================
-//  wifi.h — раздел Wi-Fi (только приём)
+//  wifi.h — Wi-Fi section (receive-only)
 // ============================================================
 #pragma once
 #include "core/section.h"
 
-void wifiRadioOff();             // выключить Wi-Fi (перед включением Bluetooth)
+void wifiRadioOff();             // turn Wi-Fi off (before enabling Bluetooth)
 
 extern const Section wifiSection;

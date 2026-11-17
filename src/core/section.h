@@ -1,33 +1,32 @@
 // ============================================================
-//  section.h — «раздел» главного меню (Bluetooth, Wi-Fi, Sub-GHz, настройки).
+//  section.h — a main-menu "section" (Bluetooth, Wi-Fi, Sub-GHz, settings).
 //
-//  Каждый раздел описывает себя одной таблицей функций, а меню
-//  (core/menu.cpp) работает с ними одинаково: показывает карточку,
-//  подменю со списком экранов, передаёт нажатия и рисует экран.
-//  Новый раздел = новый файл с такой таблицей + строчка в menu.cpp.
+//  Each section describes itself with one function table; the menu
+//  (core/menu.cpp) treats all sections alike: card, submenu, input, drawing.
+//  New section = new file with such a table + one line in menu.cpp.
 // ============================================================
 #pragma once
 #include <Arduino.h>
 #include "core/display.h"
 
 struct Section {
-  const char* title;                         // подпись карточки
-  uint8_t r, g, b;                           // цвет раздела
+  const char* title;                         // card title
+  uint8_t r, g, b;                           // section color
   void (*icon)(int x, int y, uint16_t c, uint16_t bg);
-  void (*subtitle)(char* out, size_t n);     // живая подпись под карточкой
+  void (*subtitle)(char* out, size_t n);     // live caption under the card
 
-  void (*enter)();                           // вошли в раздел из главного меню
-  void (*leave)();                           // вышли в главное меню
+  void (*enter)();                           // entered from the main menu
+  void (*leave)();                           // left to the main menu
 
-  int  nScreens;                             // 0 — подменю нет (сразу экран)
-  void (*screenInfo)(int i, SubItem& it);    // строка подменю: имя, описание, цифра
-  int  (*screenNow)();                       // какой экран сейчас выбран
-  void (*open)(int screen);                  // подменю -> экран
-  void (*close)();                           // экран -> подменю
+  int  nScreens;                             // 0 = no submenu (straight to the screen)
+  void (*screenInfo)(int i, SubItem& it);    // submenu row: name, description, number
+  int  (*screenNow)();                       // currently selected screen
+  void (*open)(int screen);                  // submenu -> screen
+  void (*close)();                           // screen -> submenu
 
-  void (*click)();                           // нажатие колеса на экране
-  void (*rotate)(int dir);                   // шаг колеса на экране
-  bool (*back)();                            // боковая кнопка на экране: true = обработал сам
-  void (*tick)(uint32_t now);                // каждый проход loop(), пока раздел открыт
-  void (*draw)(uint32_t now);                // нарисовать текущий экран
+  void (*click)();                           // wheel click on a screen
+  void (*rotate)(int dir);                   // wheel step on a screen
+  bool (*back)();                            // side button on a screen: true = handled here
+  void (*tick)(uint32_t now);                // every loop() pass while the section is open
+  void (*draw)(uint32_t now);                // draw the current screen
 };

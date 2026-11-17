@@ -1,9 +1,7 @@
 // ============================================================
-//  web_page.h — лёгкая страница TENGAN для телефона (/lite).
-//  Вся страница — один файл: разметка, стиль и скрипт. Меню из шести
-//  вкладок; каждая сама спрашивает у устройства свои данные (/api/...).
-//  Язык — как на устройстве: <html lang> подставляется при отдаче (web.cpp), тексты — L("en","ru") в скрипте.
-//  Вкладки Sub-GHz и Sound включают CC1101 / микрофон, пока открыты.
+//  web_page.h — lightweight phone page (/lite): markup, style and script in one file.
+//  Each tab polls its own /api/... data. Language follows the device (<html lang> set in web.cpp).
+//  The Sub-GHz and Sound tabs keep the CC1101 / microphone on while open.
 // ============================================================
 #pragma once
 #include <Arduino.h>
@@ -107,7 +105,7 @@ tr.cl{cursor:pointer}tr.cl:hover td{background:var(--hov)}
 <div id="modal" class="hide" onclick="if(event.target==this)closeM()"><div class="card" id="mc"></div></div>
 <script>
 const $=id=>document.getElementById(id),dp=()=>window.devicePixelRatio||1;
-const RU=document.documentElement.lang=='ru',L=(e,r)=>RU?r:e;   // язык прошивки
+const RU=document.documentElement.lang=='ru',L=(e,r)=>RU?r:e;   // firmware language
 if(RU)document.querySelectorAll('[data-ru]').forEach(e=>e.textContent=e.dataset.ru);
 const TABS=[['ov',L('OVERVIEW','ОБЗОР')],['ble','BLUETOOTH'],['wifi','WI-FI'],['sub','SUB-GHZ'],['snd',L('SOUND','ЗВУК')],['sys',L('SYSTEM','СИСТЕМА')],['upd',L('UPDATE','ОБНОВЛЕНИЕ')]];
 let cur='ov',timer=null,bd=[],wd=[],sens=[],bhist=[],rhist={},bs={k:'r',d:-1},ws={k:'r',d:-1},sub={m:0,b:1},ahist=[],detId=null;
@@ -119,21 +117,21 @@ async function J(u){const r=await fetch(u+(u.includes('?')?'&':'?')+'tab='+cur,{
 function sizeC(c,h){const W=c.width=c.clientWidth*dp(),H=c.height=h*dp();const g=c.getContext('2d');g.clearRect(0,0,W,H);return[g,W,H]}
 
 $('nav').innerHTML=TABS.map(([k,n])=>`<button id="n-${k}" onclick="go('${k}')">${n}</button>`).join('');
-// опрос: следующий запрос — только после ответа на предыдущий (не копятся в очередь)
+// polling: next request only after the previous answer (no queue build-up)
 let gen=0;
 function go(t){cur=t;TABS.forEach(([k])=>{$('n-'+k).className=k==t?'on':'';$('p-'+k).classList.toggle('hide',k!=t)});
  $('n-'+t).scrollIntoView({inline:'nearest',block:'nearest'});const f={ov:ov,ble:ble,wifi:wifi,sub:subP,snd:snd,sys:sys,upd:ver}[t];
  const ms={ov:3000,ble:2000,wifi:5000,sub:60,snd:60,sys:3000,upd:600000}[t];const my=++gen;
  (async function loop(){while(my==gen){const t0=Date.now();await f();const w=ms-(Date.now()-t0);await new Promise(r=>setTimeout(r,Math.max(w,10)))}})()}
 
-// ---------- шапка ----------
-// цвета холстов берутся из CSS-переменных
+// ---------- header ----------
+// canvas colors come from CSS variables
 const CV=n=>getComputedStyle(document.body).getPropertyValue('--'+n).trim();
-function theme(t){}   // лёгкая страница — одна тема
+function theme(t){}   // lite page has a single theme
 async function info(){try{const j=await J('/api/info');theme(j.theme);const b=j.bat;$('bat').textContent=b.ok?L('BAT ','ЗАРЯД ')+b.soc+'%':'';
  const s=j.up;$('up').textContent='T+'+[s/3600|0,(s/60|0)%60,s%60].map(v=>String(v).padStart(2,'0')).join(':');return j}catch(e){}}
 
-// ---------- обзор ----------
+// ---------- overview ----------
 async function ov(){try{const [b,i]=await Promise.all([J('/api/ble'),info()]);bd=b.dev;
  $('o-b').textContent=b.on?b.count:L('off','выкл');const tr=bd.filter(d=>d.t=='tracker').length;$('o-b2').innerHTML=tr?`<span class="alert">${tr} ${L('tracker(s) nearby','трекер(ов) рядом')}</span>`:b.macs+L(' addresses',' адресов');
  $('o-w').textContent=i.nets||'…';$('o-w2').textContent=i.nets?L('last scan','последний поиск'):L('scanning','поиск');
@@ -223,5 +221,5 @@ function upload(){const f=$('u-f').files[0];if(!f){$('u-st').textContent=L('choo
  x.onerror=()=>{$('u-st').innerHTML='<span class="alert">'+L('connection lost','связь потеряна')+'</span> — '+L('if the device restarted, reconnect and check the version','если устройство перезапустилось, подключитесь снова и проверьте версию');$('u-go').disabled=false};
  $('u-st').textContent=L('uploading…','загрузка…');x.send(fd)}
 heads('p-ble',bs,drawB);heads('p-wifi',ws,drawW);subUI();go('ov');
-info();setInterval(info,8000);   // тема и батарея — на всех вкладках
+info();setInterval(info,8000);   // theme and battery: on every tab
 </script></body></html>)HTML";

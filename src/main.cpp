@@ -1,16 +1,9 @@
 // ============================================================
-//  TENGAN — анализатор радиоэфира для LilyGO T-Embed CC1101
+//  TENGAN — radio spectrum analyzer for the LilyGO T-Embed CC1101
+//  Receive-only: Bluetooth, Wi-Fi (2.4 GHz), Sub-GHz (CC1101).
 //
-//  Только приём: Bluetooth, Wi-Fi (2.4 ГГц) и Sub-GHz (CC1101).
-//  Ничего не передаём, ни к чему не подключаемся.
-//
-//  Где что лежит:
-//    core/    — экран, меню, кнопки, питание, батарея, настройки, лента
-//    ble/     — раздел Bluetooth (+ базы типов, производителей, датчиков)
-//    wifi/    — раздел Wi-Fi (+ база производителей сетевых устройств)
-//    subghz/  — раздел Sub-GHz (драйвер CC1101 + экраны)
-//
-//  Весь код: Claude. Распиновка — из репозитория LilyGO.
+//  core/ UI, menu, input, power, battery, settings, LEDs
+//  ble/  Bluetooth      wifi/ Wi-Fi      subghz/ CC1101 driver + screens
 // ============================================================
 #include "core/crumb.h"
 #include <Arduino.h>
@@ -33,34 +26,32 @@
 #include "core/perf.h"
 
 
-// Самый ранний момент, где можно что-то сделать (ещё до setup): гасим подсветку,
-// чтобы не было видно «мусора» на экране, пока он не инициализирован.
+// Earliest hook before setup(): backlight off so uninitialised screen garbage is not visible.
 extern "C" void initVariant() {
   pinMode(TFT_BL, OUTPUT);
   digitalWrite(TFT_BL, LOW);
 }
-// Ещё раньше: глобальный конструктор запускается до всей инициализации Arduino.
+// Even earlier: a global constructor runs before any Arduino init.
 __attribute__((constructor(101))) static void earlyBacklightOff() {
   gpio_set_direction((gpio_num_t)TFT_BL, GPIO_MODE_OUTPUT);
   gpio_set_level((gpio_num_t)TFT_BL, 0);
 }
 
-// Откат прошивки: после обновления по Wi-Fi новая прошивка считается «пробной».
-// Подтверждаем её сами, когда она проработала 15 с; если раньше зависла или
-// перезагрузилась — загрузчик вернёт старую.
+// OTA rollback: a firmware updated over Wi-Fi is "pending verify". We confirm it after 15 s
+// of uptime; if it hangs or reboots earlier, the bootloader restores the old one.
 extern "C" bool verifyRollbackLater() { return true; }
 static void confirmFirmware(uint32_t now) {
   static bool done = false;
   if (done || now < 15000) return;
   done = true;
-  esp_ota_mark_app_valid_cancel_rollback();      // после прошивки по USB просто ничего не делает
+  esp_ota_mark_app_valid_cancel_rollback();      // no-op after a USB flash
 }
 
 void setup() {
-  crumbBoot();          // «чёрный ящик»: причина прошлого сброса и последний шаг
-  checkWakeHold();      // включение после «выключения»: только удержанием боковой кнопки
+  crumbBoot();          // black box: previous reset reason and last step
+  checkWakeHold();      // after "power off", wake only by holding the side button
 
-  // общая шина SPI: все устройства — «не выбраны», пока не начнём с ними работать
+  // shared SPI bus: deselect every device until it is used
   pinMode(BOARD_PWR_EN, OUTPUT); digitalWrite(BOARD_PWR_EN, HIGH);
   pinMode(PIN_TFT_CS,  OUTPUT);  digitalWrite(PIN_TFT_CS,  HIGH);
   pinMode(PIN_SD_CS,   OUTPUT);  digitalWrite(PIN_SD_CS,   HIGH);
@@ -68,20 +59,20 @@ void setup() {
   pinMode(PIN_NRF_CS,  OUTPUT);  digitalWrite(PIN_NRF_CS,  HIGH);
 
   Serial.setRxBufferSize(2048);
-  Serial.setTxBufferSize(8192);    // поток приложения для компьютера (link/serout) — без ожидания
-  Serial.begin(115200);  // USB: сюда пишет программа ноутбука (раздел PC)
+  Serial.setTxBufferSize(8192);    // PC app stream (link/serout), non-blocking
+  Serial.begin(115200);  // USB: the laptop program writes here (PC section)
   inputBegin();
   displayBegin();
   ledsBegin();
   settingsBegin();
   batBegin();
-  bootScreen();          // анимация включения
+  bootScreen();          // boot animation
   bleBegin();
-  audioBegin();          // динамик: звуки интерфейса
-  satBegin();            // сохранённые орбиты спутников (Gallery › Globe)
+  audioBegin();          // speaker: UI sounds
+  satBegin();            // saved satellite orbits (Gallery > Globe)
   navBegin();
   navDraw(millis());
-  crumbWatchdogStart();                // с этого места зависание дольше 15 с = перезагрузка с записью шага
+  crumbWatchdogStart();                // from here a hang > 15 s = reboot with the step logged
 }
 
 void loop() {
@@ -93,18 +84,18 @@ void loop() {
   crumb("ble sample"); bleSample(now);
   ledsTick();
   batTick(now);
-  crumb("pc poll"); pcPoll(now);                        // строки с ноутбука по USB (раздел PC)
-  crumb("usb out"); webLinkPump();                     // в USB: страница и поток приложения для компьютера
-  crumb("nav tick"); navTick(now);                       // работа открытого раздела (сканы, развёртки)
+  crumb("pc poll"); pcPoll(now);                        // lines from the laptop over USB (PC)
+  crumb("usb out"); webLinkPump();                     // to USB: web page and PC app stream
+  crumb("nav tick"); navTick(now);                       // work of the open section (scans, sweeps)
 
   powerIdleTick(now);
   confirmFirmware(now);
-  // в приглушённом режиме кадры в 4 раза реже — меньше работы процессору и шине
+  // dimmed mode: 4x fewer frames to spare CPU and bus
   uint32_t frame = powerIdle() ? REDRAW_MS * 4 : (g_fastFrame ? 33 : REDRAW_MS);
   if (now - lastDraw >= frame) {
     lastDraw = now;
-    crumb("ble update"); bleUpdate(now);                   // нужно всегда: меню показывает число устройств, лента — события
-    g_fastFrame = false;              // экран сам попросит снова, если ему нужно
+    crumb("ble update"); bleUpdate(now);                   // always needed: menu shows device count, LED strip shows events
+    g_fastFrame = false;              // the screen asks again if needed
     uint32_t tDraw = micros();
     if (g_powerHold) drawPowerHold();
     else             { crumb("draw"); navDraw(now); }

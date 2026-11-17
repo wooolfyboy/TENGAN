@@ -1,8 +1,6 @@
 // ============================================================
-//  wifi_screens.cpp — экраны раздела Wi-Fi
-//
-//  NETWORKS (+подробности) · CHANNELS · ACTIVITY · CLIENTS · FIND
-//  Все экраны собраны из компонентов core/ui.h по общей сетке.
+//  wifi_screens.cpp — Wi-Fi section screens: NETWORKS (+details), CHANNELS, ACTIVITY, CLIENTS, FIND.
+//  All built from core/ui.h components on a common grid.
 // ============================================================
 #include <esp_wifi.h>
 #include "core/lang.h"
@@ -16,7 +14,7 @@
 #include "core/leds.h"
 #include "audio/audio.h"
 
-// значок защиты сети; открытые и WEP — инверсией, как тревога
+// security glyph; open and WEP are inverted, as an alert
 static char secGlyph(uint8_t e) {
   switch (e) {
     case WIFI_AUTH_OPEN:            return 'O';
@@ -35,7 +33,7 @@ static bool secAlert(uint8_t e) { return e == WIFI_AUTH_OPEN || e == WIFI_AUTH_W
 
 static void upperCopy(const char* s, char* out, size_t n) { utf8Upper(s, out, n); }
 
-// «идёт приём» — мигающая точка в конце линии шапки
+// "scanning" blinking dot at the end of the header line
 static void scanDot() {
   if ((g_scanning || g_prom) && (millis() / 300) % 2) spr.fillRect(spr.width() - UI_M - 3, 18, 3, 3, C_ACC());
 }
@@ -47,7 +45,7 @@ static bool waiting() {
 }
 
 // ============================================================
-//  NETWORKS — список и подробности
+//  NETWORKS — list and details
 // ============================================================
 void drawNets(uint32_t now) {
   int W = spr.width();
@@ -122,7 +120,7 @@ void drawNetDetail(uint32_t now) {
   spr.setTextColor(alert ? C_ALERT() : UI_LABEL());
   txt(bu, UI_M + 20, UI_TOP + 26, 1);
 
-  // показатели
+  // readouts
   int sameCh = 0, near = 0;
   for (auto& kv : g_aps) {
     if (kv.first == g_wSel) continue;
@@ -173,7 +171,7 @@ void drawNetDetail(uint32_t now) {
 }
 
 // ============================================================
-//  CHANNELS — кто какой канал занимает
+//  CHANNELS — who occupies which channel
 // ============================================================
 void drawChannels(uint32_t now) {
   int W = spr.width();
@@ -208,8 +206,8 @@ void drawChannels(uint32_t now) {
   }
   if (best) spr.fillTriangle(chX(best), pb + 14, chX(best) - 4, pb + 19, chX(best) + 4, pb + 19, C_ACC());
 
-  // «холмики» реальной ширины (20 / 40 МГц), слабые снизу, «жар» — сила
-  static std::vector<std::pair<int, uint64_t>> v;      // static: без выделения памяти каждый кадр
+  // humps of real width (20 / 40 MHz), weak ones at the bottom, heat = strength
+  static std::vector<std::pair<int, uint64_t>> v;      // static: no allocation every frame
   v.clear();
   for (auto& kv : g_aps) if (kv.second.ch >= 1 && kv.second.ch <= CH_MAX) v.push_back({ kv.second.rssi, kv.first });
   std::sort(v.begin(), v.end());
@@ -229,7 +227,7 @@ void drawChannels(uint32_t now) {
       prevx = x; prevy = y;
     }
   }
-  for (int i = (int)v.size() - 1, k = 0; i >= 0 && k < 3; i--, k++) {     // подписи трёх сильных
+  for (int i = (int)v.size() - 1, k = 0; i >= 0 && k < 3; i--, k++) {     // labels of the three strongest
     const Ap& a = g_aps[v[i].second];
     char nm[20], nu[20];
     fitText(ssidOr(a), nm, sizeof(nm), 72, 1);
@@ -242,7 +240,7 @@ void drawChannels(uint32_t now) {
 }
 
 // ============================================================
-//  ACTIVITY — пакеты в секунду и шум по каналам
+//  ACTIVITY — packets per second and noise per channel
 // ============================================================
 void drawActivity(uint32_t now) {
   int W = spr.width();
@@ -263,7 +261,7 @@ void drawActivity(uint32_t now) {
     int h = (int)((pb - pt) * sqrtf(t) / smx);
     int hd = t > 0 ? (int)(h * g_ppsData[c] / t) : 0;
     spr.fillRect(x + 2, pt, bw - 4, pb - pt, TC(10, 18, 26));
-    if (h > 0) {                                  // данные — ярко, служебные — тусклее
+    if (h > 0) {                                  // data bright, management dimmer
       uint16_t hc = heatV(0.3f + 0.7f * sqrtf(t) / smx);
       spr.fillRect(x + 2, pb - h, bw - 4, h - hd, scale565(hc, 40));
       spr.fillRect(x + 2, pb - hd, bw - 4, hd, hc);
@@ -273,7 +271,7 @@ void drawActivity(uint32_t now) {
     spr.setTextDatum(TC_DATUM);
     spr.setTextColor((c == 1 || c == 6 || c == 11) ? UI_LABEL() : UI_DIM());
     txt(buf, x + bw / 2, pb + 5, 1);
-    if (g_noise[c] != 0) {                         // шум: обычно -90..-95; выше -85 — тревога
+    if (g_noise[c] != 0) {                         // noise: usually -90..-95 dBm; above -85 = alert
       int nf = (int)lroundf(g_noise[c]);
       snprintf(buf, sizeof(buf), "%d", -nf);
       spr.setTextColor(nf > -86 ? C_ALERT() : UI_DIM());
@@ -289,7 +287,7 @@ void drawActivity(uint32_t now) {
   txt(L("MGMT", "СЛУЖ"), UI_M + 10, pt + 14, 1);
   spr.fillRect(UI_M + 2, pt + 14, 5, 7, scale565(heatV(0.9f), 40));
 
-  // общий трафик за 2 минуты
+  // total traffic over 2 minutes
   int gx = UI_M + 4, gy = UI_TOP + 92, gw = W - 2 * UI_M - 8, gh = UI_BOTTOM - gy + 2;
   uiFrame(gx, gy, gw, gh, UI_LINE());
   float hm = 1;
@@ -305,7 +303,7 @@ void drawActivity(uint32_t now) {
   txt(buf, gx + 5, gy + 3, 1);
   present();
 
-  if (g_ledEvent == 0) {                           // лента — уровень трафика
+  if (g_ledEvent == 0) {                           // LED strip = traffic level
     int lv = tot < 1 ? 0 : constrain((int)(log10f(tot) * 2.7f), 0, WS2812_N);
     strip.clear();
     for (int i = 0; i < lv; i++) strip.setPixelColor(i, strip.Color(10 + i * 8, 40 + i * 20, 60 + i * 20));
@@ -314,7 +312,7 @@ void drawActivity(uint32_t now) {
 }
 
 // ============================================================
-//  CLIENTS — сколько устройств работает в каждой сети
+//  CLIENTS — devices per network
 // ============================================================
 void drawClients(uint32_t now) {
   int W = spr.width();
@@ -358,7 +356,7 @@ void drawClients(uint32_t now) {
     spr.setTextColor(C_HOT());
     txtNum(cnt, W - UI_M - 8, cy, 2);
   }
-  // «ищут Wi-Fi»
+  // "looking for Wi-Fi"
   int y = UI_TOP + 2 + rows * rh + 4;
   spr.drawFastHLine(UI_M + 8, y, W - 2 * UI_M - 16, UI_LINE());
   snprintf(buf, sizeof(buf), "%d", (int)g_probes.size());
@@ -371,7 +369,7 @@ void drawClients(uint32_t now) {
 }
 
 // ============================================================
-//  FIND — «горячо-холодно» по выбранной сети
+//  FIND — hot/cold on the selected network
 // ============================================================
 void drawFind(uint32_t now) {
   int W = spr.width();
@@ -383,7 +381,7 @@ void drawFind(uint32_t now) {
   char sub[40]; snprintf(sub, sizeof(sub), L("ch %d  ·  %s", "к %d  ·  %s"), a.ch, encName(a.enc));
   uiHeader(L("Finder", "Поиск"), sub);
 
-  // средний сигнал за последние ~5 замеров
+  // average signal over the last ~5 samples
   int sum = 0, cnt = 0;
   for (int i = g_fSparkN - 1; i >= 0 && i >= g_fSparkN - 5; i--)
     if (g_fSpark[i] > -127) { sum += g_fSpark[i]; cnt++; }
@@ -399,7 +397,7 @@ void drawFind(uint32_t now) {
   spr.setTextColor(lost ? UI_DIM() : C_HOT());
   if (lost) txt("--", cx, cy - 22, 6); else txtNum(r, cx, cy - 22, 6);
   if (!lost) {
-    float d = powf(10.0f, (-45.0f - r) / 25.0f);    // грубая оценка до точки доступа
+    float d = powf(10.0f, (-45.0f - r) / 25.0f);    // rough distance estimate to the AP
     snprintf(buf, sizeof(buf), L("DBM  %s  ~%.0f M", "ДБМ  %s  ~%.0f М"), word, d < 1 ? 1.0f : d);
   } else snprintf(buf, sizeof(buf), "%s", word);
   spr.setTextColor(UI_LABEL());
@@ -408,7 +406,7 @@ void drawFind(uint32_t now) {
   spr.setTextColor(C_HOT());
   txt(nm, cx, cy + 22, 2);
 
-  // слева: MAX / MIN / AVG; справа: тренд
+  // left: MAX / MIN / AVG; right: trend
   int mx = -127, mn = 0, s2 = 0, n = 0;
   for (int i = 0; i < g_fSparkN; i++) if (g_fSpark[i] > -127) {
     mx = max(mx, (int)g_fSpark[i]); mn = min(mn, (int)g_fSpark[i]); s2 += g_fSpark[i]; n++;
@@ -429,9 +427,9 @@ void drawFind(uint32_t now) {
   }
   uiFooter(L("wheel: screens  ·  click: next network", "колесо: экраны · нажать: сеть"), L("side: back", "кнопка: назад"));
   present();
-  if (!lost && g_wifiTicks) audioGeiger(pct);                     // щелчки чаще — ближе
+  if (!lost && g_wifiTicks) audioGeiger(pct);                     // clicks get faster as you get closer
 
-  if (g_ledEvent == 0) {                           // лента — уровень сигнала
+  if (g_ledEvent == 0) {                           // LED strip = signal level
     int lv = pct * WS2812_N / 100;
     strip.clear();
     uint8_t rr = ((col >> 11) & 0x1F) << 3, gg = ((col >> 5) & 0x3F) << 2, bb = (col & 0x1F) << 3;

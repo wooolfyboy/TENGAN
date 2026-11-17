@@ -1,10 +1,7 @@
 // ============================================================
-//  langpick.cpp — выбор языка при первом включении (English / Русский).
-//
-//  Показывается, пока в памяти нет сохранённого языка (g_langAsk). Колесо —
-//  выбор, нажатие — подтвердить. Подсказки на обоих языках сразу, а сам
-//  выбранный вариант тут же «примеряет» язык: заголовок и подписи меняются
-//  при повороте колеса. Потом язык меняется в Настройки › Язык.
+//  langpick.cpp — first-boot language picker (English / Russian).
+//  Shown while no language is saved (g_langAsk). Wheel = choose, click = confirm.
+//  The highlighted option is applied live, so the labels change as you turn the wheel.
 // ============================================================
 #include "core/langpick.h"
 #include "core/theme.h"
@@ -12,7 +9,7 @@
 #include "core/settings.h"
 #include "core/lang.h"
 
-static int s_sel = -1;                    // выбранный вариант: 0 English, 1 Русский
+static int s_sel = -1;                    // selected: 0 English, 1 Russian
 
 static void ensure() { if (s_sel < 0) s_sel = g_lang ? 1 : 0; }
 
@@ -21,7 +18,7 @@ void langPickClick() { ensure(); settingsSetLang(s_sel); s_sel = -1; }
 
 void langPickDraw(uint32_t now) {
   ensure();
-  g_lang = s_sel;                          // примерка: все надписи экрана — на выбранном языке
+  g_lang = s_sel;                          // preview: the whole screen uses the highlighted language
   int W = spr.width(), H = spr.height();
   spr.fillSprite(C_BG());
   uiHeader(L("LANGUAGE", "ЯЗЫК"), L("first start", "первое включение"));
@@ -42,7 +39,7 @@ void langPickDraw(uint32_t now) {
     txt(names[i], x + bw / 2, y + bh / 2 - 8, 4);
     spr.setTextColor(on ? C_SELACC() : UI_DIM());
     txt(subs[i], x + bw / 2, y + bh / 2 + 18, 1);
-    if (on && ((now / 400) & 1)) {        // мигающий маркер выбора
+    if (on && ((now / 400) & 1)) {        // blinking selection marker
       spr.fillTriangle(x + bw / 2 - 5, y + bh + 6, x + bw / 2 + 5, y + bh + 6, x + bw / 2, y + bh + 1, C_ACC());
     }
   }

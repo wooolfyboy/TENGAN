@@ -1,5 +1,5 @@
 // ============================================================
-//  ui.cpp — компоненты дизайн-системы
+//  ui.cpp — design-system components
 // ============================================================
 #include "core/ui.h"
 #include "core/lang.h"
@@ -20,7 +20,7 @@ void uiHeader(const char* title, const char* right, bool rightAlert) {
   upper(title, u, sizeof(u));
   snprintf(t, sizeof(t), "// %s", u);
   spr.setTextDatum(TL_DATUM);
-  if (themeKurenai()) {                            // KURENAI: заголовок — белая скошенная плашка, текст чёрный
+  if (themeKurenai()) {                            // KURENAI: title is a white cut-corner plate, black text
     snprintf(t, sizeof(t), "%s", u);
     int tw = txtW(t, 2), x0 = UI_M, x1 = UI_M + tw + 16;
     spr.fillTriangle(x0 + 4, 1, x1 + 4, 1, x0, 17, C_HOT());
@@ -33,14 +33,14 @@ void uiHeader(const char* title, const char* right, bool rightAlert) {
   }
   if (right && right[0]) {
     char r0[48], r[48]; upper(right, r0, sizeof(r0));
-    int room = W - UI_M - 4 - (UI_M + 4 + txtW(t, 2)) - 10;   // сколько места справа от заголовка
-    fitText(r0, r, sizeof(r), max(room, 12), 1);               // не наезжать на заголовок
+    int room = W - UI_M - 4 - (UI_M + 4 + txtW(t, 2)) - 10;   // room to the right of the title
+    fitText(r0, r, sizeof(r), max(room, 12), 1);               // don't overlap the title
     spr.setTextDatum(TR_DATUM);
     spr.setTextColor(rightAlert ? C_ALERT() : UI_LABEL());
     txt(r, W - UI_M - 4, 6, 1);
   }
-  if (themeKurenai()) { spr.fillRect(UI_M, 19, W - 2 * UI_M, 2, C_ACC()); return; }   // KURENAI: сплошная красная черта
-  // линия под шапкой, угасающая вправо
+  if (themeKurenai()) { spr.fillRect(UI_M, 19, W - 2 * UI_M, 2, C_ACC()); return; }   // KURENAI: solid red line
+  // line under the header, fading to the right
   uint16_t a = C_ACC();
   for (int x = UI_M; x < W - UI_M; x++) {
     float k = 1.0f - 0.85f * (x - UI_M) / (float)(W - 2 * UI_M);
@@ -53,7 +53,7 @@ void uiFooter(const char* left, const char* right) {
   char l[60] = "", r[60] = "";
   if (left && left[0]) upper(left, l, sizeof(l));
   if (right && right[0]) upper(right, r, sizeof(r));
-  // не влезает в строку — тот же шрифт, на ступень мельче (одинаково для обоих языков)
+  // doesn't fit: same font, one step smaller (same for both languages)
   int room = W - 2 * (UI_M + 8) - 10, sz = (txtW(l, 1) + txtW(r, 1) <= room) ? 1 : 8;
   spr.setTextColor(UI_DIM());
   if (l[0]) { spr.setTextDatum(BL_DATUM); txt(l, UI_M + 8, UI_FOOT_Y, sz); }

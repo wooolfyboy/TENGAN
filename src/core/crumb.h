@@ -1,17 +1,16 @@
 // ============================================================
-//  crumb.h — «чёрный ящик»: последний шаг перед падением.
-//  crumb("...") пишет короткую метку в память, которая переживает
-//  программную перезагрузку (RTC_NOINIT). После падения палка знает
-//  причину сброса и последний шаг: Settings › Version, /api/info, поток st.
+//  crumb.h — black box: the last step before a crash.
+//  crumb("...") stores a short tag in RTC_NOINIT memory that survives a soft reset;
+//  after a crash the reset reason and last step show in Settings > Version, /api/info, stream st.
 // ============================================================
 #pragma once
 #include <Arduino.h>
 
-void crumb(const char* s);                 // отметить текущий шаг
-void crumbBoot();                          // в начале setup(): прочитать прошлый шаг и причину сброса
+void crumb(const char* s);                 // mark current step
+void crumbBoot();                          // at start of setup(): read previous step and reset reason
 const char* crumbLastReason();             // "power on", "panic", "watchdog", "brownout", ...
-const char* crumbLastStep();               // последний шаг перед сбросом ("" если чистый запуск)
-bool crumbWasCrash();                      // прошлый сброс — падение (panic / watchdog / brownout)
-// сторожевой таймер основного цикла: завис дольше 15 с — палка перезагрузится сама, шаг запишется
+const char* crumbLastStep();               // last step before reset ("" on a clean start)
+bool crumbWasCrash();                      // previous reset was a crash (panic / watchdog / brownout)
+// main-loop watchdog: a hang > 15 s reboots the device and logs the step
 void crumbWatchdogStart();
-void crumbFeed();                          // «я жив» — в начале каждого прохода loop() и в долгих операциях
+void crumbFeed();                          // "I'm alive": call each loop() pass and inside long operations
