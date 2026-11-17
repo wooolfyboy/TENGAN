@@ -16,20 +16,20 @@
 #include "core/jsonutil.h"
 
 #define CITY_MAX 24
-#define CITY_GRID 6                          // площадь 6x6 мест
+#define CITY_GRID 6                          // 6x6 plots
 struct Tower {
   char  name[20] = "";
-  float cpu = 0, ram = 0;                    // что прислал ноутбук: %, МБ
-  float h = 0, w = 0;                        // анимированные высота и ширина
+  float cpu = 0, ram = 0;                    // sent by the laptop: %, MB
+  float h = 0, w = 0;                        // animated height and width
   bool  fg = false, alive = false;
   int   slot = -1;
 };
 static Tower s_tw[CITY_MAX];
 static uint32_t s_cityT = 0;
-static int s_sel = -1;                       // прожектор (индекс в s_tw)
+static int s_sel = -1;                       // spotlight (index in s_tw)
 
 bool pcCityLive(uint32_t now) { return s_cityT && msSince(now, s_cityT) < 6000; }
-void pcCityNext() {                          // нажатие: следующая башня (по убыванию CPU)
+void pcCityNext() {                          // click: next tower (by descending CPU)
   int order[CITY_MAX], n = 0;
   for (int i = 0; i < CITY_MAX; i++) if (s_tw[i].alive) order[n++] = i;
   if (!n) { s_sel = -1; return; }
@@ -53,7 +53,7 @@ void pcCityLine(char* s) {
       if (s_tw[k].name[0] && !strcmp(s_tw[k].name, tok)) i = k;
       if (free < 0 && !s_tw[k].name[0]) free = k;
     }
-    if (i < 0) {                             // новая программа — свободное место ближе к центру
+    if (i < 0) {                             // new program: free plot nearest the center
       if (free < 0) continue;
       i = free;
       Tower& t = s_tw[i];
@@ -143,11 +143,11 @@ void drawPcCity(uint32_t now) {
       spr.fillTriangle(bx[a], by[a], bx[b], by[b], tx[b], ty[b], fc);
       spr.fillTriangle(bx[a], by[a], tx[b], ty[b], tx[a], ty[a], fc);
     }
-    uint16_t roof = t.fg ? C_HOT() : col;                       // активное окно — белая крыша
+    uint16_t roof = t.fg ? C_HOT() : col;                       // active window: white roof
     spr.fillTriangle(tx[0], ty[0], tx[1], ty[1], tx[2], ty[2], roof);
     spr.fillTriangle(tx[0], ty[0], tx[2], ty[2], tx[3], ty[3], roof);
     for (int q = 0; q < 4; q++) spr.drawLine(tx[q], ty[q], tx[(q + 1) % 4], ty[(q + 1) % 4], sel ? C_HOT() : scale565(C_HOT(), 60));
-    if (sel) {                                                  // прожектор: луч сверху
+    if (sel) {                                                  // spotlight: beam from above
       float px, py, pd; proj(gx, t.h + 0.35f, gz, px, py, pd);
       float rx, ry, rd; proj(gx, t.h, gz, rx, ry, rd);
       spr.drawLine(px, py, rx, ry, C_HOT());

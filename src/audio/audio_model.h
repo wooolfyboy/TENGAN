@@ -1,60 +1,60 @@
 // ============================================================
-//  audio_model.h — данные раздела Sound, общие для логики (audio.cpp)
-//  и экранов (audio_screens.cpp)
+//  audio_model.h — Sound section data shared by logic (audio.cpp)
+//  and screens (audio_screens.cpp)
 // ============================================================
 #pragma once
 #include <Arduino.h>
 
 enum { A_BARS = 0, A_TERRAIN, A_REACTOR, A_LEVEL, A_SCOPE, A_XY, A_NUM };
 
-#define AU_BANDS 32          // полосы спектра (логарифмически, 60 Гц .. 8 кГц)
-#define AU_WAVE  256         // точек формы волны
-#define AU_HIST  120         // история громкости: точка раз в 0.5 с => 1 мин
+#define AU_BANDS 32          // spectrum bands (logarithmic, 60 Hz .. 8 kHz)
+#define AU_WAVE  256         // waveform points
+#define AU_HIST  120         // loudness history: one point per 0.5 s => 1 min
 
 struct AudioView {
-  float level;               // громкость, dBFS (0 — максимум микрофона)
-  float peak;                // пик громкости с медленным спадом, dBFS
-  float bands[AU_BANDS];     // полосы 0..1 (с автоусилением), сглаженные
-  float caps[AU_BANDS];      // «шапки» пиков полос 0..1
-  int16_t wave[AU_WAVE];     // форма волны (последний блок)
-  float domHz;               // самая громкая частота
-  float energy;              // общая «энергия» 0..1 (для анимаций)
+  float level;               // loudness, dBFS (0 = mic maximum)
+  float peak;                // loudness peak with slow decay, dBFS
+  float bands[AU_BANDS];     // bands 0..1 (auto-gain), smoothed
+  float caps[AU_BANDS];      // band peak caps 0..1
+  int16_t wave[AU_WAVE];     // waveform (last block)
+  float domHz;               // loudest frequency
+  float energy;              // overall energy 0..1 (for animations)
 };
 
 extern AudioView g_au;
-extern bool  g_micOk;                // микрофон отвечает
+extern bool  g_micOk;                // mic responds
 extern int   g_aMode;
-extern float g_auHist[AU_HIST];      // громкость, dBFS
+extern float g_auHist[AU_HIST];      // loudness, dBFS
 extern int   g_auHistN;
-extern float g_auMax;                // максимум за время на экране
-extern float g_auAvg;                // среднее (скользящее)
+extern float g_auMax;                // max while on screen
+extern float g_auAvg;                // average (moving)
 
-// диагностика микрофона (видна на экранах, если что-то не так)
+// mic diagnostics (shown on screens when something is wrong)
 struct MicDiag {
-  int      stage;            // 0 выкл, 1 драйвер не встал, 2 пины, 3 частота, 4 работает
-  int      slot;             // 0 — левый канал, 1 — правый (пробуем оба)
-  uint32_t blocks;           // сколько блоков звука пришло
-  uint32_t timeouts;         // сколько раз не дождались данных
-  int      rawPeak;          // максимум |отсчёта| в последнем блоке (тишина ~ десятки)
-  bool     disabled;         // выключен в настройках
+  int      stage;            // 0 off, 1 driver failed, 2 pins, 3 frequency, 4 working
+  int      slot;             // 0 = left channel, 1 = right (we try both)
+  uint32_t blocks;           // audio blocks received
+  uint32_t timeouts;         // times data didn't arrive in time
+  int      rawPeak;          // max |sample| in the last block (silence ≈ tens)
+  bool     disabled;         // disabled in settings
 };
 extern MicDiag g_micDiag;
 
-// звук с ноутбука (раздел PC: программа на ноуте слушает то, что играет в колонках)
-extern bool   g_auFromPc;            // сейчас картинки рисуются по звуку ноутбука, а не микрофона
-extern int    g_auSrcNow;            // источник сейчас: 0 авто, 1 микрофон, 2 ноутбук (из настроек)
-void drawPcAudioWait(uint32_t now);  // выбран «ноутбук», а звука от него нет
+// laptop audio (PC section: a laptop program listens to what the speakers play)
+extern bool   g_auFromPc;            // visuals now follow laptop audio, not the mic
+extern int    g_auSrcNow;            // current source: 0 auto, 1 mic, 2 laptop (from settings)
+void drawPcAudioWait(uint32_t now);  // "laptop" selected but no audio from it
 #define AU_XY 64
-extern int8_t g_auXY[AU_XY][2];      // точки для XY-осциллографа: левый / правый канал
+extern int8_t g_auXY[AU_XY][2];      // XY scope points: left / right channel
 extern bool   g_auXYStereo;
 
 const char* levelWord(float db);     // QUIET / NORMAL / LOUD / VERY LOUD
 
-// экраны (audio_screens.cpp)
+// screens (audio_screens.cpp)
 void drawAuBars(uint32_t now);
 void drawReactor(uint32_t now);
-void drawTerrain(uint32_t now);    // 3D «звуковые горы»
-void drawXY(uint32_t now);         // XY-осциллограф: левый канал по X, правый по Y
+void drawTerrain(uint32_t now);    // 3D "sound mountains"
+void drawXY(uint32_t now);         // XY scope: left channel on X, right on Y
 void drawLevel(uint32_t now);
 void drawWave(uint32_t now);
-void drawMicMissing();             // драйвер не встал / выключен / нет данных
+void drawMicMissing();             // driver failed / disabled / no data

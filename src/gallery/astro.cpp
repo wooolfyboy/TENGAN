@@ -1,7 +1,7 @@
 // ============================================================
-//  astro.cpp — время, город и положения светил
-//  Планеты — по средним элементам орбит JPL (E. M. Standish, 1800–2050),
-//  Луна — укороченный ряд из «Астрономических алгоритмов» (Meeus).
+//  astro.cpp — time, city and positions of celestial bodies
+//  Planets: JPL mean orbital elements (E. M. Standish, 1800–2050);
+//  Moon: truncated series from Meeus, "Astronomical Algorithms".
 // ============================================================
 #include "gallery/astro.h"
 #include "core/lang.h"
@@ -30,22 +30,22 @@ int  cityCount() { return g_gpsKnown ? N_CITIES + 1 : N_CITIES; }
 void setGpsCity(float lat, float lon) {
   g_gpsCity.lat = lat; g_gpsCity.lon = lon; g_gpsKnown = true;
   g_city = N_CITIES;
-  settingsTouch();                      // сохранится вместе с остальными настройками
+  settingsTouch();                      // saved with the other settings
 }
 
 static const double D2R = PI / 180.0, R2D = 180.0 / PI;
 static double norm360(double a) { a = fmod(a, 360.0); return a < 0 ? a + 360.0 : a; }
 
-// ---------- время ----------
+// ---------- time ----------
 static int32_t s_tz = 0;
 void astroSetTime(uint32_t unixUtc, int32_t tz) {
   s_tz = tz;
   time_t cur = time(nullptr);
-  if (llabs((long long)cur - (long long)unixUtc) > 2) {        // часы чипа сильно ушли — поправить
+  if (llabs((long long)cur - (long long)unixUtc) > 2) {        // chip clock drifted a lot - fix it
     struct timeval tv = { (time_t)unixUtc, 0 };
     settimeofday(&tv, nullptr);
   }
-  if (g_tzOff != tz) { g_tzOff = tz; settingsTouch(); }       // запомнить (для «без ноутбука»)
+  if (g_tzOff != tz) { g_tzOff = tz; settingsTouch(); }       // remember (for use without a laptop)
 }
 bool astroTimeKnown() { return time(nullptr) > 1700000000; }
 double astroUnixNow() {
@@ -72,7 +72,7 @@ AltAz toAltAz(float ra, float dec, double jd, float lat, float lon) {
 
 SkyFrame skyFrame(double jd, float lat, float lon) {
   SkyFrame f;
-  f.lst = (float)norm360(gmstDeg(jd) + lon);           // местное звёздное время, градусы
+  f.lst = (float)norm360(gmstDeg(jd) + lon);           // local sidereal time, degrees
   f.sinLat = sinf(lat * (float)D2R); f.cosLat = cosf(lat * (float)D2R);
   return f;
 }
@@ -88,7 +88,7 @@ AltAz toAltAzF(const SkyFrame& f, float ra, float dec) {
   return r;
 }
 
-// ---------- эклиптика -> экватор ----------
+// ---------- ecliptic -> equator ----------
 static RaDec eclToEq(double lonDeg, double latDeg) {
   const double eps = 23.43928 * D2R;
   double l = lonDeg * D2R, b = latDeg * D2R;
@@ -99,7 +99,7 @@ static RaDec eclToEq(double lonDeg, double latDeg) {
   return r;
 }
 
-// ---------- планеты: элементы J2000 и их скорости за столетие ----------
+// ---------- planets: J2000 elements and their rates per century ----------
 struct Elem { double a, da, e, de, I, dI, L, dL, w, dw, N, dN; };
 static const Elem EL[] = {
   { 0.38709927, 0.00000037, 0.20563593, 0.00001906, 7.00497902, -0.00594749, 252.25032350, 149472.67411175, 77.45779628, 0.16047689, 48.33076593, -0.12534081 },
@@ -109,12 +109,12 @@ static const Elem EL[] = {
   { 9.53667594, -0.00125060, 0.05386179, -0.00050991, 2.48599187, 0.00193609, 49.95424423, 1222.49362201, 92.59887831, -0.41897216, 113.66242448, -0.28867794 },
 };
 static const Elem EARTH = { 1.00000261, 0.00000562, 0.01671123, -0.00004392, -0.00001531, -0.01294668, 100.46457166, 35999.37244981, 102.93768193, 0.32327364, 0.0, 0.0 };
-const char* const PLANET_RU[PL_NUM] = { LP("Mercury", "Меркурий"), LP("Venus", "Венера"), LP("Mars", "Марс"), LP("Jupiter", "Юпитер"), LP("Saturn", "Сатурн") };   // имена на языке прошивки
+const char* const PLANET_RU[PL_NUM] = { LP("Mercury", "Меркурий"), LP("Venus", "Венера"), LP("Mars", "Марс"), LP("Jupiter", "Юпитер"), LP("Saturn", "Сатурн") };   // names in the firmware language
 
 static void helio(const Elem& el, double T, double& x, double& y, double& z) {
   double a = el.a + el.da * T, e = el.e + el.de * T, I = (el.I + el.dI * T) * D2R;
   double L = el.L + el.dL * T, w = el.w + el.dw * T, N = (el.N + el.dN * T) * D2R;
-  double M = norm360(L - w) * D2R, om = (w * D2R) - N;     // аргумент перицентра
+  double M = norm360(L - w) * D2R, om = (w * D2R) - N;     // argument of perihelion
   double E = M;
   for (int k = 0; k < 8; k++) E = E - (E - e * sin(E) - M) / (1 - e * cos(E));
   double xp = a * (cos(E) - e), yp = a * sqrt(1 - e * e) * sin(E);
@@ -145,6 +145,6 @@ RaDec moonRaDec(double jd, float* phase01) {
   double Ms = norm360(357.529 + 0.98560028 * d) * D2R;
   double lon = L + 6.289 * sin(M) + 1.274 * sin(2 * D - M) + 0.658 * sin(2 * D) - 0.186 * sin(Ms) + 0.214 * sin(2 * M);
   double lat = 5.128 * sin(F);
-  if (phase01) *phase01 = (float)((1 - cos(D)) / 2);           // освещённая доля по элонгации
+  if (phase01) *phase01 = (float)((1 - cos(D)) / 2);           // lit fraction from elongation
   return eclToEq(lon, lat);
 }

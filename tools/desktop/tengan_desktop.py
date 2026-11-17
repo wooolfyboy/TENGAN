@@ -1,24 +1,19 @@
 # -*- coding: utf-8 -*-
 """
-TENGAN — приложение для компьютера (Windows).
+TENGAN desktop app (Windows, macOS, Linux).
 
-Одно окно со штабом палки (та же страница FULL, что на планшете) + монитор ПК
-(tools/pc_monitor) в одной программе и на одном USB-кабеле.
+One window with the stick's HQ page (same FULL page as on the tablet) plus the PC monitor
+(tools/pc_monitor), in one program over one USB cable.
 
-Режимы связи (выбор при запуске, последний запоминается):
-  USB   — всё по кабелю: страницу и данные палка отдаёт строками «@…»
-          (протокол — в src/web/web.cpp, «Приложение для компьютера по USB»).
-          Интернет на компьютере остаётся.
-  Wi-Fi — как планшет: компьютер подключён к точке палки, окно открывает
-          http://192.168.4.1/full. Если кабель тоже воткнут — монитор ПК шлёт
-          нагрузку и музыку по нему.
-  Авто  — USB, если палка на кабеле, иначе Wi-Fi.
+Link modes (chosen at start, last one remembered):
+  USB   - everything over the cable: the stick sends the page and data as "@..." lines
+          (protocol: src/web/web.cpp). The PC keeps its internet.
+  Wi-Fi - like a tablet: PC joins the stick's AP, window opens http://192.168.4.1/full.
+          If the cable is also plugged in, the PC monitor sends load and music over it.
+  Auto  - USB if the stick is on the cable, else Wi-Fi.
 
-Клавиши: F11 — во весь экран, F2 — снова выбор режима.
-
-Плюс (WIDGET.md): значок в трее (закрытие окна — в трей), всплывашки при событиях
-(в стиле темы TENGAN: DENKO / KURENAI) и мини-виджет поверх всех окон. Решения «что показать» — events.py,
-окна — overlay.py.
+Keys: F11 fullscreen, F2 mode picker, F3 widget (see WIDGET.md).
+Tray icon, event popups and the always-on-top widget: decisions in events.py, windows in overlay.py.
 """
 import base64
 import gzip
@@ -37,10 +32,10 @@ import urllib.request
 from collections import deque
 
 APP_NAME = "TENGAN Desktop"
-PORT = 47321                       # постоянный адрес страницы — чтобы планшетные настройки (вкладки) запоминались
+PORT = 47321                       # fixed page address so per-origin tablet settings (tabs) persist
 STICK_URL = "http://192.168.4.1/full"
 
-# ---------- куда писать журнал (у окна без консоли нет stdout) ----------
+# ---------- log location (a windowed app has no stdout) ----------
 if os.name == "nt":                                   # Windows: %APPDATA%\TENGAN
     APPDIR = os.path.join(os.environ.get("APPDATA") or os.path.expanduser("~"), "TENGAN")
 elif sys.platform == "darwin":                        # macOS: ~/Library/Application Support/TENGAN
@@ -49,7 +44,7 @@ else:                                                 # Linux: ~/.config/TENGAN
     APPDIR = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.join(os.path.expanduser("~"), ".config"), "TENGAN")
 os.makedirs(APPDIR, exist_ok=True)
 if sys.platform.startswith("linux"):
-    os.environ.setdefault("PYWEBVIEW_GUI", "qt")        # окно на Qt WebEngine (надёжно упаковывается PyInstaller)
+    os.environ.setdefault("PYWEBVIEW_GUI", "qt")        # Qt WebEngine window (packs reliably with PyInstaller)
 
 if getattr(sys, "frozen", False) or sys.stdout is None:
     _log = open(os.path.join(APPDIR, "desktop.log"), "a", encoding="utf-8", buffering=1)
@@ -58,16 +53,16 @@ if getattr(sys, "frozen", False) or sys.stdout is None:
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "pc_monitor"))
-import pc_monitor as pm            # noqa: E402  (сбор нагрузки, музыка, звук, медиа-клавиши, поиск палки)
+import pc_monitor as pm            # noqa: E402  (load, music, sound, media keys, stick discovery)
 sys.path.insert(0, HERE)
-from events import Engine, cfg_from_settings, KINDS   # noqa: E402  («мозг» оповещений — без окон)
+from events import Engine, cfg_from_settings, KINDS   # noqa: E402  (alert engine, no windows)
 
 
 def log(*a):
     print(time.strftime("%H:%M:%S"), *a, flush=True)
 
 
-# ---------- язык окна: последний известный язык прошивки TENGAN, иначе язык Windows ----------
+# ---------- window language: last known TENGAN firmware language, else the OS language ----------
 TX = {
     "en": {
         "sub": "desktop · HQ and PC monitor", "usb_s": "over the cable · internet stays on", "wifi_s": "via the TENGAN access point",
@@ -110,7 +105,7 @@ TX = {
 }
 
 
-# настройки оповещений и виджета (панель на стартовом экране) — по языку окна
+# alert/widget settings panel texts (start screen), by window language
 PP_TX = {
     "en": {
         "h_pop": "Popups", "h_kinds": "What to show", "h_quiet": "Quiet hours", "h_widget": "Widget", "h_window": "Window",
@@ -156,7 +151,7 @@ PP_TX = {
     },
 }
 
-# заголовки оповещений (events.py пишет по-английски) — перевод для русского окна
+# alert titles (events.py writes English): Russian translations for the Russian window
 NOTE_RU = {"TRACKER NEARBY": "ТРЕКЕР РЯДОМ", "NEW DEVICE NEARBY": "НОВОЕ УСТРОЙСТВО РЯДОМ", "REMOTE": "ПУЛЬТ", "CARD": "КАРТА",
            "433 REMOTE / BELL": "ПУЛЬТ / ЗВОНОК 433", "NEW 433 SENSOR": "НОВЫЙ ДАТЧИК 433", "OUTSIDE": "ЗА ОКНОМ",
            "TENGAN BATTERY LOW": "TENGAN: БАТАРЕЯ РАЗРЯЖЕНА", "LINK LOST": "СВЯЗЬ С TENGAN ПРОПАЛА", "LINK RESTORED": "СВЯЗЬ С TENGAN ВЕРНУЛАСЬ",
@@ -173,14 +168,14 @@ def note_title(title, lang):
 
 
 def os_lang():
-    """Язык интерфейса системы: русский → ru, остальное → en."""
+    """OS UI language: Russian -> ru, anything else -> en."""
     if os.name == "nt":
         try:
             import ctypes
             return "ru" if (ctypes.windll.kernel32.GetUserDefaultUILanguage() & 0x3FF) == 0x19 else "en"
         except Exception:
             pass
-    if sys.platform == "darwin":                      # приложение из Finder запускается без LANG
+    if sys.platform == "darwin":                      # apps launched from Finder have no LANG
         out = pm.run_cmd(["defaults", "read", "-g", "AppleLanguages"]) or ""
         first = re.findall(r"[A-Za-z]{2}", out)
         if first:
@@ -191,13 +186,13 @@ def os_lang():
 
 
 class Msg(RuntimeError):
-    """Ошибка с ключом из TX (текст подставляется на языке окна)."""
+    """Error carrying a TX key (text is looked up in the window language)."""
     def __init__(self, key, **kw):
         super().__init__(key)
         self.key, self.kw = key, kw
 
 
-# ---------- настройки приложения ----------
+# ---------- app settings ----------
 CFG_PATH = os.path.join(APPDIR, "desktop.json")
 
 
@@ -213,8 +208,8 @@ AUTOSTART_NAME = "TENGAN Desktop"
 
 
 def autostart_cmd():
-    """Чем запускать программу при входе в систему (с ключом --tray). AppImage — по пути самого образа
-    (sys.executable внутри смонтированного образа временный)."""
+    """Command to launch the app at login (with --tray). AppImage: the image path itself
+    (sys.executable inside the mounted image is temporary)."""
     if getattr(sys, "frozen", False):
         return [os.environ.get("APPIMAGE") or sys.executable, "--tray"]
     return [sys.executable, os.path.abspath(__file__), "--tray"]
@@ -239,7 +234,7 @@ def autostart_get():
 
 
 def autostart_set(on):
-    """Запуск вместе с системой: Windows — HKCU\\…\\Run, macOS — LaunchAgent, Linux — ~/.config/autostart."""
+    """Start with the OS: Windows HKCU\\...\\Run, macOS LaunchAgent, Linux ~/.config/autostart."""
     cmd = autostart_cmd()
     try:
         if os.name == "nt":
@@ -279,7 +274,7 @@ def autostart_set(on):
 
 
 def zoom_js(z):
-    """Масштаб интерфейса окна (CSS zoom всей страницы: и стартовый экран, и страница палки)."""
+    """Window UI scale (CSS zoom of the whole page: start screen and stick page)."""
     try:
         z = min(1.5, max(0.8, float(z)))
     except Exception:
@@ -296,9 +291,9 @@ def cfg_save(c):
 
 
 # ============================================================
-#  Связь с палкой по USB: один порт на всё.
-#  Строки «@…» — приложение (поток, ответы, страница), остальные — монитор ПК
-#  (KEY …, AUD …). Пишем через pm.send (общий замок): строки не перемешиваются.
+#  USB link to the stick: one port for everything.
+#  "@..." lines belong to the app (stream, replies, page), the rest to the PC monitor
+#  (KEY ..., AUD ...). Writes go through pm.send (shared lock) so lines never interleave.
 # ============================================================
 class Link:
     def __init__(self, find_port=None, open_port=None):
@@ -314,16 +309,16 @@ class Link:
         self.req_id = 0
         self.pending = {}
         self.pages = {}
-        self.on_line = None            # монитор ПК: строки без «@» (KEY / AUD)
-        self.on_event = None           # «мозг» оповещений: каждое событие палки (ev, json)
-        self.extra = ""                # что ещё слушать для оповещений/виджета (даже если штаб на другой вкладке)
-        self.page_q = ""               # подписка самой страницы
-        self.on_port = None            # монитор ПК: порт открылся / пропал
-        self.dev_lang = None           # язык прошивки TENGAN (из события st)
+        self.on_line = None            # PC monitor: lines without "@" (KEY / AUD)
+        self.on_event = None           # alert engine: every stick event (ev, json)
+        self.extra = ""                # extra subscriptions for alerts/widget (even if HQ is on another tab)
+        self.page_q = ""               # the page's own subscription
+        self.on_port = None            # PC monitor: port opened / lost
+        self.dev_lang = None           # TENGAN firmware language (from the st event)
         self.stop = False
         threading.Thread(target=self._keeper, daemon=True).start()
 
-    # --- порт ---
+    # --- port ---
     def connected(self):
         return self.port is not None
 
@@ -347,7 +342,7 @@ class Link:
                             self.on_event("_link", "true")
                     except Exception as e:
                         log("USB: не открылся", name, e)
-                        # Linux: порт есть, но нет прав (группа dialout) — покажем подсказку на экране запуска
+                        # Linux: port exists but no permission (dialout group): show a hint on the start screen
                         self.perm_err = name if (isinstance(e, PermissionError) or getattr(e, "errno", None) == 13
                                                  or "permission" in str(e).lower()) else ""
                         time.sleep(2)
@@ -355,7 +350,7 @@ class Link:
                 else:
                     time.sleep(1)
                     continue
-            # «я здесь» раз в 2 с — палка держит подписку, пока слышит приложение
+            # "I am here" every 2 s: the stick keeps the subscription while it hears the app
             if self.want_q and time.time() - self.want_t > 2:
                 self.send_line("@W " + self.want_q)
             time.sleep(0.25)
@@ -407,7 +402,7 @@ class Link:
                     except Exception as e:
                         log("строка не разобрана:", e, line[:80])
 
-    # --- входящие строки ---
+    # --- incoming lines ---
     def handle(self, line):
         if line.startswith("@E "):
             ev, _, js = line[3:].partition(" ")
@@ -437,12 +432,12 @@ class Link:
             except Exception as e:
                 log("оповещения:", e)
         with self.cv:
-            if ev == "snd" and len(self.events) > 200:   # страница не успевает — старый звук не нужен
+            if ev == "snd" and len(self.events) > 200:   # page is behind: stale sound is useless
                 return
             self.events.append((ev, js))
             self.cv.notify_all()
 
-    # --- для страницы ---
+    # --- for the page ---
     def want(self, q):
         self.page_q = q
         self._rewant()
@@ -453,8 +448,8 @@ class Link:
             self._rewant()
 
     def _rewant(self):
-        """Подписка = то, что смотрит штаб, + то, что нужно оповещениям (ble, ir, nfc, sens, wx)."""
-        q = self.page_q                                  # вид «want=ble,wifi&sm=0&sb=1» (как у SSE)
+        """Subscription = what HQ watches + what alerts need (ble, ir, nfc, sens, wx)."""
+        q = self.page_q                                  # form "want=ble,wifi&sm=0&sb=1" (same as SSE)
         if self.extra:
             head, sep, tail = q.partition("&")
             if head.startswith("want="):
@@ -476,7 +471,7 @@ class Link:
                 self.cv.wait(wait)
             items = list(self.events)
             self.events.clear()
-        # готовый JSON без перекодирования: данные палки вставляются как есть
+        # ready JSON, no re-encoding: stick data is inserted as is
         return "[" + ",".join('["%s",%s]' % (ev, js) for ev, js in items) + "]"
 
     def api(self, path, timeout=3.0):
@@ -494,7 +489,7 @@ class Link:
         finally:
             self.pending.pop(rid, None)
 
-    # --- страница с палки (gzip кусками) ---
+    # --- page from the stick (gzip in chunks) ---
     def _page_part(self, rest):
         parts = rest.split(" ")
         pid = parts[0]
@@ -511,8 +506,8 @@ class Link:
             pg["got"] = sum(len(c) for c in pg["chunks"].values())
 
     def get_page(self, timeout=60, progress=None, tries=3):
-        """Страница с палки; если по дороге потерялся кусок (по USB-CDC изредка пропадает пакет в 64 байта —
-        «страница пришла не целиком» или битый gzip), молча просим ещё раз."""
+        """Fetch the page; if a chunk got lost (USB-CDC occasionally drops a 64-byte packet,
+        giving a partial page or bad gzip), silently retry."""
         for n in range(1, tries + 1):
             try:
                 return self._get_page_once(timeout, progress)
@@ -520,7 +515,7 @@ class Link:
                 if e.key != "partial" or n == tries:
                     raise
                 log("страница: пришла не целиком (%s из %s) — прошу ещё раз (%d)" % (e.kw.get("a"), e.kw.get("b"), n + 1))
-            except (OSError, EOFError, zlib.error) as e:      # битый gzip (BadGzipFile — это OSError)
+            except (OSError, EOFError, zlib.error) as e:      # bad gzip (BadGzipFile is an OSError)
                 if n == tries:
                     raise Msg("partial", a="?", b="?")
                 log("страница: не распаковалась (%s) — прошу ещё раз (%d)" % (e, n + 1))
@@ -554,7 +549,7 @@ class Link:
 
 
 # ============================================================
-#  Монитор ПК — тот же, что tools/pc_monitor, только на общем порту
+#  PC monitor: same as tools/pc_monitor, but on the shared port
 # ============================================================
 class Monitor:
     def __init__(self, link):
@@ -620,7 +615,7 @@ class Monitor:
 
 
 # ============================================================
-#  Страницы окна: выбор режима и штаб (локальный сервер 127.0.0.1)
+#  Window pages: mode picker and HQ (local server on 127.0.0.1)
 # ============================================================
 BRIDGE = """<script>
 window.TENGAN_DESKTOP={mode:'usb'};
@@ -630,7 +625,7 @@ window.TenganUSB={want:function(q){return t('/__link/want?q='+encodeURIComponent
  poll:function(){return t('/__link/poll')}};})();
 </script>"""
 
-# F11 / F2 — через мост pywebview (он есть на любой странице окна, и на странице палки по Wi-Fi)
+# F11 / F2 go through the pywebview bridge (present on every window page, including the stick page over Wi-Fi)
 KEYS = """(function(){if(window.__tgKeys)return;window.__tgKeys=1;
 function api(){return window.pywebview&&window.pywebview.api}
 // кнопка виджета: язычок у правого края окна (F3 — то же самое)
@@ -653,20 +648,20 @@ document.addEventListener('keydown',function(e){var a=api();if(!a)return;
 
 
 class JsApi:
-    """То, что страница окна может попросить у приложения (pywebview js_api)."""
+    """What a window page can ask of the app (pywebview js_api)."""
     def __init__(self, app):
         self._app = app
 
     def fullscreen(self):
         if self._app.window:
             self._app.window.toggle_fullscreen()
-            self._app.win_fs = not getattr(self._app, "win_fs", False)   # пока во весь экран — место окна не запоминаем
+            self._app.win_fs = not getattr(self._app, "win_fs", False)   # in fullscreen the window position is not remembered
 
     def home(self):
         self._app.launcher()
 
     def widget_toggle(self):
-        """Кнопка ◰ / F3 в окне: показать или спрятать виджет. Возвращает новое состояние."""
+        """Button / F3 in the window: show or hide the widget. Returns the new state."""
         on = not bool(self._app.engine.prefs.get("widget"))
         self._app.set_pref("widget", on)
         return on
@@ -779,11 +774,11 @@ class App:
         self.cfg = cfg_load()
         self.engine = Engine(prefs=self.cfg.get("alerts"))
         self.eng_lock = threading.Lock()
-        self.mode_on = ""              # режим, в котором штаб реально запущен: usb / wifi
+        self.mode_on = ""              # mode HQ is really running in: usb / wifi
         self.popups = self.widget = self.tray = self.sse = None
         self.quitting = False
-        self.hq_style = "denko"        # тема TENGAN (st.theme): denko / kurenai — по ней красятся плашки и виджет
-        self.ev_t = 0.0                # когда пришло последнее событие палки
+        self.hq_style = "denko"        # TENGAN theme (st.theme): denko / kurenai; popups and widget follow it
+        self.ev_t = 0.0                # time of the last stick event
         link.on_event = self.on_stick_event
         self.window = None
         self.html = None
@@ -796,7 +791,7 @@ class App:
     @property
     def lang(self):
         d = self.link.dev_lang
-        if d in TX and self.cfg.get("lang") != d:            # запомнить язык прошивки — следующий запуск сразу на нём
+        if d in TX and self.cfg.get("lang") != d:            # remember the firmware language so the next start uses it at once
             self.cfg["lang"] = d
             cfg_save(self.cfg)
         return d if d in TX else self.cfg.get("lang") if self.cfg.get("lang") in TX else os_lang()
@@ -817,7 +812,7 @@ class App:
             h = h.replace(k, v)
         return h
 
-    # --- переходы окна ---
+    # --- window transitions ---
     def launcher(self, autostart=False, prefs=False):
         if self.window:
             self.window.load_url("http://127.0.0.1:%d/" % self.port + ("?auto=1" if autostart else "?prefs=1" if prefs else ""))
@@ -867,14 +862,14 @@ class App:
         finally:
             self.busy = False
 
-    # ---------- оповещения, виджет, трей ----------
+    # ---------- alerts, widget, tray ----------
     def on_stick_event(self, ev, js):
         with self.eng_lock:
             if ev == "_link":
                 self.engine.link(js == "true")
                 return
             self.ev_t = time.time()
-            if ev == "st":                                   # тема устройства — стиль плашек и виджета
+            if ev == "st":                                   # device theme: popup and widget style
                 try:
                     th = json.loads(js).get("theme")
                 except Exception:
@@ -894,7 +889,7 @@ class App:
         return bool(p.get("popups") or p.get("widget"))
 
     def apply_prefs(self):
-        """Включить/выключить то, что нужно оповещениям, под текущий режим и настройки."""
+        """Turn on/off what alerts need, for the current mode and settings."""
         need = self.need_events()
         self.link.set_extra("ble,ir,nfc,sens,wx" if need and self.mode_on == "usb" else "")
         if need and self.mode_on == "wifi":
@@ -923,7 +918,7 @@ class App:
         elif k == "autostart":
             v = bool(v)
             if not autostart_set(v):
-                v = autostart_get()                       # не вышло — показываем как есть на самом деле
+                v = autostart_get()                       # failed: show the real state
         p = dict(self.engine.prefs)
         if k.startswith("kinds."):
             kk = dict(p["kinds"])
@@ -943,7 +938,7 @@ class App:
 
     def style(self):
         s = self.engine.prefs.get("style", "auto")
-        s = {"nerv": "denko", "domain": "kurenai"}.get(s, s)          # старые значения из конфига
+        s = {"nerv": "denko", "domain": "kurenai"}.get(s, s)          # legacy config values
         return self.hq_style if s not in ("denko", "kurenai") else s
 
     def show_main(self, prefs=False):
@@ -987,8 +982,8 @@ class App:
             pass
 
     def ticker(self):
-        """5 раз в секунду: показать готовые плашки, обновить виджет; раз в 30 с — настройки тревог с TENGAN.
-        Стиль плашек — тема устройства (событие st)."""
+        """5 times a second: show ready popups, update the widget; every 30 s fetch alert settings from TENGAN.
+        Popup style follows the device theme (st event)."""
         last_cfg = 0.0
         while not self.quitting:
             time.sleep(0.2)
@@ -1072,7 +1067,7 @@ def make_handler(app):
             elif p == "/__app/home":
                 app.launcher()
                 self._send('{"ok":true}')
-            elif p == "/__app/show":                      # второй запуск программы — показать это окно
+            elif p == "/__app/show":                      # second launch of the app: show this window
                 app.show_main()
                 self._send('{"ok":true}')
             elif p == "/__app/prefs":
@@ -1086,7 +1081,7 @@ def make_handler(app):
                 if k:
                     app.set_pref(k, v)
                 self._send(app.prefs_json())
-            elif p == "/__app/test_popup":                # кнопка «проверить» в настройках
+            elif p == "/__app/test_popup":                # "test" button in settings
                 app.show_note({"kind": "new", "kj": "接近警告", "title": "TEST · NEW DEVICE NEARBY",
                                "text": app.t("test_text"), "sev": "alert"})
                 self._send('{"ok":true}')
@@ -1102,8 +1097,8 @@ class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
 
 
 def serve(app, port=PORT):
-    """Локальный сервер окна. Порт постоянный (настройки страницы запоминаются);
-    если занят (второе окно приложения) — следующий свободный."""
+    """Local window server. The port is fixed (page settings persist per origin);
+    if taken (second app window), use the next free one."""
     for p in range(port, port + 20):
         try:
             srv = Server(("127.0.0.1", p), make_handler(app))
@@ -1119,11 +1114,11 @@ def main():
     import webview
     import overlay
     if os.environ.get("TENGAN_SELFTEST"):
-        # CI: проверяем, что PyInstaller упаковал всё нужное (окно, его движок, монитор, оповещения),
-        # не запуская сам интерфейс — на headless-машине у Chromium нет GPU и он падает не по нашей вине.
+        # CI: check PyInstaller packed everything (window, its engine, monitor, alerts) without starting the UI;
+        # on a headless box Chromium has no GPU and crashes through no fault of ours.
         import overlay_html, events                     # noqa: F401
         if sys.platform.startswith("linux"):
-            import webview.platforms.qt                 # noqa: F401  (движок окна на Linux — Qt WebEngine)
+            import webview.platforms.qt                 # noqa: F401  (window engine on Linux: Qt WebEngine)
         print("selftest OK: webview + window engine + modules import", flush=True)
         log("selftest OK")
         return
@@ -1136,9 +1131,9 @@ def main():
     app = App(link)
     serve(app)
     pr = app.engine.prefs
-    if bool(pr.get("autostart")) != autostart_get():          # убрали/добавили в системе вручную — верим системе
+    if bool(pr.get("autostart")) != autostart_get():          # changed in the OS by hand: trust the OS
         app.set_pref("autostart", autostart_get())
-    # окно: прошлые место и размер (если всё ещё на экране), развёрнуто / во весь экран, старт в трее
+    # window: previous position/size (if still on screen), maximized / fullscreen, start in tray
     geo = {"width": 1600, "height": 1000}
     r = pr.get("win_rect")
     W, H = overlay.screen_size()
@@ -1187,7 +1182,7 @@ def main():
             getattr(win.events, ev).__iadd__(fn)
         except Exception as e:
             log("окно: нет события", ev, e)
-    # оповещения и виджет (WIDGET.md): свои окна поверх всех + значок в трее
+    # alerts and widget (WIDGET.md): own always-on-top windows + tray icon
     for name, make in (("popups", overlay.Popups), ("widget", overlay.Widget), ("tray", overlay.Tray)):
         try:
             setattr(app, name, make(app))
@@ -1195,9 +1190,9 @@ def main():
             log("не включилось:", name, e)
 
     def on_closing():
-        # крестик (и «Закрыть окно» на панели задач) — только прячет окно, если программа должна жить дальше:
-        # есть значок в трее (и так настроено) или включён виджет — он самостоятельный, как настоящий виджет.
-        # Выход — из меню трея или из меню виджета (правый клик).
+        # The close button (and taskbar "Close window") only hides the window if the app should live on:
+        # a tray icon (and it is enabled) or the widget is on, which works standalone.
+        # Quit is in the tray menu or the widget menu (right click).
         if not app.quitting:
             tray_ok = app.tray and app.tray.icon and app.engine.prefs.get("tray", True)
             widget_on = app.widget and app.engine.prefs.get("widget")
@@ -1213,20 +1208,20 @@ def main():
     def on_loaded():
         try:
             wt = "Виджет поверх окон — F3" if app.lang == "ru" else "Widget on top — F3"
-            win.evaluate_js(KEYS.replace("%WT%", wt))   # F11 / F2 / F3 и кнопка виджета — и на странице палки (Wi-Fi)
+            win.evaluate_js(KEYS.replace("%WT%", wt))   # F11 / F2 / F3 and the widget button, also on the stick page (Wi-Fi)
             if float(app.engine.prefs.get("zoom", 1) or 1) != 1:
                 win.evaluate_js(zoom_js(app.engine.prefs.get("zoom")))
         except Exception:
             pass
         if first[0]:
             first[0] = False
-            if hidden and not (app.tray and app.tray.icon):   # просили «в трей», а значка нет — показать окно
+            if hidden and not (app.tray and app.tray.icon):   # "start in tray" requested but there is no icon: show the window
                 try:
                     win.show()
                 except Exception:
                     pass
     win.events.loaded += on_loaded
-    # Linux: окно на Qt WebEngine (ставится из pip и надёжно упаковывается); Windows / macOS — системный движок
+    # Linux: Qt WebEngine window (pip install, packs reliably); Windows / macOS: the system engine
     gui = "qt" if sys.platform.startswith("linux") else None
     webview.start(private_mode=False, storage_path=os.path.join(APPDIR, "webview"), gui=gui)
 

@@ -1,25 +1,25 @@
 // ============================================================
-//  audio.h — звук: микрофон (раздел Sound) и динамик (звуки интерфейса)
+//  audio.h — sound: microphone (Sound section) and speaker (UI sounds)
 // ============================================================
 #pragma once
 #include <Arduino.h>
 #include "core/section.h"
 
-void audioBegin();                   // динамик (звуки интерфейса)
-void audioClick();                   // щелчок колеса
+void audioBegin();                   // speaker (UI sounds)
+void audioClick();                   // wheel click
 void audioBeep(uint16_t hz, uint16_t ms);
-void audioGeiger(int pct);           // «счётчик Гейгера»: чем ближе (pct 0..100), тем чаще щелчки
+void audioGeiger(int pct);           // Geiger counter: the closer (pct 0..100), the faster the clicks
 
 extern const Section soundSection;
 
-// веб-страница (раздел Web)
-bool audioWebUse();                  // включить микрофон (если разрешён в настройках)
+// web page (Web section)
+bool audioWebUse();                  // start the mic (if allowed in settings)
 void audioWebTick(uint32_t now);
 void audioWebStop();
 void audioJson(String& out);
-void audioStreamJson(String& out);   // компактный кадр для планшета (поток SSE)
+void audioStreamJson(String& out);   // compact frame for the tablet (SSE stream)
 
-// звук с ноутбука (строки «PA ...» по USB, разбирает pc.cpp)
+// laptop audio ("PA ..." lines over USB, parsed by pc.cpp)
 void audioPcFrame(float levelDb, int domHz, const uint8_t* bands32, const int8_t* wave64,
                   const int8_t* xy64x2, bool stereo);
-bool audioPcLive(uint32_t now);      // кадры с ноута идут (< 0.6 с назад)
+bool audioPcLive(uint32_t now);      // frames from the laptop are arriving (< 0.6 s ago)

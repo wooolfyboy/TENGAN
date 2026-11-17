@@ -160,7 +160,7 @@ void pcSendLine(const char* s) {
   serOutLine(s);
 }
 
-// ---------- раздел ----------
+// ---------- section ----------
 static void pcSubtitle(char* out, size_t n) {
   if (pcLive(millis())) snprintf(out, n, L("%d%% cpu", "%d%% ЦП"), (int)g_pc.cpu);
   else                  snprintf(out, n, "%s", L("via USB", "по USB"));

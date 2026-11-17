@@ -1,10 +1,10 @@
 // ============================================================
-//  pc_screens.cpp — экраны раздела PC
+//  pc_screens.cpp — screens of the PC section
 //
-//  ОБЗОР — CPU крупно + график за минуту; справа RAM, диск, сеть, батарея
-//  ЯДРА  — загрузка каждого ядра столбиками
-//  МУЗЫКА — колесо крутит громкость ноутбука, нажатие — пауза/играть
-//  ЖДЁМ  — если ноутбук ничего не присылает: что сделать по шагам
+//  OVERVIEW — big CPU + one-minute graph; RAM, disk, network, battery on the right
+//  CORES    — per-core load bars
+//  MUSIC    — wheel sets laptop volume, click = pause/play
+//  WAITING  — if the laptop sends nothing: step-by-step setup
 // ============================================================
 #include "core/timeutil.h"
 #include "core/lang.h"
@@ -13,7 +13,7 @@
 #include "core/theme.h"
 #include "core/ui.h"
 
-static uint16_t loadCol(float pct) {                 // загрузка: холодно -> горячо, > 90% — тревога
+static uint16_t loadCol(float pct) {                 // load: cold -> hot, > 90% = alert
   return pct >= 90 ? C_ALERT() : heatV(0.25f + 0.75f * pct / 100.0f);
 }
 static void rateStr(float kb, char* out, size_t n) {
@@ -36,10 +36,10 @@ void drawPc(uint32_t now) {
   spr.fillSprite(C_BG());
   uint32_t age = msSince(now, p.t) / 1000;
   char hdr[32];
-  if (age >= 3) snprintf(hdr, sizeof(hdr), L("no data %lus", "нет данных %lu с"), (unsigned long)age);   // короткая пауза — цифры старые
+  if (age >= 3) snprintf(hdr, sizeof(hdr), L("no data %lus", "нет данных %lu с"), (unsigned long)age);   // short pause: numbers are stale
   uiHeader(L("PC", "ПК"), age >= 3 ? hdr : (p.host[0] ? p.host : L("computer", "компьютер")), p.cpu >= 90);
 
-  // ---- слева: CPU ----
+  // ---- left: CPU ----
   spr.setTextDatum(TL_DATUM);
   spr.setTextColor(UI_LABEL());
   txt("CPU", UI_M + 6, UI_TOP + 4, 1);
@@ -47,7 +47,7 @@ void drawPc(uint32_t now) {
   snprintf(buf, sizeof(buf), "%d%%", (int)lroundf(p.cpu));
   spr.setTextColor(loadCol(p.cpu));
   txt(buf, UI_M + 4, UI_TOP + 14, 6);
-  // график: CPU (яркий) и RAM (тусклый) за минуту
+  // graph: CPU (bright) and RAM (dim) over a minute
   const int gx = UI_M + 4, gy = UI_TOP + 70, gw = 140, gh = 54;
   uiFrame(gx, gy, gw, gh, UI_LINE());
   for (int k = 1; k < 4; k++) spr.drawFastHLine(gx + 1, gy + gh * k / 4, gw - 2, UI_LINE());
@@ -67,7 +67,7 @@ void drawPc(uint32_t now) {
   spr.setTextColor(UI_DIM());
   txt("60 S", gx + 3, gy + 3, 1);
 
-  // ---- справа: RAM, диск, сеть, батарея ----
+  // ---- right: RAM, disk, network, battery ----
   const int rx = 164, rw = W - rx - UI_M - 4;
   int y = UI_TOP + 4;
   spr.setTextDatum(TL_DATUM);
@@ -149,33 +149,33 @@ void drawPcWaiting(uint32_t now) {
   y += 34;
   spr.setTextColor(C_ACC());  txt("3", x, y, 4);
   spr.setTextColor(C_HOT());  txt(L("WAIT A FEW SECONDS · DATA APPEARS HERE", "ПОДОЖДИТЕ - ДАННЫЕ ПОЯВЯТСЯ ЗДЕСЬ"), x + 22, y + 6, 1);
-  // «пульс ожидания»
+  // "waiting pulse"
   int k = (now / 300) % 4;
   for (int i = 0; i < 3; i++) spr.fillRect(W - UI_M - 30 + i * 8, UI_TOP + 112, 5, 5, i < k ? C_ACC() : UI_LINE());
   uiFooter("", L("side: back", "кнопка: назад"));
   present();
 }
 
-// ---------- МУЗЫКА: что играет + пульт ----------
+// ---------- MUSIC: now playing + remote ----------
 static void mmss(int s, char* out, size_t n) {
   if (s < 0) { snprintf(out, n, "--:--"); return; }
   if (s >= 3600) snprintf(out, n, "%d:%02d:%02d", s / 3600, s / 60 % 60, s % 60);
   else           snprintf(out, n, "%d:%02d", s / 60, s % 60);
 }
 
-// длинное название — «бегущая строка»: окно из символов (UTF-8), которое влезает в ширину
+// long title -> marquee: a window of UTF-8 characters that fits the width
 static void marquee(const char* s, int x, int y, int w, int font, uint32_t now) {
   if (txtW(s, font) <= w) { txt(s, x, y, font); return; }
   int starts[96], nc = 0, len = strlen(s);
   for (int k = 0; k < len && nc < 96; k++) if (((uint8_t)s[k] & 0xC0) != 0x80) starts[nc++] = k;
-  int maxStart = nc - 1;                              // первый старт, с которого хвост влезает
+  int maxStart = nc - 1;                              // first start from which the tail fits
   for (int c = 0; c < nc; c++) if (txtW(s + starts[c], font) <= w) { maxStart = c; break; }
-  int cycle = maxStart + 8;                           // +8 шагов паузы (в начале и в конце)
+  int cycle = maxStart + 8;                           // +8 pause steps (at start and end)
   int step = (now / 260) % cycle;
   int c0 = constrain(step - 4, 0, maxStart);
   char buf[100];
   int m = 0;
-  for (int c = c0; c < nc; c++) {                     // добавляем по целому символу, пока влезает
+  for (int c = c0; c < nc; c++) {                     // add whole characters while they fit
     int a = starts[c], b = c + 1 < nc ? starts[c + 1] : len;
     if (m + (b - a) >= (int)sizeof(buf)) break;
     memcpy(buf + m, s + a, b - a); buf[m + (b - a)] = 0;
@@ -194,7 +194,7 @@ void drawPcMedia(uint32_t now) {
   char app[40]; snprintf(app, sizeof(app), "%s", trk && p.app[0] ? p.app : (p.host[0] ? p.host : L("computer", "компьютер")));
   uiHeader(L("Media", "Музыка"), app);
 
-  // ---- справа: громкость узкой полоской (ярче, когда крутишь колесо) ----
+  // ---- right: volume as a thin bar (brighter while the wheel turns) ----
   const int vx = W - UI_M - 16, vy = UI_TOP + 6, vh = 92, vw = 10;
   bool known = p.vol >= 0 && msSince(now, p.volT) < 15000;
   uint32_t since = msSince(now, g_pcLastCmdMs);
@@ -211,18 +211,18 @@ void drawPcMedia(uint32_t now) {
 
   const int tx = UI_M + 6, tw = vx - tx - 12;
   if (!trk) {
-    // ---- нет данных о треке: крутится виниловая пластинка, рядом крупно громкость ----
+    // ---- no track info: spinning vinyl record, big volume beside it ----
     g_fastFrame = true;
     static float rot = 0;
     static uint32_t lastMs = 0;
     float dt = lastMs ? min<uint32_t>(msSince(now, lastMs), 100) * 0.001f : 0.03f;
     lastMs = now;
-    rot += dt * (turning ? 7.0f : 1.8f);                   // крутишь колесо — пластинка разгоняется
+    rot += dt * (turning ? 7.0f : 1.8f);                   // wheel turning: the record speeds up
     const int cx = tx + 66, cy = UI_TOP + 64, R = 58;
     spr.fillCircle(cx, cy, R, TC(6, 18, 22));
     spr.drawCircle(cx, cy, R, UI_LINE());
-    for (int r = 24; r < R - 2; r += 4) spr.drawCircle(cx, cy, r, TC(12, 34, 41));   // бороздки
-    // блики: два светлых сектора на бороздках, крутятся вместе с пластинкой
+    for (int r = 24; r < R - 2; r += 4) spr.drawCircle(cx, cy, r, TC(12, 34, 41));   // grooves
+    // highlights: two light sectors on the grooves, spinning with the record
     for (int side = 0; side < 2; side++) {
       float base = rot + side * PI;
       for (int r = 26; r < R - 3; r += 4)
@@ -232,13 +232,13 @@ void drawPcMedia(uint32_t now) {
           spr.drawPixel(cx + (int)(cosf(ang) * r), cy + (int)(sinf(ang) * r), TC(br / 3, br, br + 20 > 255 ? 255 : br + 20));
         }
     }
-    // яблоко пластинки с меткой, крутится
+    // record label, spinning
     spr.fillCircle(cx, cy, 19, TC(10, 60, 74));
     spr.drawCircle(cx, cy, 19, C_ACC());
     float la = rot * 1.0f;
     spr.drawLine(cx + (int)(cosf(la) * 8), cy + (int)(sinf(la) * 8), cx + (int)(cosf(la) * 16), cy + (int)(sinf(la) * 16), C_HOT());
     spr.fillCircle(cx, cy, 3, C_HOT());
-    // тонарм
+    // tonearm
     const int px = cx + R + 12, py = cy - R + 6;
     spr.fillCircle(px, py, 6, UI_LINE());
     spr.drawCircle(px, py, 6, UI_LABEL());
@@ -246,7 +246,7 @@ void drawPcMedia(uint32_t now) {
     spr.drawLine(px, py, nx + 6, ny - 10, UI_LABEL());
     spr.drawLine(px + 1, py, nx + 7, ny - 10, UI_LABEL());
     spr.fillRect(nx, ny - 12, 9, 6, C_ACC());
-    // справа от пластинки: громкость крупно
+    // right of the record: big volume
     const int gx = px + 16;
     spr.setTextDatum(TL_DATUM);
     spr.setTextColor(UI_LABEL());
@@ -258,15 +258,15 @@ void drawPcMedia(uint32_t now) {
     txt(L("NO TRACK INFO", "НЕТ ДАННЫХ О ТРЕКЕ"), gx, UI_TOP + 84, 1);
     txt(L("WHEEL: VOLUME", "КОЛЕСО: ГРОМКОСТЬ"), gx, UI_TOP + 96, 1);
   } else {
-    // ---- название и исполнитель ----
+    // ---- title and artist ----
     spr.setTextDatum(TL_DATUM);
     spr.setTextColor(C_HOT());
-    marquee(p.title[0] ? p.title : L("(no title)", "(без названия)"), tx, UI_TOP + 10, tw, 5, now);   // шрифты с кириллицей
+    marquee(p.title[0] ? p.title : L("(no title)", "(без названия)"), tx, UI_TOP + 10, tw, 5, now);   // fonts with Cyrillic
     spr.setTextColor(UI_LABEL());
     char art[96];
     fitText(p.artist, art, sizeof(art), tw, 3);
     txt(art, tx, UI_TOP + 40, 3);
-    // ---- прогресс: позицию между обновлениями досчитываем сами ----
+    // ---- progress: position between updates is extrapolated ----
     int pos = p.pos;
     if (pos >= 0 && p.playing) pos += msSince(now, p.trkT) / 1000;
     if (p.dur > 0) pos = min(pos, p.dur);
@@ -282,7 +282,7 @@ void drawPcMedia(uint32_t now) {
     txt(a, tx, py + 11, 1);
     spr.setTextDatum(TR_DATUM);
     txt(b, tx + tw, py + 11, 1);
-    // ---- состояние: играет / пауза (и вспышка после нажатия) ----
+    // ---- state: playing / paused (and a flash after a click) ----
     bool flash = g_pcLastCmd == 2 && since < 500;
     uint16_t ic = flash ? C_HOT() : C_ACC();
     int ix = tx, iy = UI_TOP + 98;
