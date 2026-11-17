@@ -1,15 +1,14 @@
-// ---- GALLERY: чистая математика — считает только планшет ----
-// Tesseract · Torus · Life · Pendulum — те же формулы, что раньше, в версии B:
-// свечение, глубина, фосфорный след. Sky и Globe — небо и Земля прямо сейчас
-// (T.astro: та же математика, что в прошивке; город и орбиты присылает палка).
-// ---- WebGL-версии сцен галереи (core/gl.js). Нет WebGL — рисуется прежняя 2D-версия ----
-// Каждая сцена: шейдер рисует «тяжёлое» (сфера, небо, свечение), HUD и подписи — 2D поверх.
+// ---- GALLERY: pure math - only the tablet computes ----
+// Tesseract, Torus, Life, Pendulum: glow, depth, phosphor trail. Sky and Globe show the sky and
+// Earth right now (T.astro: same math as the firmware; city and orbits come from the stick).
+// ---- WebGL versions of gallery scenes (core/gl.js). No WebGL - the old 2D version is drawn ----
+// Each scene: shader draws the heavy part (sphere, sky, glow); HUD and labels are 2D on top.
 T.galGL = (() => {
   const G = {}, GL = T.GL;
   G.on = () => GL && GL.ok;
   const progs = {};
   const prog = (k, fs) => (k in progs ? progs[k] : (progs[k] = GL.prog(fs)));
-  // кадр: область (x, y, w, h) в CSS-px вида; rendered → на 2D-холст
+  // frame: area (x, y, w, h) in view CSS px; rendered -> onto the 2D canvas
   const run = (g, x, y, w, h, scale, k, fs, vals, clear) => {
     const P = prog(k, fs); if (!P) return false;
     GL.begin(w, h, scale, clear);
@@ -20,19 +19,19 @@ T.galGL = (() => {
   };
   const FRAG = `uniform vec2 res; uniform vec2 css; vec2 fragCss(){ return vec2(gl_FragCoord.x, res.y-gl_FragCoord.y)/res*css; }`;
 
-  // ---------- карта суши (равнопромежуточная, 1024×512): контуры из прошивки + грубые материки, которых в ней нет ----
+  // ---------- land map (equirectangular, 1024x512): firmware outlines + rough continents it lacks ----------
   const EXTRA = [
-    // Северная Америка
+    // North America
     [[71,-156],[70,-145],[69,-135],[70,-125],[68,-110],[67,-98],[69,-90],[66,-85],[62,-94],[58,-94],[55,-82],[52,-79],[56,-77],[60,-78],[62,-73],[60,-65],[55,-60],[52,-56],[47,-53],[47,-60],[45,-61],[44,-66],[42,-70],[41,-72],[39,-74],[37,-76],[35,-76],[32,-81],[30,-81],[27,-80],[25,-80],[27,-82],[30,-84],[30,-89],[29,-94],[26,-97],[22,-98],[19,-96],[18,-94],[19,-91],[21,-87],[18,-88],[16,-88],[15,-84],[11,-84],[9,-79],[8,-77],[7,-78],[8,-80],[10,-85],[13,-88],[15,-93],[16,-96],[18,-103],[21,-105],[23,-106],[26,-109],[28,-112],[31,-113],[29,-114],[24,-110],[23,-110],[26,-112],[30,-115],[32,-117],[34,-120],[38,-123],[42,-124],[46,-124],[48,-125],[51,-128],[55,-131],[58,-136],[60,-145],[60,-150],[57,-157],[55,-162],[58,-158],[60,-164],[63,-166],[65,-168],[68,-166],[71,-156]],
-    // Канадский архипелаг (грубо)
+    // Canadian archipelago (rough)
     [[73,-120],[76,-118],[78,-105],[76,-90],[74,-80],[72,-78],[70,-85],[71,-100],[73,-120]],
     [[80,-90],[83,-75],[82,-62],[79,-70],[77,-80],[80,-90]],
-    // Южная Америка
+    // South America
     [[12,-72],[11,-64],[8,-60],[5,-52],[1,-50],[-2,-44],[-5,-36],[-8,-35],[-13,-39],[-18,-39],[-23,-42],[-25,-48],[-29,-49],[-34,-53],[-36,-57],[-39,-62],[-42,-64],[-46,-67],[-50,-69],[-54,-68],[-55,-66],[-54,-71],[-50,-75],[-45,-74],[-40,-73],[-35,-72],[-30,-71],[-25,-70],[-18,-70],[-14,-76],[-6,-81],[-2,-81],[2,-79],[6,-77],[9,-77],[11,-75],[12,-72]],
-    // Гренландия, Исландия
+    // Greenland, Iceland
     [[83,-35],[82,-20],[77,-18],[73,-22],[70,-22],[68,-30],[65,-38],[60,-43],[61,-48],[65,-52],[69,-51],[72,-55],[76,-60],[78,-72],[81,-65],[83,-35]],
     [[66,-23],[66,-14],[64,-14],[63,-20],[64,-23],[66,-23]],
-    // Австралия, Новая Зеландия, Новая Гвинея, Борнео, Суматра, Мадагаскар, Япония, Британия
+    // Australia, New Zealand, New Guinea, Borneo, Sumatra, Madagascar, Japan, Britain
     [[-11,142],[-17,141],[-15,136],[-12,136],[-12,131],[-15,129],[-14,126],[-17,122],[-20,119],[-22,114],[-26,113],[-31,115],[-34,115],[-35,118],[-32,126],[-32,133],[-35,136],[-35,138],[-38,140],[-38,146],[-37,150],[-33,152],[-28,153],[-24,152],[-19,147],[-15,145],[-11,142]],
     [[-35,173],[-38,178],[-41,175],[-46,170],[-44,168],[-40,173],[-35,173]],
     [[-1,131],[-3,141],[-8,147],[-10,150],[-8,143],[-6,138],[-4,133],[-1,131]],
@@ -41,7 +40,7 @@ T.galGL = (() => {
     [[-12,49],[-16,50],[-25,47],[-25,44],[-21,43],[-16,44],[-12,49]],
     [[45,142],[43,145],[41,141],[38,141],[35,140],[34,136],[33,130],[35,133],[37,137],[39,140],[41,140],[45,142]],
     [[58,-5],[58,-3],[55,-1.5],[53,0],[51,1],[50,-5],[52,-4],[54,-3],[55,-5],[58,-5]],
-    // Антарктида
+    // Antarctica
     [[-63,-58],[-66,-62],[-70,-75],[-72,-100],[-74,-130],[-77,-160],[-78,-180],[-90,-180],[-90,180],[-78,180],[-72,170],[-68,150],[-66,120],[-66,90],[-67,60],[-69,30],[-70,0],[-72,-15],[-75,-30],[-77,-45],[-72,-60],[-63,-58]],
   ];
   G.land = () => {
@@ -51,20 +50,20 @@ T.galGL = (() => {
     g.fillStyle = '#000'; g.fillRect(0, 0, W, H); g.fillStyle = '#fff';
     const polys = T.astro.data().land.filter(l => l.length >= 3).concat(EXTRA);
     for (const l of polys) {
-      // долгота без разрыва на ±180 (рисуем трижды: -360, 0, +360)
+      // longitude without a seam at +-180 (drawn three times: -360, 0, +360)
       const pts = []; let prev = null;
       for (const q of l) { let lo = q[1]; if (prev != null) { while (lo - prev > 180) lo -= 360; while (prev - lo > 180) lo += 360; } pts.push([q[0], lo]); prev = lo; }
       for (const off of [-360, 0, 360]) {
         g.beginPath(); pts.forEach((q, i) => { const x = (q[1] + off + 180) / 360 * W, y = (90 - q[0]) / 180 * H; i ? g.lineTo(x, y) : g.moveTo(x, y); }); g.closePath(); g.fill();
       }
     }
-    // мягкий берег: шейдер берёт порог по размытой маске + шум — берег «живой», без ломаной
+    // soft coast: shader thresholds a blurred mask + noise, so the coast looks alive, not a polyline
     const b = document.createElement('canvas'); b.width = W; b.height = H; const bg = b.getContext('2d');
     bg.filter = 'blur(3px)'; bg.drawImage(c, 0, 0);
     return (G._land = b);
   };
 
-  // ---------- ЗЕМЛЯ ----------
+  // ---------- EARTH ----------
   const GLOBE = FRAG + T.GL.NOISE + `
   uniform float t, l0, b0; uniform vec3 sun; uniform sampler2D land;
   const float PI=3.14159265;
@@ -111,7 +110,7 @@ T.galGL = (() => {
     return run(g, cx - S2, cy - S2, S2 * 2, S2 * 2, 0.8, 'globe', GLOBE, { t, l0, b0, sun, land }, [0, 0, 0, 0]);
   };
 
-  // ---------- НЕБО: купол со звёздным полем и Млечным Путём (настоящие звёзды и планеты — 2D поверх) ----------
+  // ---------- SKY: dome with star field and Milky Way (real stars and planets are 2D on top) ----------
   const SKY = FRAG + T.GL.NOISE + `
   uniform float t, rot, lat, lst, sunAlt, sunAz, night, day;
   const float PI=3.14159265, D2R=.0174533;
@@ -155,7 +154,7 @@ T.galGL = (() => {
     return run(g, cx - R, cy - R, R * 2, R * 2, 0.7, 'sky', SKY, Object.assign({}, o), [0, 0, 0, 0]);
   };
 
-  // ---------- ТЕССЕРАКТ: 32 ребра как светящиеся трубки (расстояние до отрезков — в шейдере) ----------
+  // ---------- TESSERACT: 32 edges as glowing tubes (distance to segments in the shader) ----------
   const TESS = FRAG + T.GL.NOISE + `
   uniform float u; uniform vec4 A[32]; uniform vec4 B[32];
   float seg(vec2 p, vec2 a, vec2 b){ vec2 pa=p-a, ba=b-a; float h=clamp(dot(pa,ba)/max(dot(ba,ba),1e-3),0.,1.); return length(pa-ba*h); }
@@ -182,7 +181,7 @@ T.galGL = (() => {
     return run(g, 0, 0, w, h, 0.6, 'tess', TESS, { u, A: tA, B: tB }, [0, 0, 0, 0]);
   };
 
-  // ---------- ТОР: трассировка лучей, сетка «точек» по поверхности, френель и отражение ----------
+  // ---------- TORUS: ray tracing, grid of dots on the surface, fresnel and reflection ----------
   const TORUS = FRAG + T.GL.NOISE + `
   uniform float Aa, Bb, K1, K2; uniform vec2 cen; uniform float t;
   float sdT(vec3 p){ vec2 q=vec2(length(p.xz)-2.1,p.y); return length(q)-1.; }
@@ -228,7 +227,7 @@ T.galGL = (() => {
 
 T.views.push({
   id: 'gal', title: 'Gallery', subs: ['Tesseract', 'Torus', 'Life', 'Pendulum', 'Sky', 'Globe', 'Weather'], sub: 0,
-  want() { return this.sub === 6 ? 'wx' : 'st'; },   // радиопогоде нужна палка, остальное считает планшет
+  want() { return this.sub === 6 ? 'wx' : 'st'; },   // radio weather needs the stick; the rest is computed by the tablet
   mount(main) {
     this.root = T.el('div', 'view');
     const st = T.el('div', 'stage'); this.root.appendChild(st); this.cv = T.canvas(st);
@@ -236,7 +235,7 @@ T.views.push({
     this.speed = 1; this.ph = 0; this.trail = []; this.trailT = 0; this.pd = null; this.life = null;
     this.dust = T.dust(160, 1.8, 1.4); this.dcam = T.orbit(0.3, 0.35, 3.4);
     this.skyRot = 0; this.skyRotT = 0; this.card = null;
-    this.gl = { lon0: 30, lat0: 25, follow: -1, last: 0 };          // follow: -1 сами крутим, -2 дом, 0.. спутник
+    this.gl = { lon0: 30, lat0: 25, follow: -1, last: 0 };          // follow: -1 we spin it, -2 home, 0.. satellite
     const cv = this.cv.cv; let down = null;
     cv.addEventListener('pointerdown', e => { down = { x: e.offsetX, y: e.offsetY, moved: false, rot: this.skyRotT, lon: this.gl.lon0, lat: this.gl.lat0 }; cv.setPointerCapture(e.pointerId); });
     cv.addEventListener('pointermove', e => {
@@ -283,7 +282,7 @@ T.views.push({
     else if (this.sub === 5) st = this.globe(g, w, h, L, dt, t);
     else st = this.weather(g, w, h, L, dt, t);                 // views/weather.js
     T.bloom(o, this.sub === 2 ? 0.7 : this.sub === 6 ? 0.8 : this.sub >= 4 ? 0.6 : 0.85);
-    // HUD поверх — плоский и чёткий
+    // HUD on top - flat and crisp
     T.header(g, m, y0, w - 2 * m, u, this.subs[this.sub], st.status);
     T.dots(g, m, y0 + u * 2.75, u, this.subs.length, this.sub);
     if (this.sub <= 3) this.speedCtl(g, w, h, L);
@@ -291,7 +290,7 @@ T.views.push({
     T.footer(g, m, h - m * 0.6 - u * 1.6, w - 2 * m, u, st.hint || '', st.right || 'math · on tablet');
     T.finish(g, w, h);
   },
-  // кнопки скорости (и «новый мир») прямо в кадре, справа внизу
+  // speed buttons (and 'new world') in the frame, bottom right
   speedCtl(g, w, h, L) {
     const { u, m } = L, bh = u * 2.2, y = h - m * 0.6 - u * 1.6 - bh - u * 0.8;
     let x = w - m;
@@ -306,7 +305,7 @@ T.views.push({
     if (this.sub === 2 || this.sub === 3) btn(this.sub === 2 ? 'NEW WORLD' : 'NEW SWING', 'new', u * 7.5, true);
   },
 
-  // ---------- 4D-гиперкуб: вращение в XW, YW, ZW, XY; перспектива 4D->3D->экран ----------
+  // ---------- 4D hypercube: rotation in XW, YW, ZW, XY; perspective 4D->3D->screen ----------
   tess(g, w, h, L, dt) {
     const { u, top, bot } = L;
     this.dcam.frame(w / 2, (top + bot) / 2 + u * 2, Math.min(w, h) * 1.1);
@@ -324,7 +323,7 @@ T.views.push({
       const k3 = K / (5.2 - z) * 2.2;
       P.push([cx + x * k3, cy + y * k3, ww, z]);
     }
-    // фосфорный след: кадр раз в 1/60 с, независимо от частоты экрана
+    // phosphor trail: one frame per 1/60 s, independent of the screen rate
     this.trailT += dt;
     if (this.trailT >= 1 / 60 || !this.trail.length) { this.trailT = 0; this.trail.unshift(P); if (this.trail.length > 14) this.trail.pop(); } else this.trail[0] = P;
     g.lineCap = 'round';
@@ -333,7 +332,7 @@ T.views.push({
       for (let i = 0; i < 16; i++) for (let b = 0; b < 4; b++) { const j = i ^ (1 << b); if (j < i) continue; g.moveTo(Q[i][0], Q[i][1]); g.lineTo(Q[j][0], Q[j][1]); }
       g.stroke();
     }
-    // рёбра: WebGL — светящиеся трубки; иначе 2D-линии (дальние по w — тусклее и тоньше)
+    // edges: WebGL - glowing tubes; else 2D lines (far in w - dimmer and thinner)
     const E = [];
     const glT = T.galGL.tess(g, w, h, P, u);
     if (!glT)
@@ -344,7 +343,7 @@ T.views.push({
       g.strokeStyle = T.heat(v, 0.85); g.lineWidth = u * (0.1 + 0.12 * v);
       g.beginPath(); g.moveTo(P[i][0], P[i][1]); g.lineTo(P[j][0], P[j][1]); g.stroke();
     }
-    if (glT) g.globalCompositeOperation = 'lighter';     // вершины поверх трубок — светом, не тёмными точками
+    if (glT) g.globalCompositeOperation = 'lighter';     // vertices over tubes - as light, not dark dots
     for (const p of P) { const v = T.clamp(0.5 + p[2] * 0.4); g.fillStyle = T.heat(v); g.beginPath(); g.arc(p[0], p[1], u * (0.22 + 0.22 * v), 0, T.TAU); g.fill(); }
     g.globalCompositeOperation = 'source-over'; g.lineCap = 'butt';
     const deg = a => String(Math.round(((a * 180 / Math.PI) % 360 + 360) % 360)).padStart(3, '0');
@@ -354,7 +353,7 @@ T.views.push({
     };
   },
 
-  // ---------- тор из точек: освещение и глубина (как donut.c), 3600 точек ----------
+  // ---------- torus of dots: lighting and depth (like donut.c), 3600 points ----------
   torus(g, w, h, L) {
     const { u, top, bot } = L;
     this.dcam.frame(w / 2, (top + bot) / 2 + u * 2, Math.min(w, h) * 1.1);
@@ -376,7 +375,7 @@ T.views.push({
     const N = U * V, idx = this.ti || (this.ti = new Uint16Array(N));
     for (let i = 0; i < N; i++) idx[i] = i;
     idx.sort((a, b) => pts[b * 4 + 2] - pts[a * 4 + 2]);
-    // точки по 12 уровням яркости: один путь на уровень
+    // dots in 12 brightness levels: one path per level
     const B = 12, paths = this._tb || (this._tb = Array.from({ length: B }, () => []));
     for (const p of paths) p.length = 0;
     const s = u / 16;
@@ -394,7 +393,7 @@ T.views.push({
     return { status: '3600 points · light + depth', hint: '±: speed', right: 'R1 1.0  R2 2.1  K2 6.5' };
   },
 
-  // ---------- «Жизнь» Конвея: большое поле, светящиеся клетки и угасающие призраки ----------
+  // ---------- Conway's Life: big field, glowing cells and fading ghosts ----------
   lifeF(g, w, h, L, dt) {
     const { u, m, top, bot } = L;
     const portrait = h > w * 1.05, W = portrait ? 200 : 320, H = portrait ? 320 : 200;
@@ -426,7 +425,7 @@ T.views.push({
       Lf.still = Math.abs(pop - Lf.prev) <= 2 ? Lf.still + 1 : 0; Lf.prev = pop;
       Lf.pop.push(pop); if (Lf.pop.length > 240) Lf.pop.shift();
       if (pop < 30) { this.life = null; return {}; }
-      if (Lf.still > 60) {                                // застой — подбросить «кляксы»
+      if (Lf.still > 60) {                                // stagnation - add some blobs
         for (let k = 0; k < 8; k++) { const cx0 = Math.random() * W | 0, cy0 = Math.random() * H | 0; for (let q = 0; q < 40; q++) Lf.a[((cy0 + (Math.random() * 7 | 0)) % H) * W + (cx0 + (Math.random() * 7 | 0)) % W] = 1; }
         Lf.still = 0;
       }
@@ -451,7 +450,7 @@ T.views.push({
       status: `gen ${Lf.gen}  ·  cells ${Lf.prev < 0 ? '—' : Lf.prev}  ·  ${W}×${H}`,
       hint: 'tap: new world  ·  ±: speed', right: 'b3/s23 · torus field',
       draw: () => {
-        // график населения — слева внизу, на уровне кнопок
+        // population graph - bottom left, at button level
         const pw = Math.min(u * 16, w * 0.3), ph = u * 2.2, px = m, py = h - m * 0.6 - u * 1.6 - ph - u * 0.8;
         if (pop.length > 2) {
           const lo = Math.min(...pop), hi = Math.max(...pop) + 1;
@@ -462,7 +461,7 @@ T.views.push({
     };
   },
 
-  // ---------- двойной маятник: Лагранж + Рунге-Кутта 4, длинный светящийся след ----------
+  // ---------- double pendulum: Lagrange + Runge-Kutta 4, long glowing trail ----------
   pend(g, w, h, L, dt) {
     const { u, top, bot } = L;
     if (!this.pd) { this.pd = { y: [2 + Math.random(), 1.5 + Math.random() * 1.6, 0, 0] }; this.trail = []; }
@@ -474,15 +473,15 @@ T.views.push({
       const y = this.pd.y, k1 = f(y), k2 = f(y.map((v, i) => v + k1[i] * hs / 2)), k3 = f(y.map((v, i) => v + k2[i] * hs / 2)), k4 = f(y.map((v, i) => v + k3[i] * hs));
       this.pd.y = y.map((v, i) => v + hs / 6 * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]));
     }
-    // точка следа ~240 раз в секунду (не зависит от частоты экрана)
+    // trail point ~240 times a second (independent of screen rate)
     this.trailT += dt;
     const [t1, t2, w1, w2] = this.pd.y, x1 = cx + R * Math.sin(t1), y1 = cy + R * Math.cos(t1), x2 = x1 + R * Math.sin(t2), y2 = y1 + R * Math.cos(t2);
     if (this.trailT >= 1 / 240) { this.trailT = 0; this.trail.push([x2 - cx, y2 - cy, Math.min(1, (Math.abs(w2) + Math.abs(w1) * 0.5) / 12)]); }
     if (this.trail.length > 2400) this.trail.splice(0, this.trail.length - 2400);
-    // круг досягаемости и сетка
+    // reach circle and grid
     g.strokeStyle = T.C.line; g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, 2 * R, 0, T.TAU); g.stroke();
     g.beginPath(); g.arc(cx, cy, R, 0, T.TAU); g.setLineDash([2, 6]); g.stroke(); g.setLineDash([]);
-    // след: пачки по возрасту и скорости — один путь на пачку
+    // trail: batches by age and speed - one path per batch
     const n = this.trail.length, AG = 16, SP = 4;
     g.lineCap = 'round';
     for (let a = 0; a < AG; a++) for (let s = 0; s < SP; s++) {
@@ -503,14 +502,14 @@ T.views.push({
     T.diamond(g, cx, cy, u * 0.35, T.C.dim, true);
     g.fillStyle = T.C.acc; g.beginPath(); g.arc(x1, y1, u * 0.55, 0, T.TAU); g.fill();
     g.fillStyle = T.C.hot; g.beginPath(); g.arc(x2, y2, u * 0.7, 0, T.TAU); g.fill();
-    // энергия (в единицах m = l = 1): видно, что RK4 держит её почти постоянной
+    // energy (in units m = l = 1): shows RK4 keeps it nearly constant
     const E = 0.5 * (2 * w1 * w1 + w2 * w2 + 2 * w1 * w2 * Math.cos(t1 - t2)) - 9.81 * (2 * Math.cos(t1) + Math.cos(t2));
     const dg = a => Math.round((((a * 180 / Math.PI) % 360) + 540) % 360 - 180);
     return { status: `θ1 ${dg(t1)}°  θ2 ${dg(t2)}°  ·  E ${E.toFixed(2)}`, hint: 'tap: new swing  ·  ±: speed', right: 'lagrange · rk4 · chaos' };
   },
 
   // ======================================================================
-  //  SKY — купол над городом прямо сейчас (зенит в центре, север вверху, восток слева)
+  // SKY - dome over the city right now (zenith in center, north up, east left)
   // ======================================================================
   skyCalc(now) {
     const c = this.sc;
@@ -523,7 +522,7 @@ T.views.push({
     const mo = A.moon(jd), moA = aa(mo.ra, mo.dec);
     const pl = A.PLANET_RU.map((_, i) => { const r = A.planet(i, jd); return aa(r.ra, r.dec); });
     const con = D.con.map(k => aa(k.ra, k.dec));
-    // спутники: след ±10 минут по небу
+    // satellites: +-10 minute track across the sky
     const sats = A.sats().map(s => { const tr = []; for (let k = -20; k <= 20; k++) tr.push(A.satLook(A.satPos(s, now + k * 30), P.lat, P.lon)); return { s, tr }; });
     return (this.sc = { t: now, P, D, stars, lines, sun: sunA, moon: moA, phase: mo.phase, waxing: mo.waxing, pl, con, sats });
   },
@@ -536,28 +535,28 @@ T.views.push({
     const rot = this.skyRot, D2R = Math.PI / 180;
     const xy = (a) => { if (a.alt < 0) return null; const r = R * Math.tan((90 - a.alt) * D2R / 2), q = (a.az - rot) * D2R; return [cx - r * Math.sin(q), cy - r * Math.cos(q)]; };
     const sunAlt = c.sun.alt, day = sunAlt > -6, night = sunAlt < -12;
-    // купол: цвет неба по высоте Солнца
+    // dome: sky color by Sun height
     const sky0 = day ? [16, 52, 72] : night ? [6, 14, 22] : [10, 30, 44], sky1 = day ? [8, 26, 38] : night ? [4, 9, 15] : [6, 18, 28];
     const glSky = T.galGL.sky(g, cx, cy, R, {
       t: tt, rot: rot * D2R, lat: c.P.lat * D2R, lst: (A.gmst(A.jd(now)) + c.P.lon) * D2R,
       sunAlt: sunAlt * D2R, sunAz: c.sun.az * D2R, day: T.clamp((sunAlt + 6) / 8), night: T.clamp((-6 - sunAlt) / 8),
     });
     if (!glSky) { const bg = g.createRadialGradient(cx, cy, 0, cx, cy, R); bg.addColorStop(0, T.rgb(sky1)); bg.addColorStop(1, T.rgb(sky0)); g.fillStyle = bg; g.beginPath(); g.arc(cx, cy, R, 0, T.TAU); g.fill(); }
-    // зарево у горизонта со стороны Солнца (сумерки) — в WebGL оно в шейдере
+    // glow at the horizon on the Sun side (twilight) - in WebGL it is in the shader
     if (!glSky && sunAlt > -18 && sunAlt < 8) {
       const q = (c.sun.az - rot) * D2R, gx = cx - R * Math.sin(q), gy = cy - R * Math.cos(q), k = 1 - Math.abs(sunAlt + 5) / 13;
       const gr = g.createRadialGradient(gx, gy, 0, gx, gy, R * 0.9); gr.addColorStop(0, `rgba(${T.RGB.acc},${0.22 * T.clamp(k)})`); gr.addColorStop(1, `rgba(${T.RGB.acc},0)`);
       g.save(); g.beginPath(); g.arc(cx, cy, R, 0, T.TAU); g.clip(); g.fillStyle = gr; g.fillRect(cx - R, cy - R, 2 * R, 2 * R); g.restore();
     }
-    // круги высоты 30° и 60°
+    // circles at 30° and 60° altitude
     g.strokeStyle = `rgba(${T.RGB.dim},.35)`; g.lineWidth = 1; g.setLineDash([2, 5]);
     for (const alt of [30, 60]) { g.beginPath(); g.arc(cx, cy, R * Math.tan((90 - alt) * D2R / 2), 0, T.TAU); g.stroke(); }
     g.setLineDash([]);
-    // линии созвездий
+    // constellation lines
     g.strokeStyle = `rgba(${T.RGB.acc},${day ? 0.16 : 0.32})`; g.lineWidth = 1; g.beginPath();
     for (const Lp of c.lines) { let have = false; for (const a of Lp) { const p = xy(a); if (p) { have ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]); have = true; } else have = false; } }
     g.stroke();
-    // звёзды: днём видны только самые яркие; яркие мерцают
+    // stars: only the brightest by day; bright ones twinkle
     const magLim = day ? 1.5 : night ? 5.2 : 3.0, D = c.D, s = u / 16, buckets = [[], [], [], []];
     for (let i = 0; i < D.stars.length; i++) {
       const st = D.stars[i]; if (st.mag > magLim) break;
@@ -570,14 +569,14 @@ T.views.push({
       } else buckets[Math.min(3, (st.mag - 2.2) / 0.8 | 0)].push(p);
     }
     buckets.forEach((b, k) => { const r = s * (1.5 - k * 0.25); g.fillStyle = T.heat(0.62 - k * 0.1); g.beginPath(); for (const p of b) g.rect(p[0] - r / 2, p[1] - r / 2, r, r); g.fill(); });
-    // подписи без наложений
+    // labels without overlaps
     const used = [];
     const label = (txt, x, y, px, col, f = 'c') => {
       const tw2 = T.tw(g, txt, px, f), bx = x - tw2 / 2, by = y - px;
       for (const q of used) if (bx < q[0] + q[2] && q[0] < bx + tw2 && by < q[1] + q[3] && q[1] < by + px * 1.2) return;
       used.push([bx, by, tw2, px * 1.2]); T.txt(g, txt, x, y, px, col, f, 'center');
     };
-    // планеты
+    // planets
     const plUp = [];
     c.pl.forEach((a, i) => {
       const p = xy(a); if (!p) return;
@@ -587,7 +586,7 @@ T.views.push({
       label(A.planetName(i), p[0], p[1] - u * 1, u * 0.78, T.C.hot);
       T.hits.circle(p[0], p[1], u * 1.5, { sky: { kind: 'planet', name: A.planetName(i), a } });
     });
-    // Луна с фазой
+    // Moon with phase
     let p = xy(c.moon);
     if (p) {
       const r = u * 0.9, k = c.phase;
@@ -598,7 +597,7 @@ T.views.push({
       label(T.L('Moon ', 'Луна ') + Math.round(k * 100) + '%', p[0], p[1] - r - u * 0.5, u * 0.78, T.C.label);
       T.hits.circle(p[0], p[1], u * 1.6, { sky: { kind: 'moon', name: T.L('Moon', 'Луна'), a: c.moon, phase: k } });
     }
-    // Солнце
+    // Sun
     p = xy(c.sun);
     if (p) {
       const gr = g.createRadialGradient(p[0], p[1], 0, p[0], p[1], u * 3); gr.addColorStop(0, `rgba(${T.RGB.hot},.9)`); gr.addColorStop(0.25, `rgba(${T.RGB.acc},.35)`); gr.addColorStop(1, `rgba(${T.RGB.acc},0)`);
@@ -606,7 +605,7 @@ T.views.push({
       g.fillStyle = T.C.hot; g.beginPath(); g.arc(p[0], p[1], u * 0.8, 0, T.TAU); g.fill();
       T.hits.circle(p[0], p[1], u * 2, { sky: { kind: 'sun', name: T.L('Sun', 'Солнце'), a: c.sun } });
     }
-    // спутники над горизонтом: след и точка «сейчас»
+    // satellites above the horizon: track and 'now' dot
     const satsUp = [];
     for (const { s: sat, tr } of c.sats) {
       g.strokeStyle = 'rgba(255,255,255,.0)'; g.lineWidth = 1.2;
@@ -623,15 +622,15 @@ T.views.push({
         T.hits.circle(q[0], q[1], u * 1.6, { sky: { kind: 'sat', name: sat.name, a: { alt: look.el, az: look.az } } });
       }
     }
-    // созвездия (по-русски)
+    // constellations (Russian names)
     if (!day) D.con.forEach((k, i) => { const a = c.con[i]; if (a.alt < 12) return; const q = xy(a); if (q) label(T.L(k.ab, k.ru), q[0], q[1], u * 0.7, `rgba(${T.RGB.acc},.6)`); });
-    // горизонт: кольцо с рисками и стороны света
+    // horizon: ring with ticks and compass points
     g.strokeStyle = T.C.acc; g.lineWidth = 1.6; g.beginPath(); g.arc(cx, cy, R, 0, T.TAU); g.stroke();
     g.lineWidth = 1; g.beginPath();
     for (let az = 0; az < 360; az += 10) { const q = (az - rot) * D2R, l = az % 30 ? 1.025 : 1.05; g.moveTo(cx - R * Math.sin(q), cy - R * Math.cos(q)); g.lineTo(cx - R * l * Math.sin(q), cy - R * l * Math.cos(q)); }
     g.strokeStyle = T.C.dim; g.stroke();
     ['N', 'E', 'S', 'W'].forEach((sd, k) => { const q = (k * 90 - rot) * D2R; T.txt(g, sd, cx - (R + u * 1.6) * Math.sin(q), cy - (R + u * 1.6) * Math.cos(q) + u * 0.45, u * 1.2, k === 0 ? T.C.hot : T.C.acc, 't', 'center'); });
-    // карточка выбранного светила
+    // card of the selected body
     const card = this.card;
     const d = new Date(), hh = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') + ':' + String(d.getSeconds()).padStart(2, '0');
     const state = day ? (sunAlt > 0 ? 'DAY' : 'TWILIGHT') : night ? 'NIGHT' : 'TWILIGHT';
@@ -639,7 +638,7 @@ T.views.push({
       status: `${c.P.city} · ${c.P.lat.toFixed(1)}° ${c.P.lon.toFixed(1)}° · ${state}`,
       hint: 'drag: turn the dome  ·  tap: star / planet', right: 'stars ' + D.stars.length + ' · jpl + meeus',
       draw: () => {
-        // панель справа (или снизу в портрете)
+        // panel on the right (bottom in portrait)
         const pw = portrait ? w - 2 * m : Math.min(u * 22, w - cx - R - m - u * 5), px = portrait ? m : w - m - pw;
         const py = portrait ? cy + R + u * 3 : top + u * 0.4, ph = portrait ? Math.min(u * 24, Math.max(u * 10, bot - py - u * 3.4)) : Math.min(bot - top - u * 3.6, u * (18 + 1.5 * (plUp.length + A.sats().length)));
         if (pw < u * 10) return;
@@ -674,16 +673,16 @@ T.views.push({
   },
 
   // ======================================================================
-  //  GLOBE — Земля с днём и ночью, спутники на орбитах, пролёт над городом
+  // GLOBE - Earth with day and night, satellites on orbits, pass over the city
   // ======================================================================
   globe(g, w, h, L, dt, tt) {
     const { u, m, top, bot } = L, A = T.astro, now = A.now(), P = A.place(), sats = A.sats(), gl = this.gl, D2R = Math.PI / 180;
     const portrait = h > w * 1.05;
     const R = portrait ? Math.min(w / 2 - m - u * 2, (bot - top) * 0.3) : Math.min((bot - top) / 2 - u * 2, w * 0.28);
     const cx = portrait ? w / 2 : m + R + u * 5, cy = portrait ? top + R + u * 3 : (top + bot) / 2 + u * 0.3;
-    // спутники сейчас
+    // satellites now
     const pos = sats.map(s => A.satPos(s, now));
-    // куда смотрим
+    // where we look
     if (gl.follow >= 0 && gl.follow >= sats.length) gl.follow = -1;
     let tLon = null, tLat = null;
     if (gl.follow === -2) { tLon = P.lon; tLat = P.lat; } else if (gl.follow >= 0) { tLon = pos[gl.follow].lon; tLat = pos[gl.follow].lat; }
@@ -692,24 +691,24 @@ T.views.push({
       gl.lon0 += dl * T.ease(dt, 0.6); gl.lat0 += (T.clamp(tLat * 0.7 + 8, -55, 60) - gl.lat0) * T.ease(dt, 0.8);
     } else if (performance.now() - gl.last > 3000) { gl.lon0 += dt * 6; gl.lat0 += (25 - gl.lat0) * T.ease(dt, 3); }
     const l0 = gl.lon0 * D2R, b0 = gl.lat0 * D2R, cb = Math.cos(b0), sb = Math.sin(b0);
-    // мир -> вид: [x, y, z]; z>0 — лицевая сторона
+    // world -> view: [x, y, z]; z>0 - front side
     const view = (lat, lon, r = 1) => {
       const la = lat * D2R, dl = lon * D2R - l0, a = Math.cos(la) * Math.cos(dl), b = Math.cos(la) * Math.sin(dl), c = Math.sin(la);
       return [b * r, (cb * c - sb * a) * r, (sb * c + cb * a) * r];
     };
     const scr = v => [cx + R * v[0], cy - R * v[1]];
-    // фон: звёзды
+    // background: stars
     if (!this.bgStars) { this.bgStars = []; for (let i = 0; i < 260; i++) this.bgStars.push([Math.random(), Math.random(), Math.random()]); }
     g.fillStyle = `rgba(${T.RGB.label},.5)`; g.beginPath();
     for (const s of this.bgStars) { const r = 0.6 + s[2] * 1.2; g.rect(s[0] * w, s[1] * h, r, r); }
     g.fill();
-    // WebGL: освещённая Земля (суша, океан с бликом, огни ночи, облака, атмосфера); иначе 2D-диск
+    // WebGL: lit Earth (land, ocean with glint, night lights, clouds, atmosphere); else 2D disc
     const jd0 = A.jd(now), sun0 = A.sun(jd0), sLon0 = ((sun0.ra - A.gmst(jd0)) % 360 + 540) % 360 - 180, sv0 = view(sun0.dec, sLon0);
     const glG = T.galGL.globe(g, cx, cy, R, l0, b0, sv0, tt);
     if (!glG) {
     const at = g.createRadialGradient(cx, cy, R * 0.96, cx, cy, R * 1.14); at.addColorStop(0, `rgba(${T.RGB.acc},.45)`); at.addColorStop(0.3, `rgba(${T.RGB.acc},.12)`); at.addColorStop(1, `rgba(${T.RGB.acc},0)`);
     g.fillStyle = at; g.beginPath(); g.arc(cx, cy, R * 1.14, 0, T.TAU); g.fill();
-    // день и ночь: свет считается для каждой точки диска (в малом разрешении)
+    // day and night: light computed per disc point (low resolution)
     const jd = A.jd(now), sun = A.sun(jd), sLon = ((sun.ra - A.gmst(jd)) % 360 + 540) % 360 - 180, sv = view(sun.dec, sLon);
     const N = 160;
     if (!this.gImg) { this.gOff = Object.assign(document.createElement('canvas'), { width: N, height: N }); this.gImg = new ImageData(N, N); }
@@ -721,20 +720,20 @@ T.views.push({
         if (rr > 1) { Dd[q + 3] = 0; continue; }
         const nz = Math.sqrt(1 - rr), lit = nx * sv[0] + ny * sv[1] + nz * sv[2];
         const k = T.clamp((lit + 0.08) / 0.2), limb = 0.55 + 0.45 * nz;
-        const tw = Math.max(0, 1 - Math.abs(lit) / 0.025) * 0.55;                    // полоса терминатора
+        const tw = Math.max(0, 1 - Math.abs(lit) / 0.025) * 0.55;                    // terminator band
         Dd[q] = (6 + 14 * k) * limb + 40 * tw; Dd[q + 1] = (12 + 46 * k) * limb + 120 * tw; Dd[q + 2] = (18 + 58 * k) * limb + 140 * tw; Dd[q + 3] = 255;
       }
     }
     this.gOff.getContext('2d').putImageData(this.gImg, 0, 0);
     g.imageSmoothingEnabled = true; g.drawImage(this.gOff, cx - R, cy - R, 2 * R, 2 * R);
     }
-    // сетка 30°
+    // 30° grid
     g.lineWidth = 1; g.strokeStyle = `rgba(${T.RGB.acc},.12)`; g.beginPath();
     const poly = pts => { let have = false; for (const v of pts) { if (v[2] > 0) { const p = scr(v); have ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]); have = true; } else have = false; } };
     for (let la = -60; la <= 60; la += 30) { const a = []; for (let lo = -180; lo <= 180; lo += 5) a.push(view(la, lo)); poly(a); }
     for (let lo = -180; lo < 180; lo += 30) { const a = []; for (let la = -90; la <= 90; la += 5) a.push(view(la, lo)); poly(a); }
     g.stroke();
-    // материки: днём ярко, ночью тускло
+    // continents: bright by day, dim by night
     const land = A.data().land, dayP = new Path2D(), nightP = new Path2D();
     for (const Lp of land) {
       let prev = null;
@@ -751,7 +750,7 @@ T.views.push({
       g.lineWidth = 1.3; g.strokeStyle = `rgba(${T.RGB.acc},.9)`; g.stroke(dayP); g.strokeStyle = `rgba(${T.RGB.acc},.35)`; g.stroke(nightP);
       g.strokeStyle = `rgba(${T.RGB.acc},.7)`; g.lineWidth = 1.5; g.beginPath(); g.arc(cx, cy, R, 0, T.TAU); g.stroke();
     }
-    // дом
+    // home
     const hv = view(P.lat, P.lon);
     if (hv[2] > 0) {
       const p = scr(hv), pulse = (tt % 2) / 2;
@@ -760,7 +759,7 @@ T.views.push({
       T.txt(g, P.city.toUpperCase(), p[0] + u * 0.9, p[1] + u * 0.3, u * 0.75, T.C.hot);
       T.hits.circle(p[0], p[1], u * 1.6, { follow: -2 });
     }
-    // спутники: наземный след ±45 мин и сам спутник на своей высоте
+    // satellites: ground track +-45 min and the satellite itself at its altitude
     if (!this.trk || now - this.trk.t > 20 || this.trk.n !== sats.length) {
       this.trk = { t: now, n: sats.length, tr: sats.map(s => { const a = []; for (let k = -45; k <= 45; k++) { const q = A.satPos(s, now + k * 60); a.push([q.lat, q.lon, k]); } return a; }) };
     }
@@ -787,7 +786,7 @@ T.views.push({
       T.txt(g, Math.round(q.alt) + ' km', p[0] + u * 1.2, p[1] + u * 0.6, u * 0.68, T.C.label);
       T.hits.circle(p[0], p[1], u * 1.8, { follow: i });
     });
-    // ближайший пролёт над городом: раз в минуту
+    // nearest pass over the city: once a minute
     const fi = gl.follow >= 0 ? gl.follow : 0, fs = sats[fi];
     if (fs && (!this.pass || this.pass.name !== fs.name || now - this.pass.t > 60 || this.pass.city !== P.city)) {
       this.pass = { name: fs.name, t: now, city: P.city, p: A.nextPass(fs, now, P.lat, P.lon, 10, 24) };

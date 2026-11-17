@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Печать 天眼 (TENGAN) для заставки: вертикальная «ханко» — залитый прямоугольник,
-иероглифы «вырезаны» (фон). Результат — 1-битная картинка src/core/seal.h.
-Шрифт: IPAGothic (IPA Font License v1.0) — используется только для растра двух знаков.
+"""TENGAN seal (天眼) for the splash: a vertical "hanko" — filled rectangle with the
+glyphs "cut out" (background). Output: 1-bit image src/core/seal.h.
+Font: IPAGothic (IPA Font License v1.0), used only to rasterize the two glyphs.
 
     python3 tools/gen_seal.py /usr/share/fonts/opentype/ipafont-gothic/ipag.ttf > src/core/seal.h
 """
@@ -10,13 +10,13 @@ from PIL import Image, ImageDraw, ImageFont
 
 font_path = sys.argv[1]
 W, H, PAD, SIZE = 32, 60, 3, 25
-img = Image.new("L", (W, H), 255)                       # 255 — заливка печати
+img = Image.new("L", (W, H), 255)                       # 255 = seal fill
 d = ImageDraw.Draw(img)
 font = ImageFont.truetype(font_path, SIZE)
 for i, ch in enumerate("天眼"):
     cy = PAD + 2 + i * (H - 2 * PAD) // 2 + (H - 2 * PAD) // 4
     d.text((W // 2, cy), ch, font=font, fill=0, anchor="mm")
-# рамка-«выщербина» внутри края, как у настоящей печати
+# chipped frame inside the edge, like a real seal
 d.rectangle([1, 1, W - 2, H - 2], outline=0)
 bits = bytearray()
 for y in range(H):

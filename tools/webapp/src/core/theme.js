@@ -1,8 +1,7 @@
-// ---- темы оформления: DENKO 電光 (бирюзовый неон, HUD) и KURENAI 紅 (манга-панк: чёрный / белый / красный) ----
-// Тема — это только палитра и шрифты: T.C (цвета), T.RGB (те же цвета тройками «r,g,b» для rgba()),
-// T.HEAT / T.COOL (шкалы силы сигнала), T.ALERT, T.FT. Рисование одно и то же — поэтому тема не тормозит.
-// KURENAI — плоская: без свечения и сканлайнов (util.js: T.bloom / T.finish / T.backdrop это проверяют),
-// шейдеры WebGL перекрашиваются одной функцией в конце (core/gl.js, T.GLK).
+// ---- themes: DENKO 電光 (teal neon HUD) and KURENAI 紅 (manga-punk: black / white / red) ----
+// A theme is only palette and fonts: T.C (colors), T.RGB (same as "r,g,b" for rgba()), T.HEAT / T.COOL (signal scales), T.ALERT, T.FT.
+// Drawing code is shared, so themes cost nothing. KURENAI is flat: no glow or scanlines (T.bloom / T.finish / T.backdrop check it);
+// WebGL shaders are recolored by one function at the end (core/gl.js, T.GLK).
 (() => {
   const rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)).join(',');
   const pack = C => { const o = {}; for (const k in C) o[k] = rgb(C[k]); return o; };
@@ -17,8 +16,7 @@
     COOL: [[0, [11, 11, 11]], [0.25, [42, 42, 42]], [0.5, [95, 95, 95]], [0.72, [150, 150, 148]], [0.86, [229, 38, 47]], [1, [244, 241, 234]]],
     ALERT: [255, 59, 48], FT: "Oswald,'Arial Narrow',sans-serif", FM: "'JetBrains Mono',ui-monospace,monospace", GLK: 1,
   };
-  // MONO — строгий чёрно-белый старт: пока не знаем тему палки, экран запуска нейтральный
-  // (одинаковый в браузере, приложении планшета и программе на компе), потом сразу нужная тема
+  // MONO: strict black-and-white start; the boot screen stays neutral (same in browser, tablet app and PC app) until the stick's theme is known
   const MONO = {
     C: { bg: '#000000', acc: '#ffffff', hot: '#ffffff', alert: '#d9d9d9', label: '#b4b4b4', dim: '#6c6c6c', line: '#2e2e2e',
       panel: '#141414', steel: '#b4b4b4', seal: '#ffffff', mid: '#5a5a5a', bg2: '#080808' },
@@ -41,17 +39,17 @@
     T._bdCache = null; T._finKey = '';
     for (const o of T._cvs || []) o.glow = null;
   };
-  // тема — как на палке (st.theme); ?theme=kurenai — для проверки
+  // theme follows the stick (st.theme); ?theme=kurenai for testing
   const urlTheme = new URLSearchParams(location.search).get('theme');
-  T.setTheme(urlTheme || 'mono');                       // старт нейтральный, тема придёт с палкой (st.theme)
-  T.themeFallback = () => { if (T.theme === 'mono') T.setTheme('denko'); };   // палки нет — по умолчанию DENKO
+  T.setTheme(urlTheme || 'mono');                       // neutral start; the theme arrives from the stick
+  T.themeFallback = () => { if (T.theme === 'mono') T.setTheme('denko'); };   // no stick: default to DENKO
   setTimeout(() => { if (!T.themeHold) T.themeFallback(); }, 9000);
-  // пока идёт экран запуска (boot.js держит T.themeHold) — остаёмся чёрно-белыми, тема включается разом перед заставкой
+  // during boot (boot.js holds T.themeHold) stay black and white; the theme switches on at once before the splash
   T.themeHold = !new URLSearchParams(location.search).has('noboot');
   const urlLang = new URLSearchParams(location.search).get('lang');
   setInterval(() => {
     const st = T.S && T.S.st; if (T.themeHold || !st) return;
     if (!urlTheme && st.theme && st.theme !== T.theme) T.setTheme(st.theme);
-    if (!urlLang && st.lang && st.lang !== T.LANG) T.setLang(st.lang);      // язык — как на устройстве (меняется только там)
+    if (!urlLang && st.lang && st.lang !== T.LANG) T.setLang(st.lang);      // language as on the device (changed only there)
   }, 400);
 })();

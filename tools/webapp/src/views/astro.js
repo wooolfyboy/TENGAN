@@ -1,7 +1,6 @@
-// ---- астрономия и спутники для неба и глобуса (не вид — библиотека T.astro) ----
-// Та же математика, что в прошивке (gallery/astro.cpp, gallery/sat.cpp):
-// планеты — средние элементы JPL, Луна — укороченный ряд Meeus,
-// спутники — Кеплер + вековые поправки J2. Время — часы планшета.
+// ---- astronomy and satellites for Sky and Globe (library T.astro, not a view) ----
+// Same math as the firmware (gallery/astro.cpp, gallery/sat.cpp): JPL mean elements for planets,
+// truncated Meeus series for the Moon, Kepler + J2 secular terms for satellites. Time = tablet clock.
 T.astro = (() => {
   const D2R = Math.PI / 180, R2D = 180 / Math.PI;
   const n360 = a => { a %= 360; return a < 0 ? a + 360 : a; };
@@ -9,7 +8,7 @@ T.astro = (() => {
   A.jd = unix => unix / 86400 + 2440587.5;
   A.now = () => Date.now() / 1000;
   A.gmst = jd => { const d = jd - 2451545, Tc = d / 36525; return n360(280.46061837 + 360.98564736629 * d + 0.000387933 * Tc * Tc); };
-  // экватор -> горизонт: {alt, az} в градусах (азимут от севера через восток)
+  // equatorial -> horizontal: {alt, az} in degrees (azimuth from north via east)
   A.altAz = (ra, dec, jd, lat, lon, gm) => {
     const H = n360((gm != null ? gm : A.gmst(jd)) + lon - ra) * D2R, d = dec * D2R, p = lat * D2R;
     const sa = Math.sin(p) * Math.sin(d) + Math.cos(p) * Math.cos(d) * Math.cos(H);
@@ -23,7 +22,7 @@ T.astro = (() => {
     const z = Math.sin(eps) * Math.cos(b) * Math.sin(l) + Math.cos(eps) * Math.sin(b);
     return { ra: n360(Math.atan2(y, x) * R2D), dec: Math.asin(z) * R2D };
   };
-  // a, da, e, de, I, dI, L, dL, w, dw, N, dN (J2000 + за столетие)
+  // a, da, e, de, I, dI, L, dL, w, dw, N, dN (J2000 + per century)
   const EL = [
     [0.38709927, 0.00000037, 0.20563593, 0.00001906, 7.00497902, -0.00594749, 252.25032350, 149472.67411175, 77.45779628, 0.16047689, 48.33076593, -0.12534081],
     [0.72333566, 0.00000390, 0.00677672, -0.00004107, 3.39467605, -0.00078890, 181.97909950, 58517.81538729, 131.60246718, 0.00268329, 76.67984255, -0.27769418],
@@ -64,7 +63,7 @@ T.astro = (() => {
     return r;
   };
 
-  // ---- спутники: элементы как в прошивке [имя, эпоха, n0, ndot2, inc, raan0, ecc, argp0, m0, a] ----
+  // ---- satellites: elements as in firmware [name, epoch, n0, ndot2, inc, raan0, ecc, argp0, m0, a] ----
   const MU = 398600.4418, RE = 6378.137, J2 = 1.08262668e-3;
   A.RE = RE;
   A.sat = arr => ({ name: arr[0], epoch: arr[1], n0: arr[2], ndot2: arr[3], inc: arr[4], raan0: arr[5], ecc: arr[6], argp0: arr[7], m0: arr[8], a: arr[9] });
@@ -83,7 +82,7 @@ T.astro = (() => {
     const rr = Math.hypot(xe, ye, z);
     return { x: xe, y: ye, z, lat: Math.asin(z / rr) * R2D, lon: Math.atan2(ye, xe) * R2D, alt: rr - RE, speed: Math.sqrt(MU * (2 / r - 1 / s.a)) };
   };
-  // как видно из точки (lat, lon): {el, az}
+  // as seen from (lat, lon): {el, az}
   A.satLook = (p, lat, lon) => {
     const la = lat * D2R, lo = lon * D2R;
     const rx = p.x - RE * Math.cos(la) * Math.cos(lo), ry = p.y - RE * Math.cos(la) * Math.sin(lo), rz = p.z - RE * Math.sin(la);
@@ -92,7 +91,7 @@ T.astro = (() => {
     const u = Math.cos(la) * Math.cos(lo) * rx + Math.cos(la) * Math.sin(lo) * ry + Math.sin(la) * rz;
     return { el: Math.asin(u / Math.hypot(rx, ry, rz)) * R2D, az: n360(Math.atan2(e, n) * R2D) };
   };
-  // ближайший пролёт выше minEl: {found, rise, set, maxEl, azRise}
+  // next pass above minEl: {found, rise, set, maxEl, azRise}
   A.nextPass = (s, from, lat, lon, minEl = 10, hours = 24) => {
     const ps = { found: false, rise: 0, set: 0, maxEl: 0, azRise: 0 }, end = from + hours * 3600;
     let up = false;
@@ -110,8 +109,8 @@ T.astro = (() => {
     if (up) ps.set = end;
     return ps;
   };
-  // город и спутники: из потока палки, без палки — Москва
-  A.place = () => {                                   // где мы: GPS планшета (приложение) > город с палки > Москва
+  // city and satellites come from the stick stream; without a stick - Moscow
+  A.place = () => {                                   // where we are: tablet GPS (app) > stick city > Moscow
     if (T.gps) return { city: 'GPS', lat: T.gps.lat, lon: T.gps.lon, gps: true };
     const k = T.S && T.S.sky; return k && k.lat != null ? { city: k.city || '', lat: k.lat, lon: k.lon } : { city: 'Moscow', lat: 55.756, lon: 37.617 }; };
   A.sats = () => {
@@ -120,7 +119,7 @@ T.astro = (() => {
     if (A._satsSrc !== k.sats) { A._satsSrc = k.sats; A._sats = k.sats.map(A.sat).filter(s => s.n0 > 0 && s.a > 0); }
     return A._sats;
   };
-  // распаковка звёздных данных из прошивки (один раз)
+  // unpack star data from firmware (once)
   A.data = () => {
     if (A._d) return A._d;
     const D = T.DATA || {}, st = D.stars || [], s16 = v => v > 32767 ? v - 65536 : v;

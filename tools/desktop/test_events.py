@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Проверка «мозга» оповещений без окон и палки:  python3 tools/desktop/test_events.py"""
+"""Test the alert engine without windows or a stick:  python3 tools/desktop/test_events.py"""
 import os
 import sys
 import time
@@ -37,13 +37,13 @@ def test_warmup_and_churn():
     clk = Clock()
     e = Engine(clock=clk)
     base = [(i, -60 - i % 30, "phone", "p%d" % i) for i in range(1, 76)]
-    e.feed("ble", ble(base))                       # первый список — до разогрева
-    for k in range(40):                            # 75 устройств то пропадают, то возвращаются
+    e.feed("ble", ble(base))                       # first list: before warm-up
+    for k in range(40):                            # 75 devices drop out and come back
         clk.t += 1
         e.feed("ble", ble(base[: 40 + k % 30]))
         assert not e.pop(), "во время разогрева/текучки не должно быть всплывашек"
     clk.t += 120
-    for k in range(20):                            # после разогрева — снова текучка тех же устройств
+    for k in range(20):                            # after warm-up: same churn again
         clk.t += 1
         e.feed("ble", ble(base[: 30 + k % 40]))
     assert not run_for(e, clk, 5), "вернувшиеся устройства — не новые"
@@ -58,10 +58,10 @@ def test_new_near_device():
     e.feed("ble", ble([(1, -70, "phone", "a"), (99, -50, "phone", "Новый")]))
     out = run_for(e, clk, 4)
     assert len(out) == 1 and out[0]["kind"] == "new" and out[0]["sev"] == "alert", out
-    # далёкое новое при al_new=near — без всплывашки
+    # far new device with al_new=near: no popup
     e.feed("ble", ble([(1, -70, "phone", "a"), (99, -50, "phone", "x"), (100, -88, "phone", "far")]))
     assert not run_for(e, clk, 4)
-    # при al_new=any — далёкое тоже
+    # with al_new=any: far one too
     e.set_cfg({"al_new": 2})
     e.feed("ble", ble([(101, -89, "phone", "far2")]))
     out = run_for(e, clk, 4)
@@ -77,7 +77,7 @@ def test_tracker_and_burst_merge():
     e.feed("ble", ble([(1, -70, "phone", "a"), (7, -55, "tracker", "tag")]))
     out = run_for(e, clk, 4)
     assert [n["kind"] for n in out] == ["tracker"], out
-    # пачка из 4 новых близких за секунду → одна плашка «4 NEW DEVICES»
+    # 4 new near devices within a second -> one "4 NEW DEVICES" popup
     e.feed("ble", ble([(1, -70, "phone", "a"), (7, -55, "tracker", "tag")] + [(200 + i, -50, "phone", "n") for i in range(4)]))
     out = run_for(e, clk, 4)
     assert len(out) == 1 and out[0]["title"] == "4 NEW DEVICES", out
@@ -104,7 +104,7 @@ def test_quiet_hours():
     clk.t += 30
     e.feed("ble", ble([(1, -70, "phone", "a"), (7, -50, "tracker", "tag")]))
     out = run_for(e, clk, 4)
-    assert [n["kind"] for n in out] == ["tracker"], out      # трекер пробивает тихие часы
+    assert [n["kind"] for n in out] == ["tracker"], out      # tracker overrides quiet hours
     e2 = Engine(clock=clk, prefs={"quiet": True, "quiet_from": 23, "quiet_to": 8}, wall=wall_at(14))
     e2.feed("nfc", {"fam": "NTAG213", "uid": "04A2••"})
     assert len(run_for(e2, clk, 4)) == 1
@@ -115,9 +115,9 @@ def test_ir_nfc_sensor_temp_battery_link():
     clk = Clock()
     e = Engine(clock=clk)
     e.feed("ir", {"p": "NEC", "addr": 4, "cmd": 8, "brand": "LG TV", "rep": 0})
-    e.feed("ir", {"p": "NEC", "addr": 4, "cmd": 8, "brand": "LG TV", "rep": 1})     # удержание
+    e.feed("ir", {"p": "NEC", "addr": 4, "cmd": 8, "brand": "LG TV", "rep": 1})     # key held
     e.feed("nfc", {"fam": "MIFARE Classic 1K", "hint": "transit card (likely)", "uid": "04A2••"})
-    e.feed("nfc", {"fam": "MIFARE Classic 1K", "uid": "04A2••"})                   # та же карта сразу
+    e.feed("nfc", {"fam": "MIFARE Classic 1K", "uid": "04A2••"})                   # same card again at once
     e.feed("sens", {"pk": 1, "sensors": [{"id": "nexus-1-0x5a", "p": "Nexus", "ch": 1, "t": 4.2}]})
     e.feed("sens", {"pk": 3, "sensors": [{"id": "nexus-1-0x5a", "p": "Nexus", "ch": 1, "t": 4.2},
                                          {"id": "remote-7a0b", "p": "Remote", "kind": "remote", "btn": 1}]})
@@ -127,7 +127,7 @@ def test_ir_nfc_sensor_temp_battery_link():
     e.feed("st", {"bat": 20, "usb": 0})
     e.feed("st", {"bat": 14, "usb": 0})
     e.link(True); clk.t += 6; first = e.pop()
-    e.link(False); clk.t += 2; e.link(True)                                            # мигнуло — без плашки
+    e.link(False); clk.t += 2; e.link(True)                                            # link blip: no popup
     clk.t += 6
     e.link(False)
     out = first + run_for(e, clk, 8)

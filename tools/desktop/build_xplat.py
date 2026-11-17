@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Собрать TENGAN Desktop для macOS или Linux (на соответствующей системе, CI: .github/workflows/desktop-xplat.yml).
+"""Build TENGAN Desktop for macOS or Linux (on that OS; CI: .github/workflows/desktop-xplat.yml).
 
-    pip install -r tools/desktop/requirements-mac.txt pyinstaller      # или requirements-linux.txt
-    python tools/desktop/build_xplat.py mac      ->  dist/TENGAN-Desktop-mac.zip  (внутри «TENGAN Desktop.app»)
-    python tools/desktop/build_xplat.py linux    ->  dist/tengan_desktop (один файл; AppImage собирает CI)
+    pip install -r tools/desktop/requirements-mac.txt pyinstaller      # or requirements-linux.txt
+    python tools/desktop/build_xplat.py mac      ->  dist/TENGAN-Desktop-mac.zip  (contains "TENGAN Desktop.app")
+    python tools/desktop/build_xplat.py linux    ->  dist/tengan_desktop (onedir; CI packs it into an AppImage)
 
-Windows-версия собирается отдельно: tools/desktop/build_exe.py.
+Windows build: tools/desktop/build_exe.py.
 """
 import os, shutil, subprocess, sys
 
@@ -16,7 +16,7 @@ BUILD = os.path.join(ROOT, "build", "pyi-xplat")
 
 
 def icons():
-    """Значок 天眼 из tengan.ico: .icns (macOS) и .png 256 (Linux)."""
+    """Make .icns (macOS) and a 256 px .png (Linux) from tengan.ico."""
     from PIL import Image
     os.makedirs(BUILD, exist_ok=True)
     im = Image.open(os.path.join(HERE, "tengan.ico"))
@@ -43,9 +43,9 @@ def common():
 
 
 def prune_qt(root):
-    """Linux: убрать из сборки части Qt, которые окну не нужны (их затягивают хуки PyInstaller вместе
-    с QtWebEngine): QML-модули, переводы Qt, локали Chromium кроме en-US/ru (остальные языки падают на en-US)
-    и библиотеки Qt, на которые не ссылается ни один оставшийся бинарник (замыкание по ELF NEEDED)."""
+    """Linux: drop Qt parts the window does not need (PyInstaller hooks pull them in with QtWebEngine):
+    QML modules, Qt translations, Chromium locales except en-US/ru (others fall back to en-US),
+    and Qt libs no remaining binary links to (closure over ELF NEEDED)."""
     qt = os.path.join(root, "_internal", "PySide6", "Qt")
     if not os.path.isdir(qt):
         return
@@ -102,14 +102,12 @@ def main():
         out = os.path.join(DIST, "TENGAN-Desktop-mac.zip")
         if os.path.exists(out):
             os.remove(out)
-        # ditto сохраняет права и атрибуты .app (обычный zip ломает подпись/запуск)
+        # ditto keeps .app permissions/attributes (plain zip breaks signing and launch)
         sys.exit(subprocess.call(["ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", app, out]))
     else:
-        # onedir (не onefile): Qt WebEngine нужен QtWebEngineProcess и ресурсы рядом —
-        # в одном файле они теряются. Папку dist/tengan_desktop/ упакует в AppImage сам CI.
-        # Только модули Qt, которые реально грузит окно pywebview (qtpy подключает их динамически,
-        # поэтому перечисляем явно); ресурсы и QtWebEngineProcess добавляют штатные хуки PyInstaller.
-        # Раньше было --collect-all PySide6 — весь Qt (≈ 690 МБ). Тесты qtpy тянут все модули — исключаем.
+        # onedir, not onefile: QtWebEngineProcess and resources must sit next to the exe; CI packs the folder into an AppImage.
+        # List only the Qt modules pywebview really loads (qtpy imports them dynamically); PyInstaller hooks add the rest.
+        # --collect-all PySide6 pulled all of Qt (~690 MB); qtpy tests import every module, so exclude them.
         qt = ["QtCore", "QtGui", "QtWidgets", "QtNetwork", "QtWebChannel", "QtPrintSupport",
               "QtOpenGL", "QtOpenGLWidgets", "QtWebEngineCore", "QtWebEngineWidgets"]
         hidden = []

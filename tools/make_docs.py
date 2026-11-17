@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Картинки для README (docs/): гифки и галерея — из кадров симулятора.
-Экран палки — пиксели, поэтому увеличиваем ровно вдвое «по пикселю» (NEAREST): чётко, без мыла.
+"""README images (docs/): GIFs and the gallery, built from simulator frames.
+The stick screen is pixel art, so scale exactly 2x per pixel (NEAREST): crisp, no blur.
 
-    SIM_ANIM=1 bash tools/sim/build.sh && python3 tools/make_docs.py              # тема DENKO: гифки + галерея (EN)
-    SIM_LANG=ru bash tools/sim/build.sh && python3 tools/make_docs.py ru          # галерея на русском
-    SIM_THEME=kurenai bash tools/sim/build.sh && python3 tools/make_docs.py kurenai   # галерея KURENAI (+ ru)
+    SIM_ANIM=1 bash tools/sim/build.sh && python3 tools/make_docs.py              # DENKO theme: GIFs + gallery (EN)
+    SIM_LANG=ru bash tools/sim/build.sh && python3 tools/make_docs.py ru          # Russian gallery
+    SIM_THEME=kurenai bash tools/sim/build.sh && python3 tools/make_docs.py kurenai   # KURENAI gallery (+ ru)
 """
 import sys
 import glob, os
@@ -61,7 +61,7 @@ def gallery(items, name, cols=3, scale=1, bg=BG, line=(18, 48, 58), ink=(127, 15
     print("%-22s %dx%d  %4d KB" % (name, W, H, os.path.getsize(os.path.join(DOCS, name)) // 1024))
 
 
-# (кадр симулятора, подпись EN, подпись RU)
+# (simulator frame, EN caption, RU caption)
 SCREENS = [("01_menu", "main menu", "главное меню"), ("13_ble_city", "Bluetooth · City (3D)", "Bluetooth · Город (3D)"),
            ("12_ble_scope", "Bluetooth · Scope", "Bluetooth · Радар"), ("16_ble_detail", "Bluetooth · device details", "Bluetooth · подробности"),
            ("22_wifi_channels", "Wi-Fi · channels", "Wi-Fi · каналы"), ("25_wifi_find", "Wi-Fi · Find", "Wi-Fi · Поиск"),
@@ -73,8 +73,8 @@ SCREENS = [("01_menu", "main menu", "главное меню"), ("13_ble_city", 
            ("54b_gallery_sky_stars", "Gallery · Sky — the sky now", "Галерея · Небо сейчас"), ("55_gallery_globe", "Gallery · Globe — ISS", "Галерея · Глобус — МКС"),
            ("54_gallery_sky", "Gallery · Sky — constellations", "Галерея · Небо — созвездия")]
 
-# python3 tools/make_docs.py [kurenai] [ru] — галерея в теме KURENAI и/или с подписями (и экранами) на русском;
-# без аргументов — ещё и гифки. Экраны на русском: SIM_LANG=ru bash tools/sim/build.sh.
+# python3 tools/make_docs.py [kurenai] [ru] — gallery in the KURENAI theme and/or with Russian captions (and screens);
+# with no arguments it also makes the GIFs. Russian screens: SIM_LANG=ru bash tools/sim/build.sh.
 RU = "ru" in sys.argv
 items = [(f, ru if RU else en) for f, en, ru in SCREENS]
 name = "screens" + ("_kurenai" if "kurenai" in sys.argv else "") + ("_ru" if RU else "") + ".png"

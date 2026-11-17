@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
-"""Пробная «палка» для разработки приложения планшета без железа.
+"""Fake TENGAN stick for developing the tablet app without hardware.
 
     python3 tools/webapp/build.py --html /tmp/tablet.html
     python3 tools/webapp/mock.py /tmp/tablet.html [8090]
-    открыть http://127.0.0.1:8090/tablet?host=127.0.0.1:8090&sse=8091
+    open http://127.0.0.1:8090/tablet?host=127.0.0.1:8090&sse=8091
 
-:8090 — /tablet и /api/*, :8091 — поток SSE /stream (как «вторая дверь» на порту 81).
-Данные выдуманные, но той же формы, что шлёт прошивка (web.cpp, ble_core.cpp, pc.cpp, subghz.cpp).
+:8090 serves /tablet and /api/*, :8091 serves the SSE /stream (like the firmware's second port 81).
+Data is made up but has the same shape as the firmware sends.
 """
 import http.server, json, math, random, sys, threading, time
 from urllib.parse import urlparse, parse_qs
 
 HTML = open(sys.argv[1] if len(sys.argv) > 1 else "tablet.html", "rb").read()
-PORT = int(sys.argv[2]) if len(sys.argv) > 2 else 8090          # API; поток SSE — на PORT+1
-THEME = next((a for a in sys.argv[3:] if a in ("denko", "kurenai")), "denko")      # тема на устройстве: denko | kurenai
-LANG = next((a for a in sys.argv[3:] if a in ("en", "ru")), "en")                  # язык прошивки: en | ru
+PORT = int(sys.argv[2]) if len(sys.argv) > 2 else 8090          # API; SSE stream on PORT+1
+THEME = next((a for a in sys.argv[3:] if a in ("denko", "kurenai")), "denko")      # device theme: denko | kurenai
+LANG = next((a for a in sys.argv[3:] if a in ("en", "ru")), "en")                  # firmware language: en | ru
 T0 = time.time()
 TYPES = ["phone", "audio", "watch", "tracker", "computer", "unknown", "TV", "sensor", "band", "phone"]
 NAMES = ["iPhone", "AirPods Pro", "Galaxy Watch5", "AirTag", "ThinkPad X1", "", "[TV] Samsung Q7", "LYWSD03MMC", "Mi Band 7", "Pixel 7"]
@@ -22,9 +22,9 @@ VEND = ["Apple", "Apple", "Samsung", "Apple", "Lenovo", "private", "Samsung", "X
 BASE = [-44 - i * 2.6 for i in range(22)]
 
 
-# пульт управления (как в прошивке: /api/settings, /api/set, /api/label, /api/act) — состояние в памяти
+# remote settings (/api/settings, /api/set, /api/label, /api/act), kept in memory
 SETTINGS = json.loads(('{"pages":[{"id":"general","name":"General","items":[{"k":"theme","name":"Theme","hint":"change it on TENGAN: Settings › Theme","type":"info","v":"__THEME__"},{"k":"screen","name":"Screen","hint":"screen backlight","type":"range","v":100,"min":20,"max":100,"step":10,"unit":"%"},{"k":"dim","name":"Auto dim","hint":"dim screen when idle","type":"enum","v":"off","opts":["off","30 s","1 min","5 min"]},{"k":"ledbr","name":"LED brightness","hint":"led strip brightness","type":"range","v":50,"min":10,"max":100,"step":10,"unit":"%"},{"k":"volume","name":"Volume","hint":"all sounds: off/quiet/loud","type":"enum","v":"quiet","opts":["off","quiet","loud"]},{"k":"clicks","name":"Wheel clicks","hint":"click on every wheel step","type":"bool","v":1},{"k":"city","name":"City","hint":"for sky map and satellites","type":"enum","v":"Moscow","opts":["Moscow","Saint Petersburg","Novosibirsk","Yekaterinburg","Kazan","Nizhny Novgorod","Samara","Krasnodar","Rostov-on-Don","Vladivostok","Irkutsk","Minsk","Kyiv","Almaty","Tbilisi","Yerevan","Berlin","London","New York","Tokyo"]},{"k":"battery","name":"Battery","hint":"","type":"info","v":"87%  3.98 V"},{"k":"version","name":"Version","hint":"TENGAN firmware","type":"info","v":"v1.7-test3"}]},{"id":"ble","name":"Bluetooth","items":[{"k":"ble_range","name":"Range","hint":"ignore weaker devices","type":"enum","v":"all","opts":["all","far","room","near","very near"]},{"k":"ble_ledev","name":"LED events","hint":"leds flash on count jump","type":"range","v":7,"min":0,"max":30,"step":1,"unit":""},{"k":"ble_ticks","name":"Find ticks","hint":"ticks on nearest screen","type":"bool","v":1}]},{"id":"wifi","name":"Wi-Fi","items":[{"k":"wifi_range","name":"Range","hint":"hide weaker networks","type":"enum","v":"all","opts":["all","far","room","near","very near"]},{"k":"wifi_ticks","name":"Find ticks","hint":"ticks on find screen","type":"bool","v":1}]},{"id":"sub","name":"Sub-GHz","items":[{"k":"sub_band","name":"Start band","hint":"band when section opens","type":"enum","v":"433 MHz","opts":["315 MHz","433 MHz","868 MHz","915 MHz"]}]},{"id":"snd","name":"Sound","items":[{"k":"mic","name":"Microphone","hint":"mic for sound section","type":"bool","v":1},{"k":"au_leds","name":"LED meter","hint":"leds show loudness","type":"bool","v":0},{"k":"au_src","name":"Source","hint":"auto / mic / PC audio","type":"enum","v":"auto","opts":["auto","mic","PC"]}]}]}').replace('__THEME__', THEME))
-SETTINGS["pages"].append({"id": "alert", "name": "Alerts", "items": [   # как Settings › Alerts в прошивке
+SETTINGS["pages"].append({"id": "alert", "name": "Alerts", "items": [   # like Settings > Alerts in the firmware
     {"k": "al_near", "name": "Near", "hint": "stronger than this = near", "type": "range", "v": -65, "min": -90, "max": -40, "step": 5, "unit": "dBm"},
     {"k": "al_new", "name": "New device", "hint": "red + alert: off/near/any", "type": "enum", "v": "near", "opts": ["off", "near", "any"]},
     {"k": "al_trk", "name": "Tracker", "hint": "tracker alert: off/near/any", "type": "enum", "v": "near", "opts": ["off", "near", "any"]},
@@ -64,7 +64,7 @@ def set_item(k, v):
                     it["v"] = max(it["min"], min(it["max"], int(v)))
                 except ValueError:
                     return {"ok": False, "err": "bad number"}
-            if k in ("al_warn", "al_alarm"):                  # «тревога» всегда выше «внимания» (как в прошивке)
+            if k in ("al_warn", "al_alarm"):                  # alarm is always above warning (as in firmware)
                 its = {x["k"]: x for x in pg["items"]}
                 if k == "al_warn" and its["al_alarm"]["v"] <= it["v"]:
                     its["al_alarm"]["v"] = min(100, it["v"] + 5)
@@ -78,12 +78,12 @@ def ble():
     t = time.time()
     d = []
     for i in range(22):
-        if i == 21 and int(t / 9) % 2:            # одно устройство то появляется, то пропадает
+        if i == 21 and int(t / 9) % 2:            # one device comes and goes
             continue
-        drift = 6 * math.sin(t * 0.05 + i)        # медленный уход
-        r = int(BASE[i] + drift + random.uniform(-3, 3))   # сырой шум ±3 dB — пусть сглаживание работает
+        drift = 6 * math.sin(t * 0.05 + i)        # slow drift
+        r = int(BASE[i] + drift + random.uniform(-3, 3))   # raw noise +-3 dB, so smoothing has work to do
         d.append([1000 + i, r, TYPES[i % 10], VEND[i % 10], NAMES[i % 10], 30 + i * 41, 1 + i % 3, LABELS.get(1000 + i, "")])
-    k = int(t / 25)                                # «гости»: каждые 25 с — новые устройства (близкие и далёкие)
+    k = int(t / 25)                                # guests: every 25 s new devices (near and far)
     for j in range(3):
         d.append([5000 + k * 3 + j, [-52, -68, -84][j], ["phone", "tracker", "watch"][j], "private", "", 5, 1, ""])
     return {"on": 1, "n": len(d), "m": len(d) + 7, "d": d}
@@ -151,7 +151,7 @@ def pc():
 
 
 def sat():
-    # МКС: элементы в тех же единицах, что Sat в прошивке (радианы, рад/мин, км)
+    # ISS: elements in the firmware's Sat units (radians, rad/min, km)
     n0 = 15.5 * 2 * math.pi / 1440
     a = (398600.4418 / (n0 / 60) ** 2) ** (1 / 3)
     epoch = time.time() - 3600 * 5
@@ -169,7 +169,7 @@ IR_FAKE = [("NEC", 0x04, 0x08, 32, "LG TV"), ("SAMSUNG", 0x07, 0x02, 32, "Samsun
 
 
 def ir_ev():
-    """ИК: случайный пульт (как событие "ir" палки)."""
+    """IR: random remote (like the stick's "ir" event)."""
     p, a, c, b, br = random.choice(IR_FAKE)
     raw = [9000, 4500] + [x for _ in range(31) for x in (560, random.choice((560, 1690)))]
     return {"p": p, "addr": a, "cmd": c, "bits": b, "brand": br, "rep": int(random.random() < 0.3), "raw": raw[:64],
@@ -183,16 +183,16 @@ NFC_FAKE = [{"fam": "MIFARE Classic 1K", "hint": "transit pass / door key - like
 
 
 def nfc_ev():
-    """NFC: случайная карта (как событие "nfc" палки)."""
+    """NFC: random card (like the stick's "nfc" event)."""
     d = dict(random.choice(NFC_FAKE)); d["present"] = 1; d["t"] = int(time.time() * 1000) & 0x7FFFFFFF
     return d
 
 
 def wx():
-    # радиопогода: медленно плывущие значения + цикл «ясно → облака → дождь → гроза» (~2 минуты)
+    # radio weather: slowly drifting values + a clear > clouds > rain > storm cycle (~2 min)
     t = time.time()
     ph = (t / 120) % 1
-    if __import__('os').environ.get('WX') == 'storm': ph = 0.44        # для картинок: гроза прямо сейчас
+    if __import__('os').environ.get('WX') == 'storm': ph = 0.44        # for screenshots: storm right now
     storm = max(0.0, math.sin(ph * math.pi * 2 - 1.2)) ** 2
     clouds = min(1, 0.25 + 0.5 * (0.5 + 0.5 * math.sin(t / 37)) + storm * 0.4)
     rain = min(1, storm * 1.1 + max(0, math.sin(t / 23)) * 0.15)
@@ -204,14 +204,14 @@ def wx():
     return {"ok": 1, "cond": cond, "clouds": round(clouds, 3), "wind": round(wind, 3), "rain": round(rain, 3), "storm": round(storm, 3),
             "thunder": thunder, "trend": round(-math.cos(ph * math.pi * 2 - 1.2), 2), "ble": int(8 + clouds * 40), "turn": int(wind * 20),
             "sub": int(rain * 9), "subPk": int(-70 + rain * 25), "snd": int(-50 + storm * 30), "pk": int(-40 + storm * 30), "hist": WX["hist"],
-            "temp": round(4.2 + 0.4 * math.sin(t / 300), 1), "hum": 81, "tsrc": "Nexus"}   # за окном: датчик 433 (null, если не слышно)
+            "temp": round(4.2 + 0.4 * math.sin(t / 300), 1), "hum": 81, "tsrc": "Nexus"}   # outdoor: 433 sensor (null if not heard)
 
 
 SENS = {"t0": time.time(), "pk": 0, "last": 0.0, "lastKind": "sensor"}
 
 
 def sens():
-    """Датчики 433 (как событие "sens" палки): три термометра и звонок; посылки приходят раз в ~4 с."""
+    """433 sensors (like the stick's "sens" event): three thermometers and a doorbell; a packet every ~4 s."""
     t = time.time()
     el = t - SENS["t0"]
     nx_t = round(4.2 + 0.4 * math.sin(t / 300), 1)
@@ -223,10 +223,10 @@ def sens():
         {"id": "nexus-3-0x2c", "p": "Nexus", "ch": 3, "kind": "t", "t": -1.6, "h": None, "bat": 0, "rssi": -88, "ago": 700 + int(el), "n": 1},
         {"id": "remote-7a0b", "p": "Remote", "ch": 0, "kind": "remote", "t": None, "h": None, "bat": None, "btn": 1, "rssi": -71, "ago": ago(40, 10), "n": 2 + int(el / 40)},
     ]
-    if t - SENS["last"] > 4:                      # «пришла посылка»
+    if t - SENS["last"] > 4:                      # a packet arrived
         SENS["last"] = t; SENS["pk"] += 1
         SENS["lastKind"] = "remote" if SENS["pk"] % 4 == 0 else "sensor"
-    if SENS["lastKind"] == "sensor":             # Nexus: 36 бит PPM, рисунок — 48 пар импульс/пауза
+    if SENS["lastKind"] == "sensor":             # Nexus: 36-bit PPM, drawn as 48 pulse/gap pairs
         raw = int(round(nx_t * 10)) & 0xFFF
         b = [0x5A, 0x80 | (raw >> 8), raw & 0xFF, 0xF0 | (81 >> 4), (81 << 4) & 0xFF]
         bits = [(b[i >> 3] >> (7 - (i & 7))) & 1 for i in range(36)]
@@ -235,7 +235,7 @@ def sens():
         pt = pt[:72]; pt[71] = 4000
         last = {"p": "Nexus", "cls": "sensor", "pulses": 444, "bits": 36, "rows": 12, "mod": "PPM", "hex": "".join("%02x" % x for x in b),
                 "short": 500, "long": 500, "gs": 1000, "gl": 2000, "gap": 4000, "hash": "e30b", "pt": pt}
-    else:                                         # звонок: только начало посылки, без кода
+    else:                                         # doorbell: only the start of the packet, no code
         pt = [350, 4000] + [350, 1050, 1050, 350, 350, 1050, 1050, 350, 1050, 350, 350, 1050, 1050, 350, 1050, 350, 350, 1050, 350, 1050, 1050, 350]
         last = {"p": "Remote", "cls": "remote", "pulses": 150, "bits": 25, "rows": 6, "mod": "PWM", "hex": "",
                 "short": 350, "long": 1050, "gs": 350, "gl": 1050, "gap": 10850, "hash": "7a0b", "pt": pt}
@@ -254,14 +254,14 @@ class Api(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         u = urlparse(self.path)
         q = parse_qs(u.query)
-        if u.path in ("/", "/full", "/tablet"):     # «/» — с выбором LITE / FULL, «/full» — сразу полная сцена
+        if u.path in ("/", "/full", "/tablet"):     # "/" offers LITE / FULL, "/full" goes straight to the full scene
             body, ct = HTML, "text/html"
         elif u.path in ("/lite", "/phone"):
             body, ct = "<h1>phone page (на палке — web_page.h)</h1>".encode(), "text/html"
         elif u.path == "/api/bledev":
             body, ct = json.dumps({"addr": [{"mac": "4A:11:22:33:44:55", "kind": "rotating (private)", "r": -52, "ago": 1}], "n": "AirPods Pro", "t": "audio", "v": "Apple",
                                    "r": -52, "rmin": -71, "rmax": -44, "pk": 812, "age": 720, "cid": "0x004C", "uu": [{"u": "FD6F", "o": "Exposure"}], "mfr": "4C0012"}).encode(), "application/json"
-        elif u.path == "/api/pagever":             # версия страницы — для самообновления приложения
+        elif u.path == "/api/pagever":             # page version, for the app's self-update
             import hashlib
             body, ct = json.dumps({"sha": hashlib.sha256(HTML).hexdigest(), "gz": 0}).encode(), "application/json"
         elif u.path == "/api/settings":
@@ -278,10 +278,10 @@ class Api(http.server.BaseHTTPRequestHandler):
         elif u.path == "/api/act":
             print("act", q.get("a"), q.get("v"), flush=True)
             body, ct = b'{"ok":true}', "application/json"
-        elif u.path == "/api/pckey":               # пульт музыки
+        elif u.path == "/api/pckey":               # music remote
             print("key", q.get("k"), flush=True)
             body, ct = b'{"ok":true}', "application/json"
-        elif u.path == "/api/loc":                 # GPS с приложения планшета
+        elif u.path == "/api/loc":                 # GPS from the tablet app
             print("loc", q.get("lat"), q.get("lon"), flush=True)
             body, ct = b'{"ok":true}', "application/json"
         elif u.path == "/api/sens":

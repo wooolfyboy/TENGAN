@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""CI: запустить собранное приложение на N секунд и проверить журнал — нет ли падения при старте
-(например, PyInstaller не положил какой-то модуль). Окно не трогаем: просто ждём и закрываем.
+"""CI: run the built app for N seconds and check the log for a startup crash
+(e.g. PyInstaller missed a module). The window is not touched: just wait, then close.
 
-    python tools/desktop/smoke_run.py <путь к исполняемому файлу> [секунд]
+    python tools/desktop/smoke_run.py <path to executable> [seconds]
 """
 import os, signal, subprocess, sys, tempfile, time
 
@@ -14,8 +14,8 @@ else:
 log = os.path.join(logdir, "desktop.log")
 if os.path.exists(log):
     os.remove(log)
-# вывод — в файл, а не в трубу: упакованное приложение запускает дочерний процесс, и труба не закрывается,
-# пока жив хоть один из них (из-за этого CI висел час). Завершаем всю группу процессов.
+# Output goes to a file, not a pipe: the packed app spawns a child, so the pipe stays open while any
+# child lives (CI once hung for an hour). We kill the whole process group.
 outf = tempfile.TemporaryFile()
 p = subprocess.Popen([exe], stdout=outf, stderr=subprocess.STDOUT, start_new_session=True)
 try:

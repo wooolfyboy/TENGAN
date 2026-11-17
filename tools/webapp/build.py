@@ -1,15 +1,11 @@
 #!/usr/bin/env python3
-"""Сборка приложения для планшета в один файл -> src/web/tablet_page.h
+"""Builds the tablet app into one offline HTML file, gzipped into src/web/tablet_page.h.
+Sources: tools/webapp/src (index.html with /*@INLINE path*/ markers). One page serves both
+languages: i18n/ru.json is embedded, the language follows the device (st.lang).
 
-  исходники: tools/webapp/src (index.html с метками /*@INLINE путь*/)
-  результат: всё внутри одного HTML (без интернета), сжато gzip -> массив байт в прошивке.
-  TENGAN отдаёт его по /tablet с заголовком Content-Encoding: gzip.
-  Одна страница на оба языка: словарь i18n/ru.json встроен, язык берётся у устройства (st.lang)
-  и переключается на лету (core/i18n.js).
-
-    python3 tools/webapp/build.py                    # собрать src/web/tablet_page.h
-    python3 tools/webapp/build.py --check            # для CI: страница совпадает с исходниками
-    python3 tools/webapp/build.py --html out.html --only-html [--lang ru]   # только HTML (язык при старте — для проверки)
+    python3 tools/webapp/build.py                    # build src/web/tablet_page.h
+    python3 tools/webapp/build.py --check            # CI: page matches the sources
+    python3 tools/webapp/build.py --html out.html --only-html [--lang ru]   # HTML only (start language, for testing)
 """
 import gzip, hashlib, json, os, re, sys
 
@@ -25,34 +21,33 @@ FW = os.path.join(HERE, "..", "..", "src")
 
 
 def c_array(text, name):
-    """Числа из static const ... NAME[] = { ... }; в плоский список."""
+    """Numbers from `static const ... NAME[] = { ... };` as a flat list."""
     m = re.search(r"static const [^=;]*\b%s\b[^=;]*=\s*\{(.*?)\};" % re.escape(name), text, re.S)
     assert m, name
     return [int(x) for x in re.findall(r"-?\d+", re.sub(r'"[^"]*"', "", m.group(1)))]
 
 
 def data_js():
-    """Данные с палки для планшета — берутся прямо из заголовков прошивки, чтобы не разъезжались:
-    звёзды, линии созвездий, контуры суши (gallery/astrodata.h)."""
+    """Sky data (stars, constellation lines, land outlines) read straight from the firmware header so they never drift apart."""
     a = open(os.path.join(FW, "gallery", "astrodata.h"), encoding="utf-8").read()
     con = re.search(r"CON_NAMES\[\]\s*=\s*\{(.*?)\};", a, re.S).group(1)
     cons = [[int(r), int(d), ab, ru] for r, d, ab, ru in re.findall(r'\{\s*(-?\d+),\s*(-?\d+),\s*"([^"]*)",\s*"([^"]*)"\s*\}', con)]
     names = re.search(r"STAR_NAMES\[\]\s*=\s*\{(.*?)\};", a, re.S).group(1)
     snames = [[int(i), n] for i, n in re.findall(r'\{\s*(\d+),\s*"([^"]*)"\s*\}', names)]
     d = {
-        "stars": c_array(a, "STARS"),            # тройки: ra*100, dec*100, (mag+2)*10
+        "stars": c_array(a, "STARS"),            # triples: ra*100, dec*100, (mag+2)*10
         "starNames": snames,
-        "cl": c_array(a, "CL_PTS"),              # пары ra*100, dec*100 (uint16 -> знак восстановить)
+        "cl": c_array(a, "CL_PTS"),              # pairs ra*100, dec*100 (uint16 -> restore the sign)
         "clStart": c_array(a, "CL_START"),
-        "con": cons,                             # [ra*100, dec*100, "Ori", "Орион"]
-        "land": c_array(a, "LAND_PTS"),          # пары (как в gallery_sky.cpp)
+        "con": cons,                             # [ra*100, dec*100, "Ori", "name"]
+        "land": c_array(a, "LAND_PTS"),          # pairs (as in gallery_sky.cpp)
         "landStart": c_array(a, "LAND_START"),
     }
     return "T.DATA=" + json.dumps(d, ensure_ascii=False, separators=(",", ":")) + ";"
 
 
 def slim(code, kind):
-    """Лёгкая минификация: убрать строки-комментарии и отступы (без риска сломать код)."""
+    """Light minify: drop comment-only lines and indentation (safe for the code)."""
     out = []
     for line in code.splitlines():
         t = line.strip()
@@ -71,8 +66,8 @@ def build(lang="en"):
     html = re.sub(r"/\*@INLINE ([^*]+?)\*/", inline, html)
     html = html.replace("/*@DATA*/", data_js())
     ver = open(os.path.join(HERE, "..", "..", "VERSION")).read().strip()
-    html = html.replace("@@VERSION@@", ver)                      # версия TENGAN (файл VERSION)
-    # язык: словарь встроен всегда, стартовый язык — 'en' (страница сразу берёт язык устройства)
+    html = html.replace("@@VERSION@@", ver)                      # TENGAN version (VERSION file)
+    # dictionary is always embedded; start language is 'en' (the page switches to the device language at once)
     assert "/*@LANG*/'en'" in html and "/*@DICT*/null" in html
     d = json.dumps(json.load(open(os.path.join(DICT_DIR, "ru.json"), encoding="utf-8")), ensure_ascii=False, separators=(",", ":"))
     html = html.replace("/*@LANG*/'en'", "'%s'" % lang).replace("/*@DICT*/null", d)
@@ -82,7 +77,7 @@ def build(lang="en"):
 
 
 def header(html):
-    gz = gzip.compress(html.encode("utf-8"), compresslevel=9, mtime=0)   # mtime=0 — одинаковый результат при пересборке
+    gz = gzip.compress(html.encode("utf-8"), compresslevel=9, mtime=0)   # mtime=0: identical output on rebuild
     digest = hashlib.sha256(html.encode("utf-8")).hexdigest()
     lines = ["// АВТОМАТИЧЕСКИ СГЕНЕРИРОВАНО tools/webapp/build.py из tools/webapp/src — не править руками.",
              "// Приложение для планшета (один HTML, gzip). Отдаётся по /tablet.",
@@ -105,14 +100,14 @@ def main():
         html = build(langs[0])
         out = arg("--html")
         open(out, "w", encoding="utf-8").write(html)
-        # рядом — версия страницы: приложение сравнивает её с TENGAN (/api/pagever)
+        # page version next to it: the app compares it with TENGAN (/api/pagever)
         open(os.path.join(os.path.dirname(os.path.abspath(out)), "pagever.txt"), "w").write(hashlib.sha256(html.encode("utf-8")).hexdigest())
-        if "--only-html" in sys.argv:                  # для разработки: прошивку не трогать
+        if "--only-html" in sys.argv:                  # dev: leave the firmware alone
             print("tablet[%s]: %d КБ HTML" % (langs[0], len(html) // 1024)); return
     html = build("en")
     data, digest, gzlen = header(html)
-    if "--check" in sys.argv:                          # для CI: исходники и прошивка не разъехались
-        # сравниваем сам HTML (по хэшу), а не сжатые байты: zlib разных версий жмёт чуть по-разному
+    if "--check" in sys.argv:                          # CI: sources and firmware must match
+        # compare the HTML hash, not gzip bytes: zlib versions compress slightly differently
         cur = open(OUT, encoding="utf-8").read() if os.path.exists(OUT) else ""
         m = re.search(r"html-sha256: ([0-9a-f]{64})", cur)
         if not m or m.group(1) != digest: sys.exit("устарел tablet_page.h: запусти python3 tools/webapp/build.py")

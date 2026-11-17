@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Данные для Gallery › Sky и Globe -> src/gallery/astrodata.h
+"""Sky/Globe data for Gallery -> src/gallery/astrodata.h
 
-Источники (tools/astro_src/):
+Sources (tools/astro_src/):
   stars.mag5.json, constellations*.json, starnames.proper.json — d3-celestial © Olaf Frohn, BSD-3
-    (звёзды — каталог Hipparcos, до 5-й величины; линии и названия созвездий)
-  land-110m.json — world-atlas © Mike Bostock, ISC (контуры суши Natural Earth 1:110m, общественное достояние)
+    (Hipparcos stars up to mag 5; constellation lines and names)
+  land-110m.json — world-atlas © Mike Bostock, ISC (Natural Earth 1:110m land outlines, public domain)
 
     python3 tools/gen_astro.py > src/gallery/astrodata.h
 """
@@ -12,7 +12,7 @@ import json, math, os
 SRC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "astro_src")
 J = lambda f: json.load(open(os.path.join(SRC, f), encoding="utf-8"))
 
-def ra_deg(x):  # d3-celestial хранит прямое восхождение как долготу -180..180
+def ra_deg(x):  # d3-celestial stores right ascension as longitude -180..180
     return x % 360.0
 
 out = ["// АВТОМАТИЧЕСКИ СГЕНЕРИРОВАНО tools/gen_astro.py — не править руками.",
@@ -20,7 +20,7 @@ out = ["// АВТОМАТИЧЕСКИ СГЕНЕРИРОВАНО tools/gen_astro
        "// Суша: world-atlas (ISC, © Mike Bostock) по Natural Earth 1:110m.",
        "#pragma once", "#include <stdint.h>", ""]
 
-# ---------- звёзды (по яркости: сначала яркие) ----------
+# ---------- stars (brightest first) ----------
 stars = J("stars.mag5.json")["features"]
 stars.sort(key=lambda f: f["properties"]["mag"])
 idx_of = {}
@@ -38,7 +38,7 @@ if row: out.append("  " + ",".join(row) + ",")
 out.append("};")
 out.append("static const int N_STARS = %d;" % len(stars))
 
-# ---------- имена ярких звёзд ----------
+# ---------- bright star names ----------
 names = J("starnames.proper.json")
 named = []
 for sid, v in names.items():
@@ -53,7 +53,7 @@ for i, n in named:
 out.append("};")
 out.append("static const int N_STAR_NAMES = %d;" % len(named))
 
-# ---------- линии созвездий: точки + начала ломаных ----------
+# ---------- constellation lines: points + polyline starts ----------
 lines = J("constellations.lines.json")["features"]
 pts, starts = [], []
 for f in lines:
@@ -70,7 +70,7 @@ out.append("};")
 out.append("static const uint16_t CL_START[] = {" + ",".join(map(str, starts)) + "};")
 out.append("static const int N_CL = %d;" % (len(starts) - 1))
 
-# ---------- названия созвездий (крупные: rank 1-2), по-русски ----------
+# ---------- constellation names (large ones: rank 1-2), in Russian ----------
 cons = [f for f in J("constellations.json")["features"] if f["properties"].get("rank") in ("1", "2")]
 out.append("struct AConName { uint16_t ra; int16_t dec; const char* ab; const char* ru; };   // ab — латинское сокращение (Ori)")
 out.append("static const AConName CON_NAMES[] = {")
@@ -80,7 +80,7 @@ for f in cons:
 out.append("};")
 out.append("static const int N_CON_NAMES = %d;" % len(cons))
 
-# ---------- суша: topojson -> ломаные, упрощение (Рамер-Дуглас-Пекер) ----------
+# ---------- land: topojson -> polylines, simplified (Ramer-Douglas-Peucker) ----------
 topo = J("land-110m.json")
 sx, sy = topo["transform"]["scale"]; tx, ty = topo["transform"]["translate"]
 arcs = []

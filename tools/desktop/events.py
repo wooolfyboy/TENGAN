@@ -1,18 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-TENGAN desktop — «мозг» оповещений и виджета (без окон, без библиотек — тестируется где угодно).
+TENGAN desktop - alert/widget engine (no windows, no libraries; testable anywhere).
 
-Получает те же события палки, что и страница штаба (ble / ir / nfc / sens / wx / st / snd),
-и решает по тем же правилам, что штаб на планшете (tools/webapp/src/core/store.js):
-  • разогрев al_warm с после подключения — никто не «новый»;
-  • «новое» — только то, чего за сеанс ещё не было (вернувшееся — не новое);
-  • новое устройство тревожит по al_new: 0 выкл / 1 только близкое (сильнее al_near) / 2 любое;
-  • трекер — по al_trk так же;
-  • активность — среднее включённых источников × al_sens/5, уровни по al_warn / al_alarm.
-Настройки тревог берутся с палки (/api/settings, страница «alert»), свои настройки приложения
-(какие всплывашки, тихие часы, лимит) — в prefs.
-
-Выход: список «извещений» (dict) для всплывашек и снимок состояния для виджета.
+Takes the same stick events as the HQ page (ble / ir / nfc / sens / wx / st / snd) and applies the same
+rules as the tablet UI (tools/webapp/src/core/store.js): al_warm warm-up after connect, "new" = not seen
+this session, al_new / al_trk levels (0 off / 1 near only / 2 any), activity = mean of enabled sources
+x al_sens/5 with al_warn / al_alarm levels. Alert settings come from the stick (/api/settings, page "alert");
+the app's own settings (popup kinds, quiet hours, limit) are in prefs.
+Output: a list of notice dicts for popups and a state snapshot for the widget.
 """
 import json
 import time
@@ -25,26 +20,26 @@ CFG_DEF = {"al_near": -65, "al_new": 1, "al_trk": 1, "al_newfor": 30, "al_warm":
 KINDS = ["new", "tracker", "ir", "nfc", "sensor", "temp", "battery", "link"]
 
 PREFS_DEF = {
-    "popups": True,                 # всплывашки вообще
+    "popups": True,                 # popups on/off
     "kinds": {k: True for k in KINDS},
-    "quiet": False, "quiet_from": 23, "quiet_to": 8,   # тихие часы (местное время)
-    "quiet_trackers": True,         # трекер рядом пробивает тихие часы
-    "per_min": 6,                   # не больше N всплывашек в минуту
-    "merge_s": 2.0,                 # одинаковые события за N с — одной плашкой («3 новых устройства»)
-    "duration": 4.5,                # сколько висит плашка, с
-    "corner": "br",                 # угол: br bl tr tl
-    "style": "auto",                # auto (как тема TENGAN) / denko / kurenai
-    "native": False,                # системные уведомления Windows вместо своих плашек
+    "quiet": False, "quiet_from": 23, "quiet_to": 8,   # quiet hours (local time)
+    "quiet_trackers": True,         # a nearby tracker overrides quiet hours
+    "per_min": 6,                   # max popups per minute
+    "merge_s": 2.0,                 # same-kind events within N s merge into one popup ("3 NEW DEVICES")
+    "duration": 4.5,                # popup lifetime, s
+    "corner": "br",                 # corner: br bl tr tl
+    "style": "auto",                # auto (follow TENGAN theme) / denko / kurenai
+    "native": False,                # native OS notifications instead of own popups
     "widget": False, "opacity": 1.0, "clickthrough": False,
     "widget_rect": None,            # [x, y, w, h]
-    "tray": True,                   # закрытие окна — в трей
-    # окно программы (настройки «Окно»)
-    "win_rect": None,               # [x, y, w, h] — место и размер (запоминается само)
-    "win_max": False,               # было развёрнуто на весь экран
-    "start_full": False,            # открывать во весь экран (как F11)
-    "zoom": 1.0,                    # масштаб интерфейса окна: 0.8 … 1.5
-    "autostart": False,             # запуск вместе с системой
-    "start_tray": True,             # при автозапуске — сразу в трей, без окна
+    "tray": True,                   # closing the window goes to tray
+    # app window ("Window" settings)
+    "win_rect": None,               # [x, y, w, h], remembered automatically
+    "win_max": False,               # was maximized
+    "start_full": False,            # start fullscreen (like F11)
+    "zoom": 1.0,                    # window UI scale: 0.8 .. 1.5
+    "autostart": False,             # start with the OS
+    "start_tray": True,             # on autostart go straight to tray
 }
 
 KJ = {"new": "接近警告", "tracker": "追跡警告", "ir": "赤外線", "nfc": "近接", "sensor": "感知",
@@ -66,7 +61,7 @@ def clamp(v, a=0.0, b=1.0):
 
 
 def cfg_from_settings(d):
-    """/api/settings → числа al_* (как S.cfgFromItem на странице). None — страницы alert нет."""
+    """/api/settings -> al_* numbers (like S.cfgFromItem on the page). None if there is no alert page."""
     pages = (d or {}).get("pages") or []
     pg = next((p for p in pages if p.get("id") == "alert"), None)
     if not pg:
@@ -101,28 +96,28 @@ class Engine:
         self.wall = wall
         self.reset()
 
-    # ---------- состояние ----------
+    # ---------- state ----------
     def reset(self):
-        """Новый сеанс связи: разогрев заново, память «уже видели» — заново."""
+        """New link session: warm up again, forget what was seen."""
         self.devs = {}              # id -> {r, type, name, label, born, seen, first, trk_t}
         self.ever = set()
         self.warm_t = None
         self.act = {"ble": [], "rf": [], "prb": []}
         self.snd_lv = None
-        self.sens_ids = None        # известные датчики 433 (None — первый снимок ещё не пришёл)
+        self.sens_ids = None        # known 433 sensors (None until the first snapshot)
         self.sens_pk = None
         self.temp = None            # {t, h, src}
-        self.temp_note = None       # (значение, время) последней всплывашки о температуре
+        self.temp_note = None       # (value, time) of the last temperature popup
         self.ir_last = None         # (p, addr, cmd, t)
-        self.ir = None              # последнее для виджета
+        self.ir = None              # last one, for the widget
         self.nfc = None
         self.nfc_last = None        # (uid, t)
         self.bat = None
         self.link_ok = None
         self.link_t = 0.0
-        self.link_pending = None    # (ok, since) — извещение о связи только если держится 5 с
-        self.queue = []             # извещения, ждущие склейки
-        self.sent = []              # времена показанных (лимит в минуту)
+        self.link_pending = None    # (ok, since); link notice only if the state holds 5 s
+        self.queue = []             # notices waiting to be merged
+        self.sent = []              # times of shown popups (per-minute limit)
 
     def set_cfg(self, c):
         if c:
@@ -131,7 +126,7 @@ class Engine:
     def set_prefs(self, p):
         self.prefs = merged_prefs(p)
 
-    # ---------- вход ----------
+    # ---------- input ----------
     def feed_raw(self, ev, js):
         if ev in ("ble", "ir", "nfc", "sens", "wx", "st", "snd"):
             try:
@@ -196,7 +191,7 @@ class Engine:
             else:
                 e["r"] = r if e["r"] is None else round(e["r"] * 0.5 + r * 0.5, 1)
                 e.update(type=typ or e["type"], name=name or e["name"], label=label or e["label"], seen=now, alive=True)
-            # трекер рядом: раз в 10 минут на одно устройство
+            # tracker nearby: once per 10 min per device
             if self.is_trk(e) and now > (self.warm_t or 0) and (e["trk_t"] is None or now - e["trk_t"] > 600):
                 e["trk_t"] = now
                 self._note("tracker", now, "TRACKER NEARBY", "%s · %d dBm" % (self._dname(e), e["r"]), sev="alert", dev=did)
@@ -209,7 +204,7 @@ class Engine:
             self.ever = set(self.devs)
         for e in fresh_new:
             if e["type"] == "tracker" and e["trk_t"] == now:
-                continue                                  # уже сказали «трекер рядом»
+                continue                                  # already reported as tracker nearby
             self._note("new", now, "NEW DEVICE NEARBY", "%s · %d dBm" % (self._dname(e), e["r"]),
                        sev="alert" if self._near(e["r"]) else "info")
 
@@ -222,7 +217,7 @@ class Engine:
         self.ir = {"p": d.get("p"), "brand": d.get("brand") or "", "cmd": d.get("cmd"), "addr": d.get("addr"), "t": time.time()}
         if d.get("rep") or (self.ir_last and self.ir_last[0] == key and now - self.ir_last[1] < 1.5):
             self.ir_last = (key, now)
-            return                                        # удержание кнопки — не новое нажатие
+            return                                        # key held: not a new press
         self.ir_last = (key, now)
         self._push_act("prb", now)
         who = d.get("brand") or d.get("p") or "IR"
@@ -251,7 +246,7 @@ class Engine:
         for s in d.get("sensors") or []:
             if isinstance(s, dict) and s.get("id"):
                 ids[s["id"]] = s
-        if self.sens_ids is None:                       # первый снимок — то, что уже было, не новость
+        if self.sens_ids is None:                       # first snapshot: what was already there is not news
             self.sens_ids = set(ids)
             return
         for sid, s in ids.items():
@@ -272,7 +267,7 @@ class Engine:
         self.temp = {"t": t, "h": d.get("hum"), "src": d.get("tsrc") or ""}
         last = self.temp_note
         if last is None:
-            self.temp_note = (t, now)                    # первое значение — точка отсчёта, без плашки
+            self.temp_note = (t, now)                    # first value is only a baseline, no popup
             return
         if abs(t - last[0]) >= 1.0 and now - last[1] >= 600:
             self.temp_note = (t, now)
@@ -291,7 +286,7 @@ class Engine:
             self.snd_lv = d.get("lv")
 
     def link(self, ok, now=None):
-        """Связь с палкой: есть / пропала. Плашка — если состояние держится 5 с (не мигает)."""
+        """Stick link up/down. A popup shows only if the state holds 5 s (no flapping)."""
         now = self.clock() if now is None else now
         if ok == self.link_ok:
             self.link_pending = None
@@ -311,10 +306,10 @@ class Engine:
                 self.reset_soft()
 
     def reset_soft(self):
-        """После возвращения связи — снова разогрев (список палки наполняется заново)."""
+        """After the link returns, warm up again (the stick refills its list)."""
         self.warm_t = None
 
-    # ---------- извещения: склейка, лимит, тихие часы ----------
+    # ---------- notices: merging, limit, quiet hours ----------
     def _note(self, kind, now, title, text, sev="info", **kw):
         self.queue.append(dict(kind=kind, kj=KJ.get(kind, ""), title=title, text=text, sev=sev, t=now, n=1, **kw))
 
@@ -327,7 +322,7 @@ class Engine:
         return (a <= h < b) if a < b else (h >= a or h < b) if a != b else False
 
     def pop(self, now=None):
-        """Готовые к показу извещения (склеенные; с учётом настроек, тихих часов и лимита)."""
+        """Notices ready to show (merged; honoring prefs, quiet hours and the limit)."""
         now = self.clock() if now is None else now
         self._link_tick(now)
         p = self.prefs
@@ -336,7 +331,7 @@ class Engine:
         groups = {}
         for n in self.queue:
             if now - n["t"] < merge:
-                keep.append(n)                             # ждём — вдруг придут такие же
+                keep.append(n)                             # wait: more of the same may arrive
             else:
                 g = groups.get(n["kind"])
                 if g is None:
@@ -346,7 +341,7 @@ class Engine:
                     g["n"] += 1
                     if n["sev"] == "alert":
                         g["sev"] = "alert"
-        # если такие же ещё в ожидании — подождём всю пачку целиком
+        # same kind still waiting: hold the whole batch
         waiting = {n["kind"] for n in keep}
         out = []
         for n in ready:
@@ -371,12 +366,12 @@ class Engine:
             if len(self.sent) >= int(p["per_min"]) and n["sev"] != "alert":
                 continue
             if len(self.sent) >= int(p["per_min"]) * 2:
-                continue                                   # даже тревоги — не больше двойного лимита
+                continue                                   # even alerts: at most twice the limit
             self.sent.append(now)
             res.append(n)
         return res
 
-    # ---------- снимок для виджета ----------
+    # ---------- widget snapshot ----------
     def activity(self, now=None):
         now = self.clock() if now is None else now
         c = self.cfg

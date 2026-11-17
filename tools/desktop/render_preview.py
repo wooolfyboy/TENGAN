@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Демо-страницы всплывашек и виджета с выдуманными данными (для просмотра в браузере без TENGAN).
+"""Demo popup and widget pages with made-up data (view in a browser without TENGAN).
 
-    python3 tools/desktop/render_preview.py <папка>
-Создаёт popup_<тема>_<язык>.html и widget_<тема>_<язык>.html (темы denko / kurenai, языки en / ru).
+    python3 tools/desktop/render_preview.py <dir>
+Writes popup_<theme>_<lang>.html and widget_<theme>_<lang>.html (themes denko / kurenai, langs en / ru).
 """
 import json
 import os

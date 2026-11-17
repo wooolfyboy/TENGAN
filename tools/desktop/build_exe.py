@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Собрать приложение для компьютера в один файл dist/tengan_desktop.exe (на Windows, CI).
+"""Build the desktop app into a single dist/tengan_desktop.exe (Windows, CI).
 
     pip install -r tools/desktop/requirements.txt pyinstaller
     python tools/desktop/build_exe.py
@@ -11,7 +11,7 @@ ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 args = [
     sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "--onefile", "--windowed",
     "--name", "tengan_desktop",
-    "--icon", os.path.join(HERE, "tengan.ico"),          # значок TENGAN 天眼 (файл, панель задач, окно)
+    "--icon", os.path.join(HERE, "tengan.ico"),          # app icon (file, taskbar, window)
     "--distpath", os.path.join(ROOT, "dist"),
     "--workpath", os.path.join(ROOT, "build", "pyi"),
     "--specpath", os.path.join(ROOT, "build", "pyi"),
@@ -24,14 +24,14 @@ args = [
     "--collect-all", "pyaudiowpatch",
     "--collect-all", "winrt",
     "--hidden-import", "clr",
-    # трей, всплывашки, виджет (WIDGET.md)
+    # tray, popups, widget (WIDGET.md)
     "--paths", HERE,
     "--hidden-import", "events",
     "--hidden-import", "overlay",
     "--hidden-import", "overlay_html",
     "--collect-submodules", "pystray",
     "--hidden-import", "PIL.Image",
-    "--add-data", os.path.join(HERE, "tengan.ico") + os.pathsep + ".",   # значок для трея внутри exe
+    "--add-data", os.path.join(HERE, "tengan.ico") + os.pathsep + ".",   # tray icon bundled inside the exe
     os.path.join(HERE, "tengan_desktop.py"),
 ]
 print(" ".join(args), flush=True)

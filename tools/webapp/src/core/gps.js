@@ -1,12 +1,11 @@
-// ---- GPS планшета (только в приложении): где мы сейчас ----
-// Небо и глобус на планшете считаются по этим координатам, и палка получает их (/api/loc),
-// чтобы её небо тоже было «отсюда». В браузере по http://192.168.4.1 геолокация запрещена — там тихо.
+// ---- tablet GPS (app only) ----
+// Sky and globe use these coordinates, and the stick gets them too (/api/loc). Browsers block geolocation on plain http://192.168.4.1, so it stays silent there.
 T.gps = null;
 (() => {
   const G = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Geolocation;
   if (!T.native || !G) return;
   let sent = null, sentT = 0;
-  const toStick = () => {                                // палке — при первом фиксе, сдвиге > 1 км или раз в 10 минут
+  const toStick = () => {                                // to the stick: on first fix, a move > 1 km, or every 10 minutes
     const p = T.gps; if (!p) return;
     const moved = !sent || Math.hypot(p.lat - sent.lat, (p.lon - sent.lon) * Math.cos(p.lat * Math.PI / 180)) > 0.009;
     if (!moved && Date.now() - sentT < 600000) return;

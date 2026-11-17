@@ -1,9 +1,9 @@
-// ---- ШТАБ 天眼司令室 (стиль «Евангелиона»): всё, что слышит палка, на одном экране ----
-// Свой фиксированный стиль (оранжевый/красный на чёрном) — не зависит от темы оформления.
-// Центр — «радиогоризонт»: BLE точками, Wi-Fi ромбами, датчики 433 треугольниками;
-// ближе к центру = сильнее сигнал. По краям — счётчики, погода, звук, пульты/карты, лог.
+// ---- HQ 天眼司令室 (Evangelion style): everything the stick hears on one screen ----
+// Fixed own style (orange/red on black) - independent of the UI theme.
+// Center: 'radio horizon': BLE dots, Wi-Fi diamonds, 433 sensors triangles; closer to center = stronger.
+// Edges: counters, weather, sound, remotes/cards, log.
 (() => {
-// палитра штаба — своя у каждой темы: DENKO — оранжевый «NERV», KURENAI — чёрный / белый / красный
+// HQ palette, one per theme: DENKO - orange 'NERV', KURENAI - black / white / red
 const PAL = {
   denko: { bg: '#050302', or: '#ff8c1a', or2: '#ffb347', dim: '#5a2e08', dk: '#2a1405', red: '#ff2a1f',
     grn: '#69ff6e', cy: '#5fe3ff', txt: '#ffcf99', wht: '#fff4e6', orRGB: '255,140,26', stripe: '#ff8c1a', plateTxt: '#000', skew: 0, mid: '#b35f10', cyRGB: '95,227,255', or2RGB: '255,179,71', redDk: '#7a120c', plateBg: 'rgba(40,0,0,.88)' },
@@ -13,13 +13,13 @@ const PAL = {
 const E = Object.assign({}, PAL.denko);
 const K = () => T.theme === 'kurenai';
 const orA = a => `rgba(${E.orRGB},${a})`;
-// шрифты фиксированные: штаб выглядит одинаково при любой теме
-const RAJ = "'Exo 2','Arial Narrow',sans-serif", ANTON = "Oswald,'Arial Narrow',sans-serif", SPM = "'JetBrains Mono',ui-monospace,monospace";   // имена исторические: заголовки DENKO / KURENAI, текст
+// fonts are fixed: HQ looks the same in any theme
+const RAJ = "'Exo 2','Arial Narrow',sans-serif", ANTON = "Oswald,'Arial Narrow',sans-serif", SPM = "'JetBrains Mono',ui-monospace,monospace";   // names are historical: DENKO / KURENAI headings, text
 const JP = () => T.SEAL_FONT, FT = () => K() ? ANTON : RAJ, FM = () => K() ? SPM : T.FM, FC = () => T.FC;
-// Oswald у нас одно начертание на все веса — «жирность» ему не нужна
+// Oswald has one weight for all - no need for 'bold'
 const font = (g, px, f, w = '') => { g.font = `${f === ANTON ? '' : w}${px}px ${f}`; };
 const tx = (g, s, x, y, px, col, f = FM(), al = 'left', w = '') => { font(g, px, f, w); g.fillStyle = col; g.textAlign = al; g.textBaseline = 'alphabetic'; g.fillText(s, x, y); };
-// «жирный» японский: системный шрифт печати один, толщину добираем обводкой
+// 'bold' Japanese: the system print font has one weight, thickness is added by stroke
 const jp = (g, s, x, y, px, col, al = 'left', bold = 0.06) => {
   font(g, px, JP()); g.textAlign = al; g.textBaseline = 'alphabetic';
   g.lineJoin = 'round'; g.lineWidth = px * bold; g.strokeStyle = col; g.strokeText(s, x, y);
@@ -27,22 +27,22 @@ const jp = (g, s, x, y, px, col, al = 'left', bold = 0.06) => {
 };
 const pad2 = n => String(n).padStart(2, '0');
 const hms = d => pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
-// возраст Луны (дни) — без интернета, достаточно для подписи
+// Moon age (days) - offline, good enough for a label
 const moonAge = () => { const syn = 29.530588853, ref = Date.UTC(2000, 0, 6, 18, 14) / 864e5; let a = (Date.now() / 864e5 - ref) % syn; if (a < 0) a += syn; return a; };
-// полосатая лента «осторожно»
+// 'caution' striped tape
 const stripes = (g, x, y, w, h, col, step) => {
   g.save(); g.beginPath(); g.rect(x, y, w, h); g.clip();
   g.fillStyle = K() ? E.bg : '#000'; g.fillRect(x, y, w, h); g.fillStyle = col;
   for (let k = -h; k < w + h; k += step * 2) { g.beginPath(); g.moveTo(x + k, y + h); g.lineTo(x + k + step, y + h); g.lineTo(x + k + step + h, y); g.lineTo(x + k + h, y); g.closePath(); g.fill(); }
   g.restore();
 };
-// панель: рамка + оранжевая шапка (EN слева, иероглифы справа) + срезанный уголок
+// panel: frame + orange header (EN left, kanji right) + cut corner
 const panel = (g, x, y, w, h, u, en, kj, right, hot) => {
   const hh = u * 1.15, col = hot ? E.red : E.or, sk = E.skew * hh;
   g.fillStyle = orA(0.045); g.fillRect(x, y, w, h);
   g.strokeStyle = col; g.lineWidth = Math.max(1, u * 0.07); g.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
   g.fillStyle = col;
-  if (sk) { g.beginPath(); g.moveTo(x, y); g.lineTo(x + w, y); g.lineTo(x + w - sk, y + hh); g.lineTo(x, y + hh); g.closePath(); g.fill(); }   // KURENAI: скошенная плашка
+  if (sk) { g.beginPath(); g.moveTo(x, y); g.lineTo(x + w, y); g.lineTo(x + w - sk, y + hh); g.lineTo(x, y + hh); g.closePath(); g.fill(); }   // KURENAI: slanted plate
   else g.fillRect(x, y, w, hh);
   const pt = hot && K() ? '#fff' : E.plateTxt;
   tx(g, en, x + u * 0.5, y + hh * 0.78, u * 0.8, pt, FT(), 'left', '600 ');
@@ -52,7 +52,7 @@ const panel = (g, x, y, w, h, u, en, kj, right, hot) => {
   g.beginPath(); g.moveTo(x + w, y + h - u); g.lineTo(x + w, y + h); g.lineTo(x + w - u, y + h); g.closePath(); g.fillStyle = col; g.fill();
   return y + hh;
 };
-// мигание можно выключить (Settings › Alerts › Blinking) — тогда всё горит ровно
+// blinking can be turned off (Settings > Alerts > Blinking) - then everything glows steady
 const blink = (t, hz = 1) => (S.cfg && !S.cfg.al_blink) || (t * hz) % 1 < 0.6;
 
 T.views.push({
@@ -66,7 +66,7 @@ T.views.push({
   },
   unmount() { this.cv.dispose(); this.root.remove(); },
 
-  // ---- ⚙ настройки тревог прямо в штабе (те же пункты, что Settings › Alerts на палке и планшете) ----
+  // ---- ⚙ alert settings right in HQ (same items as Settings > Alerts on the stick and tablet) ----
   alUI() {
     const esc = x => String(x == null ? '' : x).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
     const btn = T.el('button', 'hq-gear', '⚙ ' + T.tr('ALERTS') + ' · <b class="kj">警報設定</b>');
@@ -87,7 +87,7 @@ T.views.push({
     const send = (k, v) => api(`/api/set?k=${encodeURIComponent(k)}&v=${encodeURIComponent(v)}`).then(r => {
       if (!r || !r.ok) throw new Error((r && r.err) || 'refused');
       S.cfgFromItem(r.item);
-      if (k === 'al_warn' || k === 'al_alarm') return T.loadCfg();   // палка могла поправить парный порог
+      if (k === 'al_warn' || k === 'al_alarm') return T.loadCfg();   // the stick may have adjusted the paired threshold
     });
     const render = () => {
       const items = S.cfgItems;
@@ -105,7 +105,7 @@ T.views.push({
       });
       pan.querySelector('.rst').onclick = () => {
         const keys = Object.keys(S.CFG_DEF).filter(k => k !== 'al_alarm' && k !== 'al_warn');
-        // пороги — по порядку, чтобы палка не поправила их друг под друга
+        // thresholds in order, so the stick does not adjust them under each other
         const seq = [['al_alarm', 100], ['al_warn', S.CFG_DEF.al_warn], ['al_alarm', S.CFG_DEF.al_alarm], ...keys.map(k => [k, S.CFG_DEF[k]])];
         msg('resetting…');
         seq.reduce((p, [k, v]) => p.then(() => send(k, v)), Promise.resolve()).then(() => T.loadCfg()).then(() => { render(); msg('defaults restored'); })
@@ -122,7 +122,7 @@ T.views.push({
   frame(dt, t) {
     const th = K() ? 'kurenai' : 'denko';
     if (this.th !== th) { this.th = th; Object.assign(E, PAL[th]); }
-    // сверху полоса под кнопку ⚙ ALERTS: сцена сдвигается под неё (касания — тоже)
+    // top strip for the ⚙ ALERTS button: the scene shifts below it (touches too)
     const off = 40, o = this.cv;
     o.g.fillStyle = E.bg; o.g.fillRect(0, 0, o.w, off);
     o.g.save(); o.g.translate(0, off);
@@ -136,7 +136,7 @@ T.views.push({
     this.track(now, t); this.wfTick(dt); this.actTick(dt, t);
     g.fillStyle = E.bg; g.fillRect(0, 0, w, h);
 
-    // ---------- раскладка ----------
+    // ---------- layout ----------
     const topH = u * 5.2, logH = u * 2.4, botH = u * 6;
     const y1 = m + topH + m, yLog = h - m - logH, yBot = yLog - m - botH;
     const portrait = h > w * 1.05;
@@ -155,31 +155,31 @@ T.views.push({
     }
 
     this.top(g, m, m, w - 2 * m, topH, u, t);
-    // левая колонка: BLE / Wi-Fi / 433
+    // left column: BLE / Wi-Fi / 433
     const lh = (L.h - 2 * m);
     this.blePanel(g, L.x, L.y, L.w, lh * 0.38, u, t);
     this.wifiPanel(g, L.x, L.y + lh * 0.38 + m, L.w, lh * 0.28, u);
     this.sensPanel(g, L.x, L.y + lh * 0.66 + 2 * m, L.w, lh * 0.34, u, t);
-    // центр: радар
+    // center: radar
     this.radar(g, C.x, C.y, C.w, C.h, u, t, now);
-    // правая колонка: погода / звук / пульты и карты
+    // right column: weather / sound / remotes and cards
     this.wxPanel(g, R.x, R.y, R.w, lh * 0.33, u);
     this.audioPanel(g, R.x, R.y + lh * 0.33 + m, R.w, lh * 0.22, u);
     this.probePanel(g, R.x, R.y + lh * 0.55 + 2 * m, R.w, lh * 0.45, u, t, now);
-    // низ: 433 поток + шкала активности
+    // bottom: 433 stream + activity scale
     const bw = (w - 3 * m) * 0.58;
     this.wfPanel(g, m, yBot, bw, botH, u, dt);
     this.lvlPanel(g, m * 2 + bw, yBot, w - 3 * m - bw, botH, u, dt, t);
     this.log(g, m, yLog, w - 2 * m, logH, u, t);
-    // сканлайны
+    // scanlines
     if (!this.scan || this.scan.h !== h) {
       const c = document.createElement('canvas'); c.width = 4; c.height = 3; const q = c.getContext('2d');
       q.fillStyle = 'rgba(0,0,0,.28)'; q.fillRect(0, 0, 4, 1); this.scan = { p: g.createPattern(c, 'repeat'), h };
     }
-    if (T.Q.scan && !K()) { g.fillStyle = this.scan.p; g.fillRect(0, 0, w, h); }   // KURENAI — плоская, без сканлайнов
+    if (T.Q.scan && !K()) { g.fillStyle = this.scan.p; g.fillRect(0, 0, w, h); }   // KURENAI - flat, no scanlines
   },
 
-  // события: новое близкое устройство, пульт, карта
+  // events: new near device, remote, card
   track(now, t) {
     const I = S.ir, N = S.nfc;
     if (I && I.t !== this.prevIr) { this.prevIr = I.t; if (I.t) this.flashIr = t; }
@@ -194,7 +194,7 @@ T.views.push({
 
   top(g, x, y, w, h, u, t) {
     stripes(g, x, y, u * 2.6, h, E.stripe, u * 0.7);
-    // заголовок
+    // title
     let cx = x + u * 3.4;
     const tw0 = (() => { font(g, h * 0.72, JP()); return g.measureText('天眼司令室').width; })();
     const bw = tw0 + u * 13.5;
@@ -203,13 +203,13 @@ T.views.push({
     tx(g, 'TENGAN HQ', cx + tw0 + u * 1.6, y + h * 0.45, u * 1.5, E.or2, FT(), 'left', '600 ');
     tx(g, 'PASSIVE MONITOR · ' + (T.VERSION || ''), cx + tw0 + u * 1.6, y + h * 0.75, u * 0.7, E.or);
     cx += bw + u;
-    // часы справа
+    // clock on the right
     const d = new Date(), cw = u * 13;
     const kx = x + w - cw;
     g.strokeStyle = E.or; g.strokeRect(kx, y, cw, h);
     tx(g, hms(d), kx + cw - u * 0.8, y + h * 0.62, h * 0.55, E.or2, FT(), 'right', '600 ');
     tx(g, d.getFullYear() + '.' + pad2(d.getMonth() + 1) + '.' + pad2(d.getDate()) + ' · 月齢 ' + moonAge().toFixed(0), kx + cw - u * 0.8, y + h * 0.88, u * 0.72, E.or, FM(), 'right');
-    // статус
+    // status
     const sx = cx, sw = kx - u - cx;
     if (sw > u * 18) {
       g.strokeStyle = E.or; g.lineWidth = u * 0.07; g.strokeRect(sx, y, sw, h);
@@ -240,7 +240,7 @@ T.views.push({
     font(g, u * 4.6, FT(), '600 '); const nx = x + u * 1.4 + g.measureText(S.ble ? String(n) : '—').width;
     tx(g, 'DEVICES', nx, y0 + u * 2.8, u * 0.7, E.or);
     tx(g, '+' + fresh + ' NEW / 5 MIN', nx, y0 + u * 3.9, u * 0.7, fresh ? E.grn : E.dim);
-    // соты: по ячейке на устройство, цвет = сила, новые — красные
+    // honeycomb: a cell per device, color = strength, new ones red
     const top = y0 + u * 5.2, s = u * 0.62, dx = s * 1.75, dy = s * 1.52;
     const cols = Math.max(1, Math.floor((w - u * 1.2) / dx)), rows = Math.max(1, Math.floor((y + h - top - u * 0.4) / dy));
     let i = 0;
@@ -298,12 +298,12 @@ T.views.push({
     const nB = [...S.dev.values()].filter(e => e.alive).length, nA = [...S.aps.values()].filter(a => a.alive).length, nR = ((S.sens && S.sens.sensors) || []).length;
     const y0 = panel(g, x, y, w, h, u, 'RADIO HORIZON · 電波地平', '', 'RANGE ≈ RSSI · ' + nB + ' BLE · ' + nA + ' AP · ' + nR + ' RF');
     const cx = x + w / 2, cy = y0 + (y + h - y0) / 2, R = Math.min(w * 0.46, (y + h - y0) * 0.44);
-    if (!(R > 8)) return;                                // окно ещё не разложилось (поворот/ресайз)
+    if (!(R > 8)) return;                                // window not laid out yet (rotation/resize)
     const gr = g.createRadialGradient(cx, cy, 0, cx, cy, R * 1.25); gr.addColorStop(0, orA(.10)); gr.addColorStop(1, orA(0));
     g.fillStyle = gr; g.fillRect(x + 1, y0, w - 2, y + h - y0 - 1);
     jp(g, '索敵', x + u * 0.8, y0 + u * 3.2, u * 2.8, E.or, 'left', 0.05);
     tx(g, 'SCANNING ALL BANDS', x + u * 0.9, y0 + u * 4.3, u * 0.7, E.or);
-    // кольца, лучи, шкала
+    // rings, rays, scale
     g.lineWidth = 1;
     for (let i = 1; i <= 5; i++) {
       g.strokeStyle = orA(i === 5 ? 0.8 : 0.3); g.setLineDash(i % 2 ? [] : [u * 0.2, u * 0.3]);
@@ -315,7 +315,7 @@ T.views.push({
     g.strokeStyle = E.or;
     for (let a = 0; a < 72; a++) { const q = a * Math.PI / 36, l = a % 6 ? u * 0.35 : u * 0.8; g.beginPath(); g.moveTo(cx + (R + u * 0.4) * Math.cos(q), cy + (R + u * 0.4) * Math.sin(q)); g.lineTo(cx + (R + u * 0.4 + l) * Math.cos(q), cy + (R + u * 0.4 + l) * Math.sin(q)); g.stroke(); }
     ['-45', '-60', '-75', '-90'].forEach((s, i) => tx(g, s + ' dBm', cx + u * 0.3, cy - R * (i + 1) / 5 - u * 0.4, u * 0.6, E.or));
-    // луч
+    // beam
     const sw = this.sweep, N = 22;
     for (let i = 0; i < N; i++) {
       const a1 = sw - i * 0.035, a2 = a1 - 0.036;
@@ -323,7 +323,7 @@ T.views.push({
       g.beginPath(); g.moveTo(cx, cy); g.arc(cx, cy, R, a2, a1); g.closePath(); g.fill();
     }
     g.strokeStyle = E.or2; g.lineWidth = u * 0.12; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + R * Math.cos(sw), cy + R * Math.sin(sw)); g.stroke();
-    // точки: радиус по силе, угол — постоянный от id; ярче, когда луч прошёл
+    // dots: radius by strength, angle fixed from id; brighter when the beam passed
     const lit = a => { let d = (sw - a) % T.TAU; if (d < 0) d += T.TAU; return 1 - Math.min(1, d / 2.6); };
     const pos = (id, rs) => { const a = (T.hash(id) % 3600) / 3600 * T.TAU; const rr = R * (0.08 + 0.92 * (1 - T.pct(rs))); return [a, cx + rr * Math.cos(a), cy + rr * Math.sin(a)]; };
     const labels = [];
@@ -351,7 +351,7 @@ T.views.push({
       T.hits.circle(px, py, u * 1.2, { go: 'ble' });
     }
     g.globalAlpha = 1;
-    // подписи без наложений: занятые прямоугольники пропускаем
+    // labels without overlaps: skip occupied rectangles
     const boxes = [];
     for (const [px, py, s, col] of labels) {
       if (boxes.length >= 14) break;
@@ -360,17 +360,17 @@ T.views.push({
       if (boxes.some(q => b[0] < q[0] + q[2] && q[0] < b[0] + b[2] && b[1] < q[1] + q[3] && q[1] < b[1] + b[3])) continue;
       boxes.push(b); tx(g, str, b[0], py + u * 0.25, u * 0.72, col, FC(), 'left', '500 ');
     }
-    // центр — глаз
+    // center - the eye
     g.fillStyle = K() ? E.bg : '#000'; g.beginPath(); g.arc(cx, cy, u * 0.9, 0, T.TAU); g.fill();
     g.strokeStyle = E.or; g.lineWidth = u * 0.15; g.stroke();
     jp(g, '眼', cx, cy + u * 0.4, u * 1.1, E.or, 'center', 0.02);
-    // легенда
+    // legend
     const ly = y + h - u * 0.8; let lx = x + u * 0.8;
     for (const [c, s] of [[E.grn, 'SAVED 自'], [E.or2, 'KNOWN 既'], [E.red, 'NEW 新'], [E.cy, '◆ WI-FI AP'], [E.wht, '▲ 433 RF']]) {
       g.fillStyle = c; g.beginPath(); g.arc(lx + u * 0.25, ly - u * 0.25, u * 0.22, 0, T.TAU); g.fill();
       tx(g, s, lx + u * 0.7, ly, u * 0.62, E.or); font(g, u * 0.62, FM()); lx += u * 1.6 + g.measureText(s).width;
     }
-    // предупреждение 接近警告
+    // warning 接近警告
     const age = t - this.alertT;
     if (age < 20 && this.alertTxt && S.cfg.al_plate) {
       const bw = Math.min(u * 15, w * 0.36), bh = u * 7.6, bx = x + w - bw - u * 0.8, by = y0 + u * 0.8;
@@ -414,7 +414,7 @@ T.views.push({
   probePanel(g, x, y, w, h, u, t, now) {
     const y0 = panel(g, x, y, w, h, u, 'PROBES · 探針', '解析');
     const bx = x + u * 0.6, bw = w - u * 1.2, bh = (y + h - y0 - u * 2.6) / 2;
-    // ИК
+    // IR
     const I = S.ir && S.ir.last, fI = T.clamp(1 - (t - this.flashIr) / 1.2);
     let by = y0 + u * 0.6;
     g.fillStyle = `rgba(${E.cyRGB},${0.25 * fI})`; g.fillRect(bx, by, bw, bh);
@@ -446,14 +446,14 @@ T.views.push({
       g.font = `500 ${u * 0.62}px ${FC()}`; tx(g, T.fit(g, (N.hint ? N.hint + ' · ' : '') + 'UID ' + (N.uid || '—') + (N.sak ? ' · SAK ' + N.sak : ''), bw - u), bx + u * 0.5, by + u * 4, u * 0.62, E.txt, FC(), 'left', '500 ');
     } else tx(g, 'TOUCH A CARD TO TENGAN', bx + u * 0.5, by + u * 2.8, u * 0.7, E.dim);
     T.hits.rect(bx, by, bw, bh, { go: 'probe' });
-    // ПК
+    // PC
     const p = S.pc, py = y + h - u * 0.7;
     tx(g, 'PC 機', bx, py, u * 0.65, E.txt);
     const ps = p && p.live ? 'CPU ' + Math.round(p.cpu || 0) + '%' + (p.ram != null ? ' · RAM ' + Math.round(p.ram) + '%' : '') + (p.trk ? ' · ♪ ' + (p.trk.play ? 'PLAY' : 'PAUSE') : '') : 'OFFLINE';
     tx(g, ps, bx + bw, py, u * 0.65, p && p.live ? E.txt : E.dim, FM(), 'right');
   },
 
-  // поток 433: каждая новая посылка — полоса импульсов, лента едет вниз
+  // 433 stream: each new packet is a pulse strip, the tape moves down
   wfPanel(g, x, y, w, h, u, dt) {
     const d = S.sens, last = d && d.last;
     const y0 = panel(g, x, y, w, h, u, '433.92 MHz · PULSE FLOW', '滝', d ? (d.pk || 0) + ' PKTS' : 'OFF');
@@ -474,7 +474,7 @@ T.views.push({
     if (!this.wf.length) tx(g, d ? 'WAITING FOR 433 MHz PACKETS' : 'SENSORS STREAM OFF', x + w / 2, top + H / 2 + u * 0.3, u * 0.8, E.dim, FM(), 'center');
   },
 
-  // новые посылки 433 — в ленту (общая для обоих стилей)
+  // new 433 packets go to the tape (shared by both styles)
   wfTick(dt) {
     const d = S.sens, last = d && d.last;
     if (d && d.pk !== this.wfPk && last && last.pt) {
@@ -482,7 +482,7 @@ T.views.push({
       this.wfPk = d.pk; if (this.wf.length > 5) this.wf.pop();
     }
   },
-  // активность эфира: новые BLE за минуту, посылки 433, громкость, пульты/карты
+  // airwaves activity: new BLE per minute, 433 packets, loudness, remotes/cards
   actTick(dt, t) {
     const A = S.activity(), k = T.ease(dt, 1.5);
     this.lvl += (A.v - this.lvl) * k;
@@ -490,7 +490,7 @@ T.views.push({
     for (const q in A.parts) this.parts[q] += (A.parts[q] - this.parts[q]) * k;
     this.partsEn = A.en;
   },
-  // мини-шкалы источников активности: видно, ПОЧЕМУ уровень такой (выключенные — тусклые)
+  // mini scales of activity sources: shows WHY the level is what it is (disabled ones are dim)
   minis(g, x, y, w, h, u, cOn, cOff, cTxt) {
     const L = [['ble', 'BLE'], ['rf', '433'], ['snd', 'SND'], ['prb', 'IR·NFC']], cw = w / 4;
     L.forEach(([k, n], i) => {
@@ -512,7 +512,7 @@ T.views.push({
       g.fillStyle = on ? (red ? (blink(t, 1.5) ? E.red : E.redDk) : E.or) : E.dk;
       g.fillRect(bx + i * (sw + gap), top, sw, bh);
     }
-    // метки порогов «внимание» и «тревога»
+    // 'attention' and 'alarm' threshold marks
     for (const [p, c] of [[S.cfg.al_warn, E.or2], [S.cfg.al_alarm, E.red]]) { const xx = bx + bw * p / 100; g.fillStyle = c; g.fillRect(xx - 1, top - u * 0.25, 2, bh + u * 0.5); }
     this.minis(g, bx, top + bh + u * 0.2, bw, y + h - (top + bh + u * 0.2) - u * 0.2, u, E.or, E.dk, E.txt);
   },

@@ -1,19 +1,17 @@
-// ---- язык страницы: EN / RU — как на устройстве (st.lang), переключается на лету ----
-// Исходный текст интерфейса — английский. Словарь tools/webapp/i18n/ru.json встроен всегда (T.DICT);
-// перевод делается в одном месте — при выводе текста:
-//  • на холстах — в fillText / strokeText / measureText (поэтому разметка меряет уже русский текст);
-//  • в DOM — через T.tr(...) там, где строка вставляется (вкладки, настройки, панели).
-// Язык меняет T.setLang(): кадры холстов переводятся сами, DOM-подписи перерисовываются (T.onLang).
-// Правила словаря: точное совпадение строки → перевод; иначе — замена известных фраз внутри строки
-// (по границам слов, длинные фразы первыми). Регистр сохраняется: «DEVICES» → «УСТРОЙСТВА».
-// Результаты кэшируются, так что на кадр это несколько обращений к Map.
+// ---- page language EN / RU, follows the device (st.lang), switches live ----
+// UI source text is English; i18n/ru.json is always embedded (T.DICT). Translation happens at output time:
+//  - canvases: in fillText / strokeText / measureText (so layout measures the Russian text);
+//  - DOM: via T.tr(...) where the string is inserted.
+// T.setLang() switches: canvas frames translate themselves, DOM labels redraw (T.onLang).
+// Dictionary: exact match first, else known phrases inside the string (word boundaries, longest first), case kept.
+// Results are cached, so a frame costs a few Map lookups.
 (() => {
   const DICT = /*@DICT*/null;
-  let lang0 = /*@LANG*/'en';                                           // для отдельной HTML-сборки (--lang)
+  let lang0 = /*@LANG*/'en';                                           // for a standalone HTML build (--lang)
   try { lang0 = new URLSearchParams(location.search).get('lang') || localStorage.getItem('lang') || lang0; } catch (e) {}
   T.LANG = lang0 === 'ru' && DICT ? 'ru' : 'en';
-  T.L = (en, ru) => T.LANG === 'ru' && ru != null ? ru : en;          // явный выбор по месту
-  const low = new Map();                                               // ключ в нижнем регистре -> перевод
+  T.L = (en, ru) => T.LANG === 'ru' && ru != null ? ru : en;          // explicit choice at the call site
+  const low = new Map();                                               // lowercase key -> translation
   if (DICT) for (const k in DICT) { low.set(k.toLowerCase(), DICT[k]); const t = k.trim(); if (t !== k && !low.has(t.toLowerCase())) low.set(t.toLowerCase(), DICT[k].trim()); }
   const keys = [...low.keys()].filter(k => k.length >= 3).sort((a, b) => b.length - a.length);
   const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -34,7 +32,7 @@
     return r;
   };
   T.tr = s => T.LANG === 'ru' ? ru(s) : s;
-  // кто перерисовывает свои DOM-подписи при смене языка (app.js: меню, вкладки; виды — свои панели)
+  // callbacks that redraw DOM labels on language change (app.js menu and tabs; views their own panels)
   T.onLang = [];
   T.setLang = code => {
     code = code === 'ru' && DICT ? 'ru' : 'en';
@@ -46,7 +44,7 @@
     for (const f of T.onLang) { try { f(code); } catch (e) {} }
   };
   document.documentElement.lang = T.LANG;
-  // холсты: перевод при выводе и измерении текста (в английском — без лишней работы)
+  // canvases: translate on draw and measure (no extra work in English)
   const P = CanvasRenderingContext2D.prototype, F = P.fillText, Sx = P.strokeText, M = P.measureText;
   P.fillText = function (s, ...a) { return F.call(this, T.LANG === 'ru' ? ru(String(s)) : s, ...a); };
   P.strokeText = function (s, ...a) { return Sx.call(this, T.LANG === 'ru' ? ru(String(s)) : s, ...a); };

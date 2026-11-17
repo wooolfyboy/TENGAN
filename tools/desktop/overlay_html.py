@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-"""Страницы всплывашек и виджета (свои маленькие окна поверх всех). Стили по теме TENGAN: DENKO (оранжевый штаб) / KURENAI (чёрный · белый · алый).
+"""HTML pages for the popups and the widget (small always-on-top windows). Themes: DENKO (orange HQ) / KURENAI (black, white, scarlet).
 
-Окна получают данные из Python (evaluate_js) и зовут обратно через window.pywebview.api:
-  всплывашки:  P.add(извещение), P.style('denko'|'kurenai') → api.popup_size(h), api.popup_click()
-  виджет:      W.update(снимок), W.style(...), W.lang('en'|'ru')               → api.widget_open()
+Python pushes data in via evaluate_js; the pages call back through window.pywebview.api:
+  popups:  P.add(notice), P.style('denko'|'kurenai') → api.popup_size(h), api.popup_click()
+  widget:  W.update(snapshot), W.style(...), W.lang('en'|'ru')  → api.widget_open()
 """
 
 COMMON_CSS = """

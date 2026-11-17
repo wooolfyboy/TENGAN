@@ -1,15 +1,14 @@
-// ---- НАСТРОЙКИ TENGAN С ПЛАНШЕТА: пульт управления ----
-// Всё, что на устройстве крутится колесом в Settings, — здесь пальцем. Устройство само отдаёт список
-// (/api/settings: страницы, пункты, тип, варианты, значение), планшет только рисует и шлёт
-// изменения (/api/set). Значение меняется сразу (оптимистично), при ошибке — откатывается.
-// Обычный DOM, а не холст: кнопки, ползунки, переключатели — без нагрузки на кадры.
+// ---- TENGAN SETTINGS FROM THE TABLET: control panel ----
+// Everything the device turns with the wheel in Settings is here by finger. The device supplies the list
+// (/api/settings: pages, items, type, options, value); the tablet only draws and sends changes (/api/set).
+// A value changes at once (optimistic) and rolls back on error. Plain DOM, not canvas: no frame cost.
 (() => {
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const api = (path) => fetch(T.apiBase() + path, { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error('http ' + r.status); return r.json(); });
 
   T.views.push({
     id: 'set', title: 'Settings', want: 'st',
-    onLang() { if (this.load) this.load(); else if (this.render) this.render(); },   // смена языка: подписи настроек приходят с устройства на его языке — перечитать
+    onLang() { if (this.load) this.load(); else if (this.render) this.render(); },   // language change: labels come from the device in its language - reload
     mount(main) {
       this.root = T.el('div', 'view setv');
       this.root.innerHTML = `<div class="set-wrap"><aside class="set-tabs"></aside><section class="set-body"></section></div><div class="set-toast"></div>`;
@@ -30,7 +29,7 @@
       const t = this.toastEl; t.textContent = T.tr(msg); t.className = 'set-toast on' + (bad ? ' bad' : '');
       clearTimeout(this.toastT); this.toastT = setTimeout(() => { t.className = 'set-toast'; }, 1800);
     },
-    // ---- отрисовка ----
+    // ---- rendering ----
     render() {
       const d = this.data;
       if (!d || !d.pages || !d.pages.length) {
@@ -52,7 +51,7 @@
         p.items.map((it, j) => `<div class="set-row" data-j="${j}">${this.rowHtml(it)}</div>`).join('');
       this.body.querySelectorAll('.set-row').forEach(row => this.bind(row, p.items[+row.dataset.j]));
     },
-    refresh() {                                            // тихое обновление значений без перерисовки (не сбивает касание)
+    refresh() {                                            // quiet value update without redraw (does not break a touch)
       const d = this.data; if (!d || this.page === 'act' || !d.pages[this.page]) { if (!d) this.render(); return; }
       const p = d.pages[this.page], rows = this.body.querySelectorAll('.set-row');
       if (rows.length !== p.items.length) { this.render(); return; }
@@ -95,12 +94,12 @@
       api(`/api/set?k=${encodeURIComponent(it.k)}&v=${encodeURIComponent(v)}`).then(r => {
         if (!r || !r.ok) throw new Error((r && r.err) || 'refused');
         if (r.item) Object.assign(it, r.item);
-        if (String(it.k).startsWith('al_')) { S.cfgFromItem(r.item || it); if (it.k === 'al_warn' || it.k === 'al_alarm') this.load(true); }   // штаб сразу видит новые пороги
+        if (String(it.k).startsWith('al_')) { S.cfgFromItem(r.item || it); if (it.k === 'al_warn' || it.k === 'al_alarm') this.load(true); }   // HQ sees new thresholds at once
         this.toast('saved');
       }).catch(e => { it.v = old; this.toast(T.tr('not saved') + ' · ' + T.tr(e.message || 'no link'), true); })
         .finally(() => { this.busy--; if (this.page !== 'act') this.refresh(); });
     },
-    // ---- действия ----
+    // ---- actions ----
     renderActions() {
       const tg = (k, on) => `<button class="tgl ${on ? 'on' : ''}" data-a="${k}"><i></i><span>${T.tr(on ? 'ON' : 'OFF')}</span></button>`;
       const row = (name, hint, ctl) => `<div class="set-row"><div class="set-name"><b>${esc(T.tr(name))}</b><span>${esc(T.tr(hint))}</span></div>${ctl}</div>`;
@@ -126,7 +125,7 @@
     },
   });
 
-  // ---- подписи устройств: окно «назвать» (вызывает Bluetooth › Devices) ----
+  // ---- device labels: 'name it' window (called from Bluetooth > Devices) ----
   T.nameDevice = (e, cur) => {
     const modal = document.getElementById('modal'), card = document.getElementById('modalCard');
     card.innerHTML = `<div class="lbl-dlg"><h3>// ${T.tr('NAME THIS DEVICE')}</h3>
@@ -139,7 +138,7 @@
     setTimeout(() => { inp.focus(); inp.select(); }, 30);
     const close = () => { modal.classList.add('hide'); card.innerHTML = ''; };
     const send = n => {
-      S.setLabel(e.id, n);                                  // сразу видно на планшете
+      S.setLabel(e.id, n);                                  // visible on the tablet at once
       api(`/api/label?id=${e.id}&n=${encodeURIComponent(n)}`).then(r => {
         if (!r.ok) throw new Error(r.err || 'refused');
         if (r.stable === false && n) { note.hidden = false; note.textContent = T.tr('this device changes its address — the name may be lost'); setTimeout(close, 2600); }
