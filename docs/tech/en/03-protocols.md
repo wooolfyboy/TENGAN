@@ -201,7 +201,7 @@ Behaviour:
 | `/__link/api?p=/api/…` | `@Q`, waits for `@R` (3 s timeout; `{"ok":false,"err":"timeout"}`) |
 | `/__link/poll` | long poll (up to 0.25 s): returns `[["st",{…}],["ble",{…}],…]`; `["_x","web"]` / `["_x","nostick"]` are service messages |
 
-`stream.js` then replaces `window.fetch` for `/api/` URLs, so the page code is unchanged. In **Wi-Fi mode** the window simply loads `http://192.168.4.1/full`; if the cable is also connected, only the monitor part uses it. Other local routes (`/__app/*`) are the app's own (launcher, preferences, tray, test popup) and are not part of the stick protocol. Popups and the mini-widget are described in `tools/desktop/WIDGET.md`.
+`stream.js` then replaces `window.fetch` for `/api/` URLs, so the page code is unchanged. In **Wi-Fi mode** the window simply loads `http://192.168.4.1/full`; if the cable is also connected, only the monitor part uses it. Other local routes (`/__app/*`) are the app's own (launcher, preferences, tray, test popup) and are not part of the stick protocol. Popups and the mini-widget are described in `05-applications.md`, section 3.4.
 
 ## 5. Firmware update over the air (OTA) and rollback
 

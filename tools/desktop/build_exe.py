@@ -24,7 +24,7 @@ args = [
     "--collect-all", "pyaudiowpatch",
     "--collect-all", "winrt",
     "--hidden-import", "clr",
-    # tray, popups, widget (WIDGET.md)
+    # tray, popups, widget (see docs/tech/en/05-applications.md, section 3.4)
     "--paths", HERE,
     "--hidden-import", "events",
     "--hidden-import", "overlay",

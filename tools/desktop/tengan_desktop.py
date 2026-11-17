@@ -12,7 +12,7 @@ Link modes (chosen at start, last one remembered):
           If the cable is also plugged in, the PC monitor sends load and music over it.
   Auto  - USB if the stick is on the cable, else Wi-Fi.
 
-Keys: F11 fullscreen, F2 mode picker, F3 widget (see WIDGET.md).
+Keys: F11 fullscreen, F2 mode picker, F3 widget (see docs/tech/en/05-applications.md, section 3.4).
 Tray icon, event popups and the always-on-top widget: decisions in events.py, windows in overlay.py.
 """
 import base64
@@ -1182,7 +1182,7 @@ def main():
             getattr(win.events, ev).__iadd__(fn)
         except Exception as e:
             log("окно: нет события", ev, e)
-    # alerts and widget (WIDGET.md): own always-on-top windows + tray icon
+    # alerts and widget (docs/tech/en/05-applications.md, 3.4): own always-on-top windows + tray icon
     for name, make in (("popups", overlay.Popups), ("widget", overlay.Widget), ("tray", overlay.Tray)):
         try:
             setattr(app, name, make(app))

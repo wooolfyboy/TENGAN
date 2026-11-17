@@ -399,6 +399,15 @@ shows the first window (Windows: named mutex; macOS / Linux: probe of port 47321
 **Autostart**: Windows `HKCU\...\Run`, macOS a LaunchAgent plist, Linux `~/.config/autostart/*.desktop`, with
 the `--tray` key (go straight to tray).
 
+**Preferences and window HTTP.** App settings live in `desktop.json` under the key `alerts`: `popups`, `kinds{}`
+(per-type switches), `quiet`, `quiet_from`, `quiet_to`, `quiet_trackers`, `per_min`, `merge_s`, `duration`,
+`corner`, `style`, `native`, `widget`, `opacity`, `clickthrough`, `widget_rect`, `tray`. The window's local HTTP
+server exposes `/__app/prefs` (read), `/__app/prefs_set?k=&v=<json>` (write one key), `/__app/test_popup` (the
+"Check popup" button) and `/__app/show` (second launch). Without a window, `tools/desktop/render_preview.py`
+renders demo popups and widget with made-up data (open the files in a browser), and `tools/desktop/test_events.py`
+tests the engine: warm-up and a 75-device churn give 0 popups, a new close device 1, tracker, merging, the limit,
+quiet hours, IR / NFC / 433 MHz / temperature / battery / link events, settings parsing and the activity meter.
+
 ### 3.5 Platform specifics
 
 - **Windows**: WebView2 never rendered in a window created hidden, so popups and the widget are created visible
@@ -411,7 +420,7 @@ the `--tray` key (go straight to tray).
   signed by Apple, so first open is right-click > Open; no PC audio loopback.
 - **Linux**: Qt WebEngine; widget drag via `.pywebview-drag-region` (`easy_drag` on Qt installs an app-wide event
   filter and crashed); system notifications by `notify-send`; the tray needs AppIndicator or X11.
-- Status of checks (`tools/desktop/WIDGET.md`): popups, widget, drag verified on Windows (200 % scaling); tray,
+- Status of checks (by the author, 17.11.2026): popups, widget, drag verified on Windows (200 % scaling); tray,
   system notifications, `focus=False` and transparency in WebView2 were still unverified; macOS and Linux
   builds are smoke-tested in CI but not with real hardware.
 
