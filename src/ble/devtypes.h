@@ -147,7 +147,7 @@ inline uint8_t typeFromName(const char* name) {
   if (!name[0]) return T_UNKNOWN;
   char low[24];
   size_t i = 0;
-  for (; name[i] && i < sizeof(low) - 1; i++) low[i] = (char)tolower((unsigned char)name[i]);
+  for (; i < sizeof(low) - 1 && name[i]; i++) low[i] = (char)tolower((unsigned char)name[i]);
   low[i] = 0;
 
   static const char* const trk[] = { "tile", "smarttag", "chipolo", "airtag", nullptr };

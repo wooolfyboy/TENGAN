@@ -114,7 +114,7 @@ void utf8UpperInPlace(char* s) {
 void utf8Upper(const char* s, char* out, size_t n) {
   if (!n) return;
   size_t i = 0;
-  while (s[i] && i < n - 1) i++;
+  while (i < n - 1 && s[i]) i++;
   while (i > 0 && ((uint8_t)s[i] & 0xC0) == 0x80 && i < strlen(s)) i--;   // не резать букву пополам
   memcpy(out, s, i); out[i] = 0;
   utf8UpperInPlace(out);

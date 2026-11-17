@@ -102,7 +102,7 @@ static void IRAM_ATTR promCb(void* buf, wifi_promiscuous_pkt_type_t type) {
 // раздача с телефона? (по имени сети и производителю)
 static bool looksLikeHotspot(const char* ssid, const char* vendor) {
   char low[33]; size_t i = 0;
-  for (; ssid[i] && i < 32; i++) low[i] = (char)tolower((unsigned char)ssid[i]);
+  for (; i < 32 && ssid[i]; i++) low[i] = (char)tolower((unsigned char)ssid[i]);
   low[i] = 0;
   static const char* const kw[] = { "iphone", "ipad", "androidap", "android", "galaxy", "redmi",
     "poco", "honor", "realme", "oneplus", "pixel", "hotspot", "huawei p", "huawei mate",

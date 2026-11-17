@@ -82,7 +82,7 @@ int sensSorted(uint8_t* idx, int max, uint32_t now) {
 
 void sensId(const SensRec& s, char* out, size_t n) {
   char p[20]; size_t i = 0;
-  for (; s.proto[i] && i < sizeof(p) - 1; i++) p[i] = tolower((unsigned char)s.proto[i]);
+  for (; i < sizeof(p) - 1 && s.proto[i]; i++) p[i] = tolower((unsigned char)s.proto[i]);
   p[i] = 0;
   if (s.kind == OOK_REMOTE) snprintf(out, n, "%s-%04lx", p, (unsigned long)(s.id & 0xFFFF));
   else snprintf(out, n, "%s-%d-0x%lx", p, s.ch, (unsigned long)s.id);
