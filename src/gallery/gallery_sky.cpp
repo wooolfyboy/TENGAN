@@ -1,14 +1,14 @@
 // ============================================================
-//  gallery_sky.cpp — Gallery › Sky (планетарий) и Globe (спутники)
+//  gallery_sky.cpp — Gallery › Sky (planetarium) and Globe (satellites)
 //
-//  SKY   — небо над городом прямо сейчас: купол (зенит в центре,
-//          горизонт — край круга, север сверху, восток слева, как на
-//          звёздной карте), ~1600 звёзд, линии созвездий, Солнце, Луна
-//          с фазой, планеты. Колесо крутит купол, нажатие — подписи.
-//  GLOBE — Земля с материками, днём и ночью, МКС и другие станции на
-//          своих орбитах, след полёта, зона видимости и ближайший
-//          пролёт над твоим городом. Колесо крутит Землю, нажатие —
-//          следить за МКС / за домом / за следующим спутником.
+//  SKY   — the sky over the city right now: a dome (zenith at the center,
+//          horizon at the rim, north up, east left, like a
+//          star chart), ~1600 stars, constellation lines, Sun, Moon
+//          with phase, planets. Wheel turns the dome, click toggles labels.
+//  GLOBE — Earth with continents, day and night, ISS and other stations on
+//          their orbits, ground track, visibility zone and the next
+//          pass over your city. Wheel turns the Earth, click =
+//          follow the ISS / home / the next satellite.
 // ============================================================
 #include "gallery/gallery.h"
 #include "core/lang.h"
@@ -33,15 +33,15 @@ static void hhmm(double unixUtc, char* out, size_t n, bool withSec = false) {
 // ============================================================
 //  SKY
 // ============================================================
-static float s_skyRot = 0, s_skyRotT = 0;     // поворот купола (колесо), плавно
-static int   s_skyLabels = 0;                 // 0 созвездия+планеты, 1 яркие звёзды, 2 без подписей
+static float s_skyRot = 0, s_skyRotT = 0;     // dome rotation (wheel), smoothed
+static int   s_skyLabels = 0;                 // 0 constellations+planets, 1 bright stars, 2 no labels
 
 void skyTurn(int dir) { s_skyRotT += dir * 15; }
 void skyClick() { s_skyLabels = (s_skyLabels + 1) % 3; }
 
 struct DomeView { int cx, cy, R; float rot; };
 
-// подписи на куполе не должны налезать друг на друга: помним занятые места
+// dome labels must not overlap: remember occupied spots
 static int s_lblN = 0;
 static int16_t s_lbl[64][4];
 static bool labelFree(int x, int y, int w, int h) {
@@ -50,14 +50,14 @@ static bool labelFree(int x, int y, int w, int h) {
   if (s_lblN < 64) { s_lbl[s_lblN][0] = x; s_lbl[s_lblN][1] = y; s_lbl[s_lblN][2] = w; s_lbl[s_lblN][3] = h; s_lblN++; }
   return true;
 }
-static void label(const char* t, int x, int y) {         // подпись по центру (x, y), если есть место
+static void label(const char* t, int x, int y) {         // label centered at (x, y) if there is room
   int w = txtW(t, 1);
   if (labelFree(x - w / 2 - 1, y - 4, w + 2, 9)) txt(t, x, y, 1);
 }
-// стереографическая проекция: зенит — центр, горизонт — край; север вверху, восток слева
+// stereographic projection: zenith at center, horizon at the rim; north up, east left
 static bool domeXY(const DomeView& v, float alt, float az, int& x, int& y) {
   if (alt < 0) return false;
-  float r = v.R * tanf((90 - alt) * D2R / 2);                 // tan(45°)=1 на горизонте
+  float r = v.R * tanf((90 - alt) * D2R / 2);                 // tan(45°)=1 at the horizon
   float a = (az - v.rot) * D2R;
   x = v.cx - (int)(r * sinf(a));
   y = v.cy - (int)(r * cosf(a));
@@ -73,7 +73,7 @@ void drawSky(uint32_t now) {
   bool timeOk = astroTimeKnown();
   double t = astroUnixNow();
   double jd = julianDate(t);
-  const SkyFrame sf = skyFrame(jd, c.lat, c.lon);       // один раз на кадр — дальше звёзды считаются быстро
+  const SkyFrame sf = skyFrame(jd, c.lat, c.lon);       // once per frame, so the stars are then cheap to compute
 
   RaDec sun = sunRaDec(jd);
   AltAz sunA = toAltAz(sun.ra, sun.dec, jd, c.lat, c.lon);
@@ -82,13 +82,13 @@ void drawSky(uint32_t now) {
   DomeView v = { 86, 88, 58, s_skyRot };
   s_lblN = 0;
   spr.fillCircle(v.cx, v.cy, v.R, day ? TC(8, 30, 44) : night ? TC(3, 10, 16) : TC(5, 20, 30));
-  for (int alt = 30; alt < 90; alt += 30) {                    // круги высоты 30° и 60°
+  for (int alt = 30; alt < 90; alt += 30) {                    // altitude circles at 30° and 60°
     int r = (int)(v.R * tanf((90 - alt) * D2R / 2));
     for (int k = 0; k < 72; k++) { float a = k * 5 * D2R; spr.drawPixel(v.cx + (int)(r * cosf(a)), v.cy + (int)(r * sinf(a)), UI_LINE()); }
   }
   spr.drawCircle(v.cx, v.cy, v.R, C_ACC());
 
-  // линии созвездий
+  // constellation lines
   uint16_t clCol = scale565(C_ACC(), day ? 25 : 45);
   for (int k = 0; k < N_CL; k++) {
     int px = 0, py = 0; bool have = false;
@@ -99,11 +99,11 @@ void drawSky(uint32_t now) {
       else have = false;
     }
   }
-  // звёзды: днём видны только самые яркие (и то — тускло)
+  // stars: by day only the brightest show (and dimly)
   float magLimit = day ? 1.5f : night ? 5.0f : 3.0f;
   for (int i = 0; i < N_STARS; i++) {
     float mag = STARS[i].mag / 10.0f - 2;
-    if (mag > magLimit) break;                                   // отсортированы по яркости
+    if (mag > magLimit) break;                                   // sorted by brightness
     AltAz a = toAltAzF(sf, STARS[i].ra / 100.0f, STARS[i].dec / 100.0f);
     int x, y;
     if (!domeXY(v, a.alt, a.az, x, y)) continue;
@@ -112,7 +112,7 @@ void drawSky(uint32_t now) {
     else if (mag < 2.5f) spr.fillRect(x, y, 2, 2, heatV(0.75f));
     else                 spr.drawPixel(x, y, heatV(max(0.15f, 0.65f - (mag - 2.5f) * 0.2f)));
   }
-  // планеты
+  // planets
   int visPl[PL_NUM], nVis = 0; float visAlt[PL_NUM];
   for (int p = 0; p < PL_NUM; p++) {
     RaDec r = planetRaDec(p, jd);
@@ -128,7 +128,7 @@ void drawSky(uint32_t now) {
       label(EN[p], x, y - 9);
     }
   }
-  // подписи: созвездия (латинские сокращения) или яркие звёзды
+  // labels: constellations (Latin abbreviations) or bright stars
   spr.setTextDatum(MC_DATUM);
   if (s_skyLabels == 0) {
     spr.setTextColor(scale565(C_ACC(), 70));
@@ -146,13 +146,13 @@ void drawSky(uint32_t now) {
       if (a.alt > 5 && domeXY(v, a.alt, a.az, x, y)) label(STAR_NAMES[i].name, x, y - 7);
     }
   }
-  // Луна с фазой и Солнце
+  // Moon with phase, and Sun
   float phase; RaDec mo = moonRaDec(jd, &phase);
   AltAz moA = toAltAz(mo.ra, mo.dec, jd, c.lat, c.lon);
   int x, y;
   if (domeXY(v, moA.alt, moA.az, x, y)) {
     spr.fillCircle(x, y, 5, scale565(C_HOT(), 25));
-    int lit = (int)(phase * 11) - 5;                            // освещённая часть — полосой
+    int lit = (int)(phase * 11) - 5;                            // lit part as a strip
     for (int dx = -5; dx <= 5; dx++) if (dx <= lit) {
       int h = (int)sqrtf(25 - dx * dx);
       spr.drawFastVLine(x + dx, y - h, 2 * h + 1, C_HOT());
@@ -162,7 +162,7 @@ void drawSky(uint32_t now) {
     spr.fillCircle(x, y, 5, C_HOT());
     for (int k = 0; k < 8; k++) { float a = k * 45 * D2R; spr.drawLine(x + cosf(a) * 7, y + sinf(a) * 7, x + cosf(a) * 10, y + sinf(a) * 10, C_HOT()); }
   }
-  // стороны света (поворачиваются вместе с куполом)
+  // compass sides (rotate with the dome)
   const char* const SIDES[4] = { L("N", "С"), L("E", "В"), L("S", "Ю"), L("W", "З") };
   spr.setTextColor(C_ACC());
   for (int k = 0; k < 4; k++) {
@@ -170,7 +170,7 @@ void drawSky(uint32_t now) {
     txt(SIDES[k], v.cx - (int)((v.R + 7) * sinf(a)), v.cy - (int)((v.R + 7) * cosf(a)), 1);
   }
 
-  // ---- справа: время, Солнце, Луна, планеты ----
+  // ---- right: time, Sun, Moon, planets ----
   const int px = 168;
   char buf[40];
   spr.setTextDatum(TL_DATUM);
@@ -186,7 +186,7 @@ void drawSky(uint32_t now) {
   int yy = UI_TOP + 70;
   spr.setTextColor(UI_LABEL());
   txt(nVis ? L("PLANETS UP, DEG", "ПЛАНЕТЫ НАД ГОРИЗОНТОМ") : L("NO PLANETS UP", "ПЛАНЕТ НЕ ВИДНО"), px, yy, 1);
-  for (int i = 0; i < nVis && i < 3; i++) {                // по-русски, шрифтом с кириллицей
+  for (int i = 0; i < nVis && i < 3; i++) {                // Russian text, font with Cyrillic
     snprintf(buf, sizeof(buf), "%s  %d", LT(PLANET_RU[visPl[i]]), (int)lroundf(visAlt[i]));
     spr.setTextColor(C_HOT());
     txt(buf, px, yy + 11 + i * 15, 3);
@@ -204,7 +204,7 @@ void drawSky(uint32_t now) {
 //  GLOBE
 // ============================================================
 static float s_gLon = 30, s_gLat = 25, s_gLonOff = 0, s_gLonOffT = 0;
-static int   s_gFollow = 0;                    // 0 — первый спутник (МКС), 1 — дом, 2.. — остальные спутники
+static int   s_gFollow = 0;                    // 0 first satellite (ISS), 1 home, 2.. other satellites
 static Pass  s_pass;
 static double s_passAt = 0;
 
@@ -218,7 +218,7 @@ struct GlobeView { int cx, cy, R; float lat0, lon0; float sl, cl; };
 static bool globeXY(const GlobeView& g, float lat, float lon, int& x, int& y) {
   float la = lat * D2R, dl = (lon - g.lon0) * D2R;
   float cosc = g.sl * sinf(la) + g.cl * cosf(la) * cosf(dl);
-  if (cosc < 0) return false;                                  // обратная сторона Земли
+  if (cosc < 0) return false;                                  // far side of the Earth
   x = g.cx + (int)(g.R * cosf(la) * sinf(dl));
   y = g.cy - (int)(g.R * (g.cl * sinf(la) - g.sl * cosf(la) * cosf(dl)));
   return true;
@@ -232,7 +232,7 @@ void drawGlobe(uint32_t now) {
   double t = astroUnixNow();
   double jd = julianDate(t);
 
-  // за чем следим
+  // what we follow
   SatPos sp[SAT_MAX]; bool spOk[SAT_MAX] = {};
   for (int i = 0; i < g_nSats; i++) spOk[i] = timeOk && satPos(g_sats[i], t, sp[i]);
   int satIdx = s_gFollow == 0 ? 0 : s_gFollow >= 2 ? s_gFollow - 1 : -1;
@@ -244,16 +244,16 @@ void drawGlobe(uint32_t now) {
   s_gLon += dLon * 0.08f; s_gLat += (wantLat - s_gLat) * 0.08f;
 
   GlobeView g = { 86, 90, 60, s_gLat, s_gLon, sinf(s_gLat * D2R), cosf(s_gLat * D2R) };
-  // день и ночь: по каждой точке диска — освещена ли она Солнцем
+  // day and night: for each disc point, is it lit by the Sun
   RaDec sun = sunRaDec(jd);
-  float sLon = sun.ra - (float)gmstDeg(jd), sLat = sun.dec;      // подсолнечная точка
+  float sLon = sun.ra - (float)gmstDeg(jd), sLat = sun.dec;      // subsolar point
   float sx = cosf(sLat * D2R) * cosf(sLon * D2R), sy = cosf(sLat * D2R) * sinf(sLon * D2R), sz = sinf(sLat * D2R);
   float cl0 = cosf(g.lon0 * D2R), sl0 = sinf(g.lon0 * D2R);
   const uint16_t dayC = TC(10, 38, 54), nightC = TC(3, 11, 17), twiC = TC(6, 22, 32);
   for (int yy = -g.R; yy <= g.R; yy++) {
     int half = (int)sqrtf((float)(g.R * g.R - yy * yy));
     for (int xx = -half; xx <= half; xx++) {
-      // точка на сфере в системе «камеры» -> земные координаты
+      // point on the sphere in the "camera" frame -> Earth coordinates
       float X = xx / (float)g.R, Y = -yy / (float)g.R, Z = sqrtf(max(0.0f, 1 - X * X - Y * Y));
       float ex = -X * sl0 + (-Y * g.sl + Z * g.cl) * cl0;
       float ey =  X * cl0 + (-Y * g.sl + Z * g.cl) * sl0;
@@ -263,12 +263,12 @@ void drawGlobe(uint32_t now) {
     }
   }
   spr.drawCircle(g.cx, g.cy, g.R, C_ACC());
-  // сетка 30°
+  // 30° grid
   for (int la = -60; la <= 60; la += 30)
     for (int lo = -180; lo < 180; lo += 4) { int x, y; if (globeXY(g, la, lo, x, y)) spr.drawPixel(x, y, UI_LINE()); }
   for (int lo = -180; lo < 180; lo += 30)
     for (int la = -88; la <= 88; la += 4) { int x, y; if (globeXY(g, la, lo, x, y)) spr.drawPixel(x, y, UI_LINE()); }
-  // материки
+  // continents
   for (int k = 0; k < N_LAND; k++) {
     int px = 0, py = 0; bool have = false;
     for (int i = LAND_START[k]; i < LAND_START[k + 1]; i++) {
@@ -277,19 +277,19 @@ void drawGlobe(uint32_t now) {
       else have = false;
     }
   }
-  // дом
+  // home
   int hx, hy;
   if (globeXY(g, c.lat, c.lon, hx, hy)) {
     int pr = 3 + (int)((now / 150) % 4);
     spr.drawCircle(hx, hy, pr, scale565(C_HOT(), 70));
     spr.fillCircle(hx, hy, 2, C_HOT());
   }
-  // спутники: след (−30 … +90 мин), зона видимости МКС, метки
+  // satellites: track (−30 … +90 min), ISS visibility zone, markers
   for (int i = 0; i < g_nSats; i++) {
     if (!spOk[i]) continue;
     bool main = (i == (satIdx >= 0 ? satIdx : 0));
-    // след пересчитываем раз в 20 с (61 расчёт орбиты в double — дорого для каждого кадра);
-    // за 20 с он сдвигается незаметно, а текущая точка спутника считается каждый кадр
+    // track is recomputed every 20 s (61 double-precision orbit solves are too costly per frame);
+    // it barely moves in 20 s, and the current satellite point is computed every frame
     static struct { double t = -1e12, epoch = 0; int n = 0; float la[61], lo[61]; } trk[SAT_MAX];
     auto& tc = trk[i];
     if (fabs(t - tc.t) > 20 || tc.epoch != g_sats[i].epochUnix) {
@@ -308,7 +308,7 @@ void drawGlobe(uint32_t now) {
         px = x; py = y; have = true;
       } else have = false;
     }
-    if (main) {                                                  // откуда спутник виден выше 10°
+    if (main) {                                                  // where the satellite is seen above 10°
       float el = 10 * D2R, h = sp[i].altKm, lam = acosf(6378.0f * cosf(el) / (6378.0f + h)) - el;
       float la0 = sp[i].lat * D2R, lo0 = sp[i].lon * D2R;
       int fx = 0, fy = 0; bool fh = false;
@@ -331,7 +331,7 @@ void drawGlobe(uint32_t now) {
     }
   }
 
-  // ---- справа: данные спутника и ближайший пролёт ----
+  // ---- right: satellite data and next pass ----
   const int px = 160;
   char buf[48], b2[16];
   spr.setTextDatum(TL_DATUM);
@@ -352,7 +352,7 @@ void drawGlobe(uint32_t now) {
     spr.setTextColor(UI_LABEL()); txt(buf, px, UI_TOP + 28, 1);
     snprintf(buf, sizeof(buf), "%.1f%c  %.1f%c", fabsf(p.lat), p.lat >= 0 ? 'N' : 'S', fabsf(p.lon), p.lon >= 0 ? 'E' : 'W');
     txt(buf, px, UI_TOP + 40, 1);
-    // ближайший пролёт над городом: пересчёт раз в минуту (или если сменили спутник/город)
+    // next pass over the city: recomputed once a minute (or when the satellite/city changes)
     static int lastSi = -1, lastCity = -1;
     if (t - s_passAt > 60 || lastSi != si || lastCity != g_city || (s_pass.found && t > s_pass.set)) {
       s_pass = satNextPass(g_sats[si], t, c.lat, c.lon, 10, 24);
