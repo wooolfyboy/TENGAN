@@ -1,6 +1,6 @@
 # Third-party components, data and licenses
 
-Project code is licensed under **MIT** (`LICENSE`, "Copyright (c) 2026 wolfyboy1488"). This section lists what else is used: libraries, fonts, data sets, bundled scripts; where it lives in the repository; and what the licensing and responsible-use terms are. License texts of bundled third-party material are kept next to it (`fonts/`, `tools/astro_src/`, `tools/flasher/`).
+Project code is licensed under **MIT** (`LICENSE`, "Copyright (c) 2026 wooolfyboy"). This section lists what else is used: libraries, fonts, data sets, bundled scripts; where it lives in the repository; and what the licensing and responsible-use terms are. License texts of bundled third-party material are kept next to it (`fonts/`, `tools/astro_src/`, `tools/flasher/`).
 
 ## Firmware libraries
 

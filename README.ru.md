@@ -10,16 +10,16 @@ Bluetooth · Wi-Fi · Sub-GHz · ИК · NFC · звук · монитор ПК 
 на LilyGO T-Embed CC1101 Plus, на планшете (TENGAN Tablet) и на компьютере (TENGAN Desktop).<br>
 **Только приём.** TENGAN ничего не передаёт в эфир и ничего не записывает на карты.
 
-[![release](https://img.shields.io/github/v/release/wolfyboy1488/TENGAN?include_prereleases&style=flat-square&color=3fd9ff&label=release)](https://github.com/wolfyboy1488/TENGAN/releases/latest)
-[![build](https://img.shields.io/github/actions/workflow/status/wolfyboy1488/TENGAN/build.yml?style=flat-square&label=build)](https://github.com/wolfyboy1488/TENGAN/actions/workflows/build.yml)
-[![license](https://img.shields.io/github/license/wolfyboy1488/TENGAN?style=flat-square&color=7f97a3)](LICENSE)
+[![release](https://img.shields.io/github/v/release/wooolfyboy/TENGAN?include_prereleases&style=flat-square&color=3fd9ff&label=release)](https://github.com/wooolfyboy/TENGAN/releases/latest)
+[![build](https://img.shields.io/github/actions/workflow/status/wooolfyboy/TENGAN/build.yml?style=flat-square&label=build)](https://github.com/wooolfyboy/TENGAN/actions/workflows/build.yml)
+[![license](https://img.shields.io/github/license/wooolfyboy/TENGAN?style=flat-square&color=7f97a3)](LICENSE)
 ![ESP32-S3](https://img.shields.io/badge/ESP32--S3-T--Embed%20CC1101%20Plus-3fd9ff?style=flat-square)
 ![receive only](https://img.shields.io/badge/RF-receive%20only-7f97a3?style=flat-square)
 ![languages](https://img.shields.io/badge/lang-RU%20%C2%B7%20EN-02090b?style=flat-square&labelColor=7f97a3)
 ![style](https://img.shields.io/badge/theme-DENKO-02090b?style=flat-square&labelColor=3fd9ff)
 ![style](https://img.shields.io/badge/theme-KURENAI-0b0b0b?style=flat-square&labelColor=e5262f)
 
-[**Скачать**](https://github.com/wolfyboy1488/TENGAN/releases/latest) ·
+[**Скачать**](https://github.com/wooolfyboy/TENGAN/releases/latest) ·
 [Что нужно](#-что-нужно) ·
 [Быстрый старт](#-быстрый-старт) ·
 [Разделы](#-разделы) ·
@@ -74,7 +74,7 @@ Bluetooth · Wi-Fi · Sub-GHz · ИК · NFC · звук · монитор ПК 
 <tr>
 <td width="55%">
 
-1. Скачай прошивальщик со страницы [**Releases**](https://github.com/wolfyboy1488/TENGAN/releases/latest):
+1. Скачай прошивальщик со страницы [**Releases**](https://github.com/wooolfyboy/TENGAN/releases/latest):
    **`flash_tengan.html`** — одна прошивка для русского и английского.
 2. Подключи T-Embed к компьютеру USB-кабелем и открой файл в **Chrome** или **Edge**.
 3. Нажми **«Установить прошивку»**, выбери в списке *USB JTAG/serial debug unit* и нажми **«Подключиться»**.
