@@ -7,7 +7,7 @@ android {
         applicationId "dev.tengan.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        // версия: из CI (номер сборки и тег релиза), локально — 1 / dev
+        // version: from CI (build number and release tag), locally 1 / dev
         versionCode Integer.parseInt(System.getenv("APP_VERSION_CODE") ?: "1")
         versionName((System.getenv("APP_VERSION_NAME") ?: new File(rootDir, "../../VERSION").text.trim()).replace("/", "-"))
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
@@ -17,10 +17,10 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
-    // Подпись релизов TENGAN: ключ и пароль — только в секретах GitHub (TENGAN_KEYSTORE_B64, TENGAN_KEYSTORE_PASSWORD),
-    // CI кладёт ключ во временный файл и передаёт путь в TENGAN_KEYSTORE. Одна подпись у всех релизов —
-    // новая версия ставится поверх старой. Без ключа (форк, своя сборка) — отладочный ключ Android:
-    // APK работает, но поверх официального не встанет (это другое приложение для Android).
+    // Release signing: key and password live only in GitHub secrets (TENGAN_KEYSTORE_B64, TENGAN_KEYSTORE_PASSWORD);
+    // CI writes the key to a temp file and passes its path in TENGAN_KEYSTORE. One signature for all releases,
+    // so a new version installs over the old one. Without the key (fork, local build) the Android debug key is
+    // used: the APK works but cannot update the official app (Android sees a different app).
     def tgKs = System.getenv("TENGAN_KEYSTORE")
     def tgPass = System.getenv("TENGAN_KEYSTORE_PASSWORD")
     def tgSigned = tgKs && tgPass && file(tgKs).exists()

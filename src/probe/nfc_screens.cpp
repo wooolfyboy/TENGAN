@@ -1,6 +1,6 @@
 // ============================================================
-//  nfc_screens.cpp — экран NFC: силуэт карты, «касание» кольцами,
-//  тип карты, начало UID, открытые записи метки.
+//  nfc_screens.cpp — NFC screen: card silhouette, rings for the "tap",
+//  card type, start of the UID, open tag records.
 // ============================================================
 #include "probe/nfc.h"
 #include "core/lang.h"
@@ -11,28 +11,28 @@
 #include "core/timeutil.h"
 
 
-// карта с волнами (значок меню)
+// card with waves (menu icon)
 void iconCard(int x, int y, uint16_t c, uint16_t bg) {
   spr.drawSmoothRoundRect(x - 17, y - 6, 3, 2, 30, 20, c, bg);
-  spr.fillRect(x - 12, y, 7, 6, c);                          // чип
+  spr.fillRect(x - 12, y, 7, 6, c);                          // chip
   for (int i = 0; i < 3; i++) {
     int r = 6 + i * 6;
-    spr.drawArc(x + 2, y - 10, r, r - 2, 135, 225, c, bg, true);   // волны над картой
+    spr.drawArc(x + 2, y - 10, r, r - 2, 135, 225, c, bg, true);   // waves above the card
   }
 }
 
-// силуэт карты: chip — смарт/банковская, bank — вместо номера «не читали»
+// card silhouette: chip = smart/bank, bank = "not read" instead of a number
 static void card(int x, int y, int w, int h, uint16_t edge, uint16_t fill, bool chip, bool bank) {
   spr.fillSmoothRoundRect(x, y, w, h, 6, fill, C_BG());
   spr.drawSmoothRoundRect(x, y, 6, 5, w, h, edge, C_BG());
-  for (int i = 0; i < 3; i++) spr.drawArc(x + w - 22, y + 16, 3 + i * 4, 2 + i * 4, 225, 315, edge, fill, true);   // знак бесконтактной
+  for (int i = 0; i < 3; i++) spr.drawArc(x + w - 22, y + 16, 3 + i * 4, 2 + i * 4, 225, 315, edge, fill, true);   // contactless symbol
   if (chip) {
     int cx = x + 12, cy = y + h / 2 - 9;
     spr.fillRoundRect(cx, cy, 20, 15, 3, C_ACC());
     spr.drawFastHLine(cx, cy + 7, 20, fill); spr.drawFastVLine(cx + 10, cy, 15, fill);
   }
   if (bank) for (int g = 0; g < 4; g++) for (int k = 0; k < 4; k++)
-    spr.fillCircle(x + 12 + g * (w - 24) / 4 + k * 5, y + h - 16, 1, edge);   // •••• •••• — номер не читали
+    spr.fillCircle(x + 12 + g * (w - 24) / 4 + k * 5, y + h - 16, 1, edge);   // •••• •••• = number not read
 }
 
 static void rings(int cx, int cy, float ph, uint16_t acc) {
@@ -46,7 +46,7 @@ static void rings(int cx, int cy, float ph, uint16_t acc) {
 static void drawIdle(uint32_t now) {
   int W = spr.width();
   uint16_t acc = C_ACC();
-  // карта подлетает к палке, касание — кольца
+  // card flies to the stick, touch = rings
   float t = fmodf(now / 2200.0f, 1.0f);
   float slide = t < 0.5f ? t / 0.5f : 1.0f;
   slide = 1 - (1 - slide) * (1 - slide);
@@ -84,7 +84,7 @@ void drawNfc(uint32_t now) {
   }
   const NfcCard& c = m.last;
   uint32_t age = msSince(now, c.t);
-  // карта: приложена — ярко, с кольцами касания; убрали — тускло
+  // card: presented = bright, with touch rings; removed = dim
   int cx = UI_M + 4, cy = 36, cw = 116, ch = 72;
   if (age < 900) rings(cx + cw / 2, cy + ch / 2, age / 900.0f, C_ACC());
   bool chip = c.isoDep || c.bank || c.felica || (c.sak & 0x28);
@@ -94,7 +94,7 @@ void drawNfc(uint32_t now) {
   if (m.present) txt(L("ON THE READER", "НА СЧИТЫВАТЕЛЕ"), cx + cw / 2, cy + ch + 8, 1);
   else { uint32_t s = age / 1000; snprintf(buf, sizeof buf, s < 60 ? L("LAST CARD %lus AGO", "КАРТА %lu С НАЗАД") : L("LAST CARD %lum AGO", "КАРТА %lu МИН НАЗАД"), (unsigned long)(s < 60 ? s : s / 60)); txt(buf, cx + cw / 2, cy + ch + 8, 1); }
 
-  // справа: тип, подсказка, UID, ATQA/SAK, записи
+  // right: type, hint, UID, ATQA/SAK, records
   int tx = 140, tw = W - tx - UI_M - 2;
   spr.setTextDatum(TL_DATUM);
   char f[48];
@@ -105,7 +105,7 @@ void drawNfc(uint32_t now) {
   char hu[100]; utf8Upper(c.hint, hu, sizeof hu);
   fitText(hu, f, sizeof f, tw, 1);
   txt(f, tx, 44, 1);
-  // UID: первые два байта, остальное — точки
+  // UID: first two bytes, the rest as dots
   spr.setTextColor(UI_DIM());
   txt("UID", tx, 58, 1);
   snprintf(buf, sizeof buf, c.uidLen >= 2 ? "%02X %02X" : "%02X", c.uid[0], c.uid[1]);
@@ -133,7 +133,7 @@ void drawNfc(uint32_t now) {
     spr.setTextColor(UI_DIM());
     txt(c.isoDep ? L("PROTECTED CHIP · NOTHING PUBLIC", "ЗАЩИЩЁННЫЙ ЧИП · ОТКРЫТОГО НЕТ") : L("NO PUBLIC RECORDS", "ОТКРЫТЫХ ЗАПИСЕЙ НЕТ"), tx, y + 4, 1);
   }
-  // история: последние карты
+  // history: last cards
   spr.setTextDatum(TL_DATUM);
   for (int i = 1; i < m.histN && i < NFC_HIST; i++) {
     const NfcCard& h = m.hist[i];

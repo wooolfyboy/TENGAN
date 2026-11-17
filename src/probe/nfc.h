@@ -1,18 +1,18 @@
 // ============================================================
-//  nfc.h — раздел NFC: «что это за карта?»
+//  nfc.h — NFC section: "what card is this?"
 //
-//  Только чтение и только то, что карта сама говорит о себе всем:
-//  тип (по ATQA/SAK), начало UID, для меток NTAG/Ultralight — открытые
-//  NDEF-записи (ссылка, текст). Банковскую карту узнаём одним вопросом
-//  «ты платёжная?» (SELECT PPSE) и больше НИЧЕГО не читаем: ни номера,
-//  ни имени, ни истории. Ничего не пишем, ничего не эмулируем.
+//  Read only, and only what a card tells everyone about itself:
+//  type (by ATQA/SAK), start of the UID, for NTAG/Ultralight tags the open
+//  NDEF records (link, text). A bank card gets one question,
+//  "are you a payment card?" (SELECT PPSE), and NOTHING else is read: no number,
+//  name or history. Nothing is written, nothing emulated.
 //
-//  PN532 по I2C (0x24, шина с батареей: SDA 8, SCL 18), сброс — GPIO45.
-//  Включается, только пока раздел открыт или планшет подписан на "nfc".
+//  PN532 over I2C (0x24, battery bus: SDA 8, SCL 18), reset on GPIO45.
+//  Enabled only while the section is open or the tablet is subscribed to "nfc".
 //
-//  nfc_model.cpp — классификация и разбор NDEF (чистый код, есть в симуляторе),
-//  nfc.cpp        — драйвер PN532, раздел меню, JSON,
-//  nfc_screens.cpp — экран.
+//  nfc_model.cpp — classification and NDEF parsing (pure code, also in the simulator),
+//  nfc.cpp        — PN532 driver, menu section, JSON,
+//  nfc_screens.cpp — screen.
 // ============================================================
 #pragma once
 #include <Arduino.h>
@@ -30,38 +30,38 @@ struct NfcCard {
   uint16_t atqa;
   uint8_t  sak;
   bool     felica, bank, isoDep;
-  char     ndef[NFC_NDEF_N][NFC_NDEF_LEN];   // открытые записи метки (ссылка / текст)
+  char     ndef[NFC_NDEF_N][NFC_NDEF_LEN];   // open tag records (link / text)
   uint8_t  nNdef;
-  uint32_t t;                         // когда приложили (millis)
+  uint32_t t;                         // when the card was presented (millis)
 };
 
 enum { NFC_OFF = 0, NFC_SCAN = 1, NFC_NOREADER = 2 };
 
 struct NfcModel {
   int      state = NFC_OFF;
-  uint32_t fw = 0;                    // версия прошивки PN532 (IC.Ver.Rev)
+  uint32_t fw = 0;                    // PN532 firmware version (IC.Ver.Rev)
   bool     have = false, present = false;
   NfcCard  last = {};
-  uint32_t lastSeen = 0;              // карта всё ещё у палки
+  uint32_t lastSeen = 0;              // card still at the stick
   uint32_t taps = 0;
-  uint32_t gen = 0;                   // растёт на каждое прикладывание / ошибку (для планшета)
+  uint32_t gen = 0;                   // grows with each tap / error (for the tablet)
   NfcCard  hist[NFC_HIST];
   int      histN = 0;
 };
 extern NfcModel g_nfc;
 
-// тип карты по тому, что она ответила (ulVer — байт объёма из GET_VERSION или -1)
+// card type from its reply (ulVer = capacity byte from GET_VERSION, or -1)
 void nfcClassify(NfcCard& c, int ulVer);
-// NDEF из памяти метки (страницы с 4-й): записи-строки в c.ndef
+// NDEF from tag memory (pages from 4th): record strings go to c.ndef
 void nfcParseNdef(const uint8_t* mem, int n, NfcCard& c);
-// UID для показа: первые 2 байта, остальное скрыто ("04A2••" в JSON)
+// UID for display: first 2 bytes, the rest hidden ("04A2••" in JSON)
 void nfcUidMasked(const NfcCard& c, char* out, size_t n, bool utf8Dots);
-void nfcCommit(const NfcCard& c, uint32_t now);   // новая карта -> модель
+void nfcCommit(const NfcCard& c, uint32_t now);   // new card -> model
 
 bool nfcStart();
 void nfcStop();
 void nfcTick(uint32_t now);
-void nfcJson(String& o);              // событие SSE "nfc"
+void nfcJson(String& o);              // SSE event "nfc"
 
 void drawNfc(uint32_t now);
 void iconCard(int x, int y, uint16_t c, uint16_t bg);

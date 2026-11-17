@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Иконка и заставка приложения: печать 天眼 (голубая, как в теме DENKO) на тёмном фоне.
-Нужны Pillow и шрифт IPAGothic (fonts-ipafont-gothic). Запускать при смене картинки."""
+"""App icon and splash: the 天眼 seal (light blue, as in the DENKO theme) on a dark background.
+Needs Pillow and the IPAGothic font (fonts-ipafont-gothic). Run when the artwork changes."""
 import os
 from PIL import Image, ImageDraw, ImageFont
 
@@ -10,7 +10,7 @@ BG, ACC = (5, 8, 13), (62, 230, 255)
 
 
 def seal(size, scale=0.62):
-    """Квадратная картинка size×size: залитая печать с двумя вырезанными знаками."""
+    """Square size x size image: a filled seal with two glyphs cut out."""
     im = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     d = ImageDraw.Draw(im)
     h = int(size * scale); w = int(h * 0.56); x0 = (size - w) // 2; y0 = (size - h) // 2; c = int(h * 0.08)
@@ -31,11 +31,11 @@ def main():
         full.save(os.path.join(d, "ic_launcher.png"))
         rnd = Image.new("RGBA", (s, s), (0, 0, 0, 0)); m = Image.new("L", (s, s), 0); ImageDraw.Draw(m).ellipse([0, 0, s - 1, s - 1], fill=255)
         rnd.paste(full, (0, 0), m); rnd.save(os.path.join(d, "ic_launcher_round.png"))
-        fg = int(s * 108 / 48)                         # адаптивная иконка: 108dp, видимая зона ~66dp
+        fg = int(s * 108 / 48)                         # adaptive icon: 108dp, visible area ~66dp
         seal(fg, 0.42).save(os.path.join(d, "ic_launcher_foreground.png"))
     open(os.path.join(RES, "values", "ic_launcher_background.xml"), "w").write(
         '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <color name="ic_launcher_background">#05080D</color>\n</resources>\n')
-    # заставка Android при запуске (до нашей шкалы)
+    # Android launch splash (before our progress bar)
     for root, _, files in os.walk(RES):
         for fn in files:
             if fn == "splash.png":

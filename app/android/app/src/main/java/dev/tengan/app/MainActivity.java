@@ -25,22 +25,20 @@ import java.security.MessageDigest;
 import java.util.zip.GZIPInputStream;
 import org.json.JSONObject;
 
-// TENGAN 天眼 — приложение для планшета: внутри та же страница, что /full на палке.
-// Здесь только то, чего не может страница:
-//  - экран не гаснет, во весь экран без системных панелей;
-//  - страница обновляется ОТ ПАЛКИ: в прошивке всегда лежит свежая страница, приложение
-//    сверяет версию (/api/pagever) и, если на палке новее, забирает /full по Wi-Fi палки
-//    (интернет не нужен), проверяет и переключается на неё. Новый APK нужен только для
-//    изменений самой оболочки.
+// TENGAN tablet app: wraps the same page as /full on the stick. Adds only what a page cannot do:
+//  - keep the screen on, fullscreen without system bars;
+//  - update the page FROM THE STICK: the firmware always holds the latest page; the app compares
+//    versions (/api/pagever) and, if the stick is newer, fetches /full over the stick's Wi-Fi
+//    (no internet needed), verifies it and switches to it. A new APK is only needed for shell changes.
 public class MainActivity extends BridgeActivity {
     private static final String STICK = "http://192.168.4.1";
-    private static final String CAP_PREFS = "CapWebViewSettings", CAP_PATH = "serverBasePath";   // так их читает сам Capacitor
+    private static final String CAP_PREFS = "CapWebViewSettings", CAP_PATH = "serverBasePath";   // this is how Capacitor itself reads them
     private final Handler ui = new Handler(Looper.getMainLooper());
     private volatile boolean busy = false;
-    // что происходит с обновлением — страница показывает это в шапке (window.TenganNative.status())
+    // update state; the page shows it in the header (window.TenganNative.status())
     static volatile String status = "start";
     static MainActivity self;
-    // плагин для страницы: Capacitor.Plugins.TenganUpdate.status() / .check()
+    // plugin for the page: Capacitor.Plugins.TenganUpdate.status() / .check()
     @CapacitorPlugin(name = "TenganUpdate")
     public static class UpdatePlugin extends Plugin {
         @PluginMethod public void status(PluginCall call) { JSObject r = new JSObject(); r.put("status", status); call.resolve(r); }
@@ -60,7 +58,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onResume() {
         super.onResume();
-        ui.postDelayed(this::checkStickPage, 1500);       // вернулись в приложение (могли перешить палку) — проверить сразу
+        ui.postDelayed(this::checkStickPage, 1500);       // back in the app (the stick may have been reflashed): check at once
     }
 
     @Override
@@ -73,7 +71,7 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
-    // проверка раз в 30 с: дёшево (короткий JSON), качаем только если версия другая
+    // check every 30 s: cheap (short JSON), download only if the version differs
     private final Runnable checker = new Runnable() {
         @Override public void run() {
             checkStickPage();
@@ -81,7 +79,7 @@ public class MainActivity extends BridgeActivity {
         }
     };
 
-    // новый APK несёт свою страницу: старую скачанную забываем (APK может быть новее палки)
+    // a new APK brings its own page: forget the downloaded one (the APK may be newer than the stick)
     private void forgetOldDownloadAfterApkUpdate() {
         try {
             PackageInfo pi = getPackageManager().getPackageInfo(getPackageName(), 0);
@@ -96,7 +94,7 @@ public class MainActivity extends BridgeActivity {
 
     private File pageDir() { return new File(getFilesDir(), "stickpage"); }
 
-    // какая страница сейчас: скачанная с палки или встроенная в APK
+    // which page is active: downloaded from the stick or bundled in the APK
     private String currentSha() {
         try {
             String path = getSharedPreferences(CAP_PREFS, MODE_PRIVATE).getString(CAP_PATH, null);
@@ -144,7 +142,7 @@ public class MainActivity extends BridgeActivity {
         try {
             if (c.getResponseCode() != 200) throw new Exception("http " + c.getResponseCode());
             byte[] b = read(c.getInputStream());
-            if (b.length > 2 && (b[0] & 0xff) == 0x1f && (b[1] & 0xff) == 0x8b) b = read(new GZIPInputStream(new java.io.ByteArrayInputStream(b)));   // палка шлёт gzip
+            if (b.length > 2 && (b[0] & 0xff) == 0x1f && (b[1] & 0xff) == 0x8b) b = read(new GZIPInputStream(new java.io.ByteArrayInputStream(b)));   // the stick sends gzip
             return b;
         } finally { c.disconnect(); }
     }

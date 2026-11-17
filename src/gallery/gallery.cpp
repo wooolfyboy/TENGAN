@@ -1,15 +1,15 @@
 // ============================================================
-//  gallery.cpp — раздел Gallery
+//  gallery.cpp — Gallery section
 //
-//  TESSERACT — четырёхмерный куб: вращается в плоскостях XW, YW, ZW
-//              и XY, проецируется 4D → 3D → экран; внутренний куб
-//              «выворачивается» через внешний. След — три прошлых кадра.
-//  TORUS     — бублик из ~1000 точек; яркость — освещение и глубина.
-//  LIFE      — игра «Жизнь» Конвея с послесвечением.
-//  PENDULUM  — двойной маятник: хаос и светящийся след.
-//  SKY/GLOBE — планетарий и спутники (gallery_sky.cpp).
+//  TESSERACT — 4D cube: rotates in the XW, YW, ZW
+//              and XY planes, projected 4D → 3D → screen; the inner cube
+//              turns inside out through the outer one. Trail = three past frames.
+//  TORUS     — donut of ~1000 points; brightness = lighting and depth.
+//  LIFE      — Conway's Game of Life with afterglow.
+//  PENDULUM  — double pendulum: chaos and a glowing trail.
+//  SKY/GLOBE — planetarium and satellites (gallery_sky.cpp).
 //
-//  Колесо — скорость, нажатие — назад в подменю.
+//  Wheel = speed, click = back to the submenu.
 // ============================================================
 #include <algorithm>
 #include "core/lang.h"
@@ -26,10 +26,10 @@
 #include "gallery/weather.h"
 
 enum { G_TESS = 0, G_TORUS, G_LIFE, G_PEND, G_SKY, G_GLOBE, G_WX, G_NUM };
-static bool s_wxOpen = false;                   // Weather открыт — его радио работают
+static bool s_wxOpen = false;                   // Weather is open - its radios are on
 static int   g_gal = 0;
-static float s_speed = 1.0f;                // множитель скорости (колесо)
-static float s_phase = 0;                   // «время» анимации с учётом скорости
+static float s_speed = 1.0f;                // speed multiplier (wheel)
+static float s_phase = 0;                   // animation "time", scaled by speed
 static uint32_t s_lastMs = 0;
 
 static void advance(uint32_t now) {
@@ -42,7 +42,7 @@ static void speedLabel(char* buf, size_t n) { snprintf(buf, n, L("speed x%.1f", 
 
 // ---------- TESSERACT ----------
 #define TS_TRAIL 3
-static int16_t s_trail[TS_TRAIL][16][2];    // экранные точки прошлых кадров
+static int16_t s_trail[TS_TRAIL][16][2];    // screen points of past frames
 static int     s_trailN = 0, s_trailHead = 0;
 
 void drawTesseract(uint32_t now) {
@@ -62,14 +62,14 @@ void drawTesseract(uint32_t now) {
     c = cosf(a2); s = sinf(a2); tx = y * c - w * s; w = y * s + w * c; y = tx;   // YW
     c = cosf(a3); s = sinf(a3); tx = z * c - w * s; w = z * s + w * c; z = tx;   // ZW
     c = cosf(a4); s = sinf(a4); tx = x * c - y * s; y = x * s + y * c; x = tx;   // XY
-    float k4 = 2.6f / (3.2f - w);                         // 4D → 3D (перспектива по w)
+    float k4 = 2.6f / (3.2f - w);                         // 4D → 3D (perspective by w)
     x *= k4; y *= k4; z *= k4;
-    c = cosf(0.5f); s = sinf(0.5f);                       // лёгкий наклон камеры
+    c = cosf(0.5f); s = sinf(0.5f);                       // slight camera tilt
     tx = y * c - z * s; z = y * s + z * c; y = tx;
-    float k3 = 175.0f / (5.2f - z);                       // 3D → экран
+    float k3 = 175.0f / (5.2f - z);                       // 3D → screen
     px[i] = cx + x * k3; py[i] = cy + y * k3; pw[i] = w;
   }
-  // след: прошлые кадры всё тусклее
+  // trail: older frames get dimmer
   for (int f = 0; f < s_trailN; f++) {
     int slot = (s_trailHead - 1 - f + TS_TRAIL * 2) % TS_TRAIL;
     uint16_t col = scale565(C_ACC(), 30 - f * 9);
@@ -79,7 +79,7 @@ void drawTesseract(uint32_t now) {
         if (j > i) spr.drawLine(s_trail[slot][i][0], s_trail[slot][i][1], s_trail[slot][j][0], s_trail[slot][j][1], col);
       }
   }
-  // рёбра: соединяют вершины, отличающиеся одной координатой. Цвет — по «глубине» в 4D
+  // edges join vertices that differ in one coordinate. Color = 4D "depth"
   for (int i = 0; i < 16; i++)
     for (int b = 0; b < 4; b++) {
       int j = i ^ (1 << b);
@@ -87,7 +87,7 @@ void drawTesseract(uint32_t now) {
       float w = (pw[i] + pw[j]) * 0.5f;                   // -1.4 .. 1.4
       uint16_t col = heatV(constrain(0.35f + w * 0.35f, 0.1f, 1.0f));
       spr.drawLine(px[i], py[i], px[j], py[j], col);
-      spr.drawLine(px[i] + 1, py[i], px[j] + 1, py[j], scale565(col, 45));   // «толщина»
+      spr.drawLine(px[i] + 1, py[i], px[j] + 1, py[j], scale565(col, 45));   // "thickness"
     }
   for (int i = 0; i < 16; i++) {
     int r = pw[i] > 0.3f ? 3 : 2;
@@ -108,7 +108,7 @@ void drawTesseract(uint32_t now) {
 #define TO_U 56
 #define TO_V 18
 struct TPt { int16_t x, y; float z; float lum; };
-static TPt*     s_pts = nullptr;                          // ~12 КБ — во внешней памяти (PSRAM)
+static TPt*     s_pts = nullptr;                          // ~12 KB, in external memory (PSRAM)
 static int16_t* s_order = nullptr;
 
 void drawTorus(uint32_t now) {
@@ -122,19 +122,19 @@ void drawTorus(uint32_t now) {
   const float cA = cosf(A), sA = sinf(A), cB = cosf(B), sB = sinf(B);
   const float R1 = 1.0f, R2 = 2.1f, K2 = 6.5f, K1 = 112.0f;
   const int cx = W / 2, cy = (UI_TOP + UI_BOTTOM) / 2 + 2;
-  // свет сверху-спереди
+  // light from above-front
   const float lx = 0, ly = 0.7071f, lz = -0.7071f;
   int n = 0;
   for (int i = 0; i < TO_V; i++) {
     float th = i * 2 * PI / TO_V, ct = cosf(th), st = sinf(th);
     for (int j = 0; j < TO_U; j++) {
       float ph = j * 2 * PI / TO_U + i * 0.09f, cp = cosf(ph), sp = sinf(ph);
-      float ox = R2 + R1 * ct, oy = R1 * st;                 // круг сечения
-      // поворот вокруг Y (ph), затем X (A), затем Z (B)
+      float ox = R2 + R1 * ct, oy = R1 * st;                 // cross-section circle
+      // rotate about Y (ph), then X (A), then Z (B)
       float x = ox * (cB * cp + sA * sB * sp) - oy * cA * sB;
       float y = ox * (sB * cp - sA * cB * sp) + oy * cA * cB;
       float z = K2 + cA * ox * sp + oy * sA;
-      // нормаль
+      // normal
       float nx = ct * (cB * cp + sA * sB * sp) - st * cA * sB;
       float ny = ct * (sB * cp - sA * cB * sp) + st * cA * cB;
       float nz = cA * ct * sp + st * sA;
@@ -146,10 +146,10 @@ void drawTorus(uint32_t now) {
   }
   int16_t* order = s_order;
   for (int i = 0; i < n; i++) order[i] = i;
-  std::sort(order, order + n, [](int16_t a, int16_t b) { return s_pts[a].z > s_pts[b].z; });   // дальние раньше
+  std::sort(order, order + n, [](int16_t a, int16_t b) { return s_pts[a].z > s_pts[b].z; });   // far ones first
   for (int k = 0; k < n; k++) {
     const TPt& p = s_pts[order[k]];
-    float depth = constrain((9.5f - p.z) / 7.0f, 0.15f, 1.0f);    // ближе — ярче
+    float depth = constrain((9.5f - p.z) / 7.0f, 0.15f, 1.0f);    // nearer = brighter
     float lum = p.lum > 0 ? p.lum : 0;
     float v = constrain(0.08f + 0.92f * lum * depth + 0.12f * depth, 0.0f, 1.0f);
     uint16_t col = heatV(v);
@@ -162,16 +162,16 @@ void drawTorus(uint32_t now) {
   present();
 }
 
-// ---------- LIFE — игра «Жизнь» Конвея ----------
-// Поле замкнуто (края склеены). Новорождённые клетки — белые, старые
-// остывают до бирюзы и стали; умершие оставляют гаснущий след. Если поле
-// «застыло» или вымерло — подбрасываем новые фигуры (глайдеры, R-пентомино).
+// ---------- LIFE — Conway's Game of Life ----------
+// Wrap-around field. Newborn cells are white, old ones
+// cool to teal and steel; dead cells leave a fading trail. If the field
+// stalls or dies out, we drop in new shapes (gliders, R-pentomino).
 #define LF_CELL 4
 #define LF_W 76
 #define LF_H 32
-// поля — во внешней памяти (PSRAM), выделяются при первом открытии «Жизни»
-static uint8_t  (*s_lf)[LF_W] = nullptr, (*s_lfN)[LF_W] = nullptr;   // возраст живой клетки (0 — мертва)
-static uint8_t  (*s_glow)[LF_W] = nullptr;                            // след умерших
+// fields live in external memory (PSRAM), allocated on first open of Life
+static uint8_t  (*s_lf)[LF_W] = nullptr, (*s_lfN)[LF_W] = nullptr;   // age of a live cell (0 = dead)
+static uint8_t  (*s_glow)[LF_W] = nullptr;                            // trail of dead cells
 static const size_t LF_BYTES = LF_H * LF_W;
 static uint32_t s_lfGen = 0, s_lfLast = 0, s_lfStill = 0, s_lfRng = 12345;
 static int      s_lfPop = 0, s_lfPrevPop = -1;
@@ -180,14 +180,14 @@ static uint32_t s_lfHash[8];
 static uint32_t lfRand() { s_lfRng ^= s_lfRng << 13; s_lfRng ^= s_lfRng >> 17; s_lfRng ^= s_lfRng << 5; return s_lfRng; }
 static void lfSet(int x, int y) { s_lf[(y + LF_H) % LF_H][(x + LF_W) % LF_W] = 1; }
 
-static void lfDrop() {                                   // подбросить фигуру в случайное место
+static void lfDrop() {                                   // drop a shape at a random spot
   int x = lfRand() % LF_W, y = lfRand() % LF_H;
   switch (lfRand() % 4) {
-    case 0: lfSet(x + 1, y); lfSet(x + 2, y + 1); lfSet(x, y + 2); lfSet(x + 1, y + 2); lfSet(x + 2, y + 2); break;  // глайдер
-    case 1: lfSet(x + 1, y); lfSet(x + 2, y); lfSet(x, y + 1); lfSet(x + 1, y + 1); lfSet(x + 1, y + 2); break;      // R-пентомино
-    case 2: lfSet(x + 1, y); lfSet(x + 3, y + 1); lfSet(x, y + 2); lfSet(x + 1, y + 2);                              // «желудь»
+    case 0: lfSet(x + 1, y); lfSet(x + 2, y + 1); lfSet(x, y + 2); lfSet(x + 1, y + 2); lfSet(x + 2, y + 2); break;  // glider
+    case 1: lfSet(x + 1, y); lfSet(x + 2, y); lfSet(x, y + 1); lfSet(x + 1, y + 1); lfSet(x + 1, y + 2); break;      // R-pentomino
+    case 2: lfSet(x + 1, y); lfSet(x + 3, y + 1); lfSet(x, y + 2); lfSet(x + 1, y + 2);                              // "acorn"
             lfSet(x + 4, y + 2); lfSet(x + 5, y + 2); lfSet(x + 6, y + 2); break;
-    default: for (int dy = 0; dy < 6; dy++) for (int dx = 0; dx < 6; dx++) if (lfRand() % 2) lfSet(x + dx, y + dy); break;   // клякса
+    default: for (int dy = 0; dy < 6; dy++) for (int dx = 0; dx < 6; dx++) if (lfRand() % 2) lfSet(x + dx, y + dy); break;   // blob
   }
 }
 
@@ -211,7 +211,7 @@ static void lfStep() {
       uint8_t a = s_lf[y][x], nv;
       if (a) nv = (n == 2 || n == 3) ? (uint8_t)min(a + 1, 255) : 0;
       else   nv = (n == 3) ? 1 : 0;
-      if (a && !nv) s_glow[y][x] = 255;                  // умерла — оставляет след
+      if (a && !nv) s_glow[y][x] = 255;                  // died - leaves a trail
       else if (s_glow[y][x]) s_glow[y][x] = s_glow[y][x] > 28 ? s_glow[y][x] - 28 : 0;
       s_lfN[y][x] = nv;
       if (nv) { pop++; hash = (hash ^ (y * LF_W + x)) * 16777619u; }
@@ -219,13 +219,13 @@ static void lfStep() {
   }
   memcpy(s_lf, s_lfN, LF_BYTES);
   s_lfGen++;
-  // застой: повтор узора (мигалки с периодом до 8) или население почти не меняется
+  // stall: pattern repeats (blinkers, period up to 8) or population barely changes
   bool repeat = false;
   for (int i = 0; i < 8; i++) if (s_lfHash[i] == hash) repeat = true;
   s_lfHash[s_lfGen % 8] = hash;
   if (repeat || abs(pop - s_lfPrevPop) <= 1) s_lfStill++; else s_lfStill = 0;
   s_lfPrevPop = pop; s_lfPop = pop;
-  if (pop < 12) lfSeed();                                 // вымерли — новый мир
+  if (pop < 12) lfSeed();                                 // died out - new world
   else if (s_lfStill > 40) { for (int i = 0; i < 4; i++) lfDrop(); s_lfStill = 0; }
 }
 
@@ -248,7 +248,7 @@ void drawLife(uint32_t now) {
       uint8_t a = s_lf[y][x];
       int px = x0 + x * LF_CELL, py = y0 + y * LF_CELL;
       if (a) {
-        uint16_t c = a == 1 ? C_HOT() : heatV(max(0.3f, 0.9f - a * 0.03f));   // рождённая — белая, стареет к бирюзе
+        uint16_t c = a == 1 ? C_HOT() : heatV(max(0.3f, 0.9f - a * 0.03f));   // newborn is white, ages to teal
         spr.fillRect(px, py, LF_CELL - 1, LF_CELL - 1, c);
       } else if (s_glow[y][x]) {
         spr.fillRect(px, py, LF_CELL - 1, LF_CELL - 1, scale565(C_ACC(), s_glow[y][x] * 30 / 255));
@@ -261,20 +261,20 @@ void drawLife(uint32_t now) {
   present();
 }
 
-// ---------- PENDULUM — двойной маятник ----------
-// Два сцепленных маятника, уравнения Лагранжа, шаг Рунге-Кутты 4-го порядка.
-// Нижний груз оставляет светящийся след: ярче и белее — где быстрее.
+// ---------- PENDULUM — double pendulum ----------
+// Two coupled pendulums, Lagrange equations, 4th-order Runge-Kutta step.
+// The lower bob leaves a glowing trail: brighter and whiter where faster.
 #define PD_TRAIL 420
-static float   s_th1, s_th2, s_w1, s_w2;                // углы и угловые скорости
+static float   s_th1, s_th2, s_w1, s_w2;                // angles and angular velocities
 static int16_t s_tx[PD_TRAIL], s_ty[PD_TRAIL];
-static uint8_t s_tv[PD_TRAIL];                           // скорость в точке следа (0..255)
+static uint8_t s_tv[PD_TRAIL];                           // speed at the trail point (0..255)
 static int     s_tHead = 0, s_tN = 0;
 static bool    s_pdInit = false;
 
 static void pdDeriv(const float* y, float* d) {          // y = th1, th2, w1, w2 (m1=m2, l1=l2)
   const float g = 9.81f, l = 1.0f;
   float t1 = y[0], t2 = y[1], w1 = y[2], w2 = y[3], dt = t1 - t2;
-  float den = 3.0f - cosf(2 * dt);                       // 2m1+m2 - m2 cos(2Δ) при m1=m2=1
+  float den = 3.0f - cosf(2 * dt);                       // 2m1+m2 - m2 cos(2Δ) for m1=m2=1
   d[0] = w1; d[1] = w2;
   d[2] = (-g * 3 * sinf(t1) - g * sinf(t1 - 2 * t2) - 2 * sinf(dt) * (w2 * w2 * l + w1 * w1 * l * cosf(dt))) / (l * den);
   d[3] = (2 * sinf(dt) * (w1 * w1 * l * 2 + g * 2 * cosf(t1) + w2 * w2 * l * cosf(dt))) / (l * den);
@@ -293,7 +293,7 @@ static void pdStep(float h) {
 }
 static void pdReset() {
   uint32_t r = esp_random();
-  s_th1 = 2.0f + (r % 1000) / 1000.0f * 1.0f;            // высоко: хаос
+  s_th1 = 2.0f + (r % 1000) / 1000.0f * 1.0f;            // high: chaos
   s_th2 = 1.5f + ((r >> 10) % 1000) / 1000.0f * 1.6f;
   s_w1 = s_w2 = 0; s_tN = 0; s_tHead = 0; s_pdInit = true;
 }
@@ -310,7 +310,7 @@ void drawPendulum(uint32_t now) {
   int steps = 6;
   for (int k = 0; k < steps; k++) {
     pdStep(dtReal / steps);
-    // точка следа на каждом подшаге — линия получается гладкой
+    // a trail point on every substep keeps the line smooth
     if (k % 2 == 1) {
       float x1 = cx + L * sinf(s_th1), y1 = cy + L * cosf(s_th1);
       int x2 = (int)(x1 + L * sinf(s_th2)), y2 = (int)(y1 + L * cosf(s_th2));
@@ -319,16 +319,16 @@ void drawPendulum(uint32_t now) {
       s_tHead = (s_tHead + 1) % PD_TRAIL; if (s_tN < PD_TRAIL) s_tN++;
     }
   }
-  if (!isfinite(s_th1) || !isfinite(s_th2)) pdReset();   // на всякий случай
+  if (!isfinite(s_th1) || !isfinite(s_th2)) pdReset();   // just in case
   spr.fillSprite(C_BG());
-  // след: старые точки тусклее; цвет — скорость
+  // trail: older points dimmer; color = speed
   for (int i = 1; i < s_tN; i++) {
     int a = (s_tHead - s_tN + i - 1 + PD_TRAIL) % PD_TRAIL, b = (a + 1) % PD_TRAIL;
-    int age = 100 * i / s_tN;                            // 0 — самая старая
+    int age = 100 * i / s_tN;                            // 0 = oldest
     uint16_t c = scale565(heatV(0.35f + 0.65f * s_tv[b] / 255.0f), 12 + age * 88 / 100);
     spr.drawLine(s_tx[a], s_ty[a], s_tx[b], s_ty[b], c);
   }
-  // маятник
+  // pendulum
   float x1 = cx + L * sinf(s_th1), y1 = cy + L * cosf(s_th1);
   float x2 = x1 + L * sinf(s_th2), y2 = y1 + L * cosf(s_th2);
   spr.drawCircle(cx, cy, (int)(2 * L), UI_LINE());
@@ -343,7 +343,7 @@ void drawPendulum(uint32_t now) {
   present();
 }
 
-// ---------- раздел ----------
+// ---------- section ----------
 static void galSubtitle(char* out, size_t n) { snprintf(out, n, L("%d scenes", "%d сцен"), G_NUM); }
 static void galEnter() { s_lastMs = 0; }
 static void galLeave() { if (s_wxOpen) { wxStop(); s_wxOpen = false; } }
@@ -361,16 +361,16 @@ static void galInfo(int i, SubItem& it) {
 static int  galNow() { return g_gal; }
 static void galOpen(int m) {
   g_gal = m; s_lastMs = 0; s_trailN = 0;
-  if (m == G_WX) { wxStart(); s_wxOpen = true; }      // радиопогода: включить её источники (BLE, CC1101 433, микрофон)
+  if (m == G_WX) { wxStart(); s_wxOpen = true; }      // radio weather: turn on its sources (BLE, CC1101 433, microphone)
 }
 static void galClose() { if (s_wxOpen) { wxStop(); s_wxOpen = false; } }
 static void galTick(uint32_t now) { if (s_wxOpen) { wxRadiosTick(now); wxUpdate(now); } }
-static void galClick() {                                // в «Жизни» — новый мир, в маятнике — новый запуск
-  if (g_gal == G_LIFE) lfSeed(); else if (g_gal == G_PEND) pdReset();   // у фигур нажатия нет
+static void galClick() {                                // Life: new world; pendulum: new run
+  if (g_gal == G_LIFE) lfSeed(); else if (g_gal == G_PEND) pdReset();   // the other scenes have no click action
   else if (g_gal == G_SKY) skyClick(); else if (g_gal == G_GLOBE) globeClick();
 }
 static void galRotate(int dir) {
-  if (g_gal == G_SKY) { skyTurn(dir); return; }              // небо и Земля — колесо крутит вид
+  if (g_gal == G_SKY) { skyTurn(dir); return; }              // sky and Earth: the wheel turns the view
   if (g_gal == G_GLOBE) { globeTurn(dir); return; }
   if (g_gal == G_WX) { wxTurn(dir); return; }
   s_speed = constrain(s_speed + dir * 0.25f, 0.0f, 4.0f);

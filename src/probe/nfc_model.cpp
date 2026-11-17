@@ -1,7 +1,7 @@
 // ============================================================
-//  nfc_model.cpp — что за карта: по ATQA/SAK (+ ответу на PPSE и
-//  GET_VERSION), разбор NDEF-записей метки, история прикладываний.
-//  Без железа — собирается и в симуляторе.
+//  nfc_model.cpp — what card it is: from ATQA/SAK (+ the PPSE reply and
+//  GET_VERSION), tag NDEF record parsing, tap history.
+//  No hardware, so the simulator builds it too.
 // ============================================================
 #include "probe/nfc.h"
 #include "core/lang.h"
@@ -16,7 +16,7 @@ static void put(NfcCard& c, const char* fam, const char* hint) {
 void nfcClassify(NfcCard& c, int ulVer) {
   if (c.felica) { put(c, "FeliCa", L("Japan transit / e-money · likely", "проезд / e-money (Япония) · вероятно")); return; }
   if (c.bank)   { put(c, L("Bank card (EMV)", "Банковская карта (EMV)"), L("tap-to-pay card or phone", "бесконтактная оплата")); return; }
-  uint8_t sak = c.sak & 0x7F;                    // бит 7 (0x80) у некоторых — «каскад», не тип
+  uint8_t sak = c.sak & 0x7F;                    // bit 7 (0x80) on some is "cascade", not a type
   switch (c.sak) {
     case 0x09: put(c, "MIFARE Mini", L("old transit / access card", "старая проездная / пропуск")); return;
     case 0x08: case 0x88: put(c, "MIFARE Classic 1K", L("transit pass / door key · likely", "проездной / ключ от двери · вероятно")); return;
@@ -58,7 +58,7 @@ static void addRec(NfcCard& c, const char* pre, const uint8_t* p, int n) {
   for (int i = 0; i < n && k < NFC_NDEF_LEN - 1; i++) o[k++] = p[i] < 0x20 ? ' ' : (char)p[i];
   if (k > NFC_NDEF_LEN - 1) k = NFC_NDEF_LEN - 1;
   o[k] = 0;
-  // не оставлять «половинку» русской буквы в конце
+  // don't leave half of a Cyrillic letter at the end
   while (k > 0 && ((uint8_t)o[k - 1] & 0xC0) == 0xC0) o[--k] = 0;
 }
 
@@ -84,15 +84,15 @@ static void parseMsg(const uint8_t* p, int n, NfcCard& c) {
     } else if (tnf == 1 && tl == 1 && type[0] == 'T' && avail >= 1) {
       int ll = pay[0] & 0x3F;
       if (1 + ll <= avail) addRec(c, "", pay + 1 + ll, avail - 1 - ll);
-    } else if (tnf == 2) {                                   // MIME: показываем только тип (vCard, Wi-Fi — личное/пароль)
+    } else if (tnf == 2) {                                   // MIME: show only the type (vCard, Wi-Fi: personal/password)
       bool wifi = tl >= 19 && !memcmp(type, "application/vnd.wfa", 19);
       if (wifi) addRec(c, L("Wi-Fi settings (hidden)", "настройки Wi-Fi (скрыто)"), nullptr, 0);
       else addRec(c, L("data: ", "данные: "), type, tl);
     } else if (tnf == 4) {
-      addRec(c, L("app: ", "приложение: "), type, tl);                          // android.com:pkg и т.п.
+      addRec(c, L("app: ", "приложение: "), type, tl);                          // android.com:pkg etc.
     }
     i += pl;
-    if (h & 0x40) break;                                     // ME — последняя запись
+    if (h & 0x40) break;                                     // ME = last record
   }
 }
 
@@ -102,7 +102,7 @@ void nfcParseNdef(const uint8_t* m, int n, NfcCard& c) {
   while (i < n) {
     uint8_t t = m[i++];
     if (t == 0x00) continue;                                 // NULL TLV
-    if (t == 0xFE) return;                                   // конец
+    if (t == 0xFE) return;                                   // end
     if (i >= n) return;
     uint32_t len = m[i++];
     if (len == 0xFF) { if (i + 2 > n) return; len = m[i] << 8 | m[i + 1]; i += 2; }

@@ -1,19 +1,18 @@
 """
-Собрать «прошивальщик в одном файле»: HTML-страница, внутри которой уже лежат
-прошивка (tengan_full_0x0.bin) и библиотека esptool-js. Пишется всё, кроме
-области настроек (NVS, 0x9000..0xE000) — настройки устройства сохраняются.
-Открыл в Chrome/Edge → кнопка «Установить» → готово. Ни адресов, ни файлов.
+Build a one-file flasher: an HTML page with the firmware (tengan_full_0x0.bin) and the esptool-js
+library embedded. Everything is written except the settings area (NVS, 0x9000..0xE000), so device
+settings survive. Open in Chrome/Edge, press Install, done: no addresses, no files.
 
-    python tools/flasher/make_flasher.py <full_0x0.bin> <out.html> <версия>
+    python tools/flasher/make_flasher.py <full_0x0.bin> <out.html> <version>
 
-Страница на двух языках (EN / RU): по языку браузера, переключатель вверху.
+The page is bilingual (EN / RU): chosen by browser language, with a switch at the top.
 """
 import base64, datetime, html as htmlmod, json, os, re, sys
 
 here = os.path.dirname(os.path.abspath(__file__))
 fw_path, out_path, version = sys.argv[1], sys.argv[2], sys.argv[3]
 
-# тексты страницы. HTML-ключи (h_*) можно размечать <b>, остальные — простой текст для JS
+# page texts. h_* keys may contain <b>; the others are plain text for JS
 TEXT = {
     "en": {
         "title": "TENGAN %(v)s — firmware installer",
@@ -60,8 +59,8 @@ TEXT = {
 }
 
 bundle = open(os.path.join(here, "esptool-js-0.5.4.bundle.js"), encoding="utf-8").read()
-# библиотека — ES-модуль с «export{...}» в конце: заменяем его на window.__esptool,
-# чтобы код страницы в том же <script type="module"> мог её использовать
+# the library is an ES module ending in "export{...}": replace that with window.__esptool
+# so page code in the same <script type="module"> can use it
 m = re.search(r"export\{([^}]*)\};?\s*$", bundle)
 if not m:
     sys.exit("esptool-js bundle: export list not found")
@@ -78,10 +77,10 @@ if fw[0] != 0xE9 or fw[0x8000:0x8002] != b"\xaa\x50":
 built = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
 page = open(os.path.join(here, "flasher_template.html"), encoding="utf-8").read()
 js = {}
-for lg, t in TEXT.items():                          # оба языка — в странице, выбор при открытии
+for lg, t in TEXT.items():                          # both languages are embedded; picked on open
     d = {k: (v % {"v": version, "b": built} if isinstance(v, str) and k in ("title", "sub") else v) for k, v in t.items()}
     js[lg] = d
-# те же шрифты, что на планшете (JetBrains Mono + Exo 2, латиница и кириллица) — встроены, без интернета
+# same fonts as the tablet (JetBrains Mono + Exo 2, Latin and Cyrillic), embedded so no internet is needed
 fonts_css = open(os.path.join(here, "..", "webapp", "src", "fonts.css"), encoding="utf-8").read()
 fonts_css = "\n".join(l for l in fonts_css.splitlines() if "font-family:'JetBrains Mono'" in l or "font-family:'Exo 2'" in l)
 page = page.replace("__FONTS__", fonts_css)
