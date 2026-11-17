@@ -225,6 +225,8 @@ firmware and updates together with it.
 - The track title comes from the Windows "Now playing" panel; if an app doesn't report it there, from the
   window title (Spotify, a YouTube tab).
 - Log file: `%APPDATA%\TENGAN\desktop.log`.
+- The EXE is not code-signed (that needs a paid certificate), so at first start Windows SmartScreen may say
+  "Windows protected your PC" — press **More info → Run anyway**.
 - The old console monitor `pc_monitor_windows.zip` is still in the releases but is no longer needed.
 
 </details>
@@ -365,7 +367,9 @@ Without a device: `python3 tools/webapp/mock.py page.html 8090 [ru] [kurenai]`.
 <summary><b>TENGAN Desktop and TENGAN Tablet</b></summary>
 
 - Desktop: `tools/desktop` (Python + pywebview), single-file build — `tools/desktop/build_exe.py` (PyInstaller, CI on Windows); macOS / Linux — `tools/desktop/build_xplat.py` (CI: `.github/workflows/desktop-xplat.yml`).
-- Tablet: `app/` (Capacitor, Android), the APK is built in CI.
+- Tablet: `app/` (Capacitor, Android), the APK is built in CI. Official APKs are signed with the TENGAN key
+  from the repository secrets; a build without it (a fork, your own build) is signed with the Android debug key —
+  it works, but installs as a separate app, not as an update over the official one.
 
 </details>
 

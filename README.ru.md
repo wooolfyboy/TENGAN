@@ -225,6 +225,8 @@ Bluetooth · Wi-Fi · Sub-GHz · ИК · NFC · звук · монитор ПК 
 - Название трека берётся из системной панели Windows «Сейчас воспроизводится»; если приложение туда его
   не сообщает — из заголовка окна (Spotify, вкладка YouTube).
 - Журнал программы: `%APPDATA%\TENGAN\desktop.log`.
+- EXE не подписан (для этого нужен платный сертификат), поэтому при первом запуске SmartScreen может написать
+  «Система Windows защитила ваш компьютер» — нажми **«Подробнее» → «Выполнить в любом случае»**.
 - Старый консольный монитор `pc_monitor_windows.zip` ещё лежит в релизах, но больше не нужен.
 
 </details>
@@ -365,7 +367,9 @@ esptool --chip esp32s3 merge-bin -o tengan_full_0x0.bin 0x0 bootloader.bin 0x800
 <summary><b>TENGAN Desktop и TENGAN Tablet</b></summary>
 
 - Desktop: `tools/desktop` (Python + pywebview), сборка в один файл — `tools/desktop/build_exe.py` (PyInstaller, CI на Windows); macOS / Linux — `tools/desktop/build_xplat.py` (CI: `.github/workflows/desktop-xplat.yml`).
-- Tablet: `app/` (Capacitor, Android), APK собирается в CI.
+- Tablet: `app/` (Capacitor, Android), APK собирается в CI. Официальные APK подписаны ключом TENGAN из секретов
+  репозитория; сборка без него (форк, своя сборка) подписывается отладочным ключом Android — работает, но ставится
+  отдельным приложением, а не обновлением поверх официального.
 
 </details>
 

@@ -17,20 +17,27 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
-    // одна и та же подпись у всех сборок — новая версия ставится поверх старой, без удаления.
-    // Ключ лежит в репозитории (он закрытый): это ключ для личной установки, не для магазина.
+    // Подпись релизов TENGAN: ключ и пароль — только в секретах GitHub (TENGAN_KEYSTORE_B64, TENGAN_KEYSTORE_PASSWORD),
+    // CI кладёт ключ во временный файл и передаёт путь в TENGAN_KEYSTORE. Одна подпись у всех релизов —
+    // новая версия ставится поверх старой. Без ключа (форк, своя сборка) — отладочный ключ Android:
+    // APK работает, но поверх официального не встанет (это другое приложение для Android).
+    def tgKs = System.getenv("TENGAN_KEYSTORE")
+    def tgPass = System.getenv("TENGAN_KEYSTORE_PASSWORD")
+    def tgSigned = tgKs && tgPass && file(tgKs).exists()
     signingConfigs {
-        tengan {
-            storeFile file("tengan.keystore")
-            storePassword "tengan-app"
-            keyAlias "tengan"
-            keyPassword "tengan-app"
+        if (tgSigned) {
+            tengan {
+                storeFile file(tgKs)
+                storeType "pkcs12"
+                storePassword tgPass
+                keyAlias "tengan"
+                keyPassword tgPass
+            }
         }
     }
     buildTypes {
-        debug { signingConfig signingConfigs.tengan }
         release {
-            signingConfig signingConfigs.tengan
+            signingConfig tgSigned ? signingConfigs.tengan : signingConfigs.debug
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
