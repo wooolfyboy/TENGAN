@@ -220,6 +220,8 @@ firmware and updates together with it.
 
 - Start: connect TENGAN with a cable and run `tengan_desktop.exe` — the device opens Web by itself.
   Modes: **USB**, **Wi-Fi**, **Auto** (the last choice is remembered). F11 — full screen, F2 — mode choice.
+- **Settings**: F2 → **⚙ Alerts & widget** — popups, the widget on top, and the window: interface scale (80–150%),
+  open full screen, start with the system (straight to the tray). Window size and position are remembered.
 - The track title comes from the Windows "Now playing" panel; if an app doesn't report it there, from the
   window title (Spotify, a YouTube tab).
 - Log file: `%APPDATA%\TENGAN\desktop.log`.

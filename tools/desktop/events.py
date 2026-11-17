@@ -38,6 +38,13 @@ PREFS_DEF = {
     "widget": False, "opacity": 1.0, "clickthrough": False,
     "widget_rect": None,            # [x, y, w, h]
     "tray": True,                   # закрытие окна — в трей
+    # окно программы (настройки «Окно»)
+    "win_rect": None,               # [x, y, w, h] — место и размер (запоминается само)
+    "win_max": False,               # было развёрнуто на весь экран
+    "start_full": False,            # открывать во весь экран (как F11)
+    "zoom": 1.0,                    # масштаб интерфейса окна: 0.8 … 1.5
+    "autostart": False,             # запуск вместе с системой
+    "start_tray": True,             # при автозапуске — сразу в трей, без окна
 }
 
 KJ = {"new": "接近警告", "tracker": "追跡警告", "ir": "赤外線", "nfc": "近接", "sensor": "感知",

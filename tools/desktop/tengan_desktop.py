@@ -122,7 +122,10 @@ PP_TX = {
                  "quiet_trackers": ["Still show a nearby tracker", ""],
                  "widget": ["Widget on top", "mini radar, activity, temperature, remote, card · double click — HQ"],
                  "opacity": ["Opacity", "0.3 … 1"], "clickthrough": ["Click-through", "clicks pass through the widget (turn off in the tray menu)"],
-                 "tray": ["Close button — to tray", "keeps running by the clock; quit from the tray icon menu"]},
+                 "tray": ["Close button — to tray", "keeps running by the clock; quit from the tray icon menu"],
+                 "start_full": ["Open full screen", "like F11; the window size and position are remembered anyway"],
+                 "zoom": ["Interface scale", "everything in the window bigger or smaller"],
+                 "autostart": ["Start with the system", "when you sign in"], "start_tray": ["…straight to the tray", "no window at autostart — only the icon by the clock"]},
         "styles": [["auto", "as the TENGAN theme"], ["denko", "DENKO"], ["kurenai", "KURENAI"]],
         "corners": [["br", "bottom right"], ["bl", "bottom left"], ["tr", "top right"], ["tl", "top left"]],
         "kinds": {"new": ["New device nearby", "per the TENGAN alert thresholds"], "tracker": ["Tracker nearby", "AirTag and similar tags"],
@@ -140,7 +143,10 @@ PP_TX = {
                  "quiet_trackers": ["Трекер рядом — всё равно показать", ""],
                  "widget": ["Виджет поверх окон", "мини-радар, активность, температура, пульт, карта · двойной клик — штаб"],
                  "opacity": ["Непрозрачность", "0.3 … 1"], "clickthrough": ["Сквозные клики", "клики проходят сквозь виджет (выключить — в меню трея)"],
-                 "tray": ["Крестик — в трей", "программа работает у часов; выход — из меню значка"]},
+                 "tray": ["Крестик — в трей", "программа работает у часов; выход — из меню значка"],
+                 "start_full": ["Открывать во весь экран", "как F11; размер и место окна запоминаются и так"],
+                 "zoom": ["Масштаб интерфейса", "всё в окне крупнее или мельче"],
+                 "autostart": ["Запускать вместе с системой", "при входе в систему"], "start_tray": ["…сразу в трей", "при автозапуске без окна — только значок у часов"]},
         "styles": [["auto", "как тема TENGAN"], ["denko", "DENKO"], ["kurenai", "KURENAI"]],
         "corners": [["br", "справа внизу"], ["bl", "слева внизу"], ["tr", "справа вверху"], ["tl", "слева вверху"]],
         "kinds": {"new": ["Новое устройство рядом", "по порогам тревог TENGAN"], "tracker": ["Трекер рядом", "AirTag и похожие метки"],
@@ -201,6 +207,84 @@ def cfg_load():
             return json.load(f)
     except Exception:
         return {}
+
+
+AUTOSTART_NAME = "TENGAN Desktop"
+
+
+def autostart_cmd():
+    """Чем запускать программу при входе в систему (с ключом --tray). AppImage — по пути самого образа
+    (sys.executable внутри смонтированного образа временный)."""
+    if getattr(sys, "frozen", False):
+        return [os.environ.get("APPIMAGE") or sys.executable, "--tray"]
+    return [sys.executable, os.path.abspath(__file__), "--tray"]
+
+
+def _autostart_file():
+    if sys.platform == "darwin":
+        return os.path.expanduser("~/Library/LaunchAgents/app.tengan.desktop.plist")
+    return os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config"), "autostart", "tengan-desktop.desktop")
+
+
+def autostart_get():
+    try:
+        if os.name == "nt":
+            import winreg
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run") as k:
+                winreg.QueryValueEx(k, AUTOSTART_NAME)
+            return True
+        return os.path.exists(_autostart_file())
+    except Exception:
+        return False
+
+
+def autostart_set(on):
+    """Запуск вместе с системой: Windows — HKCU\\…\\Run, macOS — LaunchAgent, Linux — ~/.config/autostart."""
+    cmd = autostart_cmd()
+    try:
+        if os.name == "nt":
+            import subprocess as sp
+            import winreg
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run", 0, winreg.KEY_SET_VALUE) as k:
+                if on:
+                    winreg.SetValueEx(k, AUTOSTART_NAME, 0, winreg.REG_SZ, sp.list2cmdline(cmd))
+                else:
+                    try:
+                        winreg.DeleteValue(k, AUTOSTART_NAME)
+                    except FileNotFoundError:
+                        pass
+        else:
+            f = _autostart_file()
+            if not on:
+                if os.path.exists(f):
+                    os.remove(f)
+            else:
+                os.makedirs(os.path.dirname(f), exist_ok=True)
+                if sys.platform == "darwin":
+                    args = "".join("<string>%s</string>" % a.replace("&", "&amp;").replace("<", "&lt;") for a in cmd)
+                    body = ('<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" '
+                            '"http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict>'
+                            '<key>Label</key><string>app.tengan.desktop</string>'
+                            '<key>ProgramArguments</key><array>%s</array><key>RunAtLoad</key><true/></dict></plist>\n' % args)
+                else:
+                    q = " ".join('"%s"' % a.replace('"', '\\"') if " " in a else a for a in cmd)
+                    body = ("[Desktop Entry]\nType=Application\nName=TENGAN Desktop\nExec=%s\n"
+                            "X-GNOME-Autostart-enabled=true\nTerminal=false\n" % q)
+                with open(f, "w", encoding="utf-8") as fh:
+                    fh.write(body)
+        return True
+    except Exception as e:
+        log("автозапуск:", e)
+        return False
+
+
+def zoom_js(z):
+    """Масштаб интерфейса окна (CSS zoom всей страницы: и стартовый экран, и страница палки)."""
+    try:
+        z = min(1.5, max(0.8, float(z)))
+    except Exception:
+        z = 1.0
+    return "document.documentElement.style.zoom=%s;window.dispatchEvent(new Event('resize'));" % ("" if z == 1 else "'%g'" % z)
 
 
 def cfg_save(c):
@@ -562,6 +646,7 @@ class JsApi:
     def fullscreen(self):
         if self._app.window:
             self._app.window.toggle_fullscreen()
+            self._app.win_fs = not getattr(self._app, "win_fs", False)   # пока во весь экран — место окна не запоминаем
 
     def home(self):
         self._app.launcher()
@@ -644,6 +729,10 @@ function draw(){L.innerHTML='';var p=P;
  row(r('clickthrough')[0],r('clickthrough')[1],tog('clickthrough',p.clickthrough));
  h3(X.h_window);
  row(r('tray')[0],r('tray')[1],tog('tray',p.tray));
+ row(r('start_full')[0],r('start_full')[1],tog('start_full',p.start_full));
+ row(r('zoom')[0],r('zoom')[1],sel('zoom',String(p.zoom),[['0.8','80%'],['0.9','90%'],['1','100%'],['1.1','110%'],['1.25','125%'],['1.5','150%']]));
+ row(r('autostart')[0],r('autostart')[1],tog('autostart',p.autostart));
+ if(p.autostart)row(r('start_tray')[0],r('start_tray')[1],tog('start_tray',p.start_tray));
 }
 function open_(){fetch('/__app/prefs').then(function(r){return r.json()}).then(function(d){P=d.prefs;draw();document.getElementById('pp').classList.add('on')})}
 document.getElementById('pb2').onclick=open_;
@@ -798,6 +887,20 @@ class App:
             self.tray.refresh()
 
     def set_pref(self, k, v):
+        if k == "zoom":
+            try:
+                v = min(1.5, max(0.8, float(v)))
+            except Exception:
+                v = 1.0
+            if self.window:
+                try:
+                    self.window.evaluate_js(zoom_js(v))
+                except Exception:
+                    pass
+        elif k == "autostart":
+            v = bool(v)
+            if not autostart_set(v):
+                v = autostart_get()                       # не вышло — показываем как есть на самом деле
         p = dict(self.engine.prefs)
         if k.startswith("kinds."):
             kk = dict(p["kinds"])
@@ -1009,9 +1112,58 @@ def main():
     Monitor(link)
     app = App(link)
     serve(app)
-    win = webview.create_window(APP_NAME, "http://127.0.0.1:%d/" % app.port, width=1600, height=1000,
-                                background_color="#000000", min_size=(900, 600), js_api=JsApi(app))
+    pr = app.engine.prefs
+    if bool(pr.get("autostart")) != autostart_get():          # убрали/добавили в системе вручную — верим системе
+        app.set_pref("autostart", autostart_get())
+    # окно: прошлые место и размер (если всё ещё на экране), развёрнуто / во весь экран, старт в трее
+    geo = {"width": 1600, "height": 1000}
+    r = pr.get("win_rect")
+    W, H = overlay.screen_size()
+    if isinstance(r, list) and len(r) == 4 and all(isinstance(v, (int, float)) for v in r) \
+            and r[2] >= 900 and r[3] >= 600 and -50 <= r[0] <= W - 200 and -10 <= r[1] <= H - 100:
+        geo = {"x": int(r[0]), "y": int(r[1]), "width": int(r[2]), "height": int(r[3])}
+    hidden = "--tray" in sys.argv and bool(pr.get("start_tray", True))
+    win = webview.create_window(APP_NAME, "http://127.0.0.1:%d/" % app.port, background_color="#000000",
+                                min_size=(900, 600), js_api=JsApi(app), maximized=bool(pr.get("win_max")),
+                                fullscreen=bool(pr.get("start_full")), hidden=hidden, **geo)
     app.window = win
+    app.win_fs = bool(pr.get("start_full"))
+    app.win_max = bool(pr.get("win_max"))
+    rect = [geo.get("x"), geo.get("y"), geo["width"], geo["height"]]
+    save_t = [0.0]
+
+    def save_rect_later():
+        t = save_t[0] = time.time()
+
+        def go():
+            time.sleep(1.0)
+            if save_t[0] == t and None not in rect:
+                app.set_pref("win_rect", list(rect))
+        threading.Thread(target=go, daemon=True).start()
+
+    def on_moved(x, y):
+        if not (app.win_max or app.win_fs):
+            rect[0], rect[1] = x, y
+            save_rect_later()
+
+    def on_resized(w, h):
+        if not (app.win_max or app.win_fs):
+            rect[2], rect[3] = w, h
+            save_rect_later()
+
+    def on_max():
+        app.win_max = True
+        app.set_pref("win_max", True)
+
+    def on_restored():
+        if app.win_max:
+            app.win_max = False
+            app.set_pref("win_max", False)
+    for ev, fn in (("moved", on_moved), ("resized", on_resized), ("maximized", on_max), ("restored", on_restored)):
+        try:
+            getattr(win.events, ev).__iadd__(fn)
+        except Exception as e:
+            log("окно: нет события", ev, e)
     # оповещения и виджет (WIDGET.md): свои окна поверх всех + значок в трее
     for name, make in (("popups", overlay.Popups), ("widget", overlay.Widget), ("tray", overlay.Tray)):
         try:
@@ -1028,11 +1180,22 @@ def main():
     win.events.closing += on_closing
     threading.Thread(target=app.ticker, daemon=True).start()
 
+    first = [True]
+
     def on_loaded():
         try:
             win.evaluate_js(KEYS)             # F11 / F2 и на странице палки (режим Wi-Fi)
+            if float(app.engine.prefs.get("zoom", 1) or 1) != 1:
+                win.evaluate_js(zoom_js(app.engine.prefs.get("zoom")))
         except Exception:
             pass
+        if first[0]:
+            first[0] = False
+            if hidden and not (app.tray and app.tray.icon):   # просили «в трей», а значка нет — показать окно
+                try:
+                    win.show()
+                except Exception:
+                    pass
     win.events.loaded += on_loaded
     # Linux: окно на Qt WebEngine (ставится из pip и надёжно упаковывается); Windows / macOS — системный движок
     gui = "qt" if sys.platform.startswith("linux") else None

@@ -23,9 +23,8 @@ from overlay_html import POPUP_HTML, WIDGET_HTML
 
 IS_WIN = os.name == "nt"
 IS_MAC = sys.platform == "darwin"
-# Linux (Qt WebEngine): pywebview easy_drag ставит фильтр событий на всё приложение Qt и роняет его (SIGSEGV
-# при старте, pywebview 6.2 + PySide6 6.12) — там окна без easy_drag, а виджет таскается за .pywebview-drag-region.
-EASY_DRAG = not sys.platform.startswith("linux")
+# Перетаскивание виджета: macOS — родной easy_drag pywebview; Windows — системное (DRAG_JS + WM_NCLBUTTONDOWN);
+# Linux — .pywebview-drag-region (easy_drag на Qt ставит фильтр событий на всё приложение и роняет его, SIGSEGV).
 HERE = os.path.dirname(os.path.abspath(__file__))
 POP_W = 380
 
@@ -77,6 +76,37 @@ def win_style(win, opacity=None, clickthrough=None, tool=True):
         return False
 
 
+DRAG_JS = """(function(){if(window.__tgDrag)return;window.__tgDrag=1;var d=null;
+addEventListener('mousedown',function(e){d=(e.button===0&&e.detail<2)?[e.screenX,e.screenY]:null},true);
+addEventListener('mouseup',function(){d=null},true);
+addEventListener('mousemove',function(e){if(!d||!(e.buttons&1))return;
+ if(Math.abs(e.screenX-d[0])+Math.abs(e.screenY-d[1])<3)return;d=null;
+ var a=window.pywebview&&window.pywebview.api;if(a&&a.widget_drag)a.widget_drag()},true)})();"""
+
+PARK = -32000                      # «стоянка» окна плашек за краем экрана (Windows)
+
+
+def work_area():
+    """Рабочая область главного экрана (без панели задач) в логических пикселях — в них pywebview двигает окна.
+    Windows: SPI_GETWORKAREA отдаёт физические пиксели (процесс DPI-aware) — делим на масштаб экрана."""
+    if IS_WIN:
+        try:
+            import ctypes
+            from ctypes import wintypes
+            r = wintypes.RECT()
+            ctypes.windll.user32.SystemParametersInfoW(0x30, 0, ctypes.byref(r), 0)
+            try:
+                k = ctypes.windll.user32.GetDpiForSystem() / 96.0
+            except Exception:
+                k = 1.0
+            k = k or 1.0
+            return r.left / k, r.top / k, r.right / k, r.bottom / k
+        except Exception as e:
+            log("work area:", e)
+    W, H = screen_size()
+    return 0, 0, W, H - 56
+
+
 def screen_size():
     try:
         import webview
@@ -108,8 +138,11 @@ class Popups:
         self.pending = []
         self.visible = False
         self.lock = threading.Lock()
-        self.win = webview.create_window("TENGAN alert", html=POPUP_HTML, width=POP_W, height=120, frameless=True, easy_drag=EASY_DRAG,
-                                         on_top=True, resizable=False, hidden=True, focus=False,
+        # Windows: окно не прячем, а держим за краем экрана — у скрытого при создании окна WebView2 так и не
+        # начинал рисовать (пустая серая плашка). Показать = подвинуть на место, спрятать = увести обратно.
+        kw = dict(x=PARK, y=PARK, hidden=False) if IS_WIN else dict(hidden=True)
+        self.win = webview.create_window("TENGAN alert", html=POPUP_HTML, width=POP_W, height=120, frameless=True, easy_drag=False,
+                                         on_top=True, resizable=False, focus=False, **kw,
                                          background_color="#000000", js_api=_PopupApi(self))
         self.win.events.loaded += self._loaded
 
@@ -138,19 +171,23 @@ class Popups:
         if h <= 0:
             if self.visible:
                 self.visible = False
-                self.win.hide()
+                try:
+                    self.win.move(PARK, PARK) if IS_WIN else self.win.hide()
+                except Exception as e:
+                    log("popup hide:", e)
             return
-        W, H = screen_size()
+        L, T, R, B = work_area()
         corner = self.app.engine.prefs.get("corner", "br")
-        m, bar = 12, 56                                    # отступ и место под панель задач
-        x = W - POP_W - m if corner in ("br", "tr") else m
-        y = H - h - bar if corner in ("br", "bl") else m
+        m = 12                                             # отступ от края рабочей области (она уже без панели задач)
+        x = R - POP_W - m if corner in ("br", "tr") else L + m
+        y = B - h - m if corner in ("br", "bl") else T + m
         try:
             self.win.resize(POP_W, h)
             self.win.move(x, y)
             if not self.visible:
                 self.visible = True
-                self.win.show()
+                if not IS_WIN:
+                    self.win.show()
                 win_style(self.win, tool=True)
         except Exception as e:
             log("popup place:", e)
@@ -166,6 +203,9 @@ class _WidgetApi:
     def widget_open(self):
         self._o.app.show_main()
 
+    def widget_drag(self):
+        self._o.native_drag()
+
 
 class Widget:
     def __init__(self, app):
@@ -179,7 +219,7 @@ class Widget:
         self.ready = False
         self.shown = bool(p.get("widget"))
         self.win = webview.create_window("TENGAN widget", html=WIDGET_HTML, width=int(r[2]), height=int(r[3]), x=int(x), y=int(y),
-                                         frameless=True, easy_drag=EASY_DRAG, on_top=True, resizable=True, hidden=not self.shown,
+                                         frameless=True, easy_drag=IS_MAC, on_top=True, resizable=True, hidden=not self.shown,
                                          focus=False, min_size=(240, 150), background_color="#050302", js_api=_WidgetApi(self))
         self.win.events.loaded += self._loaded
         try:
@@ -192,12 +232,29 @@ class Widget:
 
     def _loaded(self):
         self.ready = True
-        if not EASY_DRAG:
-            try:
+        try:
+            # Windows: таскает сама система (как за заголовок обычного окна) — плавно; запрос уходит один раз,
+            # когда кнопка зажата и мышь сдвинулась на 3+ px, поэтому клик и двойной клик (штаб) работают как раньше.
+            # Linux: перетаскивание pywebview за .pywebview-drag-region.
+            if IS_WIN:
+                self.win.evaluate_js(DRAG_JS)
+            elif not IS_MAC:
                 self.win.evaluate_js("document.getElementById('w').classList.add('pywebview-drag-region')")
-            except Exception:
-                pass
+        except Exception as e:
+            log("widget drag:", e)
         self.apply_style()
+
+    def native_drag(self):
+        h = hwnd_of(self.win)
+        if not (IS_WIN and h):
+            return
+        try:
+            import ctypes
+            u = ctypes.windll.user32
+            u.ReleaseCapture()
+            u.SendMessageW(h, 0x00A1, 2, 0)            # WM_NCLBUTTONDOWN, HTCAPTION — системное перетаскивание
+        except Exception as e:
+            log("widget drag:", e)
 
     def apply_style(self):
         p = self.app.engine.prefs
