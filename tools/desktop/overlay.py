@@ -23,6 +23,9 @@ from overlay_html import POPUP_HTML, WIDGET_HTML
 
 IS_WIN = os.name == "nt"
 IS_MAC = sys.platform == "darwin"
+# Linux (Qt WebEngine): pywebview easy_drag ставит фильтр событий на всё приложение Qt и роняет его (SIGSEGV
+# при старте, pywebview 6.2 + PySide6 6.12) — там окна без easy_drag, а виджет таскается за .pywebview-drag-region.
+EASY_DRAG = not sys.platform.startswith("linux")
 HERE = os.path.dirname(os.path.abspath(__file__))
 POP_W = 380
 
@@ -105,7 +108,7 @@ class Popups:
         self.pending = []
         self.visible = False
         self.lock = threading.Lock()
-        self.win = webview.create_window("TENGAN alert", html=POPUP_HTML, width=POP_W, height=120, frameless=True,
+        self.win = webview.create_window("TENGAN alert", html=POPUP_HTML, width=POP_W, height=120, frameless=True, easy_drag=EASY_DRAG,
                                          on_top=True, resizable=False, hidden=True, focus=False,
                                          background_color="#000000", js_api=_PopupApi(self))
         self.win.events.loaded += self._loaded
@@ -176,7 +179,7 @@ class Widget:
         self.ready = False
         self.shown = bool(p.get("widget"))
         self.win = webview.create_window("TENGAN widget", html=WIDGET_HTML, width=int(r[2]), height=int(r[3]), x=int(x), y=int(y),
-                                         frameless=True, easy_drag=True, on_top=True, resizable=True, hidden=not self.shown,
+                                         frameless=True, easy_drag=EASY_DRAG, on_top=True, resizable=True, hidden=not self.shown,
                                          focus=False, min_size=(240, 150), background_color="#050302", js_api=_WidgetApi(self))
         self.win.events.loaded += self._loaded
         try:
@@ -189,6 +192,11 @@ class Widget:
 
     def _loaded(self):
         self.ready = True
+        if not EASY_DRAG:
+            try:
+                self.win.evaluate_js("document.getElementById('w').classList.add('pywebview-drag-region')")
+            except Exception:
+                pass
         self.apply_style()
 
     def apply_style(self):

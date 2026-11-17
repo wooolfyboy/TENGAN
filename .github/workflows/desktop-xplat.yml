@@ -83,15 +83,10 @@ jobs:
           rc=0; timeout 60 dist/tengan_desktop/tengan_desktop || rc=$?
           echo "exit code: $rc"; echo "--- desktop.log ---"; cat "$LOG" || true
           test "$rc" = 0 && grep -q "selftest OK" "$LOG"
-      - name: Smoke run (window under a virtual display; informational, headless Chromium may crash without GPU)
-        continue-on-error: true
+      - name: Smoke run (start the app with its windows for 25 s under a virtual display)
         env:
           TENGAN_NO_TRAY: "1"
           QTWEBENGINE_DISABLE_SANDBOX: "1"
-          QTWEBENGINE_CHROMIUM_FLAGS: "--no-sandbox --disable-gpu --disable-gpu-compositing --in-process-gpu"
-          QT_XCB_GL_INTEGRATION: none
-          LIBGL_ALWAYS_SOFTWARE: "1"
-          QT_QUICK_BACKEND: software
         run: xvfb-run -a -s "-screen 0 1280x800x24" python tools/desktop/smoke_run.py dist/tengan_desktop/tengan_desktop 25
       - name: AppImage
         run: |
