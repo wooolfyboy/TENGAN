@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Симулятор экрана: собирает настоящий код рисования на компьютере и сохраняет
-# все экраны в картинки (tools/sim/out/*.png, увеличение x2) + общий лист contact.png.
-# Нужны: g++, python3 + Pillow, установленные библиотеки PlatformIO (pio run хотя бы раз).
+# Screen simulator: builds the real drawing code on the PC and saves
+# every screen as an image (tools/sim/out/*.png, 2x) plus a contact sheet contact.png.
+# Needs: g++, python3 + Pillow, PlatformIO libraries installed (run pio run once).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SIM="$ROOT/tools/sim"
@@ -10,7 +10,7 @@ OUT="${SIM_OUTDIR:-$SIM/out}"
 LIB="$ROOT/.pio/libdeps/t-embed-cc1101/TFT_eSPI"
 mkdir -p "$WORK" "$OUT"
 
-# копия TFT_eSPI с правкой для 64-битного компьютера (адрес шрифта хранится в uint32_t)
+# copy of TFT_eSPI patched for a 64-bit host (font address is stored in uint32_t)
 if [ ! -d "$WORK/tftlib" ]; then
   cp -r "$LIB" "$WORK/tftlib"
   sed -i 's/uint32_t flash_address/uintptr_t flash_address/g' "$WORK/tftlib/Extensions/Sprite.cpp" "$WORK/tftlib/TFT_eSPI.cpp"
@@ -40,7 +40,7 @@ imgs = []
 for f in files:
     im = Image.open(f).convert("RGB").resize((640, 340), Image.NEAREST)
     im.save(f[:-4] + ".png"); os.remove(f)
-    if not os.path.basename(f).startswith("anim_"):   # кадры гифок — не в общий лист
+    if not os.path.basename(f).startswith("anim_"):   # GIF frames are not in the contact sheet
         imgs.append(im)
 cols = 3
 rows = (len(imgs) + cols - 1) // cols

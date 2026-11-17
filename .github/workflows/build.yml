@@ -1,12 +1,11 @@
-# Сборка прошивки на каждый пуш. На тег вида v1.0 — ещё и GitHub Release: полный образ (USB, 0x0),
-# firmware для обновления по Wi-Fi и установщик-страница. Прошивка одна на оба языка
-# (English / Русский выбирается на устройстве).
-# Релиз можно сделать и без тега: Actions → build → Run workflow → release_tag = v1.1
-# (тег создастся сам на собранном коммите).
+# Builds the firmware on every push. A tag like v1.0 also makes a GitHub Release: full USB image (0x0),
+# OTA firmware and the web installer page. One firmware for both languages (chosen on the device).
+# A release can also be made without a tag: Actions → build → Run workflow → release_tag = v1.1
+# (the tag is created on the built commit).
 name: build
 
-# Правки только текста и картинок (README, docs/, лицензии) сборку не запускают — экономим минуты Actions.
-# На тег v* сборка идёт всегда (фильтр путей для тегов не действует).
+# Text/image-only changes (README, docs/, licenses) skip the build to save Actions minutes.
+# Tag v* always builds (path filters don't apply to tags).
 on:
   push:
     branches: ['**']
@@ -68,7 +67,7 @@ jobs:
           esptool.py --chip esp32s3 merge_bin -o dist/tengan_full_0x0.bin \
             0x0 $B/bootloader.bin 0x8000 $B/partitions.bin 0xe000 "$APP0" 0x10000 $B/firmware.bin
           cp $B/firmware.bin dist/tengan_firmware_ota.bin
-          # установщик в одном файле (английский и русский на одной странице): открыть в Chrome/Edge → «Установить»
+          # single-file installer (English and Russian on one page): open in Chrome/Edge → "Install"
           python tools/flasher/make_flasher.py dist/tengan_full_0x0.bin dist/flash_tengan.html "${{ inputs.release_tag || github.ref_name }}"
           ls -la dist
 
@@ -76,8 +75,8 @@ jobs:
         run: |
           fail=0
           check() { s=$(stat -c %s "$1"); echo "$1: $s / $2 bytes"; [ "$s" -le "$2" ] || { echo "::error::$1 is over budget ($s > $2)"; fail=1; }; }
-          check dist/tengan_firmware_ota.bin 2830000    # прошивка (OTA) — 2.69 МБ на v2.0-test5
-          check dist/flash_tengan.html      4150000    # установщик — 3.94 МБ
+          check dist/tengan_firmware_ota.bin 2830000    # OTA firmware: 2.69 MB on v2.0-test5
+          check dist/flash_tengan.html      4150000    # installer: 3.94 MB
           gz=$(python3 -c "import re;t=open('src/web/tablet_page.h').read();print(len(re.findall(r'0x[0-9a-fA-F]{2}',t)))")
           echo "tablet page (gzip): $gz / 231000 bytes"; [ "$gz" -le 231000 ] || { echo "::error::tablet page is over budget ($gz > 231000)"; fail=1; }
           exit $fail
@@ -124,8 +123,8 @@ jobs:
             | **tengan_desktop.exe** | TENGAN Desktop для Windows: панель управления и монитор ПК, по USB или Wi-Fi. |
 
 
-  # Приложение для планшета (Android, app/): та же страница, что /full на устройстве, плюс GPS.
-  # APK подписан ключом TENGAN из секретов репозитория — обновление ставится поверх старой версии.
+  # Android tablet app (app/): same page as /full on the device, plus GPS.
+  # APK is signed with the TENGAN key from repo secrets, so updates install over the old version.
   android:
     runs-on: ubuntu-latest
     needs: firmware
@@ -189,11 +188,10 @@ jobs:
           tag_name: ${{ inputs.release_tag || github.ref_name }}
           files: dist/tengan_tablet.apk
 
-  # Приложение для компьютера (Windows, tools/desktop): та же страница FULL + монитор ПК,
-  # связь по USB-кабелю или по Wi-Fi устройства. Один файл tengan_desktop.exe.
+  # Windows desktop app (tools/desktop): FULL page + PC monitor, over USB cable or device Wi-Fi.
   desktop:
     runs-on: windows-latest
-    needs: firmware                  # релиз создаёт firmware — сюда только докладываем exe
+    needs: firmware                  # firmware creates the release; this only adds the exe
     steps:
       - uses: actions/checkout@v5
 
