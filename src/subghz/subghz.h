@@ -1,5 +1,5 @@
 // ============================================================
-//  subghz.h — раздел Sub-GHz (CC1101, только приём)
+//  subghz.h — Sub-GHz section (CC1101, receive only)
 // ============================================================
 #pragma once
 #include <Arduino.h>
@@ -7,8 +7,8 @@
 
 extern const Section subghzSection;
 
-// веб-страница (раздел Web)
-bool subWebUse(int mode, int band);     // включить приём в нужном режиме/полосе
+// web page (Web section)
+bool subWebUse(int mode, int band);     // enable receive in the given mode/band
 void subWebTick(uint32_t now);
 void subWebStop();
 void subJson(String& out);

@@ -1,14 +1,13 @@
-// ---- WebGL: один общий контекст на всё приложение ----
-// Вид рисует сцену шейдером в общий GL-холст (вне страницы), потом кладёт картинку
-// на свой 2D-холст одной командой drawImage и сверху рисует HUD как обычно.
-// Один контекст — без лимита браузера на число WebGL-холстов и без пересоздания при смене раздела.
-// Нет WebGL (старый планшет, ?nogl) — T.GL.ok = false, вид рисует свою старую 2D-версию.
+// ---- WebGL: one shared context for the whole app ----
+// A view draws its scene with a shader into the shared off-page GL canvas, copies it onto its own 2D canvas
+// with one drawImage, then draws the HUD on top. One context avoids the browser's WebGL canvas limit and re-creation on section change.
+// No WebGL (old tablet, ?nogl): T.GL.ok = false and the view falls back to its 2D version.
 //
-//   const P = T.GL.prog(FS)                 // фрагментный шейдер на весь кадр (uniform vec2 res, float t)
-//   const P = T.GL.prog(FS, VS)             // свой вершинный шейдер (меши)
-//   T.GL.begin(w, h, scale)                 // размер кадра в CSS-px; scale — доля разрешения (0.5 — вдвое меньше пикселей)
-//   T.GL.quad(P, { t, foo: [1,2,3], tex: T.GL.tex('name', data, w, h) })   // полноэкранный проход
-//   T.GL.draw(g, x, y, w, h)               // положить результат на 2D-холст вида
+//   const P = T.GL.prog(FS)                 // full-frame fragment shader (uniform vec2 res, float t)
+//   const P = T.GL.prog(FS, VS)             // custom vertex shader (meshes)
+//   T.GL.begin(w, h, scale)                 // frame size in CSS px; scale = resolution share (0.5 = half the pixels)
+//   T.GL.quad(P, { t, foo: [1,2,3], tex: T.GL.tex('name', data, w, h) })   // full-screen pass
+//   T.GL.draw(g, x, y, w, h)               // put the result on the view's 2D canvas
 (() => {
 const GL = T.GL = { ok: false, cv: null, gl: null, progs: [], texs: new Map(), bufs: new Map() };
 const off = new URLSearchParams(location.search).has('nogl');
@@ -31,18 +30,18 @@ const sh = (type, src) => {
   if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { console.error('GL shader:', gl.getShaderInfoLog(s), src.slice(0, 300)); return null; }
   return s;
 };
-// перекраска под тему одной функцией в конце любого фрагментного шейдера: шейдеры пишут цвета DENKO,
-// а в KURENAI (T.GLK = 1) бирюзовое и оранжевое становится красным, остальное — серым той же яркости
+// theme recolor in one function at the end of every fragment shader: shaders write DENKO colors;
+// in KURENAI (T.GLK = 1) teal and orange become red, the rest gray of equal brightness
 const THEMED = fs => fs.replace(/\bgl_FragColor\b/g, 'tg_FC').replace(/\bvoid\s+main\s*\(/, 'void tg_main(') + `
 uniform float tg_k;
 vec3 tg_map(vec3 c){ float l=dot(c,vec3(.299,.587,.114));
  float k=max(smoothstep(.12,.42,min(c.g,c.b)-c.r), smoothstep(.15,.45,c.r-max(c.g,c.b)));
  return mix(vec3(l)*vec3(1.,.988,.96), vec3(.898,.149,.184)*min(1.6,l*1.5+.15), k); }
 void main(){ tg_FC=vec4(0.); tg_main(); gl_FragColor = tg_k > .5 ? vec4(tg_map(tg_FC.rgb), tg_FC.a) : tg_FC; }`;
-// программа с автоматическим поиском uniform/attribute по имени
+// program that finds uniforms/attributes by name
 GL.prog = (fs, vs = VS) => {
   fs = (fs.includes('precision') ? '' : HEAD) + fs;
-  // объявление tg_FC — сразу после precision (и #extension), чтобы шейдер мог писать его до main
+  // declare tg_FC right after precision (and #extension) so the shader can write it before main
   fs = THEMED(fs).replace(/(precision\s+\w+\s+float\s*;)/, '$1\nvec4 tg_FC;');
   const p = gl.createProgram(), a = sh(gl.VERTEX_SHADER, vs), b = sh(gl.FRAGMENT_SHADER, fs);
   if (!a || !b) return null;
@@ -55,11 +54,11 @@ GL.prog = (fs, vs = VS) => {
   for (let i = 0; i < na; i++) { const inf = gl.getActiveAttrib(p, i); P.a[inf.name] = gl.getAttribLocation(p, inf.name); }
   GL.progs.push(P); return P;
 };
-// значения uniform: число, массив, Float32Array, текстура {tex}
+// uniform values: number, array, Float32Array, texture {tex}
 let unit = 0;
 GL.set = (P, vals) => {
   unit = 0;
-  if (P.u.tg_k) gl.uniform1f(P.u.tg_k.loc, T.GLK || 0);   // тема для перекраски (THEMED)
+  if (P.u.tg_k) gl.uniform1f(P.u.tg_k.loc, T.GLK || 0);   // theme for the recolor (THEMED)
   for (const k in vals) {
     const U = P.u[k]; if (!U) continue; const v = vals[k], l = U.loc;
     switch (U.type) {
@@ -74,7 +73,7 @@ GL.set = (P, vals) => {
     }
   }
 };
-// текстура из массива (Uint8 RGBA/LUMINANCE) или из холста/картинки; переиспользуется по имени
+// texture from an array (Uint8 RGBA/LUMINANCE) or a canvas/image; reused by name
 GL.tex = (name, data, w, h, opt = {}) => {
   let T0 = GL.texs.get(name);
   if (!T0) {
@@ -94,7 +93,7 @@ GL.tex = (name, data, w, h, opt = {}) => {
   else { gl.texImage2D(gl.TEXTURE_2D, 0, fmt, w, h, 0, fmt, gl.UNSIGNED_BYTE, data); T0.w = w; T0.h = h; T0.fmt = fmt; }
   return T0;
 };
-// буфер вершин/индексов по имени (меши: рельеф, город, сфера)
+// vertex/index buffer by name (meshes: terrain, city, sphere)
 GL.buf = (name, data, index = false, dynamic = false) => {
   let b = GL.bufs.get(name); const tgt = index ? gl.ELEMENT_ARRAY_BUFFER : gl.ARRAY_BUFFER;
   if (!b) { b = gl.createBuffer(); GL.bufs.set(name, b); }
@@ -103,7 +102,7 @@ GL.buf = (name, data, index = false, dynamic = false) => {
   return b;
 };
 const quadB = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, quadB); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
-// начало кадра: размер в CSS-px × доля разрешения (как у 2D-холстов: не больше T.RES по длинной стороне)
+// frame start: size in CSS px x resolution share (as for 2D canvases, at most T.RES on the long side)
 GL.begin = (w, h, scale = 1, clear = [0, 0, 0, 0]) => {
   const d = Math.min(window.devicePixelRatio || 1, 3, T.RES / Math.max(1, w, h)) * scale * (T.RS || 1);
   const W = Math.max(1, Math.round(w * d)), H = Math.max(1, Math.round(h * d));
@@ -114,7 +113,7 @@ GL.begin = (w, h, scale = 1, clear = [0, 0, 0, 0]) => {
   return GL;
 };
 GL.res = () => [GL.w, GL.h];
-// полноэкранный проход фрагментным шейдером; blend: 'add' — сложение (свет), иначе обычная прозрачность
+// full-screen fragment pass; blend 'add' = additive (light), otherwise normal alpha
 GL.quad = (P, vals = {}, blend) => {
   if (!P) return;
   gl.useProgram(P.p);
@@ -127,9 +126,9 @@ GL.quad = (P, vals = {}, blend) => {
   GL.set(P, vals);
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 };
-// результат на 2D-холст вида (в CSS-координатах)
+// result onto the view's 2D canvas (CSS coordinates)
 GL.draw = (g, x = 0, y = 0, w, h) => { g.drawImage(GL.cv, x, y, w != null ? w : GL.cv.width, h != null ? h : GL.cv.height); };
-// общий кусок GLSL: шум и fbm — вставлять в шейдеры как ${T.GL.NOISE}
+// shared GLSL chunk: noise and fbm, insert into shaders as ${T.GL.NOISE}
 GL.NOISE = `
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 float hash3(vec3 p){return fract(sin(dot(p,vec3(127.1,311.7,74.7)))*43758.5453);}
@@ -141,7 +140,7 @@ float noise3(vec3 p){vec3 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
 float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<5;i++){v+=a*noise(p);p=p*2.03+vec2(1.7,9.2);a*=.5;}return v;}
 float fbm3(vec3 p){float v=0.,a=.5;for(int i=0;i<5;i++){v+=a*noise3(p);p=p*2.03+vec3(1.7,9.2,3.1);a*=.5;}return v;}
 `;
-// матрицы для 3D-мешей (без библиотек)
+// matrices for 3D meshes (no libraries)
 GL.persp = (fov, asp, n, f) => { const t = 1 / Math.tan(fov / 2), r = 1 / (n - f); return new Float32Array([t / asp, 0, 0, 0, 0, t, 0, 0, 0, 0, (n + f) * r, -1, 0, 0, 2 * n * f * r, 0]); };
 GL.lookAt = (e, c, up = [0, 1, 0]) => {
   let z = [e[0] - c[0], e[1] - c[1], e[2] - c[2]]; let l = Math.hypot(...z); z = z.map(v => v / l);

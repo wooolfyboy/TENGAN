@@ -1,10 +1,10 @@
-// ---- WI-FI: каналы — 3D-хребты, уходящие вдаль; сети — стеклянная таблица с карточкой ----
-// Версия B: глубина, туман, свечение. Красота важнее точности: высоты «перетекают»,
-// порядок строк липкий, между сканами (раз в ~20 с) сцена тихо «дышит».
+// ---- WI-FI: channels - 3D ridges going into the distance; networks - glass table with a card ----
+// Version B: depth, fog, glow. Beauty over accuracy: heights 'glide', row order is sticky,
+// between scans (every ~20 s) the scene quietly 'breathes'.
 (() => {
 const WF = {
-  // лучший канал из 1/6/11: меньше всего помех от соседей (как на палке)
-  // липкий: меняется, только если другой канал заметно (на 20%) свободнее
+  // best channel of 1/6/11: least interference from neighbors (like on the stick)
+  // sticky: changes only if another channel is noticeably (20%) freer
   bestCh(nets) {
     const sc = {};
     for (const c of [1, 6, 11]) {
@@ -34,7 +34,7 @@ T.views.push({
     this.drag = T.drag(this.cv.cv, this.cam, { minPitch: 0.25, maxPitch: 1.0 });
     this.drag.onTap = (x, y) => this.tap(x, y);
     this.dust = T.dust(140, 1.9, 1.2);
-    this.z = {};                // сглаженная глубина каждой сети
+    this.z = {};                // smoothed depth of each network
     this.order = []; this.orderT = 0;
     this.sel = null; this.t = 0;
   },
@@ -64,20 +64,20 @@ T.views.push({
     T.finish(g, w, h);
   },
 
-  // ---------- CHANNELS: хребты ----------
+  // ---------- CHANNELS: ridges ----------
   channels(g, w, h, u, m, y0, dt, nets) {
     const cam = this.cam, tt = this.t, portrait = h > w * 1.05;
     this.drag.tick(dt);
     if (this.drag.idle()) cam.yaw = T.lerp(cam.yaw, 0.22 * Math.sin(tt * 0.08), T.ease(dt, 2));
     cam.yaw = T.clamp(cam.yaw, -0.7, 0.7);
     cam.frame(w / 2, portrait ? h * 0.5 : h * 0.54, portrait ? w * 0.95 : Math.min(w * 0.74, h * 1.3));
-    const X = c => (c - 7) * 0.2;                     // канал -> x
+    const X = c => (c - 7) * 0.2;                     // channel -> x
     const sorted = [...nets].sort((a, b) => b.rs - a.rs);
-    sorted.forEach((n, i) => {                        // сильные спереди, слабые дальше
+    sorted.forEach((n, i) => {                        // strong in front, weak farther
       const tz = -0.55 + (sorted.length > 1 ? i / (sorted.length - 1) : 0) * 1.9;
       this.z[n.k] = this.z[n.k] == null ? tz : T.lerp(this.z[n.k], tz, T.ease(dt, 1.2));
     });
-    // пол, ось каналов
+    // floor, channel axis
     T.floorGrid(g, cam, 1.9, 0.25);
     const zF = -0.85;
     for (let c = 1; c <= 13; c++) {
@@ -87,17 +87,17 @@ T.views.push({
       T.txt(g, c, p[0], p[1] + u * 1.25, u * (c === 1 || c === 6 || c === 11 ? 1.0 : 0.8), c === 1 || c === 6 || c === 11 ? T.C.hot : T.C.label, 't', 'center');
     }
     { const a = cam.p(X(1) - 0.5, 0, zF), b = cam.p(X(13) + 0.5, 0, zF); g.strokeStyle = `rgba(${T.RGB.acc},.35)`; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); }
-    // лучший канал — ромб на полу
+    // best channel - diamond on the floor
     const best = WF.bestCh(nets);
     { const p = cam.p(X(best), 0, zF - 0.18); T.diamond(g, p[0], p[1], u * 0.55, T.C.acc, true); T.txt(g, 'BEST', p[0] + u * 0.9, p[1] + u * 0.3, u * 0.72, T.C.acc); }
-    // проходящий «луч скана»: тихое мерцание между сканами
+    // passing 'scan beam': quiet flicker between scans
     {
       const sx = -1.6 + ((tt * 0.28) % 1) * 3.2, a = cam.p(sx, 0, zF), b = cam.p(sx, 0, 1.5), c2 = cam.p(sx, 0.9, 1.5), d = cam.p(sx, 0.9, zF);
       const gr = g.createLinearGradient(a[0], a[1], d[0], d[1]); gr.addColorStop(0, `rgba(${T.RGB.acc},.10)`); gr.addColorStop(1, `rgba(${T.RGB.acc},0)`);
       g.fillStyle = gr; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.lineTo(c2[0], c2[1]); g.lineTo(d[0], d[1]); g.closePath(); g.fill();
       g.strokeStyle = `rgba(${T.RGB.acc},.25)`; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke();
     }
-    // хребты: дальние первыми
+    // ridges: far ones first
     const draw = sorted.map(n => ({ n, z: this.z[n.k], d: cam.p(X(n.c), 0, this.z[n.k])[3] })).sort((a, b) => b.d - a.d);
     const tops = [];
     for (const { n, z } of draw) {
@@ -107,7 +107,7 @@ T.views.push({
       const pts = [];
       for (let i = 0; i <= 28; i++) { const k = i / 28 * 2 - 1, y = H * Math.pow(Math.cos(k * Math.PI / 2), 2); pts.push(cam.p(cx + k * hw, y, z)); }
       const b0 = cam.p(cx - hw, 0, z), b1 = cam.p(cx + hw, 0, z), top = cam.p(cx, H, z);
-      // занавес: заливка (перекрывает дальние) + градиент цвета
+      // curtain: fill (covers far ones) + color gradient
       g.beginPath(); g.moveTo(b0[0], b0[1]); for (const p of pts) g.lineTo(p[0], p[1]); g.lineTo(b1[0], b1[1]); g.closePath();
       g.fillStyle = `rgba(${T.RGB.bg2},.82)`; g.fill();
       const gr = g.createLinearGradient(0, top[1], 0, b0[1]);
@@ -115,16 +115,16 @@ T.views.push({
       g.fillStyle = gr; g.fill();
       g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]));
       g.strokeStyle = T.rgb(sel ? [235, 250, 255] : col, fog * (0.6 + 0.4 * breath)); g.lineWidth = sel ? 2.4 : 1.5; g.stroke();
-      // отражение на полу
+      // reflection on the floor
       g.beginPath(); g.moveTo(b0[0], b0[1]); g.lineTo(b1[0], b1[1]); g.strokeStyle = T.rgb(col, 0.35 * fog); g.lineWidth = 1; g.stroke();
       tops.push({ n, top, s, fog, H, z, cx });
       T.hits.circle(top[0], top[1], Math.max(u * 1.6, top[2] * 0.06), { k: 'net', id: n.k });
     }
     this.dust.tick(dt); this.dust.draw(g, cam);
     T.bloom(this.cv, 0.8);
-    // флажки на вершинах сильнейших
+    // flags on the peaks of the strongest
     const flags = [...tops].sort((a, b) => b.s - a.s).slice(0, portrait ? 3 : 5);
-    const placed = [];                                // флажки не наезжают друг на друга
+    const placed = [];                                // flags do not overlap
     for (const f of [...tops].sort((a, b) => a.top[1] - b.top[1])) {
       if (!flags.includes(f) && this.sel !== f.n.k) continue;
       const p = f.top, open = WF.open(f.n);
@@ -141,10 +141,10 @@ T.views.push({
       T.txt(g, T.fit(g, WF.ssid(f.n), u * 11), p[0] + u * 0.9, fy + u * 0.3, u * 0.8, open ? T.C.alert : T.C.hot, 'c');
       T.txt(g, `CH ${f.n.c} · ${Math.round(f.n.rs)} DBM`, p[0] + u * 0.9, fy + u * 1.25, u * 0.65, T.C.label);
     }
-    // шапка
+    // header
     const age = S.wifiT ? (performance.now() - S.wifiT) / 1000 : 0;
     T.header(g, m, y0, w - 2 * m, u, 'Channels', `${nets.length} networks · best ch ${best} · scan ${T.ago(age)} ago`);
-    // загрузка каналов: мини-панель
+    // channel load: mini panel
     const pw = Math.min(u * 17, w * 0.32), ph = u * 6, px = w - m - pw, py = y0 + u * 3.2;
     T.panel(g, px, py, pw, ph, u);
     T.txt(g, 'CHANNEL LOAD', px + u * 0.8, py + u * 1.3, u * 0.7, T.C.dim);
@@ -157,7 +157,7 @@ T.views.push({
       g.fillStyle = c === best ? T.C.acc : T.heat(0.25 + 0.6 * v); g.fillRect(bx + bw * 0.15, by - bh, bw * 0.7, bh);
       if (c % 5 === 1) T.txt(g, c, bx + bw / 2, py + ph - u * 0.25, u * 0.6, T.C.dim, 'm', 'center');
     }
-    // выбранная сеть — выноска
+    // selected network - callout
     if (this.sel) {
       const f = tops.find(x => x.n.k === this.sel);
       if (f) this.callout(g, u, f.n, f.top, w, h);
@@ -182,10 +182,10 @@ T.views.push({
     T.hits.rect(bx, by, bw, bh, { k: 'close' });
   },
 
-  // ---------- NETWORKS: таблица + карточка ----------
+  // ---------- NETWORKS: table + card ----------
   networks(g, w, h, u, m, y0, dt, nets) {
     const now = performance.now();
-    // липкий порядок: соседи меняются, только если разница больше 6 dB
+    // sticky order: neighbors swap only if the difference is over 6 dB
     const have = new Set(nets.map(n => n.k));
     this.order = this.order.filter(k => have.has(k));
     for (const n of nets) if (!this.order.includes(n.k)) {

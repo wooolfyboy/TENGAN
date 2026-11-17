@@ -1,20 +1,19 @@
 // ============================================================
-//  web.h — раздел Web: палка раздаёт свой Wi-Fi и показывает
-//  страницу с данными на телефоне или компьютере
+//  web.h — Web section: the device runs its own Wi-Fi AP and serves a data page.
 // ============================================================
 #pragma once
 #include "core/section.h"
 
 extern const Section webSection;
 
-// экран (web_screen.cpp) — отдельно, чтобы его видел симулятор
+// screen (web_screen.cpp) is separate so the simulator can use it
 struct WebView { const char* ssid; const char* pass; const char* url; int clients; uint32_t reqs; bool ok; const char* tab; };
 void drawWebScreen(const WebView& v, const uint8_t* qr, int qrSize);
 void drawWebOta(const WebView& v, int pct, const char* err);
-// планшет подключён: вместо пароля — анимация связи «палка -> планшет»
-struct WebLink { int tablets; const char* streams; uint32_t bps; uint32_t sent; };   // streams: "BLE  WX  SND"; bps — байт/с
-void drawWebLink(const WebLink& l, uint32_t now);   // загрузка прошивки: -2 ошибка, 0..100
+// tablet connected: link animation instead of the password
+struct WebLink { int tablets; const char* streams; uint32_t bps; uint32_t sent; };   // streams: "BLE  WX  SND"; bps in bytes/s
+void drawWebLink(const WebLink& l, uint32_t now);   // firmware upload: -2 error, 0..100
 
-// приложение для компьютера по USB (строки «@…» с того же провода, что монитор ПК)
-void webLinkLine(char* s);                         // строка от компьютера (её отдаёт pc.cpp)
-void webLinkPump();                                // каждый проход loop(): страница кусками + очередь USB
+// PC app over USB ("@..." lines on the same wire as the PC monitor)
+void webLinkLine(char* s);                         // line from the PC (passed in by pc.cpp)
+void webLinkPump();                                // every loop(): page in chunks + USB queue

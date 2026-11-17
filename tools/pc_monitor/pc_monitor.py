@@ -1,20 +1,15 @@
 # -*- coding: utf-8 -*-
 """
-TENGAN — монитор нагрузки ноутбука.
+TENGAN laptop monitor.
 
-Раз в секунду смотрит загрузку процессора, память, диск, сеть и батарею
-и отправляет это на палку по USB-кабелю. Палка показывает всё в разделе PC.
+Once a second it reads CPU, memory, disk, network and battery and sends them to TENGAN over USB
+(shown in the PC section). TENGAN sends back remote commands (Media page in PC):
+KEY VOLUP / VOLDN / PLAY / NEXT / PREV / MUTE, which the program turns into media key presses.
 
-Обратно палка присылает команды пульта (страница «Media» в разделе PC):
-  KEY VOLUP / KEY VOLDN — громче / тише, KEY PLAY — пауза/играть, KEY NEXT / KEY PREV — трек, KEY MUTE — без звука.
-Программа нажимает за тебя мультимедийные клавиши Windows.
+PC sound: while the Sound section is open on TENGAN it sends "AUD ON"; the program captures what plays
+on the speakers/headphones (not the microphone), computes the spectrum and sends ~30 "PA ..." lines per second.
 
-Звук ноутбука: когда на палке открыт раздел Sound, она шлёт «AUD ON» —
-программа слушает то, что играет в колонках/наушниках (без микрофона),
-считает спектр и ~30 раз в секунду отправляет палке строки «PA ...».
-
-Запускать двойным кликом по start_pc_monitor.bat (он сам всё поставит).
-Остановить — закрыть окно или нажать Ctrl+C.
+Run by double-clicking start_pc_monitor.bat (it installs everything). Stop: close the window or Ctrl+C.
 """
 import os
 import asyncio
@@ -33,41 +28,104 @@ except ImportError:
     input("Нажми Enter, чтобы закрыть окно...")
     sys.exit(1)
 
-ESP_VID = 0x303A          # «код производителя» USB у чипов Espressif (наша палка)
+ESP_VID = 0x303A          # USB vendor ID of Espressif chips (our stick)
 
-# ---------- мультимедийные клавиши (только Windows) ----------
+# ---------- media keys ----------
+# Windows: virtual keys; macOS: AppleScript (system volume, Spotify / Music);
+# Linux: playerctl (MPRIS: any player or browser) and pactl / amixer (volume).
 IS_WIN = os.name == "nt"
+IS_MAC = sys.platform == "darwin"
+IS_LINUX = sys.platform.startswith("linux")
 VK = {"VOLUP": 0xAF, "VOLDN": 0xAE, "MUTE": 0xAD, "PLAY": 0xB3, "NEXT": 0xB0, "PREV": 0xB1}
 if IS_WIN:
     import ctypes
     _user32 = ctypes.windll.user32
 
 
+def run_cmd(args, timeout=2.0):
+    """Run a system command (macOS / Linux). Return its output, or None (missing program, error)."""
+    import subprocess
+    try:
+        r = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
+        return r.stdout if r.returncode == 0 else None
+    except Exception:
+        return None
+
+
+def osa(script, timeout=2.0):
+    return run_cmd(["osascript", "-e", script], timeout)
+
+
+# macOS: control whichever player is running (Spotify first, then Music)
+_MAC_PLAYER = ('if application "Spotify" is running then\n tell application "Spotify" to %s\n'
+               'else if application "Music" is running then\n tell application "Music" to %s\nend if')
+_MAC_CMD = {"PLAY": ("playpause", "playpause"), "NEXT": ("next track", "next track"), "PREV": ("previous track", "previous track")}
+
+
 def press(name):
-    """Нажать мультимедийную клавишу, как на клавиатуре ноутбука."""
-    code = VK.get(name)
-    if code is None or not IS_WIN:
-        return
-    _user32.keybd_event(code, 0, 0, 0)        # нажали
-    _user32.keybd_event(code, 0, 2, 0)        # отпустили
+    """Press a media key, like on a laptop keyboard."""
+    if IS_WIN:
+        code = VK.get(name)
+        if code is None:
+            return
+        _user32.keybd_event(code, 0, 0, 0)        # key down
+        _user32.keybd_event(code, 0, 2, 0)        # key up
+    elif IS_MAC:
+        if name in _MAC_CMD:
+            osa(_MAC_PLAYER % _MAC_CMD[name])
+        elif name == "VOLUP":
+            osa("set volume output volume ((output volume of (get volume settings)) + 6)")
+        elif name == "VOLDN":
+            osa("set volume output volume ((output volume of (get volume settings)) - 6)")
+        elif name == "MUTE":
+            osa("set volume output muted (not (output muted of (get volume settings)))")
+    elif IS_LINUX:
+        if name in ("PLAY", "NEXT", "PREV"):
+            run_cmd(["playerctl", {"PLAY": "play-pause", "NEXT": "next", "PREV": "previous"}[name]])
+        elif name in ("VOLUP", "VOLDN", "MUTE"):
+            pa = {"VOLUP": ["set-sink-volume", "@DEFAULT_SINK@", "+5%"], "VOLDN": ["set-sink-volume", "@DEFAULT_SINK@", "-5%"],
+                  "MUTE": ["set-sink-mute", "@DEFAULT_SINK@", "toggle"]}[name]
+            if run_cmd(["pactl"] + pa) is None:
+                run_cmd(["amixer", "-q", "sset", "Master", {"VOLUP": "5%+", "VOLDN": "5%-", "MUTE": "toggle"}[name]])
 
 
-# ---------- текущая громкость (если стоит библиотека pycaw; без неё палка просто не покажет %) ----------
+# ---------- current volume (Windows: pycaw; macOS: AppleScript; Linux: pactl / amixer) ----------
 _vol_iface = None
 
 
 def read_volume():
-    """Вернуть (громкость 0..100, без звука?) или None."""
+    """Return (volume 0..100, muted?) or None."""
     global _vol_iface
+    if IS_MAC:
+        out = osa('set s to get volume settings\nreturn ((output volume of s) as text) & "," & ((output muted of s) as text)')
+        try:
+            v, m = out.strip().split(",")
+            return int(float(v)), m.strip() == "true"
+        except Exception:
+            return None
+    if IS_LINUX:
+        import re
+        out = run_cmd(["pactl", "get-sink-volume", "@DEFAULT_SINK@"])
+        if out:
+            m = re.search(r"(\d+)%", out)
+            mute = run_cmd(["pactl", "get-sink-mute", "@DEFAULT_SINK@"]) or ""
+            if m:
+                return int(m.group(1)), "yes" in mute.lower()
+        out = run_cmd(["amixer", "get", "Master"])
+        if out:
+            m = re.search(r"\[(\d+)%\].*?\[(on|off)\]", out)
+            if m:
+                return int(m.group(1)), m.group(2) == "off"
+        return None
     if not IS_WIN:
         return None
     try:
         if _vol_iface is None:
             from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
             spk = AudioUtilities.GetSpeakers()
-            if hasattr(spk, "EndpointVolume"):           # новые версии pycaw
+            if hasattr(spk, "EndpointVolume"):           # newer pycaw
                 _vol_iface = spk.EndpointVolume
-            else:                                        # старые версии pycaw
+            else:                                        # older pycaw
                 from comtypes import CLSCTX_ALL
                 from ctypes import POINTER, cast
                 raw = spk.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
@@ -84,16 +142,19 @@ def say(msg=""):
 
 
 def find_port(forced=None):
-    """Найти палку среди USB-устройств. Вернуть имя порта (например COM5) или None."""
+    """Find the stick among USB devices. Return the port name (e.g. COM5) or None."""
     if forced:
         return forced
     ports = list(serial.tools.list_ports.comports())
     for p in ports:
         if p.vid == ESP_VID:
             return p.device
-    for p in ports:                                   # запасной вариант — по названию
+    for p in ports:                                   # fallback: by name
         d = (p.description or "").lower()
         if "jtag" in d or "esp32" in d:
+            return p.device
+    for p in ports:                                   # macOS / Linux: USB-CDC port by name
+        if p.device.startswith("/dev/cu.usbmodem") or p.device.startswith("/dev/ttyACM"):
             return p.device
     return None
 
@@ -102,16 +163,16 @@ def open_port(name):
     s = serial.Serial()
     s.port = name
     s.baudrate = 115200
-    s.dtr = False             # иначе палка может перезагрузиться при подключении
+    s.dtr = False             # otherwise the stick may reset on connect
     s.rts = False
     s.write_timeout = 2
-    s.timeout = 1             # чтение команд от палки: ждать строку не больше секунды
+    s.timeout = 1             # reading commands from the stick: wait at most 1 s per line
     s.open()
     return s
 
 
 def clean(text, n=20):
-    """Убрать пробелы и лишнее из имени (палка делит строку по пробелам)."""
+    """Strip spaces and junk from a name (the stick splits lines on spaces)."""
     text = "".join(ch if ch.isalnum() or ch in "._-" else "_" for ch in (text or ""))
     return text[:n] or "-"
 
@@ -124,10 +185,10 @@ class Collector:
         self.disk = psutil.disk_io_counters()
         self.net = psutil.net_io_counters()
         self.top = "-"
-        self.city = None                      # строка «PP ...» для города процессов
+        self.city = None                      # "PP ..." line for the process city
         self.procs = {}
-        # поиск «прожорливого» процесса — в отдельном потоке: на Windows перебор
-        # сотен процессов занимает 1-2 с и иначе задерживал бы отправку
+        # the hungriest-process search runs in its own thread: on Windows scanning
+        # hundreds of processes takes 1-2 s and would delay sending
         threading.Thread(target=self._top_loop, daemon=True).start()
         self.root = "C:\\" if os.name == "nt" else "/"
         self.host = clean(socket.gethostname())
@@ -142,7 +203,7 @@ class Collector:
 
     @staticmethod
     def _foreground_pid():
-        """Программа, в окне которой ты сейчас работаешь (только Windows)."""
+        """The program whose window is in the foreground (Windows only)."""
         if not IS_WIN:
             return -1
         try:
@@ -154,18 +215,18 @@ class Collector:
             return -1
 
     def _find_top(self):
-        """Самый «прожорливый» процесс + город процессов (по программам, не по окнам)."""
+        """Hungriest process + process city (per program, not per window)."""
         best, best_cpu = "-", -1.0
         seen = {}
-        apps = {}                                  # имя программы -> [cpu, память МБ, активна?]
+        apps = {}                                  # program name -> [cpu, memory MB, active?]
         fg = self._foreground_pid()
         ncpu = psutil.cpu_count() or 1
         for p in psutil.process_iter(["name", "memory_info"]):
             try:
                 if p.pid == 0:
-                    continue              # «System Idle Process» — это простой, а не нагрузка
+                    continue              # "System Idle Process" is idle time, not load
                 proc = self.procs.get(p.pid) or p
-                cpu = proc.cpu_percent(interval=None) / ncpu      # % от всего процессора
+                cpu = proc.cpu_percent(interval=None) / ncpu      # % of total CPU
                 seen[p.pid] = proc
                 name = clean((p.info["name"] or "-").replace(".exe", ""), 18)
                 mem = (p.info["memory_info"].rss if p.info["memory_info"] else 0) / 1048576
@@ -179,7 +240,7 @@ class Collector:
                 pass
         self.procs = seen
         self.top = best
-        # в город — 24 программы: самые занятые процессором, потом самые большие по памяти, и активная
+        # the city gets 24 programs: busiest by CPU, then biggest by memory, plus the active one
         items = sorted(apps.items(), key=lambda kv: (-kv[1][0], -kv[1][1]))
         pick = [kv for kv in items if kv[1][0] >= 0.3][:16]
         names = {k for k, _ in pick}
@@ -233,7 +294,7 @@ class Collector:
             "up=%d" % up,
             "top=" + self.top,
             "host=" + self.host,
-            "ts=%d" % int(time.time()),                       # точное время для неба и спутников на палке
+            "ts=%d" % int(time.time()),                       # exact time for the sky and satellites on the stick
             "tz=%d" % (time.localtime().tm_gmtoff or 0),
         ]
         if bat is not None:
@@ -241,9 +302,9 @@ class Collector:
         return " ".join(parts) + "\n", cpu, vm.percent
 
 
-# ---------- что сейчас играет (Windows: панель «Сейчас воспроизводится») ----------
-# Нужна библиотека winrt (её ставит start_pc_monitor.bat); без неё палка просто
-# не покажет название трека — всё остальное работает.
+# ---------- now playing (Windows: the system media panel) ----------
+# Needs the winrt library (installed by start_pc_monitor.bat); without it the stick just
+# shows no track title and everything else works.
 _media_mgr_cls = None
 _media_import_err = ""
 try:
@@ -260,7 +321,7 @@ PUNCT = {"\u2014": "-", "\u2013": "-", "\u2012": "-", "\u2212": "-", "\u2018": "
 
 
 def screen_text(text, limit):
-    """Оставить то, что палка умеет рисовать: латиница, цифры, знаки и русские буквы."""
+    """Keep what the stick can draw: Latin, digits, punctuation and Cyrillic."""
     out = []
     for ch in text or "":
         ch = PUNCT.get(ch, ch)
@@ -272,7 +333,7 @@ def screen_text(text, limit):
             out.append(ch)
         elif ch in "\t\r\n":
             out.append(" ")
-        else:                                     # é -> e, остальное (иероглифы, эмодзи) — пропускаем
+        else:                                     # e-acute -> e; skip the rest (CJK, emoji)
             base = unicodedata.normalize("NFKD", ch)[0]
             if 0x20 <= ord(base) < 0x7F:
                 out.append(base)
@@ -295,7 +356,7 @@ def app_name(aumid):
 
 
 def window_track():
-    """Запасной способ: название из заголовка окна (Spotify, вкладка YouTube)."""
+    """Fallback: take the title from the window title (Spotify, YouTube tab)."""
     if not IS_WIN:
         return None
     found = []
@@ -318,12 +379,12 @@ def window_track():
             pname = psutil.Process(pid).name().lower()
         except Exception:
             pname = ""
-        if pname == "spotify.exe" and " - " in title:          # играет: «Исполнитель - Песня»
+        if pname == "spotify.exe" and " - " in title:          # playing: "Artist - Song"
             artist, song = title.split(" - ", 1)
             found.append(("Spotify", song, artist))
-        elif " - YouTube" in title:                             # вкладка YouTube: «Песня - YouTube - Google Chrome»
+        elif " - YouTube" in title:                             # YouTube tab: "Song - YouTube - Google Chrome"
             found.append(("YouTube", title.split(" - YouTube")[0], ""))
-        else:                                                   # вкладка Яндекс Музыки: «Песня — Исполнитель — Яндекс Музыка»
+        else:                                                   # Yandex Music tab: "Song - Artist - Yandex Music"
             low = title.lower()
             for mark in ("яндекс музык", "yandex music", "яндекс.музык"):
                 k = low.find(mark)
@@ -339,11 +400,61 @@ def window_track():
     return "PM\t1\t-1\t-1\t%s\t%s\t%s\n" % (app, screen_text(song, 90), screen_text(artist, 70))
 
 
+def unix_track():
+    """macOS: AppleScript (Spotify / Music); Linux: playerctl (MPRIS: any player or browser).
+    Return a "PM ..." line for TENGAN, "PM\\n" (nothing playing) or None (method unavailable)."""
+    def pm(playing, pos, dur, app, title, artist):
+        title, artist = screen_text(title, 90), screen_text(artist, 70)
+        if not title and not artist:
+            return "PM\n"
+        if dur <= 0:
+            pos = dur = -1
+        elif pos > dur:
+            pos = dur
+        return "PM\t%d\t%d\t%d\t%s\t%s\t%s\n" % (playing, pos, dur, app, title, artist)
+    if IS_MAC:
+        for app, dur_ms in (("Spotify", True), ("Music", False)):
+            script = ('if application "%s" is running then\n tell application "%s"\n'
+                      '  if player state is stopped then return ""\n'
+                      '  return (player state as text) & "\t" & (player position as text) & "\t" & '
+                      '((duration of current track) as text) & "\t" & (name of current track) & "\t" & (artist of current track)\n'
+                      ' end tell\nend if\nreturn ""') % (app, app)
+            out = osa(script)
+            if out is None:
+                continue
+            parts = out.rstrip("\n").split("\t")
+            if len(parts) < 5:
+                continue
+            try:
+                pos = int(float(parts[1].replace(",", ".")))
+                dur = float(parts[2].replace(",", "."))
+                dur = int(dur / 1000) if dur_ms else int(dur)
+            except Exception:
+                pos = dur = -1
+            return pm(1 if parts[0].strip() == "playing" else 0, pos, dur, app, parts[3], parts[4])
+        return "PM\n"
+    if IS_LINUX:
+        out = run_cmd(["playerctl", "metadata", "--format",
+                       "{{status}}\t{{position}}\t{{mpris:length}}\t{{playerName}}\t{{title}}\t{{artist}}"])
+        if out is None:
+            return None if run_cmd(["playerctl", "--version"]) is None else "PM\n"
+        parts = out.rstrip("\n").split("\t")
+        if len(parts) < 6 or parts[0] not in ("Playing", "Paused"):
+            return "PM\n"
+        try:
+            pos = int(int(parts[1] or 0) / 1000000)
+            dur = int(int(parts[2] or 0) / 1000000)
+        except Exception:
+            pos = dur = -1
+        return pm(1 if parts[0] == "Playing" else 0, pos, dur, screen_text((parts[3] or "player").capitalize(), 14), parts[4], parts[5])
+    return None
+
+
 class NowPlaying:
-    """В отдельном потоке раз в секунду узнаёт, что играет, и пишет в окно, что нашёл."""
+    """Background thread: once a second finds what is playing and reports it in the window."""
     def __init__(self):
-        self.line = None                          # готовая строка для палки
-        self.ok = _media_mgr_cls is not None or IS_WIN
+        self.line = None                          # ready line for the stick
+        self.ok = _media_mgr_cls is not None or IS_WIN or IS_MAC or IS_LINUX
         self.err = None
         self.shown = None
         if self.ok:
@@ -359,7 +470,22 @@ class NowPlaying:
         mgr = None
         while True:
             line, how = None, ""
-            if _media_mgr_cls is not None:
+            if not IS_WIN:                                       # macOS / Linux: own methods
+                try:
+                    line = unix_track()
+                    how = "AppleScript" if IS_MAC else "playerctl"
+                    if line is None:
+                        if self.err != "none":
+                            self.err = "none"
+                            self._note("[трек] не нашёл playerctl — название трека не покажу (sudo apt install playerctl)")
+                        time.sleep(5)
+                        continue
+                except Exception as e:
+                    line = None
+                    if str(e) != self.err:
+                        self.err = str(e)
+                        self._note("[трек] " + str(e)[:150])
+            elif _media_mgr_cls is not None:
                 try:
                     if mgr is None:
                         mgr = loop.run_until_complete(self._request())
@@ -370,7 +496,7 @@ class NowPlaying:
                 except Exception as e:
                     mgr = None
                     msg = "%s: %s" % (type(e).__name__, e)
-                    if msg != self.err:                      # одну и ту же ошибку пишем один раз
+                    if msg != self.err:                      # report the same error once
                         self.err = msg
                         self._note("[трек] системная панель не ответила: " + msg[:150])
             if (line is None or line == "PM\n") and IS_WIN:
@@ -385,7 +511,7 @@ class NowPlaying:
                         self._note("[трек] " + msg[:150])
             self.line = line or "PM\n"
             shown = self.line.strip().split("\t")[4:6]
-            if shown != self.shown:                          # трек сменился — написать в окно
+            if shown != self.shown:                          # track changed: report in the window
                 self.shown = shown
                 self._note("[трек] " + (" | ".join(shown) + "  (" + how + ")" if shown else "ничего не играет"))
             time.sleep(1)
@@ -396,8 +522,8 @@ class NowPlaying:
 
     @staticmethod
     async def _read(mgr):
-        # Источников бывает несколько (браузер, плеер...). «Текущий» по мнению Windows —
-        # тот, что трогали последним, а не тот, что играет. Поэтому берём играющий.
+        # There can be several sources (browser, player...). Windows' "current" one is the last
+        # touched, not the one playing, so pick the playing one.
         s = None
         try:
             sessions = list(mgr.get_sessions())
@@ -417,19 +543,19 @@ class NowPlaying:
         props = await s.try_get_media_properties_async()
         info = s.get_playback_info()
         tl = s.get_timeline_properties()
-        playing = 1 if int(info.playback_status) == 4 else 0      # 4 — играет, 5 — пауза
+        playing = 1 if int(info.playback_status) == 4 else 0      # 4 = playing, 5 = paused
 
         def secs(v):
             try:
                 return int(v.total_seconds())
             except Exception:
                 try:
-                    return int(v.duration / 10000000)             # старые версии: 100-нс тики
+                    return int(v.duration / 10000000)             # older versions: 100 ns ticks
                 except Exception:
                     return -1
         pos, dur = secs(tl.position), secs(tl.end_time)
-        # приложение обновляет позицию редко; Windows помнит, КОГДА она была записана —
-        # досчитываем, сколько прошло с тех пор (иначе время на палке отстаёт)
+        # the app updates position rarely; Windows remembers WHEN it was written, so add the elapsed
+        # time (otherwise the stick lags)
         if playing and pos >= 0:
             try:
                 import datetime as _dt
@@ -453,7 +579,7 @@ class NowPlaying:
         return "PM\t%d\t%d\t%d\t%s\t%s\t%s\n" % (playing, pos, dur, app_name(s.source_app_user_model_id), title, artist)
 
 
-# ---------- запись в порт из нескольких потоков — по очереди ----------
+# ---------- port writes from several threads, one at a time ----------
 _write_lock = threading.Lock()
 
 
@@ -462,26 +588,70 @@ def send(port, data):
         port.write(data)
 
 
-# ---------- звук ноутбука (то, что играет в колонках) ----------
-# Нужны numpy и PyAudioWPatch (их ставит start_pc_monitor.bat). Без них всё
-# остальное работает, а палка просто показывает звук со своего микрофона.
+# ---------- laptop sound (what plays on the speakers) ----------
+# Needs numpy and PyAudioWPatch (installed by start_pc_monitor.bat). Without them everything
+# else works and the stick just shows sound from its own microphone.
+class Analyzer:
+    """Sound frame (int16 as float32, shape (N, channels)) -> "PA ..." line for TENGAN:
+    level, 32 spectrum bands, waveform and XY. Same for Windows and Linux."""
+    def __init__(self, np, rate, ch, nfft):
+        self.np, self.rate, self.ch, self.NFFT = np, rate, ch, nfft
+        self.mono = np.zeros(nfft, dtype=np.float32)
+        self.win = np.hanning(nfft).astype(np.float32)
+        self.freqs = np.fft.rfftfreq(nfft, 1.0 / rate)
+        edges = np.geomspace(60, min(8000, rate / 2 - 1), 33)     # same as the TENGAN mic, so the frequency labels match
+        self.idx = [(max(1, int(np.searchsorted(self.freqs, edges[k]))), max(1, int(np.searchsorted(self.freqs, edges[k + 1])))) for k in range(32)]
+        self.top = -40.0
+        self.gain = 120.0 / 8000.0
+
+    def frame(self, data):
+        np, ch, NFFT = self.np, self.ch, self.NFFT
+        m = data.mean(axis=1)
+        self.mono = mono = np.concatenate((self.mono, m))[-NFFT:]
+        # level
+        rms = float(np.sqrt(np.mean(m * m))) / 32768.0
+        level = 20 * np.log10(rms + 1e-7)
+        # spectrum: 32 bands, auto gain
+        spec = np.abs(np.fft.rfft(mono * self.win))
+        db = np.array([20 * np.log10(spec[a:max(b, a + 1)].max() / (NFFT * 8192.0) + 1e-9) for a, b in self.idx])
+        self.top = max(float(db.max()), self.top - 0.25, -60.0)
+        bands = np.clip((db - (self.top - 48)) / 48.0, 0, 1)
+        k = int(np.argmax(spec[2:])) + 2
+        hz = int(self.freqs[k]) if level > -60 else 0
+        # waveform and XY: 64 points, auto gain so the shape fills the screen
+        pk = float(np.abs(data).max()) if data.size else 0.0
+        target = 120.0 / max(pk * 1.05, 400.0)
+        self.gain = target if target < self.gain else self.gain + (target - self.gain) * 0.2   # louder: instantly, quieter: smoothly
+        gain = self.gain
+        tail = mono[-512:][::8]
+        wave = np.clip(tail * gain, -127, 127).astype(np.int8)
+        st = data[-256:] if len(data) >= 256 else data
+        stp = st[::max(1, len(st) // 64)][:64]
+        if len(stp) < 64:
+            stp = np.vstack([stp, np.zeros((64 - len(stp), ch), dtype=np.float32)])
+        lr = stp if ch == 2 else np.repeat(stp, 2, axis=1)
+        xy = np.clip(lr * gain, -127, 127).astype(np.int8)
+        return "PA %d %d %s %s %s %d\n" % (int(level * 10), hz, (bands * 255).astype(np.uint8).tobytes().hex(),
+                                           wave.tobytes().hex(), xy.tobytes().hex(), 1 if ch == 2 else 0)
+
+
 class AudioTap:
     FPS = 30
     NFFT = 2048
 
     def __init__(self):
         self.port = None
-        self.want_until = 0.0                   # палка просит звук до этого момента
+        self.want_until = 0.0                   # the stick wants sound until this time
         self.err_shown = False
         self.thread = None
 
     def request(self):
-        """Палка прислала «AUD ON» (повторяет каждые 1.5 с, пока открыт раздел Sound)."""
+        """The stick sent "AUD ON" (repeated every 1.5 s while the Sound section is open)."""
         first = time.time() > self.want_until
         self.want_until = time.time() + 4.0
         if first:
             say("")
-            say("     [звук] палка просит звук ноутбука — начинаю слушать колонки")
+            say("     [звук] TENGAN просит звук компьютера — начинаю слушать колонки")
         if self.thread is None or not self.thread.is_alive():
             self.thread = threading.Thread(target=self._run, daemon=True)
             self.thread.start()
@@ -489,10 +659,18 @@ class AudioTap:
     def stop(self):
         if time.time() < self.want_until:
             say("")
-            say("     [звук] палка закрыла раздел Sound — перестаю слушать")
+            say("     [звук] на TENGAN закрыт раздел «Звук» — перестаю слушать")
         self.want_until = 0.0
 
     def _run(self):
+        if IS_LINUX:
+            return self._run_linux()
+        if IS_MAC:                                          # macOS cannot capture speaker output without an extra driver (BlackHole)
+            if not self.err_shown:
+                self.err_shown = True
+                say("")
+                say("     [звук] на macOS звук колонок недоступен — TENGAN покажет свой микрофон.")
+            return
         try:
             import numpy as np
             import pyaudiowpatch as pyaudio
@@ -535,17 +713,11 @@ class AudioTap:
         say("")
         say("     [звук] слушаю: %s (%d Гц, %s)" % (dev["name"][:60], rate, "стерео" if ch == 2 else "моно"))
         name = dev["name"]
-        mono = np.zeros(self.NFFT, dtype=np.float32)
-        win = np.hanning(self.NFFT).astype(np.float32)
-        freqs = np.fft.rfftfreq(self.NFFT, 1.0 / rate)
-        edges = np.geomspace(60, min(8000, rate / 2 - 1), 33)     # как у микрофона палки — совпадают подписи частот
-        idx = [(max(1, int(np.searchsorted(freqs, edges[k]))), max(1, int(np.searchsorted(freqs, edges[k + 1])))) for k in range(32)]
-        top = -40.0
-        gain = 120.0 / 8000.0
+        an = Analyzer(np, rate, ch, self.NFFT)
         silent_since = None
         try:
             while time.time() < self.want_until:
-                # в тишине Windows не присылает звук совсем — не ждём, шлём «пусто»
+                # in silence Windows delivers no audio at all: do not wait, send "empty"
                 avail = stream.get_read_available()
                 if avail < block:
                     if silent_since is None:
@@ -560,42 +732,57 @@ class AudioTap:
                     raw = stream.read(block, exception_on_overflow=False)
                     data = np.frombuffer(raw, dtype=np.int16).astype(np.float32).reshape(-1, ch)
                 if self._device_changed(pyaudio, pa, name):
-                    return                                   # переключили колонки/наушники — откроем заново
-                m = data.mean(axis=1)
-                mono = np.concatenate((mono, m))[-self.NFFT:]
-                # громкость
-                rms = float(np.sqrt(np.mean(m * m))) / 32768.0
-                level = 20 * np.log10(rms + 1e-7)
-                # спектр: 32 полосы 40 Гц..16 кГц, автоусиление
-                spec = np.abs(np.fft.rfft(mono * win))
-                db = np.array([20 * np.log10(spec[a:max(b, a + 1)].max() / (self.NFFT * 8192.0) + 1e-9) for a, b in idx])
-                top = max(float(db.max()), top - 0.25, -60.0)
-                bands = np.clip((db - (top - 48)) / 48.0, 0, 1)
-                k = int(np.argmax(spec[2:])) + 2
-                hz = int(freqs[k]) if level > -60 else 0
-                # форма волны и XY: 64 точки, «автоусиление» чтобы фигура была во весь экран
-                pk = float(np.abs(data).max()) if data.size else 0.0
-                target = 120.0 / max(pk * 1.05, 400.0)
-                gain = target if target < gain else gain + (target - gain) * 0.2   # громче — сразу, тише — плавно
-                tail = mono[-512:][::8]
-                wave = np.clip(tail * gain, -127, 127).astype(np.int8)
-                st = data[-256:] if len(data) >= 256 else data
-                stp = st[::max(1, len(st) // 64)][:64]
-                if len(stp) < 64:
-                    stp = np.vstack([stp, np.zeros((64 - len(stp), ch), dtype=np.float32)])
-                lr = stp if ch == 2 else np.repeat(stp, 2, axis=1)
-                xy = np.clip(lr * gain, -127, 127).astype(np.int8)
-                line = "PA %d %d %s %s %s %d\n" % (int(level * 10), hz, (bands * 255).astype(np.uint8).tobytes().hex(),
-                                                    wave.tobytes().hex(), xy.tobytes().hex(), 1 if ch == 2 else 0)
-                port = self.port
-                if port is not None:
-                    try:
-                        send(port, line.encode())
-                    except Exception:
-                        pass
+                    return                                   # speakers/headphones switched: reopen
+                self._emit(an.frame(data))
         finally:
             stream.stop_stream()
             stream.close()
+
+    def _emit(self, line):
+        port = self.port
+        if port is not None:
+            try:
+                send(port, line.encode())
+            except Exception:
+                pass
+
+    # Linux: speaker sound is the PulseAudio / PipeWire output "monitor", via sounddevice
+    def _run_linux(self):
+        try:
+            import numpy as np
+            import sounddevice as sd
+        except Exception as e:
+            if not self.err_shown:
+                self.err_shown = True
+                say("")
+                say("     [звук] нет библиотек для звука компьютера (%s). TENGAN покажет свой микрофон." % e)
+            return
+        sink = (run_cmd(["pactl", "get-default-sink"]) or "").strip()
+        if sink:
+            os.environ["PULSE_SOURCE"] = sink + ".monitor"           # listen to what plays on the speakers
+        dev = None
+        try:
+            for i, d in enumerate(sd.query_devices()):
+                if d["name"] in ("pulse", "pipewire") and d["max_input_channels"] > 0:
+                    dev = i
+                    break
+        except Exception:
+            pass
+        rate, ch = 48000, 2
+        block = rate // self.FPS
+        while time.time() < self.want_until:
+            try:
+                with sd.InputStream(device=dev, channels=ch, samplerate=rate, blocksize=block, dtype="int16") as st:
+                    say("")
+                    say("     [звук] слушаю: %s" % (sink + ".monitor" if sink else "вход по умолчанию"))
+                    an = Analyzer(np, rate, ch, self.NFFT)
+                    while time.time() < self.want_until:
+                        raw, _ = st.read(block)
+                        self._emit(an.frame(np.asarray(raw, dtype=np.float32).reshape(-1, ch)))
+            except Exception as e:
+                say("")
+                say("     [звук] ошибка: %s — пробую снова" % str(e)[:120])
+                time.sleep(1)
 
     _dev_check_t = 0.0
 
@@ -609,16 +796,16 @@ class AudioTap:
             return False
 
 
-# ---------- орбиты спутников для Gallery › Globe ----------
-# Раз в 6 часов скачиваем свежие элементы орбит (TLE) с CelesTrak и раз в минуту
-# отдаём палке; кэш в файле рядом с программой — работает и без интернета.
+# ---------- satellite orbits for Gallery > Globe ----------
+# Every 6 h fetch fresh orbital elements (TLE) from CelesTrak and send them to the stick once a minute;
+# cached in a file next to the program, so it also works offline.
 SATS = [("ISS", 25544), ("Tiangong", 48274), ("Hubble", 20580)]
 TLE_CACHE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tle_cache.txt")
 
 
 class Orbits:
     def __init__(self):
-        self.lines = []                         # готовые строки «TLE\t...»
+        self.lines = []                         # ready "TLE\t..." lines
         self._load_cache()
         threading.Thread(target=self._run, daemon=True).start()
 
@@ -661,12 +848,12 @@ class Orbits:
 
 
 def reader(port, wake, tap):
-    """Отдельный поток: слушает команды от палки и сразу их выполняет."""
+    """Separate thread: listens for commands from the stick and runs them at once."""
     while True:
         try:
-            raw = port.readline()                # ждёт строку (до 1 с), потом снова
+            raw = port.readline()                # waits for a line (up to 1 s), then again
         except Exception:
-            return                               # порт закрыли — поток заканчивается
+            return                               # port closed: the thread ends
         if not raw:
             continue
         line = raw.decode("ascii", "ignore").strip()
@@ -682,7 +869,7 @@ def reader(port, wake, tap):
             label = {"VOLUP": "громче", "VOLDN": "тише", "PLAY": "пауза/играть", "NEXT": "следующий трек", "PREV": "предыдущий трек", "MUTE": "без звука"}.get(name, name)
             sys.stdout.write("\r     пульт: %-14s                              " % label)
             sys.stdout.flush()
-            wake.set()                           # сразу отправить новую громкость
+            wake.set()                           # send the new volume at once
 
 
 def main():
@@ -691,7 +878,7 @@ def main():
         forced = sys.argv[2]
     say("=" * 56)
     say("  TENGAN — монитор ноутбука")
-    say("  Окно не закрывай: пока оно открыто, палка получает данные.")
+    say("  Окно не закрывай: пока оно открыто, TENGAN получает данные.")
     say("  Остановить — закрыть окно (или Ctrl+C).")
     say("=" * 56)
     col = Collector()
@@ -710,13 +897,13 @@ def main():
     next_t = time.monotonic()
     wake = threading.Event()
     while True:
-        # 1. найти и открыть палку
+        # 1. find and open the stick
         if port is None:
             name = find_port(forced)
             if not name:
                 if not warned:
                     say("")
-                    say("[..] Ищу палку... Подключи её к ноуту USB-кабелем и включи.")
+                    say("[..] Ищу TENGAN... Подключи устройство к компьютеру USB-кабелем и включи.")
                     say("     (Ищу дальше сама — ничего нажимать не надо.)")
                     warned = True
                 time.sleep(2)
@@ -724,7 +911,7 @@ def main():
             try:
                 port = open_port(name)
                 say("")
-                say("[OK] Палка найдена: %s. Отправляю данные. Открой на палке раздел PC." % name)
+                say("[OK] TENGAN найден: %s. Отправляю данные. Открой на устройстве раздел ПК." % name)
                 say("     Колесо громкости: в разделе PC прокрути колесом до страницы Media.")
                 warned = False
                 tap.port = port
@@ -738,15 +925,15 @@ def main():
                     say("[!!] Не получилось открыть %s: %s" % (name, e))
                 time.sleep(3)
                 continue
-        # 2. отправить показатели
+        # 2. send the metrics
         try:
-            if wake.is_set():                    # только что крутили колесо — громкость сразу
+            if wake.is_set():                    # wheel just turned: send volume at once
                 wake.clear()
-                time.sleep(0.05)                 # Windows нужно мгновение, чтобы применить
+                time.sleep(0.05)                 # Windows needs a moment to apply it
                 v = read_volume()
                 if v:
                     send(port, ("PV vol=%d mute=%d\n" % (v[0], 1 if v[1] else 0)).encode())
-                wake.wait(max(0.0, next_t - time.monotonic()))   # и дальше ждём до своей секунды
+                wake.wait(max(0.0, next_t - time.monotonic()))   # then wait until our next second
                 continue
             line, cpu, ram = col.line()
             send(port, line.encode("ascii", "replace"))
@@ -757,7 +944,7 @@ def main():
                 send(port, media.line.encode("utf-8"))
             if col.city:
                 send(port, col.city.encode("ascii", "replace"))
-            if orbits.lines and time.time() - last_tle > 60:       # орбиты — раз в минуту
+            if orbits.lines and time.time() - last_tle > 60:       # orbits: once a minute
                 last_tle = time.time()
                 for l in orbits.lines:
                     send(port, l.encode("ascii", "ignore"))
@@ -765,20 +952,20 @@ def main():
             sys.stdout.flush()
         except Exception:
             say("")
-            say("[..] Связь с палкой пропала (кабель отключили?). Жду, когда вернётся...")
+            say("[..] Связь с TENGAN пропала (кабель отключили?). Жду, когда вернётся...")
             tap.port = None
             try:
                 port.close()
             except Exception:
                 pass
             port = None
-        # ровно раз в секунду, сколько бы ни заняли замеры
+        # exactly once a second, however long the sampling takes
         next_t += 1.0
         wait = next_t - time.monotonic()
         if wait < 0:
             next_t = time.monotonic()
             wait = 0
-        wake.wait(wait)                          # проснуться раньше, если крутили колесо
+        wake.wait(wait)                          # wake early if the wheel was turned
 
 
 if __name__ == "__main__":

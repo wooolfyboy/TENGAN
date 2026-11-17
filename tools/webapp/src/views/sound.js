@@ -1,14 +1,14 @@
-// ---- SOUND (версия B): спектр на глянцевом полу, 3D-рельеф, реактор, осциллограф, XY ----
-// Данные — живой звук микрофона палки (~25 кадров/с), между кадрами всё перетекает плавно.
+// ---- SOUND (version B): spectrum on a glossy floor, 3D terrain, reactor, oscilloscope, XY ----
+// Data is live sound from the stick's microphone (~25 frames/s); everything glides between frames.
 (() => {
-  // «послесвечение» люминофора: свой холст, каждый кадр гасится и рисуется заново
+  // phosphor afterglow: own canvas, cleared and redrawn every frame
   const trail = o => {
     const c = document.createElement('canvas'), x = c.getContext('2d');
     return {
       c, x,
       fit() { if (c.width !== o.cv.width || c.height !== o.cv.height) { c.width = o.cv.width; c.height = o.cv.height; x.fillStyle = '#000'; x.fillRect(0, 0, c.width, c.height); } x.setTransform(o.dpr, 0, 0, o.dpr, 0, 0); },
       fade(a) { x.save(); x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = `rgba(0,0,0,${a})`; x.fillRect(0, 0, c.width, c.height); x.restore(); },
-      draw(g) { g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'lighter'; g.drawImage(c, 0, 0); g.restore(); },   // чёрное не добавляет света
+      draw(g) { g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'lighter'; g.drawImage(c, 0, 0); g.restore(); },   // black adds no light
     };
   };
   const NAMES = ['Sound spectrum', 'Terrain', 'Reactor', 'Waveform', 'XY scope'];
@@ -21,12 +21,12 @@
       this.cv = T.canvas(st, 2);
       main.appendChild(this.root);
       this.ROWS = 40; this.COLS = 72; this.rows = [];
-      if (T.glOrbit && T.GL.ok) { this.ROWS = 110; this.COLS = 128; }   // WebGL-рельеф: гуще и глубже
+      if (T.glOrbit && T.GL.ok) { this.ROWS = 110; this.COLS = 128; }   // WebGL terrain: denser and deeper
       this.rowT = 0; this.top = 0.3;
       this.tilt = 0; this.wave = new Float32Array(64);
       this.parts = []; this.bassPrev = 0; this.spin = 0; this.lvS = -90; this.pkS = -90; this.pkHold = -90; this.pkT = 0;
       this.trW = trail(this.cv); this.trX = trail(this.cv);
-      // пальцем по рельефу — наклон
+      // finger on the terrain - tilt
       let d = null;
       const cv = this.cv.cv;
       cv.addEventListener('pointerdown', e => { d = { y: e.offsetY, t: this.tilt }; cv.setPointerCapture(e.pointerId); });
@@ -50,13 +50,13 @@
         T.emptyState(g, w, h, u, bad[0], bad[1], bad[2]);
         T.finish(g, w, h); return;
       }
-      // уровень: плавно, пик держится секунду
+      // level: smooth, peak holds for a second
       this.lvS = T.lerp(this.lvS, S.level, T.ease(dt, 0.08));
       if (S.peak >= this.pkHold || t - this.pkT > 1.2) { this.pkHold = Math.max(S.peak, this.lvS); this.pkT = t; }
       for (let i = 0; i < 64; i++) this.wave[i] = T.lerp(this.wave[i], S.wave[i], T.ease(dt, 0.03));
       const loud = this.lvS >= -15;
       const top = y0 + u * 3.2, bot = h - m * 0.6 - u * 1.8;
-      const mx = w - m - u * 1.2;                         // справа — шкала уровня
+      const mx = w - m - u * 1.2;                         // level scale on the right
       const area = { x: m, y: top, w: mx - u * 1.6 - m, h: bot - top };
       if (this.sub === 0) this.spectrum(g, area, u);
       else if (this.sub === 1) this.terrain(g, w, h, dt, u, top);
@@ -64,16 +64,16 @@
       else if (this.sub === 3) this.scope(g, area, u, dt);
       else this.xy(g, area, u, dt);
       T.bloom(o, this.sub === 1 ? 0.6 : 0.85);
-      // HUD поверх
+      // HUD on top
       const hz = S.hz >= 1000 ? (S.hz / 1000).toFixed(1) + ' kHz' : S.hz + ' Hz';
       const word = this.lvS < -55 ? 'quiet' : this.lvS < -40 ? 'normal' : this.lvS < -15 ? 'loud' : 'very loud';
       T.header(g, m, y0, w - 2 * m, u, NAMES[this.sub], `mic · ${Math.round(this.lvS)} dBFS · ${word}${S.energy > 0.15 ? ' · ' + hz : ''}`, loud);
       T.dots(g, m, y0 + u * 2.75, u, 5, this.sub);
       this.meter(g, mx, top + u * 0.4, u * 1.2, bot - top - u * 0.8, u);
-      T.footer(g, m, bot + u * 0.2, w - 2 * m, u, ['32 bands · 25 fps', 'drag: tilt', 'bass: burst', 'phosphor trace', 'phase figure'][this.sub], 'sse snd 25 hz');
+      T.footer(g, m, bot + u * 0.2, w - 2 * m, u, ['32 bands · 25 fps', 'drag: tilt', 'bass: burst', 'phosphor trace', 'phase figure'][this.sub], 'live');
       T.finish(g, w, h);
     },
-    // вертикальная шкала уровня с удержанием пика
+    // vertical level scale with peak hold
     meter(g, x, y, mw, mh, u) {
       const v = T.clamp((this.lvS + 60) / 60), pk = T.clamp((this.pkHold + 60) / 60), n = 24, sh = mh / n;
       for (let k = 0; k < n; k++) {
@@ -86,10 +86,10 @@
       T.txt(g, 'dB', x + mw / 2, y - u * 0.5, u * 0.7, T.C.dim, 'm', 'center');
       [0, -15, -30, -45, -60].forEach(db => T.txt(g, db, x - u * 0.4, y + mh * (-db / 60) + u * 0.25, u * 0.62, db === -15 ? T.C.alert : T.C.dim, 'm', 'right'));
     },
-    // 32 сегментные полосы, отражение на глянцевом полу, шапки пиков
+    // 32 segment bars, reflection on the glossy floor, peak caps
     spectrum(g, a, u) {
       const n = 32, L = a.x + u * 1.6, bw = (a.w - u * 1.6) / n, base = a.y + a.h * 0.7, H = base - a.y - u, seg = Math.max(4, u * 0.55);
-      // пол
+      // floor
       const fl = g.createLinearGradient(0, base, 0, a.y + a.h);
       fl.addColorStop(0, `rgba(${T.RGB.acc},.10)`); fl.addColorStop(1, `rgba(${T.RGB.acc},0)`);
       g.fillStyle = fl; g.fillRect(L, base, bw * n, a.y + a.h - base);
@@ -100,7 +100,7 @@
         for (let s = 0; s < segs; s++) {
           const y = base - (s + 1) * seg, c = T.heat(0.25 + 0.75 * (s * seg) / H);
           g.fillStyle = c; g.fillRect(x + bw * 0.12, y + seg * 0.15, bw * 0.76, seg * 0.7);
-          const ry = base + s * seg * 0.55 + seg * 0.2;                     // отражение: короче и тусклее
+          const ry = base + s * seg * 0.55 + seg * 0.2;                     // reflection: shorter and dimmer
           if (ry < a.y + a.h) { g.globalAlpha = 0.16 * (1 - s / (segs + 1)); g.fillRect(x + bw * 0.12, ry, bw * 0.76, seg * 0.4); g.globalAlpha = 1; }
         }
         const cy = base - S.caps[i] * H - seg * 0.4;
@@ -110,13 +110,13 @@
       [[100, 4], [500, 14], [1000, 19], [4000, 28]].forEach(([f, i]) => T.txt(g, f >= 1000 ? f / 1000 + 'k' : f, L + (i + 0.5) * bw, a.y + a.h - u * 0.3, u * 0.8, T.C.label, 'm', 'center'));
       T.txt(g, 'Hz', L + bw * n, a.y + a.h - u * 0.3, u * 0.7, T.C.dim, 'm', 'right');
     },
-    // 3D-рельеф: новый хребет 40 раз в секунду, дальние — в тумане
+    // 3D terrain: a new ridge 40 times a second, far ones in fog
     terrain(g, w, h, dt, u, top) {
       this.rowT += dt;
       while (this.rowT > 0.025) {
         this.rowT -= 0.025;
         const C = this.COLS, raw = new Float32Array(C);
-        const canyon = C === 128;   // WebGL: каньон — басы стенами по краям, верхи в долине по центру
+        const canyon = C === 128;   // WebGL: canyon - bass as walls at the edges, highs in the valley center
         for (let c = 0; c < C; c++) { const k = canyon ? (1 - Math.abs(c / (C - 1) * 2 - 1)) * 30 : c * 31 / (C - 1), k0 = Math.floor(k), f = k - k0; const b = S.bands[k0] * (1 - f) + S.bands[Math.min(31, k0 + 1)] * f; raw[c] = b * b; }
         for (let pass = 0; pass < 2; pass++) for (let c = 1; c < C - 1; c++) raw[c] = (raw[c - 1] + 2 * raw[c] + raw[c + 1]) / 4;
         let mx = 0; for (let c = 0; c < C; c++) mx = Math.max(mx, raw[c]);
@@ -133,7 +133,7 @@
       if (T.glOrbit && T.GL.ok && this.COLS === 128) return this.terrainGL(g, w, h, u, top);
       const hy = top + (h - top) * (0.16 - this.tilt * 0.12), camH = 1.25 + this.tilt * 0.6, cx = w / 2;
       const F = Math.max(Math.min(w, h * 1.6) * 0.62, (h * 0.97 - hy) * 1.5 / camH);
-      // солнце-резонатор на горизонте
+      // resonator sun on the horizon
       const sx = w * 0.68, sunR = u * (1.8 + S.energy * 2.2);
       const sg = g.createRadialGradient(sx, hy, 0, sx, hy, sunR * 2.4);
       sg.addColorStop(0, `rgba(${T.RGB.hot},.75)`); sg.addColorStop(0.25, `rgba(${T.RGB.acc},.45)`); sg.addColorStop(1, `rgba(${T.RGB.acc},0)`);
@@ -153,8 +153,8 @@
       }
     },
 
-    // WebGL: полёт над рельефом звука. Новый хребет рождается у горизонта и плывёт к камере;
-    // свет по нормалям, сетка-«трон», солнце на горизонте.
+    // WebGL: flight over the sound terrain. A new ridge is born at the horizon and floats to the camera;
+    // lighting by normals, 'throne' grid, sun on the horizon.
     terrainGL(g, w, h, u, top) {
       const O = T.glOrbit, C = this.COLS, R = this.ROWS;
       if (!this.tgP) {
@@ -169,7 +169,7 @@ void main(){
     col+=vec3(st)*.8;
     vec3 sc=mix(cAcc,cHot,smoothstep(-.3,1.,(p.y-sun.y)/sun.z));
     float disk=smoothstep(1.,.985,d);
-    float below=(sun.y-p.y)/sun.z;   // нижняя половина солнца режется полосами
+    float below=(sun.y-p.y)/sun.z;   // lower half of the sun is cut by stripes
     if(below>0.){ float band=fract(below*6.); disk*=step(below*.55,band); }
     col=mix(col,sc,disk*step(hy,p.y));
     col+=cAcc*exp(-d*1.6)*(.35+lv*.5);
@@ -206,7 +206,7 @@ void main(){
       cam.pitch = 0.22 + this.tilt * 0.2;
       const F = w * 0.55, cy = top + (h - top) * 0.45;
       cam.frame(w / 2, cy, F);
-      // высоты: новый ряд (индекс 0) — на горизонте
+      // heights: new row (index 0) is at the horizon
       const G = O.grid('sndTerrain', C, R);
       if (this.tgN !== this.rows.length || this.rows[0] !== this.tgLast) {
         this.tgN = this.rows.length; this.tgLast = this.rows[0];
@@ -228,7 +228,7 @@ void main(){
       });
       T.GL.draw(g, 0, 0, w, h);
     },
-    // реактор: ядро пульсирует уровнем, круговой спектр, частицы вылетают на басах
+    // reactor: core pulses with level, circular spectrum, particles fly out on bass
     reactor(g, a, u, dt, t) {
       const cx = a.x + a.w / 2, cy = a.y + a.h / 2, Rm = Math.min(a.w, a.h) * 0.42;
       const lv = T.clamp((this.lvS + 60) / 60), bass = (S.bands[0] + S.bands[1] + S.bands[2] + S.bands[3]) / 4;
@@ -240,17 +240,17 @@ void main(){
       this.bassPrev = T.lerp(this.bassPrev, bass, T.ease(dt, 0.12));
       this.spin += dt * (0.25 + lv * 1.2);
       const R0 = Rm * (0.2 + lv * 0.12);
-      // орбиты: наклонённые эллипсы
+      // orbits: tilted ellipses
       for (let k = 0; k < 3; k++) {
         const rr = Rm * (0.55 + k * 0.17), tilt = 0.32 + k * 0.12, rot = this.spin * (k % 2 ? -0.4 : 0.3) + k;
         g.save(); g.translate(cx, cy); g.rotate(rot); g.scale(1, tilt);
         g.strokeStyle = k === 2 ? `rgba(${T.RGB.acc},.55)` : `rgba(${T.RGB.dim},.45)`; g.lineWidth = 1.2 / Math.sqrt(tilt);
         g.beginPath(); g.arc(0, 0, rr, 0, T.TAU); g.stroke();
         g.restore();
-        const pa = t * (0.6 + k * 0.3) * (k % 2 ? -1 : 1), ex = Math.cos(pa) * rr, ey = Math.sin(pa) * rr * tilt;   // «спутник» — без растяжения
+        const pa = t * (0.6 + k * 0.3) * (k % 2 ? -1 : 1), ex = Math.cos(pa) * rr, ey = Math.sin(pa) * rr * tilt;   // 'satellite' - without stretching
         g.fillStyle = T.C.hot; g.beginPath(); g.arc(cx + ex * Math.cos(rot) - ey * Math.sin(rot), cy + ex * Math.sin(rot) + ey * Math.cos(rot), u * 0.25, 0, T.TAU); g.fill();
       }
-      // круговой спектр
+      // circular spectrum
       const n = 32;
       for (let i = 0; i < n * 2; i++) {
         const b = S.bands[i < n ? i : 2 * n - 1 - i], an = this.spin * 0.2 + i / (n * 2) * T.TAU - Math.PI / 2;
@@ -258,12 +258,12 @@ void main(){
         g.strokeStyle = T.heat(0.3 + 0.7 * b); g.lineWidth = Math.max(2, R0 * 0.09);
         g.beginPath(); g.moveTo(cx + Math.cos(an) * r1, cy + Math.sin(an) * r1); g.lineTo(cx + Math.cos(an) * r2, cy + Math.sin(an) * r2); g.stroke();
       }
-      // ядро
+      // core
       const cg = g.createRadialGradient(cx, cy, 0, cx, cy, R0 * 1.25);
       cg.addColorStop(0, `rgba(${T.RGB.hot},1)`); cg.addColorStop(0.45, this.lvS >= -15 ? `rgba(${T.RGB.alert},.9)` : `rgba(${T.RGB.acc},.9)`); cg.addColorStop(1, `rgba(${T.RGB.acc},0)`);
       g.fillStyle = cg; g.beginPath(); g.arc(cx, cy, R0 * 1.25, 0, T.TAU); g.fill();
       g.strokeStyle = T.C.acc; g.lineWidth = 2; g.beginPath(); g.arc(cx, cy, R0 * 1.25, this.spin, this.spin + Math.PI * 1.4); g.stroke();
-      // частицы
+      // particles
       g.fillStyle = T.C.acc;
       for (let i = this.parts.length - 1; i >= 0; i--) {
         const p = this.parts[i];
@@ -274,11 +274,11 @@ void main(){
       g.globalAlpha = 1;
       T.bigNum(g, Math.round(this.lvS), cx, cy + Rm * 1.02, u * 2.2, this.lvS >= -15 ? T.C.alert : T.C.hot, 'dBFS');
     },
-    // осциллограф: гладкая линия, люминофор держит прошлые кадры
+    // oscilloscope: smooth line, phosphor keeps past frames
     scope(g, a, u, dt) {
       const tr = this.trW; tr.fit(); tr.fade(Math.min(1, dt * 11));
       const x = tr.x, mid = a.y + a.h / 2, amp = a.h * 0.42, gain = 1 / Math.max(0.15, Math.min(1, Math.max(...this.wave.map(Math.abs)) * 1.1));
-      // сетка (на основном холсте — не размазывается)
+      // grid (on the main canvas - not smeared)
       g.strokeStyle = `rgba(${T.RGB.line},.6)`; g.lineWidth = 1;
       for (let k = 0; k <= 10; k++) { const gx = a.x + a.w * k / 10; g.beginPath(); g.moveTo(gx, a.y); g.lineTo(gx, a.y + a.h); g.stroke(); }
       for (let k = 0; k <= 8; k++) { const gy = a.y + a.h * k / 8; g.beginPath(); g.moveTo(a.x, gy); g.lineTo(a.x + a.w, gy); g.stroke(); }
@@ -294,7 +294,7 @@ void main(){
       T.brackets(g, a.x, a.y, a.w, a.h, u * 1.2, `rgba(${T.RGB.acc},.6)`);
       T.txt(g, `×${gain.toFixed(1)}`, a.x + u * 0.6, a.y + u * 1.4, u * 0.8, T.C.label);
     },
-    // XY: фигура из волны и её сдвинутой копии, с послесвечением
+    // XY: figure from the wave and its shifted copy, with afterglow
     xy(g, a, u, dt) {
       const tr = this.trX; tr.fit(); tr.fade(Math.min(1, dt * 4));
       const x = tr.x, s = Math.min(a.w, a.h) * 0.46, cx = a.x + a.w / 2, cy = a.y + a.h / 2, k = 16;

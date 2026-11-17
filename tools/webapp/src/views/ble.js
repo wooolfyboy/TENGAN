@@ -1,21 +1,21 @@
-// ---- BLUETOOTH (версия B): радар в глубину, 3D-город, плотная таблица ----
-// Общие кусочки (T.bleUI) использует и «Обзор».
+// ---- BLUETOOTH (version B): depth radar, 3D city, dense table ----
+// Shared helpers (T.bleUI) are also used by Overview.
 const BU = T.bleUI = {};
 BU.G = { phone: 'P', audio: 'A', watch: 'W', tracker: 'T', computer: 'C', TV: 'V', tv: 'V', sensor: 'S', band: 'B', input: 'G', beacon: 'i', unknown: '?' };
 BU.glyph = e => BU.G[e.type] || (e.type ? String(e.type)[0].toUpperCase() : '?');
 BU.ang = id => (T.hash(id) % 360) * Math.PI / 180;
-BU.rad = rs => 0.08 + 0.88 * (1 - T.pct(rs));          // сильный — ближе к центру
+BU.rad = rs => 0.08 + 0.88 * (1 - T.pct(rs));          // strong = closer to center
 BU.list = () => [...S.dev.values()].filter(e => e.h > 0.02 && e.rs != null);
-BU.label = e => e.label || e.name || (e.type && e.type !== 'unknown' ? e.type : 'device');   // своя подпись — главнее
+BU.label = e => e.label || e.name || (e.type && e.type !== 'unknown' ? e.type : 'device');   // custom label wins
 BU.tr = e => e.type === 'tracker';
 BU.rgb = (e, v) => BU.tr(e) ? T.ALERT : T.heatRGB(v);
 BU.crossed = (a, b, x) => b >= a ? (x > a && x <= b) : (x > a || x <= b);
 BU.dist = r => { const d = Math.pow(10, (-59 - r) / 20); return d < 10 ? d.toFixed(1) : String(Math.round(d)); };
 BU.apiBase = () => T.apiBase();
-// число, которое не мигает: новое значение принимается, только если продержалось 1.5 с
+// number that does not flicker: a new value is accepted only after holding for 1.5 s
 BU.hold = (ms = 1500) => ({ v: null, c: null, t: 0, set(x, now) { if (this.v == null) { this.v = x; return x; } if (x === this.v) { this.c = null; return x; } if (x !== this.c) { this.c = x; this.t = now; } else if (now - this.t > ms) { this.v = x; this.c = null; } return this.v; } });
 
-// луч: шаг и засечки (ping — время, когда луч прошёл цель)
+// beam: step and marks (ping = time the beam passed the target)
 BU.sweeper = (period = 3.2) => ({
   a: 0, pings: new Map(),
   tick(dt, t) {
@@ -25,8 +25,8 @@ BU.sweeper = (period = 3.2) => ({
   ping(id, t) { const p = this.pings.get(id); return p == null ? 9 : t - p; },
 });
 
-// ---- радар в перспективе: диск, кольца, луч-клин со стенкой, столбы света ----
-// opt: {sel, u, t, labels (сколько подписать), hits}
+// ---- perspective radar: disc, rings, wedge beam with a wall, light pillars ----
+// opt: {sel, u, t, labels (how many to label), hits}
 BU.scene = (g, cam, sw, opt) => {
   const { u, t } = opt;
   T.floorGrid(g, cam, 1.7, 0.2);
@@ -38,19 +38,19 @@ BU.scene = (g, cam, sw, opt) => {
   g.beginPath();
   for (let a = 0; a < 360; a += 10) { const r = a * Math.PI / 180, l = a % 30 ? 1.03 : 1.07, p = cam.p(Math.cos(r), 0, Math.sin(r)), q = cam.p(Math.cos(r) * l, 0, Math.sin(r) * l); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); }
   g.strokeStyle = T.C.acc; g.lineWidth = 1; g.stroke();
-  // клин луча на полу
+  // beam wedge on the floor
   const tail = 1.3, N = 26, o = cam.p(0, 0, 0), s = sw.a;
   for (let i = 0; i < N; i++) {
     const a0 = s - tail * (1 - i / N), a1 = s - tail * (1 - (i + 1) / N), v = (i + 1) / N, p = cam.p(Math.cos(a0), 0, Math.sin(a0)), q = cam.p(Math.cos(a1), 0, Math.sin(a1));
     g.fillStyle = T.heat(0.2 + 0.65 * v, 0.3 * v * v); g.beginPath(); g.moveTo(o[0], o[1]); g.lineTo(p[0], p[1]); g.lineTo(q[0], q[1]); g.closePath(); g.fill();
   }
-  { // стенка луча
+  { // beam wall
     const rx = Math.cos(s), rz = Math.sin(s), a = cam.p(0, 0, 0), b = cam.p(rx, 0, rz), c = cam.p(rx, 0.2, rz), d = cam.p(0, 0.2, 0);
     const gr = g.createLinearGradient(a[0], a[1], d[0], d[1]); gr.addColorStop(0, `rgba(${T.RGB.acc},.22)`); gr.addColorStop(1, `rgba(${T.RGB.acc},0)`);
     g.fillStyle = gr; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.lineTo(c[0], c[1]); g.lineTo(d[0], d[1]); g.closePath(); g.fill();
     g.strokeStyle = T.C.hot; g.lineWidth = 2; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke();
   }
-  // столбы: дальние раньше
+  // pillars: far ones first
   const list = BU.list(), rank = [...list].sort((a, b) => b.rs - a.rs);
   const items = list.map(e => { const r = BU.rad(e.rs), a = BU.ang(e.id), x = Math.cos(a) * r, z = Math.sin(a) * r; return { e, x, z, p0: cam.p(x, 0, z) }; }).sort((a, b) => b.p0[3] - a.p0[3]);
   let selTop = null;
@@ -78,11 +78,11 @@ BU.scene = (g, cam, sw, opt) => {
 
 BU.sceneAny = (g, cam, sw, opt) => BU.scene(g, cam, sw, opt);
 
-// ---- ГОРОД НА ВИДЕОКАРТЕ (WebGL): башни-коробки с окнами, мокрый асфальт с отражениями, туман ----
-// Проекция в шейдере повторяет T.orbit один в один — подписи и касания (cam.p) ложатся точно на башни.
-// Общий для Bluetooth › City и PC › City.
+// ---- GPU CITY (WebGL): box towers with windows, wet asphalt with reflections, fog ----
+// Shader projection matches T.orbit exactly, so labels and touches (cam.p) land on the towers.
+// Shared by Bluetooth > City and PC > City.
 // towers: [{x, z, sx, sz, h, col:[r,g,b] 0..255, roof:[r,g,b], seed, glow 0..1, tr, sel}]
-// opt: {t, rings:[радиусы], rmax, grid:'radial'|'square', step, ext}
+// opt: {t, rings:[radii], rmax, grid:'radial'|'square', step, ext}
 BU.glCity = (() => {
   const MAXP = 48, STRIDE = 14;
   let P = null, PG = null, PI = null, data = new Float32Array(MAXP * 30 * STRIDE), failed = false;
@@ -95,7 +95,7 @@ void main(){vec3 p=pos;p.y*=mir;
  float wv=max(.05,cam2.x+z2);
  gl_Position=vec4((2.*cam2.z/scr.x-1.)*wv+2.*x1*cam2.y/scr.x,(1.-2.*cam2.w/scr.y)*wv+2.*y2*cam2.y/scr.y,((wv-.05)/12.*2.-1.)*wv,wv);
  vuv=fuv;vface=face;vcol=col;vex=ex;vdep=wv;vy=pos.y;}`;
-  // башни: фасад с окнами (этажи по 0.035, колонки по 0.03), светящиеся рёбра, крыша
+  // towers: facade with windows (floors every 0.035, columns every 0.03), glowing edges, roof
   const FS = `precision highp float;
 varying vec3 vuv;varying float vface;varying vec3 vcol;varying vec4 vex;varying float vdep;varying float vy;
 uniform float t;uniform float refl;uniform float fogA;uniform float fogB;
@@ -123,7 +123,7 @@ void main(){
  float fog=smoothstep(fogA,fogB,vdep);a*=1.-fog*.8;
  if(refl>0.){a*=refl*exp(-vy*5.);col*=.9;}
  gl_FragColor=vec4(col*a,a);}`;
-  // земля: мокрый асфальт; кольца/спицы или квадратная сетка; лужи; пятна света под башнями
+  // ground: wet asphalt; rings/spokes or square grid; puddles; light spots under towers
   const FG = `#extension GL_OES_standard_derivatives : enable
 precision highp float;
 varying vec3 vuv;varying float vdep;
@@ -161,7 +161,7 @@ void main(){vec3 p=pos;float x1=p.x*cam1.x-p.z*cam1.y,z1=p.x*cam1.y+p.z*cam1.x;f
     if (P || failed) return !!P;
     P = T.GL.prog(FS, VS); PG = T.GL.prog(FG, VG);
     if (!P || !PG) { failed = true; P = null; return false; }
-    const gd = []; const N = 48, R = 2.1;                 // земля: сетка-квадрат (мелко — для правильной перспективы)
+    const gd = []; const N = 48, R = 2.1;                 // ground: square grid (fine, for correct perspective)
     for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
       const x0 = -R + 2 * R * i / N, x1 = -R + 2 * R * (i + 1) / N, z0 = -R + 2 * R * j / N, z1 = -R + 2 * R * (j + 1) / N;
       gd.push(x0, 0, z0, x1, 0, z0, x1, 0, z1, x0, 0, z0, x1, 0, z1, x0, 0, z1);
@@ -175,12 +175,12 @@ void main(){vec3 p=pos;float x1=p.x*cam1.x-p.z*cam1.y,z1=p.x*cam1.y+p.z*cam1.x;f
   const attrib = (prog, name, size, off) => { const gl = T.GL.gl, l = prog.a[name]; if (l == null || l < 0) return; gl.enableVertexAttribArray(l); gl.vertexAttribPointer(l, size, gl.FLOAT, false, STRIDE * 4, off * 4); };
   return {
     ok: () => T.GL && T.GL.ok && init(),
-    // рисует всю сцену в общий GL-холст и кладёт на 2D-холст вида
+    // draw the whole scene into the shared GL canvas and copy it onto the view's 2D canvas
     render(g, cam, W, H, towers, opt) {
       if (!this.ok()) return false;
       const GL = T.GL, gl = GL.gl;
       GL.begin(W, H, opt.scale || 1);
-      // вершины башен (дальние/ближние — неважно: буфер глубины)
+      // tower vertices (order does not matter: depth buffer)
       k = 0;
       const list = towers.slice(0, MAXP);
       for (const b of list) {
@@ -206,8 +206,8 @@ void main(){vec3 p=pos;float x1=p.x*cam1.x-p.z*cam1.y,z1=p.x*cam1.y+p.z*cam1.x;f
       };
       gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
       gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL);
-      drawTowers(-1, 0.3); gl.clear(gl.DEPTH_BUFFER_BIT);                     // отражения в мокром асфальте
-      // земля
+      drawTowers(-1, 0.3); gl.clear(gl.DEPTH_BUFFER_BIT);                     // reflections in wet asphalt
+      // ground
       gl.disable(gl.DEPTH_TEST);
       gl.useProgram(PG.p); GL.buf('cityGround');
       const lp = PG.a.pos; gl.enableVertexAttribArray(lp); gl.vertexAttribPointer(lp, 3, gl.FLOAT, false, 0, 0);
@@ -217,7 +217,7 @@ void main(){vec3 p=pos;float x1=p.x*cam1.x-p.z*cam1.y,z1=p.x*cam1.y+p.z*cam1.x;f
       GL.set(PG, camU(cam, W, H, { t: opt.t, rmax: opt.rmax || 1.5, rings, mode: opt.grid === 'square' ? 1 : 0, step0: opt.step || 0.2,
         tw: twU, tc: tcU, n: list.length, fogA, fogB }));
       gl.drawArrays(gl.TRIANGLES, 0, PG.nGround); gl.disableVertexAttribArray(lp);
-      // башни
+      // towers
       gl.enable(gl.DEPTH_TEST); gl.clear(gl.DEPTH_BUFFER_BIT); drawTowers(1, 0);
       gl.disable(gl.DEPTH_TEST);
       GL.draw(g, 0, 0, W, H);
@@ -226,7 +226,7 @@ void main(){vec3 p=pos;float x1=p.x*cam1.x-p.z*cam1.y,z1=p.x*cam1.y+p.z*cam1.x;f
   };
 })();
 
-// выноска-карточка у цели (Scope и City)
+// callout card at the target (Scope and City)
 BU.card = (g, p, e, u, W, H, top) => {
   const sg = T.pct(e.rs), bw = u * 15, bh = u * 8.2;
   let bx = p[0] + u * 4, by = p[1] - u * 7;
@@ -244,7 +244,7 @@ BU.card = (g, p, e, u, W, H, top) => {
   T.hits.rect(bx, by, bw, bh, { k: 'card' });
 };
 
-// липкий порядок: соседи меняются, только если разница > 6 dB (как ORDER_HYST_DB на палке)
+// sticky order: neighbors swap only if the difference is > 6 dB (like ORDER_HYST_DB on the stick)
 BU.sticky = () => ({
   ids: [], t: 0,
   get(list, now, frozen) {
@@ -260,7 +260,7 @@ BU.sticky = () => ({
   },
 });
 
-// строки списка; ry плавно едет к своему месту
+// list rows; ry glides to its place
 BU.rows = (g, x, y, w, h, u, rowH, list, sel, dt, cols = {}) => {
   const fs = rowH * 0.42;
   T.txt(g, 'T', x + u * 0.35, y + u * 0.8, u * 0.7, T.C.dim);
@@ -315,7 +315,7 @@ T.views.push({
     else if (h.k === 'back') this.sel = null;
     else if (h.k === 'name') { const e = S.dev.get(this.sel); if (e && T.nameDevice) T.nameDevice(e, e.label || (this.info && this.info.label) || ''); }
   },
-  // подробности выбранного с палки: адреса, Company ID, сервисы
+  // details of the stick-selected device: addresses, Company ID, services
   fetchInfo(now) {
     if (this.sel == null || now - this.infoT < 3000) return;
     this.infoT = now; const id = this.sel;
@@ -376,12 +376,12 @@ T.views.push({
     this.camStep(dt);
     const c = this.cam;
     c.frame(w * 0.5, y0 + (h - y0) * (portrait ? 0.5 : 0.58), portrait ? w * 0.78 : Math.min((h - y0) * 1.2, w * 0.72));
-    // радиальная сетка: кольца = пороги дальности палки (settings.h RANGES), спицы через 30°
+    // radial grid: rings = stick range thresholds (settings.h RANGES), spokes every 30°
     const RINGS = [[-60, 'VERY NEAR'], [-70, 'NEAR'], [-80, 'ROOM'], [-90, 'FAR']], RMAX = 1.55;
     const ringR = db => { const P = [[-45, 0.22], [-60, 0.42], [-70, 0.68], [-80, 0.96], [-90, 1.24], [-100, 1.5]];
       if (db >= P[0][0]) return P[0][1]; for (let i = 1; i < P.length; i++) if (db >= P[i][0]) { const a = P[i - 1], b = P[i]; return b[1] + (a[1] - b[1]) * (db - b[0]) / (a[0] - b[0]); } return P[P.length - 1][1]; };
     const ring = (r, col, lw) => { g.beginPath(); for (let i = 0; i <= 96; i++) { const a = i / 96 * T.TAU, q = c.p(Math.cos(a) * r, 0, Math.sin(a) * r); i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); } g.strokeStyle = col; g.lineWidth = lw; g.stroke(); };
-    const useGL = BU.glCity.ok();                         // видеокарта: земля и башни шейдером; 2D — запасной путь
+    const useGL = BU.glCity.ok();                         // GPU: ground and towers by shader; 2D is the fallback
     if (!useGL) {
       g.lineWidth = 1; g.strokeStyle = `rgba(${T.RGB.line},.55)`; g.beginPath();
       for (let a = 0; a < 360; a += 30) { const r = a * Math.PI / 180, p0 = c.p(Math.cos(r) * 0.1, 0, Math.sin(r) * 0.1), p1 = c.p(Math.cos(r) * RMAX, 0, Math.sin(r) * RMAX); g.moveTo(p0[0], p0[1]); g.lineTo(p1[0], p1[1]); }
@@ -391,8 +391,8 @@ T.views.push({
     }
     const list = BU.list(), rank = [...list].sort((a, b) => b.rs - a.rs);
     const SZ = { computer: 0.09, TV: 0.1, tv: 0.1, phone: 0.065, audio: 0.06, watch: 0.05, band: 0.045, tracker: 0.045, sensor: 0.05 };
-    // место башни: расстояние от центра — по силе сигнала (кольца), угол — по id с небольшим разбросом;
-    // соседи расталкиваются, всё плавно перетекает
+    // tower position: distance from center = signal strength (rings), angle = from id with small jitter;
+    // neighbors push apart, everything glides
     for (const e of list) {
       const ang = (T.hash(e.id) % 3600) / 3600 * T.TAU, rr = ringR(e.rs) + (((T.hash(e.id * 7 + 3) & 255) / 255) - 0.5) * 0.12;
       e._tx = Math.cos(ang) * rr; e._tz = Math.sin(ang) * rr;
@@ -415,14 +415,14 @@ T.views.push({
       return { x: tw.x, z: tw.z, sx: tw.s, sz: tw.s, h: Math.max(0.01, tw.hh), col: BU.rgb(e, 0.35 + 0.65 * tw.sg), roof: tr ? T.ALERT : T.heatRGB(0.55 + 0.45 * tw.sg),
         seed: T.hash(e.id) % 997, glow: tw.sg, tr, sel: e.id === this.sel };
     }), { t, rings: RINGS.map(([db]) => ringR(db)), rmax: RMAX, grid: 'radial' });
-    for (const [db, name] of [...RINGS, [-127, 'ALL']]) {             // подписи колец — на ближней стороне
+    for (const [db, name] of [...RINGS, [-127, 'ALL']]) {             // ring labels on the near side
       const r = db < -100 ? RMAX : ringR(db), a = -c.yaw - Math.PI / 2 + 0.22, q = c.p(Math.cos(a) * r, 0, Math.sin(a) * r);
       T.txt(g, name + (db > -100 ? '  ' + db : ''), q[0] + u * 0.3, q[1] - u * 0.3, u * 0.66, db === -90 || db < -100 ? T.C.acc : T.C.dim);
     }
     for (const tw of towers) {
       const { e, x, z, s, hh, sg } = tw, tr = BU.tr(e), fog = T.clamp(1.2 - (tw.d + 1) * 0.3, 0.3, 1) * T.clamp(e.h);
       const col = BU.rgb(e, 0.35 + 0.65 * sg);
-      if (useGL) {                                         // башню нарисовала видеокарта — здесь только касания и подписи
+      if (useGL) {                                         // tower drawn by GPU - only touches and labels here
         const top = c.p(x, hh, z), bot = c.p(x, 0, z);
         T.hits.circle(top[0], top[1], Math.max(u * 1.6, top[2] * s * 1.2), { k: 'dev', id: e.id });
         T.hits.rect(Math.min(top[0], bot[0]) - top[2] * s, top[1], top[2] * s * 2, Math.max(4, bot[1] - top[1]), { k: 'dev', id: e.id });
@@ -431,7 +431,7 @@ T.views.push({
         continue;
       }
       const P = [[-s, -s], [s, -s], [s, s], [-s, s]].map(([a, b]) => [c.p(x + a, 0, z + b), c.p(x + a, hh, z + b)]);
-      // боковые грани: видимые (обход по часовой на экране), дальние раньше
+      // side faces: visible ones (clockwise on screen), far ones first
       const faces = [0, 1, 2, 3].map(i => { const j = (i + 1) % 4; return { i, j, d: (P[i][0][3] + P[j][0][3]) / 2 }; }).sort((a, b) => b.d - a.d);
       for (const f of faces) {
         const a = P[f.i], b = P[f.j];
@@ -440,12 +440,12 @@ T.views.push({
         const lit = 0.18 + 0.22 * Math.abs(Math.sin(f.i + 0.5));
         g.fillStyle = T.rgb(col, lit * 0.4 * fog); g.beginPath(); g.moveTo(a[0][0], a[0][1]); g.lineTo(b[0][0], b[0][1]); g.lineTo(b[1][0], b[1][1]); g.lineTo(a[1][0], a[1][1]); g.closePath(); g.fill();
         g.strokeStyle = T.rgb(col, 0.45 * fog); g.lineWidth = 1; g.stroke();
-        // окна: полосы этажей
+        // windows: floor stripes
         g.strokeStyle = T.rgb(col, 0.18 * fog); g.beginPath();
         for (let y = 0.05; y < hh - 0.02; y += 0.05) { const k = y / Math.max(hh, 1e-3), ax = T.lerp(a[0][0], a[1][0], k), ay = T.lerp(a[0][1], a[1][1], k), bx = T.lerp(b[0][0], b[1][0], k), by = T.lerp(b[0][1], b[1][1], k); g.moveTo(ax, ay); g.lineTo(bx, by); }
         g.stroke();
       }
-      // крыша светится; у трекеров — оранжевая
+      // roof glows; orange for trackers
       g.fillStyle = T.rgb(tr ? T.ALERT : T.heatRGB(0.55 + 0.45 * sg), (0.45 + 0.35 * sg) * fog);
       g.beginPath(); P.forEach((q, k) => k ? g.lineTo(q[1][0], q[1][1]) : g.moveTo(q[1][0], q[1][1])); g.closePath(); g.fill();
       const top = c.p(x, hh, z);
@@ -501,7 +501,7 @@ T.views.push({
     T.txt(g, '// DEVICE', x + p, cy + u * 0.9, u * 1.05, T.C.acc, 't');
     T.txt(g, '‹ ALL', x + w - p, cy + u * 0.9, u * 0.9, T.C.label, 'm', 'right');
     T.hits.rect(x + w - p - u * 4.5, cy - u * 0.4, u * 5, u * 2, { k: 'back' });
-    // кнопка «назвать»: своя подпись для устройства (хранится на палке)
+    // 'name it' button: custom label for the device (stored on the stick)
     { const bw = u * 5.4, bx = x + w - p - u * 5 - bw - u * 0.8, by = cy - u * 0.35;
       T.panel(g, bx, by, bw, u * 1.7, u * 0.4, `rgba(${T.RGB.acc},.1)`, T.C.acc);
       T.txt(g, e.label ? 'RENAME' : 'NAME', bx + bw / 2, by + u * 1.15, u * 0.8, T.C.hot, 'm', 'center');

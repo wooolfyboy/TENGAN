@@ -1,26 +1,26 @@
 // ============================================================
-//  power.h — выключение / включение боковой кнопкой
+//  power.h — power off / on with the side button
 //
-//  «Выключено» = глубокий сон ESP32: экран, светодиоды и периферия
-//  обесточены, будит ТОЛЬКО удержание боковой кнопки.
+//  "Off" = ESP32 deep sleep: screen, LEDs and peripherals are
+//  unpowered; ONLY holding the side button wakes it.
 // ============================================================
 #pragma once
 #include <Arduino.h>
 
-static const uint32_t PWR_SHOW_MS = 600;    // после стольких мс удержания показываем шкалу
-static const uint32_t PWR_OFF_MS  = 2000;   // держать столько, чтобы выключить
-static const uint32_t PWR_ON_MS   = 1000;   // держать столько, чтобы включить
+static const uint32_t PWR_SHOW_MS = 600;    // show the gauge after this many ms of holding
+static const uint32_t PWR_OFF_MS  = 2000;   // hold this long to power off
+static const uint32_t PWR_ON_MS   = 1000;   // hold this long to power on
 
-extern uint32_t g_powerHold;                // сколько уже держат (для шкалы на экране)
-extern bool     g_ignoreUser;               // игнорировать кнопку, пока её не отпустят
+extern uint32_t g_powerHold;                // how long it has been held (for the on-screen gauge)
+extern bool     g_ignoreUser;               // ignore the button until released
 
-void checkWakeHold();                       // в самом начале setup()
+void checkWakeHold();                       // at the very start of setup()
 
-// Экономия (Settings -> Auto dim, по умолчанию выключено): после заданного
-// времени без касаний экран гаснет до 25 % и кадры реже.
-void powerTouch();                          // было нажатие / поворот колеса
-bool powerIdle();                           // экран сейчас приглушён
+// Power saving (Settings -> Auto dim, off by default): after the set idle
+// time the screen dims to 25 % and frames get less frequent.
+void powerTouch();                          // a press / wheel turn happened
+bool powerIdle();                           // screen is dimmed now
 void powerIdleTick(uint32_t now);
 void powerOff();
 void drawPowerHold();
-void shutFrame(uint32_t t);         // кадр анимации выключения в момент t мс (0..1400)
+void shutFrame(uint32_t t);         // power-off animation frame at t ms (0..1400)

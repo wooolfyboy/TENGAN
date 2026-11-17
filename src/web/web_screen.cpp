@@ -1,8 +1,8 @@
 // ============================================================
-//  web_screen.cpp — экран раздела Web: QR-код для подключения,
-//  имя сети, пароль и адрес страницы
+//  web_screen.cpp — Web section screens: join QR, SSID, password, page URL; OTA progress; tablet-link eye animation.
 // ============================================================
 #include "web/web.h"
+#include "core/lang.h"
 #include "core/display.h"
 #include "core/theme.h"
 #include "core/ui.h"
@@ -12,15 +12,15 @@ void drawWebScreen(const WebView& v, const uint8_t* qr, int n) {
   char buf[40];
   spr.fillSprite(C_BG());
   if (!v.ok) {
-    uiHeader("Web", "error", true);
-    uiEmpty("hotspot did not start", "side: back, then try again");
-    uiFooter("", "side: back");
+    uiHeader(L("Web", "Веб"), L("error", "ошибка"), true);
+    uiEmpty(L("access point did not start", "точка доступа не запустилась"), L("go back and try again", "выйдите и попробуйте снова"));
+    uiFooter("", L("side: back", "кнопка: назад"));
     present();
     return;
   }
-  snprintf(buf, sizeof(buf), v.clients ? "%d connected" : "waiting", v.clients);
-  uiHeader("Web", buf, false);
-  // QR: тёмные модули на светлом поле (так его читают камеры)
+  if (v.clients) snprintf(buf, sizeof(buf), L("%d connected", "подключено: %d"), v.clients); else snprintf(buf, sizeof(buf), "%s", L("waiting", "ожидание"));
+  uiHeader(L("Web", "Веб"), buf, false);
+  // QR: dark modules on a light field, as cameras expect
   int scale = n > 0 ? min(4, 116 / (n + 4)) : 3;
   int side = (n + 4) * scale, qx = UI_M + 2, qy = UI_TOP + 4;
   spr.fillRect(qx, qy, side, side, TFT_WHITE);
@@ -31,48 +31,54 @@ void drawWebScreen(const WebView& v, const uint8_t* qr, int n) {
   int tx = qx + side + 12, y = UI_TOP + 6;
   spr.setTextDatum(TL_DATUM);
   spr.setTextColor(C_ACC());
-  txt("1  SCAN QR OR JOIN WI-FI", tx, y, 1);
-  uiReadout(tx, y + 12, "network", v.ssid, C_HOT());
-  uiReadout(tx, y + 40, "password", v.pass, C_HOT());
+  txt(L("1  SCAN THE QR OR JOIN WI-FI", "1  QR-КОД ИЛИ ВРУЧНУЮ"), tx, y, 1);
+  uiReadout(tx, y + 12, L("network", "сеть"), v.ssid, C_HOT());
+  uiReadout(tx, y + 40, L("password", "пароль"), v.pass, C_HOT());
   spr.setTextColor(C_ACC());
-  txt("2  OPEN IN BROWSER", tx, y + 72, 1);
+  txt(L("2  OPEN IN A BROWSER", "2  ОТКРОЙТЕ В БРАУЗЕРЕ"), tx, y + 72, 1);
   spr.setTextColor(C_HOT());
   txt(v.url, tx, y + 84, 2);
   spr.setTextColor(UI_DIM());
-  if (v.tab && v.tab[0]) { char tb[16]; size_t k = 0; for (; v.tab[k] && k < 15; k++) tb[k] = (char)toupper((unsigned char)v.tab[k]); tb[k] = 0;
-                          snprintf(buf, sizeof(buf), "VIEWING: %s", tb); }
-  else snprintf(buf, sizeof(buf), "PHONE OR COMPUTER  REQ %lu", (unsigned long)v.reqs);
+  if (v.tab && v.tab[0]) { char tb[32];
+                          const char* tl = v.tab;
+                          if (g_lang) {
+                            static const char* const TM[][2] = { { "overview", "обзор" }, { "bluetooth", "bluetooth" }, { "wi-fi", "wi-fi" }, { "sub-ghz", "sub-ghz" }, { "sound", "звук" }, { "system", "система" }, { "update", "обновление" } };
+                            for (auto& m : TM) if (!strcmp(v.tab, m[0])) tl = m[1];
+                          }
+                          utf8Upper(tl, tb, sizeof tb);
+                          snprintf(buf, sizeof(buf), L("VIEWING: %s", "ОТКРЫТО: %s"), tb); }
+  else snprintf(buf, sizeof(buf), "%s", L("PHONE, TABLET OR COMPUTER", "ТЕЛЕФОН, ПЛАНШЕТ ИЛИ ПК"));
   txt(buf, tx, y + 106, 1);
-  uiFooter("bluetooth + wi-fi live", "side: back");
+  uiFooter(L("Bluetooth and Wi-Fi live", "Bluetooth и Wi-Fi в эфире"), L("side: back", "кнопка: назад"));
   present();
   (void)W;
 }
 
-// загрузка прошивки по Wi-Fi: рисуем и сразу выводим (сервер в это время занят)
+// Wi-Fi firmware upload: draw and present immediately (the server is busy meanwhile)
 void drawWebOta(const WebView& v, int pct, const char* err) {
   const int W = spr.width();
   char buf[40];
   spr.fillSprite(C_BG());
   bool bad = pct == -2;
-  uiHeader("Firmware update", bad ? "failed" : pct >= 100 ? "done" : "receiving", bad);
+  uiHeader(L("Firmware update", "Обновление"), bad ? L("failed", "ошибка") : pct >= 100 ? L("done", "готово") : L("receiving", "приём"), bad);
   int bx = UI_M + 12, bw = W - 2 * bx, by = 76;
   spr.setTextDatum(TC_DATUM);
   if (bad) {
     spr.setTextColor(C_ALERT());
-    txt("UPDATE FAILED", W / 2, 50, 4);
+    txt(L("UPDATE FAILED", "НЕ УДАЛОСЬ"), W / 2, 50, 4);
     spr.setTextColor(UI_LABEL());
-    txt(err && err[0] ? err : "unknown error", W / 2, 84, 2);
+    txt(err && err[0] ? err : L("unknown error", "неизвестная ошибка"), W / 2, 84, 2);
     spr.setTextColor(UI_DIM());
-    txt("OLD FIRMWARE KEPT - NOTHING CHANGED", W / 2, 110, 1);
+    txt(L("THE PREVIOUS FIRMWARE IS KEPT", "ПРЕЖНЯЯ ПРОШИВКА СОХРАНЕНА"), W / 2, 110, 1);
   } else {
     snprintf(buf, sizeof(buf), "%d%%", max(0, pct));
     spr.setTextColor(C_HOT());
-    txt(pct >= 100 ? "RESTARTING" : buf, W / 2, 38, 4);
+    txt(pct >= 100 ? L("RESTARTING", "ПЕРЕЗАПУСК") : buf, W / 2, 38, 4);
     spr.drawRect(bx, by, bw, 14, UI_LINE());
     spr.fillRect(bx + 2, by + 2, (bw - 4) * constrain(pct, 0, 100) / 100, 10, C_ACC());
     spr.setTextColor(UI_DIM());
-    txt("DO NOT TURN OFF", W / 2, by + 26, 1);
-    txt("IF THE NEW FIRMWARE FAILS, THE OLD ONE COMES BACK", W / 2, by + 40, 1);
+    txt(L("DO NOT TURN OFF", "НЕ ВЫКЛЮЧАЙТЕ"), W / 2, by + 26, 1);
+    txt(L("IF THE NEW FIRMWARE FAILS, THE OLD ONE COMES BACK", "ЕСЛИ НОВАЯ НЕ ЗАПУСТИТСЯ, ВЕРНЁТСЯ ПРЕЖНЯЯ"), W / 2, by + 40, 1);
   }
   uiFooter("", "");
   present();
@@ -80,9 +86,8 @@ void drawWebOta(const WebView& v, int pct, const char* err) {
 }
 
 // ============================================================
-//  Планшет подключён — вместо пароля живая картинка по теме:
-//   «небесный глаз» (天眼): оглядывается, кольца радужки вращаются, моргает.
-//  Колесо или нажатие — снова QR и пароль (web.cpp).
+//  Tablet connected: animated "sky eye" (天眼) instead of the password -
+//  looks around, iris rings spin, blinks. Wheel/press brings back QR and password (web.cpp).
 // ============================================================
 #include "core/settings.h"
 
@@ -94,21 +99,21 @@ static void drawEye(uint32_t now, int cx, int cy) {
   if (!blinkAt) blinkAt = now + 2500;
   if ((int32_t)(now - nextLook) > 0) { tx = random(-26, 27); ty = random(-7, 8); nextLook = now + 900 + random(2600); }
   lx = ease(lx, tx, 0.14f); ly = ease(ly, ty, 0.14f);
-  float open = 1;                                        // моргание: 260 мс, раз в 3–7 с
+  float open = 1;                                        // blink: 260 ms, every 3-7 s
   if ((int32_t)(now - blinkAt) >= 0) {
     float k = (now - blinkAt) / 260.0f;
-    if (k >= 1) { blinkAt = now + 3000 + random(4000); if (random(5) == 0) blinkAt = now + 350; }   // иногда — двойное
+    if (k >= 1) { blinkAt = now + 3000 + random(4000); if (random(5) == 0) blinkAt = now + 350; }   // sometimes a double blink
     else open = fabsf(cosf(k * PI));
   }
   const int Wh = 112, Hh = 38;
   auto lid = [&](int x) { float u = (float)(x - cx) / Wh; return Hh * open * (1 - u * u); };
-  // пульс вокруг: расходящиеся кольца
+  // pulse: expanding rings
   for (int i = 0; i < 3; i++) {
     float ph = fmodf(now / 2400.0f + i / 3.0f, 1.0f);
     int r = 46 + (int)(ph * 90);
     spr.drawEllipse(cx, cy, r * 2, r * 0.7f, scale565(C_ACC(), (int)(40 * (1 - ph))));
   }
-  // радужка: кольца, вращающиеся риски, зрачок-щель с бликом
+  // iris: rings, rotating ticks, slit pupil with a highlight
   int ix = cx + (int)lx, iy = cy + (int)ly;
   spr.fillCircle(ix, iy, 31, scale565(C_ACC(), 16));
   spr.drawCircle(ix, iy, 31, C_ACC());
@@ -118,10 +123,10 @@ static void drawEye(uint32_t now, int cx, int cy) {
     spr.drawLine(ix + cosf(a) * 25, iy + sinf(a) * 25, ix + cosf(a) * 30, iy + sinf(a) * 30, k % 3 ? scale565(C_ACC(), 70) : C_HOT());
     if (k % 2 == 0) spr.drawLine(ix + cosf(b) * 14, iy + sinf(b) * 14, ix + cosf(b) * 21, iy + sinf(b) * 21, heatV(0.5f + 0.5f * (k % 4 == 0)));
   }
-  spr.fillEllipse(ix, iy, 5, 11, C_BG());                // зрачок — вертикальная щель
+  spr.fillEllipse(ix, iy, 5, 11, C_BG());                // slit pupil
   spr.drawEllipse(ix, iy, 5, 11, C_HOT());
-  spr.fillCircle(ix + 7, iy - 9, 3, C_HOT());            // блик
-  // веки: закрашиваем всё вне миндалины и рисуем контур
+  spr.fillCircle(ix + 7, iy - 9, 3, C_HOT());            // highlight
+  // eyelids: paint over everything outside the almond shape, then draw its outline
   for (int x = cx - Wh - 2; x <= cx + Wh + 2; x++) {
     int h = (int)lid(x);
     if (h < 0) h = 0;
@@ -134,7 +139,7 @@ static void drawEye(uint32_t now, int cx, int cy) {
     spr.drawLine(px, pu, x, yu, C_ACC()); spr.drawLine(px, pd, x, yd, C_ACC());
     px = x; pu = yu; pd = yd;
   }
-  // уголки глаза — штрихи
+  // eye corner ticks
   spr.drawLine(cx - Wh - 10, cy, cx - Wh - 2, cy, C_HOT());
   spr.drawLine(cx + Wh + 2, cy, cx + Wh + 10, cy, C_HOT());
 }
@@ -145,15 +150,15 @@ void drawWebLink(const WebLink& l, uint32_t now) {
   const int W = spr.width(), H = spr.height(), cx = W / 2, cy = H / 2 - 6;
   spr.fillSprite(C_BG());
   drawEye(now, cx, cy);
-  // подпись — мелко, чтобы не мешать картинке
+  // small caption so it does not cover the picture
   char buf[48];
   float kb = l.bps / 1024.0f;
-  snprintf(buf, sizeof(buf), "TABLET LINKED  %.1f KB/S", kb);
+  snprintf(buf, sizeof(buf), L("APP CONNECTED  ·  %.1f KB/S", "ПРИЛОЖЕНИЕ  ·  %.1f КБ/С"), kb);
   spr.setTextDatum(BL_DATUM);
   spr.setTextColor(UI_DIM());
   txt(buf, UI_M + 2, H - 4, 1);
   spr.setTextDatum(BR_DATUM);
-  txt("WHEEL: PASSWORD", W - UI_M - 2, H - 4, 1);
+  txt(L("WHEEL: PASSWORD", "КОЛЕСО: ПАРОЛЬ"), W - UI_M - 2, H - 4, 1);
   spr.setTextDatum(TL_DATUM);
   spr.setTextColor(UI_LINE());
   txt(l.streams, UI_M + 2, 4, 1);

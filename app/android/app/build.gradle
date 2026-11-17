@@ -7,7 +7,7 @@ android {
         applicationId "dev.tengan.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        // версия: из CI (номер сборки и тег релиза), локально — 1 / dev
+        // version: from CI (build number and release tag), locally 1 / dev
         versionCode Integer.parseInt(System.getenv("APP_VERSION_CODE") ?: "1")
         versionName((System.getenv("APP_VERSION_NAME") ?: new File(rootDir, "../../VERSION").text.trim()).replace("/", "-"))
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
@@ -17,20 +17,27 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
-    // одна и та же подпись у всех сборок — новая версия ставится поверх старой, без удаления.
-    // Ключ лежит в репозитории (он закрытый): это ключ для личной установки, не для магазина.
+    // Release signing: key and password live only in GitHub secrets (TENGAN_KEYSTORE_B64, TENGAN_KEYSTORE_PASSWORD);
+    // CI writes the key to a temp file and passes its path in TENGAN_KEYSTORE. One signature for all releases,
+    // so a new version installs over the old one. Without the key (fork, local build) the Android debug key is
+    // used: the APK works but cannot update the official app (Android sees a different app).
+    def tgKs = System.getenv("TENGAN_KEYSTORE")
+    def tgPass = System.getenv("TENGAN_KEYSTORE_PASSWORD")
+    def tgSigned = tgKs && tgPass && file(tgKs).exists()
     signingConfigs {
-        tengan {
-            storeFile file("tengan.keystore")
-            storePassword "tengan-app"
-            keyAlias "tengan"
-            keyPassword "tengan-app"
+        if (tgSigned) {
+            tengan {
+                storeFile file(tgKs)
+                storeType "pkcs12"
+                storePassword tgPass
+                keyAlias "tengan"
+                keyPassword tgPass
+            }
         }
     }
     buildTypes {
-        debug { signingConfig signingConfigs.tengan }
         release {
-            signingConfig signingConfigs.tengan
+            signingConfig tgSigned ? signingConfigs.tengan : signingConfigs.debug
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

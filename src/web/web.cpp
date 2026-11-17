@@ -1,14 +1,7 @@
 // ============================================================
-//  web.cpp — раздел Web
-//
-//  Палка поднимает свою точку Wi-Fi (имя и пароль — из MAC-адреса,
-//  не меняются), веб-сервер на 192.168.4.1 и «перехват» DNS: телефон
-//  при подключении сам предлагает открыть страницу. Страница (web_page.h)
-//  каждые пару секунд спрашивает у палки данные:
-//    /api/ble  — устройства Bluetooth (сканирование идёт всё время)
-//    /api/wifi — сети вокруг (скан раз в 20 с, короткий — чтобы точка не «падала»)
-//    /api/info — батарея и время работы
-//  Работает, только пока открыт раздел.
+//  web.cpp — Web section: own Wi-Fi AP (SSID/password derived from the MAC), web server on
+//  192.168.4.1 and a catch-all DNS so phones offer to open the page. The page polls /api/ble,
+//  /api/wifi and /api/info. Active only while the section is open.
 // ============================================================
 #include <WiFi.h>
 #include <WebServer.h>
@@ -22,7 +15,8 @@
 #include "core/perf.h"
 #include "core/board.h"
 #include "web/web_page.h"
-#include "web/tablet_page.h"    // приложение для планшета (gzip, собирается tools/webapp/build.py)
+#include "core/lang.h"
+#include "web/tablet_page.h"       // tablet app (gzip, built by tools/webapp/build.py): both languages, picks the device language (st.lang)
 #include <lwip/sockets.h>
 #include "ble/ble.h"
 #include "wifi/wifi.h"
@@ -55,25 +49,23 @@ static char       s_ssid[24], s_pass[12];
 static uint32_t   s_reqs = 0, s_scanMs = 0;
 static bool       s_scanned = false;
 static String     s_wifiJson = "{\"scanned\":false,\"nets\":[]}";
-static uint32_t   s_wifiGen = 0;              // растёт при каждом новом результате скана (поток планшета)
+static uint32_t   s_wifiGen = 0;              // bumped on every new scan result (tablet stream)
 static uint8_t    s_qr[45 * 45];
 static int        s_qrN = 0;
 static int        s_netCount = 0;
-static uint32_t   s_subMs = 0, s_sndMs = 0;     // когда вкладки Sub-GHz / Sound последний раз спрашивали
+static uint32_t   s_subMs = 0, s_sndMs = 0;     // last time the Sub-GHz / Sound tabs were polled
 static bool       s_subOn = false, s_sndOn = false;
-static uint32_t   s_irMs = 0, s_nfcMs = 0;      // ИК-приёмник и NFC для планшета (пока подписан)
+static uint32_t   s_irMs = 0, s_nfcMs = 0;      // IR receiver and NFC for the tablet (while subscribed)
 static bool       s_irOn = false, s_nfcOn = false;
 static const char* s_tab = "";
-static int8_t      s_bleWanted = -1;            // что webTick последний раз решил про Bluetooth (-1 — пересчитать)
+static int8_t      s_bleWanted = -1;            // last webTick decision for Bluetooth (-1: recompute)
 
-// ---------- обновление прошивки по Wi-Fi (OTA) ----------
-// Принимаем и обычный firmware.bin, и «общий» файл для прошивки на 0x0
-// (в нём программа лежит со смещения 0x10000 — начало пропускаем).
-// Новая прошивка пишется во второй слот; пока она не проработает 15 с
-// (main.cpp), загрузчик готов откатить палку на старую.
-static int      s_otaPct = -1;                  // -1 — загрузки нет
+// ---------- Wi-Fi firmware update (OTA) ----------
+// Accepts a plain firmware.bin or a merged image for 0x0 (app at offset 0x10000, the head is skipped).
+// The new firmware goes to the second slot; the bootloader rolls back unless it runs 15 s (main.cpp).
+static int      s_otaPct = -1;                  // -1: no upload
 static String   s_otaErr;
-static uint8_t* s_otaHead = nullptr;            // первые 0x8002 байт: решаем, «общий» ли файл
+static uint8_t* s_otaHead = nullptr;            // first 0x8002 bytes: decide whether the file is merged
 static size_t   s_otaHeadN = 0, s_otaPos = 0, s_otaSkip = 0;
 static bool     s_otaStarted = false;
 static const size_t OTA_PROBE = 0x8002, OTA_APP_OFS = 0x10000;
@@ -88,7 +80,7 @@ static void qrStore(esp_qrcode_handle_t q) {
 static void makeNames() {
   uint8_t m[6]; WiFi.macAddress(m);
   snprintf(s_ssid, sizeof(s_ssid), "TENGAN-%02X%02X", m[4], m[5]);
-  uint32_t h = 2166136261u;                       // пароль: 8 цифр из MAC (одинаковый каждый раз)
+  uint32_t h = 2166136261u;                       // password: 8 digits from the MAC (stable)
   for (int i = 0; i < 6; i++) h = (h ^ m[i]) * 16777619u;
   snprintf(s_pass, sizeof(s_pass), "%08lu", (unsigned long)(h % 100000000UL));
   char wifiQr[80];
@@ -109,10 +101,9 @@ static const char* encStr(wifi_auth_mode_t e) {
   }
 }
 
-// Скан сетей «по одному каналу»: раньше палка уходила с канала точки на все 13 каналов
-// разом (~1.2 с) — планшет/телефон терял связь и мог отвалиться от Wi-Fi. Теперь раз в
-// SCAN_STEP_MS слушаем один канал ~90 мс и сразу возвращаемся; полный круг — ~20 с,
-// результаты копятся в таблице и устаревают через NET_FORGET_MS.
+// Network scan one channel at a time: scanning all 13 channels at once (~1.2 s) pulled the
+// radio off the AP channel and clients dropped. Now every SCAN_STEP_MS we listen to one channel
+// for ~90 ms; a full round takes ~20 s; results are kept and expire after NET_FORGET_MS.
 #define NET_MAX 64
 static const uint32_t SCAN_STEP_MS = 1500, NET_FORGET_MS = 60000;
 struct NetRec { uint8_t b[6]; char ssid[33]; int8_t r; uint8_t ch, enc; uint32_t t; };
@@ -122,7 +113,7 @@ static uint8_t  s_scanCh = 1;
 
 static void netsJson() {
   uint32_t now = millis();
-  int w = 0;                                       // выбросить давно не слышанные
+  int w = 0;                                       // drop long-unheard networks
   for (int i = 0; i < s_nNets; i++) if (now - s_nets[i].t < NET_FORGET_MS) s_nets[w++] = s_nets[i];
   s_nNets = w;
   String o; o.reserve(64 + s_nNets * 90);
@@ -131,7 +122,7 @@ static void netsJson() {
     const NetRec& n = s_nets[i];
     if (i) o += ',';
     char mac[18]; snprintf(mac, sizeof(mac), "%02X:%02X:%02X:%02X:%02X:%02X", n.b[0], n.b[1], n.b[2], n.b[3], n.b[4], n.b[5]);
-    const char* v = ouiName(n.b);                  // производитель по первым байтам адреса
+    const char* v = ouiName(n.b);                  // vendor from the address prefix
     o += "{\"s\":"; jsonStr(o, n.ssid);
     o += ",\"b\":\""; o += mac; o += '"';
     o += ",\"v\":"; jsonStr(o, v ? v : "");
@@ -148,7 +139,7 @@ static void netsJson() {
 
 static void scanCollect() {
   int n = WiFi.scanComplete();
-  if (n < 0) return;                              // ещё идёт (или не запускали)
+  if (n < 0) return;                              // still running (or never started)
   uint32_t now = millis();
   for (int i = 0; i < n; i++) {
     uint8_t* b = WiFi.BSSID(i);
@@ -163,7 +154,7 @@ static void scanCollect() {
   netsJson();
 }
 
-// какая вкладка открыта на телефоне: страница присылает её в каждом запросе (?tab=)
+// which tab is open on the phone: the page sends it in every request (?tab=)
 static void noteTab() {
   static const char* const T[][2] = { { "ov", "overview" }, { "ble", "bluetooth" }, { "wifi", "wi-fi" },
                                       { "sub", "sub-ghz" }, { "snd", "sound" }, { "sys", "system" },
@@ -176,11 +167,11 @@ static bool tabIs(const char* a) { return strcmp(s_tab, a) == 0; }
 static void sendJson(const String& s) {
   noteTab();
   s_reqs++;
-  // без этого заголовок и данные уходят двумя кусками, и телефон ждёт ~0.2-0.5 с
-  // перед вторым (алгоритм Нейгла + отложенное подтверждение TCP)
+  // otherwise header and data go as two segments and the phone waits ~0.2-0.5 s
+  // for the second (Nagle + delayed ACK)
   s_srv->client().setNoDelay(true);
   s_srv->sendHeader("Cache-Control", "no-store");
-  s_srv->sendHeader("Access-Control-Allow-Origin", "*");   // приложение планшета живёт на своём адресе (localhost)
+  s_srv->sendHeader("Access-Control-Allow-Origin", "*");   // the tablet app lives on its own origin (localhost)
   s_srv->send(200, "application/json", s);
 }
 
@@ -190,7 +181,7 @@ static void otaDrawProgress() {
 }
 
 static bool otaWrite(uint8_t* d, size_t n) {
-  // пропустить загрузчик и таблицу разделов «общего» файла
+  // skip the bootloader and partition table of a merged file
   if (s_otaSkip) {
     size_t k = min(n, s_otaSkip);
     d += k; n -= k; s_otaSkip -= k;
@@ -201,7 +192,7 @@ static bool otaWrite(uint8_t* d, size_t n) {
     if (!Update.begin(UPDATE_SIZE_UNKNOWN)) { s_otaErr = Update.errorString(); return false; }
     s_otaStarted = true;
   }
-  crumbFeed();                                     // запись прошивки долгая — сторож знает, что мы живы
+  crumbFeed();                                     // flash writing is slow; tell the watchdog we are alive
   if (Update.write(d, n) != n) { s_otaErr = Update.errorString(); return false; }
   return true;
 }
@@ -210,7 +201,7 @@ static void otaUpload() {
   HTTPUpload& up = s_srv->upload();
   if (up.status == UPLOAD_FILE_START) {
     s_otaErr = ""; s_otaPct = 0; s_otaPos = 0; s_otaHeadN = 0; s_otaSkip = 0; s_otaStarted = false;
-    bleRadioOff();                                 // весь эфир — загрузке
+    bleRadioOff();                                 // all airtime goes to the upload
     if (!s_otaHead) s_otaHead = (uint8_t*)malloc(OTA_PROBE);
     if (!s_otaHead) s_otaErr = "no memory";
     otaDrawProgress();
@@ -218,24 +209,24 @@ static void otaUpload() {
     if (s_otaErr.length()) return;
     uint8_t* d = up.buf; size_t n = up.currentSize;
     s_otaPos += n;
-    if (s_otaHeadN < OTA_PROBE && s_otaHead) {     // копим начало файла
+    if (s_otaHeadN < OTA_PROBE && s_otaHead) {     // collect the file head
       size_t k = min(n, OTA_PROBE - s_otaHeadN);
       memcpy(s_otaHead + s_otaHeadN, d, k);
       s_otaHeadN += k; d += k; n -= k;
       if (s_otaHeadN < OTA_PROBE) return;
-      bool merged = s_otaHead[0x8000] == 0xAA && s_otaHead[0x8001] == 0x50;   // таблица разделов на 0x8000
-      if (merged) s_otaSkip = OTA_APP_OFS - OTA_PROBE;                        // остаток до 0x10000 пропустить
+      bool merged = s_otaHead[0x8000] == 0xAA && s_otaHead[0x8001] == 0x50;   // partition table at 0x8000
+      if (merged) s_otaSkip = OTA_APP_OFS - OTA_PROBE;                        // skip the rest up to 0x10000
       else if (!otaWrite(s_otaHead, OTA_PROBE)) return;
     }
     if (n && !otaWrite(d, n)) return;
     static uint32_t lastDraw = 0;
-    if (millis() - lastDraw > 400) {               // экран палки: прогресс (размер неизвестен — по ~2 МБ)
+    if (millis() - lastDraw > 400) {               // device screen: progress (size unknown, assume ~2 MB)
       lastDraw = millis();
       s_otaPct = min(99, (int)(s_otaPos * 100 / 2100000));
       otaDrawProgress();
     }
   } else if (up.status == UPLOAD_FILE_END) {
-    if (!s_otaErr.length() && s_otaHeadN < OTA_PROBE && s_otaHead)   // файл меньше 32 КБ
+    if (!s_otaErr.length() && s_otaHeadN < OTA_PROBE && s_otaHead)   // file smaller than 32 KB
       s_otaErr = "file is too small";
     if (!s_otaErr.length() && !Update.end(true)) s_otaErr = Update.errorString();
     if (s_otaErr.length() && s_otaStarted) Update.abort();
@@ -255,82 +246,74 @@ static void otaDone() {
   o += ",\"err\":\""; o += s_otaErr; o += "\"}";
   s_srv->client().setNoDelay(true);
   s_srv->send(200, "application/json", o);
-  if (ok) {                                        // ответить телефону и перезагрузиться в новую прошивку
+  if (ok) {                                        // reply to the phone and reboot into the new firmware
     delay(600);
     ESP.restart();
   }
   s_otaPct = -1;
-  s_bleWanted = -1;                                // радио вернёт webTick — по тому, что смотрят
+  s_bleWanted = -1;                                // webTick restores the radio according to what is being viewed
 }
 
 // ============================================================
-//  «Вторая дверь» для планшета: поток SSE на порту 81.
-//  Планшет открывает http://192.168.4.1:81/stream?want=ble,wifi,snd и не
-//  закрывает — палка сама толкает туда события:
-//    event: st    раз в 2 с    (батарея, аптайм, клиенты)
-//    event: ble   раз в 1 с    (устройства, компактно)
-//    event: wifi  после скана  (сети)
-//    event: snd   ~25 раз в с  (полосы, уровень, волна) — только если просили
-//    event: sub   ~7 раз в с   (спектр CC1101; режим и полоса — &sm= &sb=)
-//    event: pc    раз в 1 с    (ноутбук: нагрузка, трек, город процессов)
-//    event: sens  на каждую новую посылку 433 МГц и раз в 1 с (датчики, анализатор; want=sens)
-//    event: sat   при подключении (орбиты спутников и город — небо считает планшет)
-//    event: ir    на каждую ИК-пачку (протокол, адрес, команда, импульсы)
-//    event: nfc   на каждое прикладывание карты (тип, начало UID, записи метки)
-//  Отправка без ожидания: если планшет не успевает принимать, кадр звука
-//  пропускается, а палка не «зависает» на записи.
+//  Tablet side channel: an SSE stream on port 81. The tablet opens
+//  http://192.168.4.1:81/stream?want=ble,wifi,snd and keeps it open; the device pushes events:
+//    st (2 s: battery, uptime, clients)   ble (1 s)   wifi (after a scan)
+//    snd (~25/s: bands, level, wave; only if requested)   sub (~7/s: CC1101 spectrum; &sm= mode, &sb= band)
+//    pc (1 s: laptop load, track, process city)   sens (each new 433 MHz packet and 1 s; want=sens)
+//    sat (on connect: orbits and city, the tablet computes the sky)   ir (each IR burst)   nfc (each card tap)
+//  Sends never block: if the tablet cannot keep up, sound frames are dropped.
 // ============================================================
-#define SSE_NET 2                                // планшеты по Wi-Fi
-#define SSE_MAX 3                                // + приложение для компьютера по USB (последний слот)
+#define SSE_NET 2                                // Wi-Fi tablets
+#define SSE_MAX 3                                // + the PC app over USB (last slot)
 #define USB_SLOT 2
-static uint32_t s_sseBytes = 0;                  // всего отправлено планшетам (для экрана связи)
+static uint32_t s_sseBytes = 0;                  // total sent to tablets (link screen)
 struct SseCli {
   NetworkClient c;
   bool on = false, ble = false, wifi = false, snd = false, sub = false, pc = false, wx = false, ir = false, nfc = false, satSent = false;
-  int8_t sm = 0, sb = 1;                         // режим и полоса Sub-GHz
-  bool sens = false;                             // датчики 433 МГц (sensors.h)
+  int8_t sm = 0, sb = 1;                         // Sub-GHz mode and band
+  bool sens = false;                             // 433 MHz sensors (sensors.h)
   uint32_t tSens = 0, sensSeen = 0;
-  String pend;                                   // не отправленный хвост (докидываем без ожидания)
-  bool usb = false;                              // этот «планшет» — приложение на компьютере по USB (link)
-  uint32_t seenMs = 0;                           // USB: когда компьютер последний раз давал о себе знать
-  String wantQ;                                  // USB: на что подписан (строка want=…)
+  String pend;                                   // unsent tail (flushed without blocking)
+  bool usb = false;                              // this "tablet" is the PC app over USB (link)
+  uint32_t seenMs = 0;                           // USB: last sign of life from the PC
+  String wantQ;                                  // USB: subscriptions (want=... string)
   uint32_t tSt = 0, tBle = 0, tSnd = 0, tSub = 0, tPc = 0, tWx = 0, wifiSeen = 0, irSeen = 0, nfcSeen = 0;
 };
 static NetworkServer* s_sseSrv = nullptr;
 static SseCli s_sse[SSE_MAX];
 
-static bool sseFlush(SseCli& k) {                // true — всё ушло
-  if (k.usb) return true;                        // USB пишет через общую очередь (link/serout)
+static bool sseFlush(SseCli& k) {                // true: everything was sent
+  if (k.usb) return true;                        // USB writes go through the shared queue (link/serout)
   while (k.pend.length()) {
     int n = send(k.c.fd(), k.pend.c_str(), k.pend.length(), MSG_DONTWAIT);
     if (n > 0) { k.pend.remove(0, n); s_sseBytes += n; continue; }
-    if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) return false;   // буфер полон — позже
-    k.on = false; k.c.stop(); return false;      // соединение умерло
+    if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) return false;   // buffer full, retry later
+    k.on = false; k.c.stop(); return false;      // connection died
   }
   return true;
 }
 static void sseEvent(SseCli& k, const char* ev, const String& data, bool droppable) {
   if (!k.on) return;
-  if (k.usb) {                                   // компьютер по USB: «@E событие json» — тот же JSON, что у планшета
+  if (k.usb) {                                   // PC over USB: "@E event json", same JSON as the tablet gets
     size_t el = strlen(ev);
-    if (!serOutBegin(4 + el + data.length(), droppable)) return;   // не успевает читать — кадр пропускаем
+    if (!serOutBegin(4 + el + data.length(), droppable)) return;   // PC is not keeping up: skip the frame
     serOutPart("@E ", 3); serOutPart(ev, el); serOutPart(" ", 1); serOutPart(data.c_str(), data.length()); serOutEnd();
     s_sseBytes += 5 + el + data.length();
     return;
   }
-  if (k.pend.length() && droppable) { sseFlush(k); return; }   // не успевает — кадр звука пропускаем
+  if (k.pend.length() && droppable) { sseFlush(k); return; }   // not keeping up: skip the sound frame
   if (k.pend.length() > 24000) { k.on = false; k.c.stop(); return; }
   k.pend += "event: "; k.pend += ev; k.pend += "\ndata: "; k.pend += data; k.pend += "\n\n";
   sseFlush(k);
 }
 
-// подписки клиента из строки запроса «…want=ble,wifi&sm=0&sb=1 …» (поток по Wi-Fi и по USB — одинаково)
+// client subscriptions from the request line "...want=ble,wifi&sm=0&sb=1 ..." (same for Wi-Fi and USB)
 static void parseWant(SseCli& k, const String& req) {
   int q = req.indexOf("want="); String want = q >= 0 ? req.substring(q + 5, req.indexOf(' ', q)) : String("ble,wifi");
   k.ble = want.indexOf("ble") >= 0; k.wifi = want.indexOf("wifi") >= 0; k.snd = want.indexOf("snd") >= 0;
   k.sub = want.indexOf("sub") >= 0; k.pc = want.indexOf("pc") >= 0; k.wx = want.indexOf("wx") >= 0;
   k.ir = want.indexOf("ir") >= 0; k.nfc = want.indexOf("nfc") >= 0;
-  k.irSeen = g_ir.gen; k.nfcSeen = g_nfc.gen;     // старое не повторяем — только новые нажатия и карты
+  k.irSeen = g_ir.gen; k.nfcSeen = g_nfc.gen;     // do not replay old taps and cards, only new ones
   auto qInt = [&](const char* key, int def) { int p = req.indexOf(key); return p >= 0 ? req.substring(p + strlen(key)).toInt() : def; };
   k.sens = want.indexOf("sens") >= 0;
   k.sm = (int8_t)qInt("sm=", 0); k.sb = (int8_t)qInt("sb=", 1);
@@ -339,7 +322,7 @@ static void parseWant(SseCli& k, const String& req) {
 static void sseAccept() {
   NetworkClient nc = s_sseSrv->accept();
   if (!nc) return;
-  // запрос приходит сразу за подключением: читаем первую строку и заголовки (до 300 мс)
+  // the request arrives right after connect: read the first line and headers (up to 300 ms)
   String req; uint32_t t0 = millis(); bool done = false;
   nc.setTimeout(300);
   while (millis() - t0 < 300 && nc.connected()) {
@@ -353,12 +336,12 @@ static void sseAccept() {
     nc.stop(); return;
   }
   int slot = 0;
-  for (int i = 0; i < SSE_NET; i++) if (!s_sse[i].on) { slot = i; break; }   // оба заняты — вытесняем первого
+  for (int i = 0; i < SSE_NET; i++) if (!s_sse[i].on) { slot = i; break; }   // both busy: evict the first
   SseCli& k = s_sse[slot];
   if (k.on) k.c.stop();
   k = SseCli();
   k.c = nc; k.c.setNoDelay(true); k.on = true;
-  k.pend.reserve(4096);                          // хвост неотправленного: один буфер на всё время, без перевыделений
+  k.pend.reserve(4096);                          // unsent tail: one buffer for the whole session, no reallocation
   parseWant(k, req);
   k.pend = "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\n"
            "Connection: keep-alive\r\nAccess-Control-Allow-Origin: *\r\n\r\nretry: 1500\n\n";
@@ -367,7 +350,7 @@ static void sseAccept() {
   s_reqs++;
 }
 
-// что сейчас нужно планшетам (для выключения ненужного радио)
+// what the tablets need now (to switch off unneeded radios)
 static int sseClients(bool& ble, bool& wifi, bool& snd, int& subM, int& subB, bool& wx) {
   int n = 0; ble = wifi = snd = wx = false; subM = -1; subB = 1;
   for (auto& k : s_sse) if (k.on) { n++; ble |= k.ble; wifi |= k.wifi; snd |= k.snd; wx |= k.wx; if (k.sub) { subM = k.sm; subB = k.sb; } }
@@ -378,7 +361,7 @@ static void sseTick(uint32_t now) {
   if (s_sseSrv) sseAccept();
   for (auto& k : s_sse) {
     if (!k.on) continue;
-    if (k.usb) { if (msSince(now, k.seenMs) > 6000) { k = SseCli(); continue; } }   // приложение закрыли / кабель вынули
+    if (k.usb) { if (msSince(now, k.seenMs) > 6000) { k = SseCli(); continue; } }   // app closed / cable pulled
     else if (!k.c.connected()) { k.on = false; k.c.stop(); continue; }
     if (k.pend.length()) sseFlush(k);
     if (!k.tSt || now - k.tSt >= 2000) {
@@ -388,21 +371,21 @@ static void sseTick(uint32_t now) {
       o += ",\"usb\":"; o += g_bat.bus ? 1 : 0; o += ",\"chg\":"; o += g_bat.chg;
       o += ",\"cli\":"; o += WiFi.softAPgetStationNum(); o += ",\"heap\":"; o += ESP.getFreeHeap() / 1024;
       o += ",\"theme\":\""; o += g_theme == THEME_KURENAI ? "kurenai" : "denko"; o += '"';
-      o += ",\"ver\":\"" FW_VERSION "\"";
+      o += ",\"ver\":\"" FW_VERSION "\",\"lang\":\""; o += LANG_CODE; o += '"';
       o += ",\"rst\":"; jsonStr(o, crumbLastReason()); o += ",\"rstStep\":"; jsonStr(o, crumbLastStep());
       o += ",\"radio\":\""; o += bleRadioActive() ? "b" : ""; o += s_scanMs && now - s_scanMs < 25000 ? "w" : "";
       o += s_subOn ? "s" : ""; o += s_sndOn ? "m" : ""; o += pcLive(now) ? "p" : ""; o += s_irOn ? "i" : ""; o += s_nfcOn ? "n" : ""; o += '"';
-      { // скорость палки: средний/худший проход цикла и кадр экрана (мс), кадров/с, доля отправленных строк экрана (%)
+      { // device speed: avg/worst loop pass and screen frame (ms), frames/s, share of screen lines sent (%)
         char lp[64]; snprintf(lp, sizeof lp, ",\"lp\":[%.1f,%.1f,%.1f,%.1f,%u,%u]", g_perf.loopAvgUs / 1000.0f, g_perf.loopMaxUs / 1000.0f,
                               g_perf.drawAvgUs / 1000.0f, g_perf.drawMaxUs / 1000.0f, g_perf.fps, g_perf.pushPct);
         o += lp;
       }
       o += '}';
       sseEvent(k, "st", o, false);
-      if (!k.satSent) {                          // один раз: город и орбиты — небо и глобус считает планшет
+      if (!k.satSent) {                          // once: city and orbits, the tablet computes sky and globe
         k.satSent = true;
         const City& c = curCity();
-        String a = "{\"city\":"; jsonStr(a, c.name);
+        String a = "{\"city\":"; jsonStr(a, LT(c.name));
         a += ",\"lat\":"; a += String(c.lat, 3); a += ",\"lon\":"; a += String(c.lon, 3);
         a += ",\"sats\":"; satJson(a); a += '}';
         sseEvent(k, "sat", a, false);
@@ -423,8 +406,8 @@ static void sseTick(uint32_t now) {
 }
 
 // ============================================================
-//  /api/* — общие обработчики: одни и те же для планшета по Wi-Fi (HTTP)
-//  и для приложения на компьютере по USB («@Q id /api/…?…», см. webLinkLine)
+//  /api/* — shared handlers for the tablet over Wi-Fi (HTTP) and the PC app over USB
+//  ("@Q id /api/...?...", see webLinkLine)
 // ============================================================
 struct ApiArgs {
   virtual String get(const char* k) const = 0;
@@ -435,7 +418,7 @@ struct HttpArgs : ApiArgs {
   String get(const char* k) const override { return s_srv ? s_srv->arg(k) : String(); }
   bool has(const char* k) const override { return s_srv && s_srv->hasArg(k); }
 };
-// аргументы из строки «a=1&b=%D0%9F…» (USB): %XX и «+» раскодируются
+// arguments from "a=1&b=%D0%9F..." (USB): %XX and "+" are decoded
 struct QueryArgs : ApiArgs {
   String q;
   explicit QueryArgs(const String& s) : q(s) {}
@@ -470,10 +453,10 @@ static const char* const API_PATHS[] = {
   "/api/set", "/api/label", "/api/act", "/api/pckey", "/api/loc", "/api/info", "/api/ver",
 };
 
-// true — путь известен (ответ в o)
+// true: path is known (reply in o)
 static bool apiHandle(const char* path, const ApiArgs& A, String& o) {
   auto is = [&](const char* p) { return !strcmp(path, p); };
-  // пока раздел Web закрыт (приложение по USB), радио трогать нельзя — только настройки и сведения
+  // while the Web section is closed (PC app over USB) do not touch the radio, only settings and info
   if (!s_on && !(is("/api/pagever") || is("/api/settings") || is("/api/set") || is("/api/label") || is("/api/act") ||
                  is("/api/pckey") || is("/api/loc") || is("/api/info") || is("/api/ver"))) {
     o = "{\"ok\":false,\"err\":\"open Web on the stick\"}"; return true;
@@ -486,15 +469,15 @@ static bool apiHandle(const char* path, const ApiArgs& A, String& o) {
     s_subOn = subWebUse(A.get("m").toInt(), A.has("b") ? A.get("b").toInt() : 1);
     subJson(o); return true;
   }
-  if (is("/api/sens")) {                           // датчики 433 (опрос): включает разбор посылок, как /api/sub?m=2
+  if (is("/api/sens")) {                           // sensors 433 (poll): enables packet decoding, like /api/sub?m=2
     s_subMs = millis();
     s_subOn = subWebUse(G_SENSORS, A.has("b") ? A.get("b").toInt() : 1);
     sensJson(o, millis()); return true;
   }
   if (is("/api/snd")) { s_sndMs = millis(); s_sndOn = audioWebUse(); audioJson(o); return true; }
-  // версия страницы планшета: приложение сверяет её и, если на палке новее, забирает /full
+  // tablet app version: the app compares it and fetches /full if the device has a newer one
   if (is("/api/pagever")) { o = "{\"sha\":\""; o += TABLET_HTML_SHA; o += "\",\"gz\":"; o += TABLET_GZ_LEN; o += '}'; return true; }
-  // планшет как пульт управления: настройки палки, подписи устройств, действия
+  // tablet as a remote: device settings, device labels, actions
   if (is("/api/settings")) { settingsJson(o); return true; }
   if (is("/api/set")) {
     { char c[48]; snprintf(c, sizeof c, "api set %s=%s", A.get("k").c_str(), A.get("v").c_str()); crumb(c); }
@@ -508,14 +491,14 @@ static bool apiHandle(const char* path, const ApiArgs& A, String& o) {
   }
   if (is("/api/act")) {
     String a = A.get("a"); int v = A.get("v").toInt(); bool ok = true;
-    if (a == "screen") { g_screenOff = !v; applyBrightness(); }   // экран палки погасить / включить (работа идёт дальше)
+    if (a == "screen") { g_screenOff = !v; applyBrightness(); }   // turn the device screen off / on (work continues)
     else if (a == "leds" && !v) ledsOff();
     else ok = false;
     o = ok ? "{\"ok\":true}" : "{\"ok\":false,\"err\":\"unknown action\"}"; return true;
   }
-  // пульт музыки: палка передаёт медиа-клавишу ноутбуку по USB
+  // music remote: send a media key to the laptop over USB
   if (is("/api/pckey")) { o = pcKey(A.get("k").c_str()) ? "{\"ok\":true}" : "{\"ok\":false}"; return true; }
-  // приложение планшета присылает свой GPS: небо и глобус палки считаются «отсюда»
+  // the tablet app sends its GPS: the device's sky and globe are computed from there
   if (is("/api/loc")) {
     float lat = A.get("lat").toFloat(), lon = A.get("lon").toFloat();
     bool ok = A.has("lat") && A.has("lon") && fabsf(lat) <= 90 && fabsf(lon) <= 180 && (lat != 0 || lon != 0);
@@ -536,7 +519,7 @@ static bool apiHandle(const char* path, const ApiArgs& A, String& o) {
     o += ",\"nets\":"; o += s_netCount;
     o += ",\"build\":\"" __DATE__ " " __TIME__ "\"";
     o += ",\"theme\":\""; o += g_theme == THEME_KURENAI ? "kurenai" : "denko"; o += '"';
-    o += ",\"ver\":\"" FW_VERSION "\"";
+    o += ",\"ver\":\"" FW_VERSION "\",\"lang\":\""; o += LANG_CODE; o += '"';
     o += ",\"rst\":"; jsonStr(o, crumbLastReason()); o += ",\"rstStep\":"; jsonStr(o, crumbLastStep());
     o += ",\"ssid\":\""; o += s_ssid; o += "\"}";
     return true;
@@ -552,21 +535,21 @@ static bool apiHandle(const char* path, const ApiArgs& A, String& o) {
 
 static void webStart() {
   if (s_on) return;
-  wifiRadioOff();                                  // раздел Wi-Fi мог оставить радио в своём режиме
+  wifiRadioOff();                                  // the Wi-Fi section may have left the radio in its own mode
   bleLowDuty(true);
-  s_bleWanted = -1;                                // Bluetooth включит webTick, только если его смотрят (реже — делит эфир с точкой)
+  s_bleWanted = -1;                                // webTick enables Bluetooth only if it is viewed (it shares airtime with the AP)
   WiFi.mode(WIFI_AP_STA);
-  makeNames();                                     // MAC известен после включения Wi-Fi
+  makeNames();                                     // MAC is known once Wi-Fi is on
   s_ok = WiFi.softAP(s_ssid, s_pass, 6, 0, 4);
   if (!s_ok) { s_on = true; return; }
   IPAddress ip = WiFi.softAPIP();
   s_dns.setErrorReplyCode(DNSReplyCode::NoError);
-  s_dns.start(53, "*", ip);                        // любые адреса -> на палку (страница откроется сама)
+  s_dns.start(53, "*", ip);                        // any address -> this device (the page opens by itself)
   s_srv = new WebServer(80);
-  // вход: «/» — запуск, заставка и выбор LITE / FULL (то же приложение, что /full);
-  // «/lite» — лёгкая телефонная страница; «/full» — сразу полная сцена, без выбора.
-  // Старые адреса /phone и /tablet оставлены и ведут туда же.
-  static auto sendApp = [] {                       // приложение для планшета: один файл, сжатый gzip
+  // entry: "/" is the launcher (splash, LITE / FULL choice, same app as /full);
+  // "/lite" is the light phone page; "/full" opens the full scene directly.
+  // Old /phone and /tablet addresses are kept and lead to the same places.
+  static auto sendApp = [] {                       // tablet app: one gzip file
     s_reqs++;
     s_srv->sendHeader("Content-Encoding", "gzip");
     s_srv->sendHeader("Cache-Control", "no-cache");
@@ -575,20 +558,29 @@ static void webStart() {
   s_srv->on("/", [] { sendApp(); });
   s_srv->on("/full", [] { sendApp(); });
   s_srv->on("/tablet", [] { sendApp(); });
-  static auto sendLite = [] { s_reqs++; s_srv->send_P(200, "text/html", WEB_PAGE); };
+  // phone page: language follows the device (<html lang> set when served)
+  static auto sendLite = [] {
+    s_reqs++;
+    size_t a = strlen_P(WEB_PAGE_HEAD), b = strlen_P(WEB_PAGE);
+    s_srv->setContentLength(a + 2 + b);
+    s_srv->send(200, "text/html", "");
+    s_srv->sendContent_P(WEB_PAGE_HEAD, a);
+    s_srv->sendContent(LANG_CODE);
+    s_srv->sendContent_P(WEB_PAGE, b);
+  };
   s_srv->on("/lite", [] { sendLite(); });
   s_srv->on("/phone", [] { sendLite(); });
   for (const char* path : API_PATHS) s_srv->on(path, [path] { HttpArgs a; String o; apiHandle(path, a, o); sendJson(o); });
   s_srv->on("/update", HTTP_POST, otaDone, otaUpload);
-  s_srv->onNotFound([] {                           // проверки «есть ли интернет» у телефонов -> на страницу
+  s_srv->onNotFound([] {                           // phone connectivity checks -> redirect to the page
     s_srv->sendHeader("Location", "http://192.168.4.1/", true);
     s_srv->send(302, "text/plain", "");
   });
   s_srv->begin();
-  s_sseSrv = new NetworkServer(81);                  // «вторая дверь» — поток для планшета
+  s_sseSrv = new NetworkServer(81);                  // side channel: tablet stream
   s_sseSrv->begin();
   s_sseSrv->setNoDelay(true);
-  s_scanMs = millis();                             // первый канал — через пару секунд
+  s_scanMs = millis();                             // first channel in a couple of seconds
   s_on = true;
 }
 
@@ -614,7 +606,7 @@ static void webStop() {
 static void webTick(uint32_t now) {
   crumb("web tick");
   if (!s_on) return;
-  if (s_ok) {                                      // точка Wi-Fi есть (без неё работает только USB)
+  if (s_ok) {                                      // AP is up (USB works without it)
     s_dns.processNextRequest();
     crumb("web http"); s_srv->handleClient();
     scanCollect();
@@ -622,66 +614,62 @@ static void webTick(uint32_t now) {
   crumb("web sse"); sseTick(millis());
   bool sBle, sWifi, sSnd, sWx; int subM, subB;
   int nSse = sseClients(sBle, sWifi, sSnd, subM, subB, sWx);
-  // радиопогода на планшете: Bluetooth + CC1101 монитор 433.92 + микрофон (Wi-Fi не трогаем — мешал бы)
+  // tablet radio weather: Bluetooth + CC1101 433.92 monitor + microphone (Wi-Fi left alone, it would interfere)
   if (nSse && sWx) {
     sBle = true; sSnd = true;
-    if (subM < 0) { subM = 1; subB = 1; }             // Sub-GHz никто не смотрит отдельно — монитор (режим 1) на 433.92 (полоса 1)
+    if (subM < 0) { subM = 1; subB = 1; }             // nobody watches Sub-GHz separately: monitor (mode 1) on 433.92 (band 1)
   }
-  // датчики 433: CC1101 в режиме разбора посылок (монитор тоже разбирает — его не трогаем)
+  // 433 sensors: CC1101 in packet-decoding mode (the monitor decodes too, leave it alone)
   bool sSens = false;
   for (auto& k : s_sse) if (k.on) sSens |= k.sens;
   if (nSse && sSens && subM != G_MONITOR && subM != G_SENSORS) { if (subM < 0) subB = 1; subM = G_SENSORS; }
-  if (nSse && sSnd) { s_sndMs = millis(); if (!s_sndOn) s_sndOn = audioWebUse(); }   // планшет смотрит звук
-  if (nSse && subM >= 0) { s_subMs = millis(); s_subOn = subWebUse(subM, subB); }    // планшет смотрит Sub-GHz
-  // работает только то, что нужно открытой вкладке, остальное молчит:
-  //  Bluetooth — на «Обзоре» и «Bluetooth»; скан сетей — на «Обзоре» и «Wi-Fi»;
-  //  CC1101 и микрофон — только на своих вкладках (ниже)
-  // пока никто ничего не смотрит — радио молчит (железное правило: что работает, то и читается)
+  if (nSse && sSnd) { s_sndMs = millis(); if (!s_sndOn) s_sndOn = audioWebUse(); }   // tablet watches sound
+  if (nSse && subM >= 0) { s_subMs = millis(); s_subOn = subWebUse(subM, subB); }    // tablet watches Sub-GHz
+  // only what the open tab needs runs, the rest stays silent:
+  //  Bluetooth: Overview and Bluetooth; network scan: Overview and Wi-Fi; CC1101 and mic: their own tabs only
+  // nobody watching -> radio off
   bool wantBle = tabIs("overview") || tabIs("bluetooth");
-  if (nSse) wantBle = sBle;                          // планшет подключён — решают его подписки
-  if (nSse && sWx) wxUpdate(millis());               // пересчёт погоды раз в секунду (источники включены выше)
+  if (nSse) wantBle = sBle;                          // tablet connected: its subscriptions decide
+  if (nSse && sWx) wxUpdate(millis());               // recompute weather once a second (sources enabled above)
   if ((int8_t)wantBle != s_bleWanted) { s_bleWanted = wantBle; if (wantBle) bleRadioOn(); else bleRadioOff(); }
   bool wantScan = tabIs("overview") || tabIs("wi-fi");
   if (nSse) wantScan = sWifi;
-  // CC1101 и микрофон работают, только пока их вкладку смотрят на телефоне
-  // время берём заново: запрос мог прийти уже после того, как посчитали now,
-  // и тогда now - s_sndMs «перекручивается» в огромное число (микрофон гас сразу)
+  // CC1101 and mic run only while the phone views their tab
+  // re-read the time: the request may arrive after now was taken, and now - s_sndMs would wrap
+  // to a huge number (the mic switched off at once)
   uint32_t t = millis();
   if (s_subOn) { if ((int32_t)(t - s_subMs) > 4000) { subWebStop(); s_subOn = false; } else subWebTick(t); }
   if (s_sndOn) { if ((int32_t)(t - s_sndMs) > 4000) { audioWebStop(); s_sndOn = false; } else audioWebTick(t); }
-  // ИК и NFC: работают, пока планшет на них подписан (+4 с), потом спят
+  // IR and NFC: run while a tablet is subscribed (+4 s), then sleep
   bool sIr = false, sNfc = false;
   for (auto& k : s_sse) if (k.on) { sIr |= k.ir; sNfc |= k.nfc; }
   if (sIr)  { s_irMs = t;  if (!s_irOn)  { irStart();  s_irOn = true; } }
   if (sNfc) { s_nfcMs = t; if (!s_nfcOn) { nfcStart(); s_nfcOn = true; } }
   if (s_irOn)  { if ((int32_t)(t - s_irMs) > 4000)  { irStop();  s_irOn = false; }  else { crumb("web ir");  irTick(t); } }
   if (s_nfcOn) { if ((int32_t)(t - s_nfcMs) > 4000) { nfcStop(); s_nfcOn = false; } else { crumb("web nfc"); nfcTick(t); } }
-  if (s_ok && wantScan && now - s_scanMs > SCAN_STEP_MS && WiFi.scanComplete() != WIFI_SCAN_RUNNING) {   // один канал за раз — точка не пропадает
+  if (s_ok && wantScan && now - s_scanMs > SCAN_STEP_MS && WiFi.scanComplete() != WIFI_SCAN_RUNNING) {   // one channel at a time so the AP does not vanish
     s_scanMs = now;
-    WiFi.scanNetworks(true, true, false, 90, s_scanCh);   // асинхронно, 90 мс на один канал
+    WiFi.scanNetworks(true, true, false, 90, s_scanCh);   // async, 90 ms per channel
     s_scanCh = s_scanCh >= 13 ? 1 : s_scanCh + 1;
   }
 }
 
 
 // ============================================================
-//  Приложение для компьютера по USB-кабелю (tools/desktop).
-//  Тот же провод, что у монитора ПК; строки приложения начинаются с «@»
-//  (их отдаёт сюда pc.cpp), остальные — по-прежнему монитор ПК.
-//  компьютер → палка:
-//    @W want=ble,wifi&sm=0&sb=1   подписка (как ?want= у планшета); повтор раз в 2 с = «я здесь»
-//    @Q <id> /api/…?…             запрос — тот же, что планшет шлёт по HTTP
-//    @G <id>                      прислать страницу (gzip, base64 кусками)
-//  палка → компьютер:
-//    @E <событие> <json>          события потока — тот же JSON, что SSE у планшета
-//    @R <id> <json>               ответ на @Q
-//    @g <id> begin <байт> <sha> / @g <id> <смещение> <base64> / @g <id> end
-//    @X web                       раздел Web на палке закрыт — открой его
-//  Без ответа 6 с — приложение закрыто, радио гаснет само (как у планшета).
+//  PC app over a USB cable (tools/desktop). Same wire as the PC monitor; app lines start with "@"
+//  (passed in by pc.cpp), everything else is still the PC monitor.
+//  PC -> device:  @W want=...&sm=&sb=  subscribe (like ?want= for the tablet; repeat every 2 s = "I'm here")
+//                 @Q <id> /api/...?...  request, same as the tablet sends over HTTP
+//                 @G <id>               send the page (gzip, base64 in chunks)
+//  device -> PC:  @E <event> <json>     stream events, same JSON as the tablet's SSE
+//                 @R <id> <json>        reply to @Q
+//                 @g <id> begin <bytes> <sha> / @g <id> <offset> <base64> / @g <id> end
+//                 @X web                the Web section is closed on the device, open it
+//  No reply for 6 s: the app is closed, radio switches off by itself (like the tablet).
 // ============================================================
 static uint32_t s_linkXMs = 0;
-static uint32_t s_linkWMs = 0;                    // последний «@W» от приложения (новое подключение — открыть Web)
-static int32_t  s_pgId = -1;                      // страница: кому и с какого места шлём
+static uint32_t s_linkWMs = 0;                    // last "@W" from the app (new connection -> open Web)
+static int32_t  s_pgId = -1;                      // page transfer: to whom and from where
 static size_t   s_pgOff = 0;
 
 void webLinkLine(char* s) {
@@ -689,18 +677,18 @@ void webLinkLine(char* s) {
   char cmd = s[1];
   char* rest = s[2] == ' ' ? s + 3 : s + 2;
   if (cmd == 'W') {
-    // новое подключение приложения (не было «@W» дольше 8 с) — палка сама открывает раздел Web;
-    // если Web потом закрыли руками при подключённом приложении — не навязываемся, только подсказка «@X»
+    // new app connection (no "@W" for over 8 s): open the Web section;
+    // if Web was closed by hand while the app is connected, do not force it, only hint with "@X"
     bool fresh = !s_linkWMs || msSince(now, s_linkWMs) > 8000;
     s_linkWMs = now ? now : 1;
     if (!s_on && fresh) { powerTouch(); navOpen(&webSection); }
-    if (!s_on) {                                   // подписаться не на что — раздел закрыт
+    if (!s_on) {                                   // nothing to subscribe to: section closed
       if (msSince(now, s_linkXMs) > 1500 || !s_linkXMs) { s_linkXMs = now ? now : 1; serOutLine("@X web"); }
       return;
     }
     SseCli& k = s_sse[USB_SLOT];
     String q(rest);
-    if (!k.on || k.wantQ != q) {                   // новая подписка (или сменилась вкладка)
+    if (!k.on || k.wantQ != q) {                   // new subscription (or the tab changed)
       bool had = k.on; uint32_t keepSt = k.tSt; bool keepSat = k.satSent;
       k = SseCli(); k.usb = true; k.on = true; k.wantQ = q;
       parseWant(k, q + " ");
@@ -731,7 +719,7 @@ void webLinkLine(char* s) {
 }
 
 void webLinkPump() {
-  // страница: кусками по 1.5 КБ, пока очередь не длинная (данные потока не задерживаются)
+  // page: 1.5 KB chunks while the queue is short (stream data is not delayed)
   while (s_pgId >= 0 && serOutQueued() < 8192) {
     size_t n = TABLET_GZ_LEN - s_pgOff; if (n > 1536) n = 1536;
     if (!n) { char b[32]; snprintf(b, sizeof b, "@g %d end", (int)s_pgId); serOutLine(b); s_pgId = -1; break; }
@@ -745,8 +733,8 @@ void webLinkPump() {
   serOutPump();
 }
 
-// экран: пока подключён планшет — анимация связи; колесо или нажатие показывают QR и пароль
-// (чтобы подключить ещё кого-то или вспомнить пароль), через 30 с без касаний — снова анимация
+// screen: link animation while a tablet is connected; wheel or press shows QR and password
+// (to connect someone else or recall the password), animation returns after 30 s idle
 static bool     s_showInfo = false;
 static uint32_t s_infoMs = 0;
 static void webDraw(uint32_t now) {
@@ -755,22 +743,22 @@ static void webDraw(uint32_t now) {
   for (auto& k : s_sse) if (k.on) { tablets++; b |= k.ble; w |= k.wifi; sn |= k.snd; su |= k.sub; pc |= k.pc; wx |= k.wx; ir |= k.ir; nf |= k.nfc; }
   if (s_showInfo && msSince(now, s_infoMs) > 30000) s_showInfo = false;
   if (!tablets || s_showInfo) { drawWebScreen(v, s_qr, s_qrN); return; }
-  // скорость: байт за последнюю секунду (плавно)
+  // speed: bytes over the last second (smoothed)
   static uint32_t lastBytes = 0, lastMs = 0; static float bps = 0;
   if (!lastMs) { lastMs = now; lastBytes = s_sseBytes; }
   uint32_t dt = msSince(now, lastMs);
   if (dt >= 250) { bps = bps * 0.6f + 0.4f * (s_sseBytes - lastBytes) * 1000.0f / dt; lastBytes = s_sseBytes; lastMs = now; }
   char st[72] = "";
-  if (s_sse[USB_SLOT].on) strcat(st, "USB  ");    // приложение на компьютере по кабелю
+  if (s_sse[USB_SLOT].on) strcat(st, "USB  ");    // PC app over cable
   if (b) strcat(st, "BLE  "); if (w) strcat(st, "WIFI  "); if (su) strcat(st, "SUB  "); if (sn) strcat(st, "SND  "); if (pc) strcat(st, "PC  "); if (wx) strcat(st, "WX  "); if (ir) strcat(st, "IR  "); if (nf) strcat(st, "NFC  ");
-  if (!st[0]) strcpy(st, "STATUS");
+  if (!st[0]) strcpy(st, L("STATUS", "СТАТУС"));
   WebLink l = { tablets, st, (uint32_t)bps, s_sseBytes };
   drawWebLink(l, now);
 }
 
 static void webSubtitle(char* out, size_t n) {
-  if (s_on && s_ok) snprintf(out, n, "%d online", (int)WiFi.softAPgetStationNum());
-  else              snprintf(out, n, "phone view");
+  if (s_on && s_ok) snprintf(out, n, L("%d online", "%d на связи"), (int)WiFi.softAPgetStationNum());
+  else              snprintf(out, n, "%s", L("apps & phone", "приложения"));
 }
 static void webEnter() { webStart(); }
 static void webLeave() { webStop(); ledsOff(); }
@@ -778,7 +766,7 @@ static void webClick() { s_showInfo = !s_showInfo; s_infoMs = millis(); }
 static void webRotate(int) { s_showInfo = !s_showInfo; s_infoMs = millis(); }
 
 const Section webSection = {
-  "Web", 90, 200, 230, iconPhone, webSubtitle,
+  LP("Web", "Веб"), 90, 200, 230, iconPhone, webSubtitle,
   webEnter, webLeave,
   0, nullptr, nullptr, nullptr, nullptr,
   webClick, webRotate, nullptr, webTick, webDraw,

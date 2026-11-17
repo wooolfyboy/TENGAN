@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Запись эфира (.cu8, 8-бит I/Q) -> импульсы OOK в мкс, как их выдал бы CC1101 на GDO0.
+"""Capture (.cu8, 8-bit I/Q) -> OOK pulses in µs, as the CC1101 would output on GDO0.
 
     python3 demod.py file.cu8 [rate] > file.pulses
 
-Огибающая, порог посередине между шумом и сигналом (с гистерезисом),
-склейка помех короче 40 мкс — так же поступает прошивка.
-Вывод: строки «импульс пауза», посылки разделены пустой строкой (тишина > 20 мс).
+Envelope, threshold midway between noise and signal (with hysteresis),
+glitches shorter than 40 µs are merged — same as the firmware does.
+Output: "pulse gap" lines, bursts separated by an empty line (silence > 20 ms).
 """
 import sys, re
 import numpy as np
@@ -14,7 +14,7 @@ def demod(path, rate):
     raw = np.fromfile(path, dtype=np.uint8).astype(np.float32) - 127.4
     i, q = raw[0::2], raw[1::2]
     mag = np.sqrt(i * i + q * q)
-    k = max(1, int(rate * 12e-6))                      # сглаживание ~12 мкс
+    k = max(1, int(rate * 12e-6))                      # smoothing ~12 µs
     env = np.convolve(mag, np.ones(k) / k, mode="same")
     noise = np.percentile(env, 50)
     peak = np.percentile(env, 99.8)
@@ -29,7 +29,7 @@ def demod(path, rate):
             segs.append((level, run * us)); run = 0; level = nl
         run += 1
     segs.append((level, run * us))
-    # склейка помех < 40 мкс
+    # merge glitches < 40 µs
     out = []
     for lv, d in segs:
         if out and (d < 40 or out[-1][0] == lv):

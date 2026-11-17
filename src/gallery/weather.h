@@ -1,49 +1,49 @@
 // ============================================================
-//  weather.h — «Радиопогода» (Gallery › Weather и планшет)
+//  weather.h — "Radio weather" (Gallery › Weather and the tablet)
 //
-//  Эфир вокруг как погода. Источники — только те, что не мешают
-//  друг другу: Bluetooth (2.4 ГГц), CC1101 на 433.92 (монитор) и
-//  микрофон. Wi-Fi не сканируется. Только приём.
-//    облака  — сколько устройств Bluetooth вокруг
-//    ветер   — сколько устройств пришло/ушло за минуту
-//    дождь   — всплески на 433.92 в минуту (пульты, датчики)
-//    гроза   — дождь + громкие пики звука; гром — резкий пик
-//    за окном — температура с уличного датчика 433 МГц (самый сильный за 10 мин)
-//  Всё сглажено: красота важнее точности.
+//  The surrounding airwaves as weather. Sources are only those that don't
+//  interfere with each other: Bluetooth (2.4 GHz), CC1101 at 433.92 (monitor) and
+//  the microphone. Wi-Fi is not scanned. Receive only.
+//    clouds   = number of Bluetooth devices around
+//    wind     = devices that came/left in a minute
+//    rain     = 433.92 bursts per minute (remotes, sensors)
+//    storm    = rain + loud sound peaks; thunder = a sharp peak
+//    outside  = temperature from a 433 MHz outdoor sensor (strongest in 10 min)
+//  Everything is smoothed: looks matter more than accuracy.
 // ============================================================
 #pragma once
 #include <Arduino.h>
 
-#define WX_HIST 60                     // история: 60 точек по 10 с = 10 минут
+#define WX_HIST 60                     // history: 60 points x 10 s = 10 minutes
 
 struct WxState {
-  bool  ok = false;                    // данные есть (идёт расчёт)
-  float clouds = 0, wind = 0, rain = 0, storm = 0;   // 0..1, сглаженные
-  bool  thunder = false;               // резкий звук или сильный всплеск в последние 2 с
-  float trend = 0;                     // «барометр» -1..1: облака за 10 минут растут / падают
-  int   ble = 0;                       // устройств сейчас
-  float turn = 0;                      // пришло + ушло за минуту
-  float sub = 0;                       // всплесков 433.92 за минуту
-  int   subPk = -127;                  // пик последнего всплеска, dBm
-  bool  subOk = false;                 // CC1101 работает
-  float snd = -90, pk = -90;           // громкость и недавний пик, dBFS
-  bool  sndOk = false;                 // микрофон работает
+  bool  ok = false;                    // data present (computing)
+  float clouds = 0, wind = 0, rain = 0, storm = 0;   // 0..1, smoothed
+  bool  thunder = false;               // sharp sound or strong burst in the last 2 s
+  float trend = 0;                     // "barometer" -1..1: clouds rising / falling over 10 minutes
+  int   ble = 0;                       // devices now
+  float turn = 0;                      // came + left per minute
+  float sub = 0;                       // 433.92 bursts per minute
+  int   subPk = -127;                  // peak of the last burst, dBm
+  bool  subOk = false;                 // CC1101 running
+  float snd = -90, pk = -90;           // level and recent peak, dBFS
+  bool  sndOk = false;                 // microphone running
   const char* cond = "calm";           // calm / clear / cloudy / overcast / windy / rain / storm
-  float hist[WX_HIST][2] = {};         // облака, дождь
+  float hist[WX_HIST][2] = {};         // clouds, rain
   int   histN = 0;
-  uint32_t thunderMs = 0;              // когда был последний гром (для вспышки)
-  bool  tOk = false;                   // услышан уличный термодатчик (433 МГц, sensors.h)
+  uint32_t thunderMs = 0;              // time of the last thunder (for the flash)
+  bool  tOk = false;                   // outdoor thermometer heard (433 MHz, sensors.h)
   float temp = 0;                      // °C
-  int   hum = -1;                      // %, -1 — датчик без влажности
-  const char* tsrc = "";              // протокол датчика (Nexus, LaCrosse-TX141TH ...)
+  int   hum = -1;                      // %, -1 = sensor has no humidity
+  const char* tsrc = "";              // sensor protocol (Nexus, LaCrosse-TX141TH ...)
 };
 extern WxState g_wx;
 
-void wxStart();                        // Gallery › Weather: включить источники (BLE, CC1101 433 монитор, микрофон)
-void wxStop();                         // выключить то, что включили
-void wxRadiosTick(uint32_t now);       // подкормить CC1101 и микрофон (когда источники включены здесь)
-void wxUpdate(uint32_t now);           // пересчитать погоду (раз в секунду, внутри сам решает)
-void wxJson(String& o);                // для планшета (поток SSE, событие wx)
+void wxStart();                        // Gallery › Weather: turn on the sources (BLE, CC1101 433 monitor, microphone)
+void wxStop();                         // turn off what was turned on
+void wxRadiosTick(uint32_t now);       // feed CC1101 and the microphone (when the sources are enabled here)
+void wxUpdate(uint32_t now);           // recompute the weather (once a second; decides internally)
+void wxJson(String& o);                // for the tablet (SSE stream, wx event)
 
-void drawWeather(uint32_t now);        // экран палки
-void wxTurn(int dir);                  // колесо: небо / график
+void drawWeather(uint32_t now);        // stick screen
+void wxTurn(int dir);                  // wheel: sky / graph

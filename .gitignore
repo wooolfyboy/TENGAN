@@ -1,11 +1,20 @@
 .pio/
 .vscode/
+.idea/
 *.bin
-# готовые прошивки — в GitHub Releases (собирает CI), не в истории
+# ready-made firmware lives in GitHub Releases (built by CI), not in git history
 release/
 dist/
 tle_cache.txt
 __pycache__/
+*.pyc
 tools/ook_test/.test_ook
 build/
 .claude/
+node_modules/
+*.log
+.DS_Store
+Thumbs.db
+# signing keys must never be committed (the APK key lives in repository secrets)
+*.keystore
+*.jks

@@ -1,4 +1,4 @@
-// ---- ОБЗОР (версия B): радар в глубину, крупные числа, каналы Wi-Fi, состояние палки, лента событий ----
+// ---- OVERVIEW (version B): depth radar, big numbers, Wi-Fi channels, stick state, event feed ----
 T.views.push({
   id: 'ov', title: 'Overview', want: 'ble,wifi',
   mount(main) {
@@ -16,7 +16,7 @@ T.views.push({
     this.sw.tick(dt, t); this.dust.tick(dt);
     T.backdrop(g, w, h, portrait ? 0.5 : 0.3, portrait ? 0.3 : 0.55);
     const devs = BU.list(), aps = [...S.aps.values()].filter(a => a.alive);
-    // радар слева (или сверху в портрете)
+    // radar on the left (top in portrait)
     const top = y0 + u * 4;
     const rr = portrait ? { x: m, y: top, w: w - 2 * m, h: (h - top) * 0.42 } : { x: m, y: top, w: w * 0.44, h: h - top - u * 3 };
     this.cam.yaw += dt * 0.06;
@@ -25,12 +25,12 @@ T.views.push({
     this.dust.draw(g, this.cam);
     T.bloom(this.cv, 0.75);
     T.hits.rect(rr.x, rr.y, rr.w, rr.h, { go: 'ble' });
-    T.header(g, m, y0, w - 2 * m, u, 'Overview', S.st ? `${S.st.name || 'TENGAN'} · up ${T.ago(S.st.up || 0)}` : 'waiting for tenGAN', !S.st);
+    T.header(g, m, y0, w - 2 * m, u, 'Overview', S.st ? `${S.st.name || 'TENGAN'} · up ${T.ago(S.st.up || 0)}` : 'waiting for TENGAN', !S.st);
     T.txt(g, '// BLE SCOPE  ›', rr.x, rr.y + u * 1, u * 0.95, T.C.acc, 't');
-    // правая колонка
+    // right column
     const cx = portrait ? m : rr.x + rr.w + u * 2, cw = portrait ? w - 2 * m : w - m - cx;
     let cy = portrait ? rr.y + rr.h + u : top;
-    // крупные числа
+    // big numbers
     const nd = this.nDev.set(S.ble ? S.ble.n : 0, now), nn = this.nNet.set(aps.length, now);
     const best = devs.length ? Math.max(...devs.map(e => e.rs)) : null; if (best != null) this.near.set(best); const nv = this.near.tick(dt);
     const tw = (cw - u * 2) / 3, th = u * 6;
@@ -43,7 +43,7 @@ T.views.push({
       T.hits.rect(x, cy, tw, th, { go });
     });
     cy += th + u;
-    // каналы Wi-Fi: сильнейшая сеть на канале, полосы «жара»
+    // Wi-Fi channels: strongest network per channel, heat bars
     const chH = u * 7.2;
     T.panel(g, cx, cy, cw, chH, u, `rgba(${T.RGB.panel},.22)`, T.C.line);
     T.txt(g, '// WI-FI CHANNELS  ›', cx + u, cy + u * 1.5, u * 0.95, T.C.acc, 't');
@@ -58,7 +58,7 @@ T.views.push({
     }
     T.hits.rect(cx, cy, cw, chH, { go: 'wifi' });
     cy += chH + u;
-    // состояние палки + история числа устройств
+    // stick state + device count history
     const sH = u * 6.6, sw2 = (cw - u) / 2;
     T.panel(g, cx, cy, sw2, sH, u, `rgba(${T.RGB.panel},.22)`, T.C.line);
     T.txt(g, '// TENGAN', cx + u, cy + u * 1.5, u * 0.95, T.C.acc, 't');
@@ -79,7 +79,7 @@ T.views.push({
     const hi = Math.max(5, ...S.bleHist);
     T.spark(g, hx + u, cy + u * 2.3, sw2 - u * 2, sH - u * 3.2, S.bleHist, 0, hi * 1.15);
     cy += sH + u;
-    // лента событий
+    // event feed
     const eh = h - cy - u * 1.2;
     if (eh > u * 3) {
       T.panel(g, cx, cy, cw, eh, u, `rgba(${T.RGB.panel},.22)`, T.C.line);

@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Пробная «палка на USB» для проверки приложения для компьютера без железа (Linux/macOS).
+"""Fake USB stick for testing the desktop app without hardware (Linux/macOS).
 
-Создаёт виртуальный последовательный порт (pty) и отвечает на протокол «@…» так же,
-как прошивка (src/web/web.cpp): данные берёт у пробной палки tools/webapp/mock.py.
+Creates a virtual serial port (pty) and answers the "@..." protocol like the firmware
+(src/web/web.cpp); data comes from the mock stick tools/webapp/mock.py.
 
     python3 tools/webapp/build.py --html /tmp/tablet.html
     python3 tools/webapp/mock.py /tmp/tablet.html 8090 &
     python3 tools/desktop/fake_stick.py /tmp/tablet.html 8090 /tmp/fake_port.txt
-    (в файл /tmp/fake_port.txt записывается имя порта, например /dev/pts/5)
+    (the port name, e.g. /dev/pts/5, is written to /tmp/fake_port.txt)
 
-Строки не с «@» (статистика монитора ПК) печатаются — видно, что монитор шлёт.
+Lines not starting with "@" (PC monitor stats) are printed, to show what the monitor sends.
 """
 import base64, gzip, hashlib, json, os, pty, sys, threading, time, tty, urllib.request
 
@@ -38,7 +38,7 @@ state = {"want": None, "gen": 0}
 
 
 def stream(want, gen):
-    """Подписка: читаем SSE мока и пересылаем «@E событие json»."""
+    """Subscribe: read the mock SSE stream and forward it as "@E event json"."""
     try:
         r = urllib.request.urlopen("http://127.0.0.1:%d/stream?%s" % (MOCK + 1, want), timeout=10)
     except Exception as e:

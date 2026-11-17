@@ -1,7 +1,8 @@
 // ============================================================
-//  ui.cpp — компоненты дизайн-системы
+//  ui.cpp — design-system components
 // ============================================================
 #include "core/ui.h"
+#include "core/lang.h"
 #include "core/display.h"
 #include "core/theme.h"
 #include "core/settings.h"
@@ -11,11 +12,7 @@ uint16_t UI_DIM()   { return themeKurenai() ? tft.color565(138, 138, 138) : tft.
 uint16_t UI_LINE()  { return themeKurenai() ? tft.color565(58, 58, 58)    : tft.color565(32, 50, 64); }
 uint16_t UI_PANEL() { return themeKurenai() ? tft.color565(34, 34, 34)    : tft.color565(14, 42, 52); }
 
-static void upper(const char* s, char* out, size_t n) {
-  size_t i = 0;
-  for (; s[i] && i < n - 1; i++) out[i] = (char)toupper((unsigned char)s[i]);
-  out[i] = 0;
-}
+static void upper(const char* s, char* out, size_t n) { utf8Upper(s, out, n); }
 
 void uiHeader(const char* title, const char* right, bool rightAlert) {
   int W = spr.width();
@@ -23,7 +20,7 @@ void uiHeader(const char* title, const char* right, bool rightAlert) {
   upper(title, u, sizeof(u));
   snprintf(t, sizeof(t), "// %s", u);
   spr.setTextDatum(TL_DATUM);
-  if (themeKurenai()) {                            // KURENAI: заголовок — белая скошенная плашка, текст чёрный
+  if (themeKurenai()) {                            // KURENAI: title is a white cut-corner plate, black text
     snprintf(t, sizeof(t), "%s", u);
     int tw = txtW(t, 2), x0 = UI_M, x1 = UI_M + tw + 16;
     spr.fillTriangle(x0 + 4, 1, x1 + 4, 1, x0, 17, C_HOT());
@@ -36,14 +33,14 @@ void uiHeader(const char* title, const char* right, bool rightAlert) {
   }
   if (right && right[0]) {
     char r0[48], r[48]; upper(right, r0, sizeof(r0));
-    int room = W - UI_M - 4 - (UI_M + 4 + txtW(t, 2)) - 10;   // сколько места справа от заголовка
-    fitText(r0, r, sizeof(r), max(room, 12), 1);               // не наезжать на заголовок
+    int room = W - UI_M - 4 - (UI_M + 4 + txtW(t, 2)) - 10;   // room to the right of the title
+    fitText(r0, r, sizeof(r), max(room, 12), 1);               // don't overlap the title
     spr.setTextDatum(TR_DATUM);
     spr.setTextColor(rightAlert ? C_ALERT() : UI_LABEL());
     txt(r, W - UI_M - 4, 6, 1);
   }
-  if (themeKurenai()) { spr.fillRect(UI_M, 19, W - 2 * UI_M, 2, C_ACC()); return; }   // KURENAI: сплошная красная черта
-  // линия под шапкой, угасающая вправо
+  if (themeKurenai()) { spr.fillRect(UI_M, 19, W - 2 * UI_M, 2, C_ACC()); return; }   // KURENAI: solid red line
+  // line under the header, fading to the right
   uint16_t a = C_ACC();
   for (int x = UI_M; x < W - UI_M; x++) {
     float k = 1.0f - 0.85f * (x - UI_M) / (float)(W - 2 * UI_M);
@@ -53,18 +50,14 @@ void uiHeader(const char* title, const char* right, bool rightAlert) {
 
 void uiFooter(const char* left, const char* right) {
   int W = spr.width();
-  char t[60];
+  char l[60] = "", r[60] = "";
+  if (left && left[0]) upper(left, l, sizeof(l));
+  if (right && right[0]) upper(right, r, sizeof(r));
+  // doesn't fit: same font, one step smaller (same for both languages)
+  int room = W - 2 * (UI_M + 8) - 10, sz = (txtW(l, 1) + txtW(r, 1) <= room) ? 1 : 8;
   spr.setTextColor(UI_DIM());
-  if (left && left[0]) {
-    upper(left, t, sizeof(t));
-    spr.setTextDatum(BL_DATUM);
-    txt(t, UI_M + 8, UI_FOOT_Y, 1);
-  }
-  if (right && right[0]) {
-    upper(right, t, sizeof(t));
-    spr.setTextDatum(BR_DATUM);
-    txt(t, W - UI_M - 8, UI_FOOT_Y, 1);
-  }
+  if (l[0]) { spr.setTextDatum(BL_DATUM); txt(l, UI_M + 8, UI_FOOT_Y, sz); }
+  if (r[0]) { spr.setTextDatum(BR_DATUM); txt(r, W - UI_M - 8, UI_FOOT_Y, sz); }
 }
 
 void uiFrame(int x, int y, int w, int h, uint16_t col) {

@@ -1,11 +1,11 @@
-// ---- PC (версия B): ноутбук через палку — кольца нагрузки, 3D-ядра, город процессов, пластинка ----
-// Ноутбук шлёт данные палке по USB раз в секунду (pc_monitor.py), палка пересылает их сюда.
-// Между пакетами всё перетекает плавно, позиция трека досчитывается на планшете.
+// ---- PC (version B): laptop via the stick - load rings, 3D cores, process city, record player ----
+// The laptop sends data to the stick over USB once a second (pc_monitor.py); the stick forwards it here.
+// Everything glides between packets; track position is extrapolated on the tablet.
 (() => {
   const fmtT = s => s < 0 ? '--:--' : (s / 60 | 0) + ':' + String(s % 60 | 0).padStart(2, '0');
   const fmtUp = s => { s = s | 0; const d = s / 86400 | 0, h = (s / 3600 | 0) % 24, m = (s / 60 | 0) % 60; return (d ? d + 'd ' : '') + String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0'); };
   const rate = kb => kb >= 1024 ? (kb / 1024).toFixed(1) + ' MB/s' : Math.round(kb) + ' KB/s';
-  // коробка-башня: дальние стенки, ближние, крыша (выпуклая — порядок рисования достаточен)
+  // tower box: far walls, near walls, roof (convex - draw order is enough)
   const box = (g, cam, x, z, sx, sz, hh, roof, side, edge, fog) => {
     const c = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => [x + a * sx, z + b * sz]);
     const B = c.map(p => cam.p(p[0], 0, p[1])), U = c.map(p => cam.p(p[0], hh, p[1]));
@@ -46,8 +46,8 @@
       T.backdrop(g, w, h, 0.45, 0.6);
       const p = S.pc, names = ['PC', 'Cores', 'Process city', 'Media'];
       if (!p || !p.live) {
-        T.header(g, m, y0, w - 2 * m, u, names[this.sub], this.wasLive ? 'laptop stopped' : 'waiting for laptop', this.wasLive);
-        T.emptyState(g, w, h, u, this.wasLive ? 'LAPTOP STOPPED' : 'LAPTOP', this.wasLive ? 'no data for a while · is pc_monitor running?' : 'waiting for laptop · run pc_monitor', this.wasLive);
+        T.header(g, m, y0, w - 2 * m, u, names[this.sub], this.wasLive ? 'PC offline' : 'waiting for PC', this.wasLive);
+        T.emptyState(g, w, h, u, this.wasLive ? 'PC OFFLINE' : 'PC', this.wasLive ? 'no data for a while · is TENGAN Desktop running?' : 'waiting for PC · run TENGAN Desktop', this.wasLive);
         T.finish(g, w, h); return;
       }
       this.wasLive = true;
@@ -55,7 +55,7 @@
       if (S.pcT !== this.lastT) { this.lastT = S.pcT; if (p.trk) { this.pos = p.trk.pos; this.posT = t; } }
       const top = y0 + u * 3.2, bot = h - m * 0.6 - u * 1.8, hot = this.cpu.v >= 90;
       const area = { x: m, y: top, w: w - 2 * m, h: bot - top };
-      let status = `${p.host || 'laptop'} · up ${fmtUp(p.up)}`;
+      let status = `${p.host || 'PC'} · up ${fmtUp(p.up)}`;
       if (this.sub === 0) this.overview(g, area, u, p);
       else if (this.sub === 1) { status = `${p.c ? p.c.length : 0} cores · ${Math.round(this.cpu.v)}%` + (p.ghz ? ` · ${p.ghz.toFixed(1)} GHz` : ''); this.cores(g, w, h, area, u, dt, t, p); }
       else if (this.sub === 2) { status = `${(p.city || []).length} programs · top ${p.top || '—'}`; this.city(g, w, h, area, u, dt, t, p); }
@@ -63,16 +63,16 @@
       T.header(g, m, y0, w - 2 * m, u, names[this.sub], status, hot);
       T.dots(g, m, y0 + u * 2.75, u, 4, this.sub);
       if (this.sub === 2 && this.selCard) this.selCard();
-      T.footer(g, m, bot + u * 0.2, w - 2 * m, u, ['laptop over usb', 'drag: orbit', 'drag: orbit · tap tower: details', 'now playing'][this.sub], (p.age || 0) >= 3 ? `data ${p.age}s old` : 'sse pc 1 hz');
+      T.footer(g, m, bot + u * 0.2, w - 2 * m, u, ['PC over USB', 'drag: orbit', 'drag: orbit · tap tower: details', 'now playing'][this.sub], (p.age || 0) >= 3 ? `data ${p.age}s old` : 'updates every second');
       T.finish(g, w, h);
     },
-    // ---- обзор: два кольца, график CPU, диск/сеть/батарея ----
+    // ---- overview: two rings, CPU graph, disk/net/battery ----
     ring(g, cx, cy, R, v, label, big, unit, sub, alert) {
       const a0 = Math.PI * 0.75, a1 = Math.PI * 2.25, lw = R * 0.12;
       g.lineCap = 'butt';
       g.strokeStyle = T.C.line; g.lineWidth = lw; g.beginPath(); g.arc(cx, cy, R, a0, a1); g.stroke();
       const n = 40, va = T.clamp(v / 100);
-      for (let k = 0; k < n * va; k++) {                  // сегменты по шкале HEAT
+      for (let k = 0; k < n * va; k++) {                  // segments along the HEAT scale
         const aa = a0 + (a1 - a0) * k / n, ab = a0 + (a1 - a0) * (k + 0.7) / n;
         g.strokeStyle = alert ? T.C.alert : T.heat(0.3 + 0.7 * k / n); g.beginPath(); g.arc(cx, cy, R, aa, ab); g.stroke();
       }
@@ -92,7 +92,7 @@
       const cy = a.y + ringsH / 2 + u * 0.4;
       this.ring(g, a.x + lw * 0.27, cy, R, this.cpu.v, 'CPU', this.cpu.v, '%', p.ghz ? p.ghz.toFixed(2) + ' GHz' : '', this.cpu.v >= 90);
       this.ring(g, a.x + lw * 0.73, cy, R, this.ram.v, 'RAM', this.ram.v, '%', (p.ru != null ? p.ru.toFixed(1) + ' / ' + (p.rt || 0).toFixed(0) + ' GB' : ''), this.ram.v >= 90);
-      // история CPU
+      // CPU history
       const cyy = port ? a.y + ringsH + u : a.y + a.h - chartH, cw = lw;
       T.txt(g, 'CPU · 2 MIN', a.x, cyy + u * 0.7, u * 0.75, T.C.dim);
       const gy = cyy + u * 1.2, gh = chartH - u * 1.4;
@@ -100,7 +100,7 @@
       for (let k = 0; k <= 4; k++) { const y = gy + gh * k / 4; g.beginPath(); g.moveTo(a.x, y); g.lineTo(a.x + cw, y); g.stroke(); }
       const hist = S.pcHist.slice(-120);
       if (hist.length > 1) T.spark(g, a.x, gy, cw * (hist.length / 120), gh, hist, 0, 100, T.C.acc);
-      // справа (или снизу): диск, сеть, батарея, лидер
+      // right (or bottom): disk, net, battery, leader
       const px = port ? a.x : a.x + lw + u * 2, py = port ? gy + gh + u * 1.4 : a.y, pw = port ? a.w : a.w - lw - u * 2, ph = port ? a.y + a.h - py : a.h;
       T.panel(g, px, py, pw, ph, u);
       let y = py + u * 1.6;
@@ -120,7 +120,7 @@
       row('UPTIME', fmtUp(p.up || 0));
       if (p.vol >= 0) row('VOLUME', p.mute ? 'mute' : p.vol + '%', p.mute ? 0 : p.vol / 100);
     },
-    // ---- ядра: башни на полу ----
+    // ---- cores: towers on the floor ----
     cores(g, w, h, a, u, dt, t, p) {
       const cam = this.cam, n = (p.c || []).length;
       this.drag.tick(dt); if (this.drag.idle()) cam.yaw += dt * 0.08;
@@ -150,17 +150,17 @@
         T.txt(g, Math.round(it.v) + '%', r.top[0], r.top[1] - u * 0.6, u * 0.85, it.v >= 90 ? T.C.alert : T.C.hot, 't', 'center');
         T.txt(g, 'C' + it.i, r.top[0], r.top[1] - u * 1.6, u * 0.62, T.C.dim, 'm', 'center');
       }
-      // сводка слева
+      // summary on the left
       T.bigNum(g, Math.round(this.cpu.v), a.x, a.y + u * 4, u * 3.6, this.cpu.v >= 90 ? T.C.alert : T.C.hot, '% CPU');
       const hist = S.pcHist.slice(-60);
       if (hist.length > 1) T.spark(g, a.x, a.y + u * 5, Math.min(a.w * 0.3, u * 14), u * 3, hist, 0, 100);
     },
-    // ---- город процессов ----
+    // ---- process city ----
     city(g, w, h, a, u, dt, t, p) {
       const cam = this.cam;
       this.drag.tick(dt); if (this.drag.idle() && !this.sel) cam.yaw += dt * 0.07;
       cam.frame(w / 2, a.y + a.h * 0.64, Math.min(w, a.h * 1.7) * 1.05);
-      const GC = T.bleUI && T.bleUI.glCity, useGL = GC && GC.ok();   // видеокарта (общий город с Bluetooth); 2D — запасной путь
+      const GC = T.bleUI && T.bleUI.glCity, useGL = GC && GC.ok();   // GPU (city shared with Bluetooth); 2D is the fallback
       if (!useGL) T.floorGrid(g, cam, 1.4, 0.233);
       this.dust.tick(dt);
       const now = new Set(), list = p.city || [];
@@ -204,7 +204,7 @@
         g.font = `${u * 0.78}px ${T.FM}`;
         T.txt(g, T.fit(g, q.e.name.toUpperCase(), u * 9) + ' ' + Math.round(q.e.cpu) + '%', q.r.top[0], q.r.top[1] - u * 1.4, u * 0.78, q.e.cpu > 50 ? T.C.alert : q.e.fg ? T.C.hot : T.C.label, 'c', 'center');
       }
-      // выноска для выбранной башни (рисуется поверх шапки — после неё)
+      // callout for the selected tower (drawn over the header, after it)
       const s = tops.find(q => q.e.name === this.sel);
       this.selCard = s ? () => {
         const e = s.e, [tx, ty] = s.r.top, bw = u * 15, bh = u * 7;
@@ -219,23 +219,23 @@
         T.segBar(g, bx + u, by + u * 6.1, bw - u * 2, u * 0.35, e.cpu / 100, 16, false, e.cpu > 50);
       } : null;
     },
-    // ---- музыка: пластинка ----
+    // ---- music: record player ----
     media(g, a, u, dt, t, p) {
       const trk = p.trk, port = a.h > a.w * 1.05;
       const R = port ? Math.min(a.w * 0.38, a.h * 0.26) : Math.min(a.h * 0.42, a.w * 0.24);
       const cx = port ? a.x + a.w / 2 : a.x + R + u * 2, cy = port ? a.y + R + u * 1.5 : a.y + a.h / 2;
       const play = trk && trk.play;
-      this.spinV = T.lerp(this.spinV || 0, play ? 0.55 * T.TAU : 0, T.ease(dt, play ? 0.5 : 0.9));   // 33⅓ об/мин, разгон и выбег
+      this.spinV = T.lerp(this.spinV || 0, play ? 0.55 * T.TAU : 0, T.ease(dt, play ? 0.5 : 0.9));   // 33⅓ rpm, spin-up and coast-down
       this.angle += this.spinV * dt;
-      // свечение вокруг
+      // glow around
       const gl = g.createRadialGradient(cx, cy, R * 0.9, cx, cy, R * 1.3);
       gl.addColorStop(0, `rgba(${T.RGB.acc},${play ? 0.25 : 0.08})`); gl.addColorStop(1, `rgba(${T.RGB.acc},0)`);
       g.fillStyle = gl; g.beginPath(); g.arc(cx, cy, R * 1.3, 0, T.TAU); g.fill();
-      // диск и бороздки
+      // disc and grooves
       g.fillStyle = '#07090d'; g.beginPath(); g.arc(cx, cy, R, 0, T.TAU); g.fill();
       g.lineWidth = 1;
       for (let r = R * 0.38; r < R * 0.98; r += Math.max(1.6, R / 70)) { g.strokeStyle = `rgba(${T.RGB.label},${0.05 + 0.04 * ((r * 7) % 3 > 1.5)})`; g.beginPath(); g.arc(cx, cy, r, 0, T.TAU); g.stroke(); }
-      // блик: свет неподвижен, бороздки блестят в двух секторах
+      // highlight: light is fixed, grooves shine in two sectors
       if (g.createConicGradient) {
         const cg = g.createConicGradient(-0.6, cx, cy);
         cg.addColorStop(0, `rgba(${T.RGB.hot},0)`); cg.addColorStop(0.06, `rgba(${T.RGB.hot},.13)`); cg.addColorStop(0.12, `rgba(${T.RGB.hot},0)`);
@@ -243,7 +243,7 @@
         g.fillStyle = cg; g.beginPath(); g.arc(cx, cy, R * 0.98, 0, T.TAU); g.arc(cx, cy, R * 0.38, 0, T.TAU, true); g.fill();
       }
       g.strokeStyle = T.C.acc; g.lineWidth = 1.5; g.beginPath(); g.arc(cx, cy, R, 0, T.TAU); g.stroke();
-      // наклейка вращается
+      // label spins
       g.save(); g.translate(cx, cy); g.rotate(this.angle);
       const lg = g.createRadialGradient(0, 0, 0, 0, 0, R * 0.34); lg.addColorStop(0, T.C.panel); lg.addColorStop(1, '#123a48');
       g.fillStyle = lg; g.beginPath(); g.arc(0, 0, R * 0.34, 0, T.TAU); g.fill();
@@ -252,17 +252,17 @@
       for (let k = 0; k < 3; k++) { g.rotate(T.TAU / 3); g.fillStyle = `rgba(${T.RGB.acc},.5)`; g.fillRect(R * 0.2, -1, R * 0.1, 2); }
       g.restore();
       g.fillStyle = T.C.hot; g.beginPath(); g.arc(cx, cy, Math.max(2, R * 0.025), 0, T.TAU); g.fill();
-      // тонарм
+      // tonearm
       const ax = cx + R * 1.08, ay = cy - R * 0.92, prog = trk && trk.dur > 0 ? T.clamp(this.curPos(t, trk) / trk.dur) : 0;
-      const ang = Math.PI * (0.56 + (trk ? 0.03 + prog * 0.1 : 0));   // игла: от края к середине
+      const ang = Math.PI * (0.56 + (trk ? 0.03 + prog * 0.1 : 0));   // needle: from edge to middle
       g.strokeStyle = T.C.label; g.lineWidth = Math.max(2, R * 0.025); g.lineCap = 'round';
       g.beginPath(); g.moveTo(ax, ay); g.lineTo(ax + Math.cos(ang) * R * 0.9, ay + Math.sin(ang) * R * 0.9); g.stroke(); g.lineCap = 'butt';
       g.fillStyle = T.C.dim; g.beginPath(); g.arc(ax, ay, R * 0.06, 0, T.TAU); g.fill();
       T.bloom(this.cv, 0.7);
-      // текст
+      // text
       const tx = port ? a.x : cx + R * 1.45, tw = port ? a.w : a.x + a.w - tx;
       let ty = port ? cy + R * 1.35 + u * 2 : a.y + a.h * 0.3;
-      if (!trk) { T.txt(g, 'NOTHING PLAYING', tx, ty + u * 2, u * 2, T.C.label, 't'); T.txt(g, 'START A TRACK ON THE LAPTOP', tx, ty + u * 3.5, u * 0.85, T.C.dim); this.controls(g, tx, ty + u * 6, tw, u, t, false); return; }
+      if (!trk) { T.txt(g, 'NOTHING PLAYING', tx, ty + u * 2, u * 2, T.C.label, 't'); T.txt(g, 'START A TRACK ON THE PC', tx, ty + u * 3.5, u * 0.85, T.C.dim); this.controls(g, tx, ty + u * 6, tw, u, t, false); return; }
       T.txt(g, (trk.app || 'MEDIA').toUpperCase() + (play ? '  ▸ PLAYING' : '  ▮▮ PAUSED'), tx, ty, u * 0.85, play ? T.C.acc : T.C.label);
       ty += u * 3;
       g.font = `500 ${u * 2.4}px ${T.FC}`; T.txt(g, T.fit(g, trk.t || '—', tw), tx, ty, u * 2.4, T.C.hot, 'c');
@@ -282,7 +282,7 @@
       }
       this.controls(g, tx, ty + u * 2.6, tw, u, t, play);
     },
-    // пульт: ⏮ ⏯ ⏭ · − MUTE + — палка передаёт клавишу ноутбуку (pc_monitor нажимает медиа-клавишу)
+    // remote: prev / play-pause / next, vol - MUTE + - the stick sends the key to the laptop (pc_monitor presses the media key)
     controls(g, x, y, w, u, t, play) {
       const keys = [['PREV', 'prev'], ['PLAY', play ? 'pause' : 'play'], ['NEXT', 'next'], null, ['VOLDN', 'minus'], ['MUTE', 'mute'], ['VOLUP', 'plus']];
       const bs = Math.min(u * 4.2, (w - u * 2) / 7.2), gap = bs * 0.18;
@@ -308,7 +308,7 @@
     },
     mediaKey(key) {
       this.pressK = key; this.pressT = performance.now() / 1000;
-      const p = S.pc; if (key === 'PLAY' && p && p.trk) p.trk.play = p.trk.play ? 0 : 1;   // сразу показать, не ждать ноутбук
+      const p = S.pc; if (key === 'PLAY' && p && p.trk) p.trk.play = p.trk.play ? 0 : 1;   // show at once, do not wait for the laptop
       fetch(`${T.apiBase()}/api/pckey?k=${key}`, { cache: 'no-store' }).catch(() => {});
     },
     curPos(t, trk) {

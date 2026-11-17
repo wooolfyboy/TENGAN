@@ -1,9 +1,9 @@
-# Версия TENGAN — одна на всё: файл VERSION в корне репозитория.
-# PlatformIO запускает этот скрипт перед сборкой: пишет src/core/version.h (только если изменилось).
-# build.py берёт ту же версию для страницы планшета, а приложение — для своего versionName.
+# TENGAN version — single source: the VERSION file in the repo root.
+# PlatformIO runs this before the build: writes src/core/version.h (only if changed).
+# build.py uses the same version for the tablet page, and the app for its versionName.
 import os
 try:
-    Import("env")  # noqa: F821  (есть, когда запускает PlatformIO)
+    Import("env")  # noqa: F821  (defined when run by PlatformIO)
     ROOT = env["PROJECT_DIR"]  # noqa: F821
 except Exception:
     ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

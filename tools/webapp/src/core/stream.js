@@ -1,17 +1,16 @@
-// ---- канал с палкой: «вторая дверь» (SSE, порт 81), запасной — опрос /api/* ----
+// ---- link to the stick: second port (SSE, port 81), fallback /api/* polling ----
 const Stream = T.Stream = { es: null, want: '', mode: 'off', lastMsg: 0, pollT: null };
-// приложение для компьютера (tools/desktop) кладёт в страницу window.TENGAN_DESKTOP;
-// в режиме USB данные идут по кабелю через мост window.TenganUSB (want / api / poll)
+// the PC app (tools/desktop) sets window.TENGAN_DESKTOP; in USB mode data goes over the cable via the window.TenganUSB bridge (want / api / poll)
 const USB = window.TENGAN_DESKTOP && window.TENGAN_DESKTOP.mode === 'usb' ? window.TenganUSB : null;
 T.desktop = !!window.TENGAN_DESKTOP;
-// события потока — одни и те же для Wi-Fi (SSE) и USB
+// stream events: same for Wi-Fi (SSE) and USB
 const H = {
   st: d => { S.onSt(d); T.app && T.app.status(); },
   ble: d => S.onBle(d), wifi: d => S.onWifi(d), snd: d => S.onSnd(d), sub: d => S.onSub(d), pc: d => S.onPc(d),
   sat: d => S.onSat(d), wx: d => S.onWx(d), ir: d => S.onIr(d), nfc: d => S.onNfc(d), sens: d => S.onSens(d),
 };
 if (USB) {
-  // запросы /api/… — тоже по кабелю (страница их не замечает: обычный fetch)
+  // /api/... requests also go over the cable (plain fetch, the page does not notice)
   const of = window.fetch.bind(window);
   window.fetch = (u, o) => {
     const url = typeof u === 'string' ? u : (u && u.url) || '';
@@ -28,7 +27,7 @@ Stream.setLink = (mode) => {
   Stream.mode = mode;
   const d = document.getElementById('link'), t = document.getElementById('linkTxt');
   d.className = 'dot ' + (mode === 'live' || mode === 'usb' ? 'live' : mode === 'poll' || mode === 'usbwait' ? 'poll' : 'off');
-  t.textContent = mode === 'live' ? 'LIVE' : mode === 'poll' ? 'POLL' : mode === 'usb' ? 'USB' : mode === 'usbwait' ? 'USB · OPEN WEB ON STICK' : mode === 'usboff' ? 'USB · NO STICK' : 'NO LINK';
+  t.textContent = T.tr(mode === 'live' ? 'LIVE' : mode === 'poll' ? 'POLL' : mode === 'usb' ? 'USB' : mode === 'usbwait' ? 'USB · OPEN WEB ON TENGAN' : mode === 'usboff' ? 'USB · NO DEVICE' : 'NO LINK');
 };
 Stream.connect = (want) => {
   Stream.want = want;
@@ -44,16 +43,16 @@ Stream.connect = (want) => {
   es.onerror = () => { if (Stream.mode === 'live') Stream.setLink('off'); };
   setTimeout(() => { if (!opened && Stream.es === es) { es.close(); Stream.es = null; Stream.poll(want); } }, 5000);
 };
-// запасной путь: те же данные через старые /api/* (медленнее, но работает)
+// fallback: same data via /api/* (slower but works)
 Stream.poll = (want) => {
   Stream.setLink('poll');
-  // палка включает радио по вкладке: строго то, что смотрим, остальное молчит
+  // the stick enables radios per tab: only what is viewed, the rest stays off
   const has = k => want.split(/[,&]/).includes(k);
   const tab = has('snd') ? 'snd' : has('sub') ? 'sub' : has('ble') && has('wifi') ? 'ov' : has('ble') ? 'ble' : has('wifi') ? 'wifi' : 'sys';
   const J = u => fetch(apiBase() + u + (u.includes('?') ? '&' : '?') + 'tab=' + tab, { cache: 'no-store' }).then(r => r.json());
   let n = 0, busy = false;
   const step = async () => {
-    if (busy) return;                                    // палка не успела ответить — не заваливаем её запросами
+    if (busy) return;                                    // the stick has not answered yet: do not flood it
     busy = true;
     try {
       n++;
@@ -77,13 +76,13 @@ Stream.poll = (want) => {
     busy = false;
   };
   Stream.pollT = setInterval(step, 125); step();
-  // запасной путь — временный: через 8 с снова пробуем нормальный поток
+  // fallback is temporary: retry the normal stream after 8 s
   clearTimeout(Stream.retryT);
   Stream.retryT = setTimeout(() => { if (Stream.mode === 'poll' && Stream.want === want) Stream.connect(want); }, 8000);
 };
 
-// ---- USB (приложение для компьютера): подписка + длинный опрос моста ----
-// Мост раз в ≤0.25 с отдаёт пачку «[[событие, данные], …]»; «_x» — служебное от приложения/палки.
+// ---- USB (PC app): subscribe + long-poll the bridge ----
+// The bridge returns a batch "[[event, data], ...]" at least every 0.25 s; "_x" is a service event from the app/stick.
 Stream.usb = (want) => {
   USB.want('want=' + want).catch(() => {});
   if (Stream.usbLoop) return;

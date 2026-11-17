@@ -1,25 +1,24 @@
-// ---- последние данные с палки + сглаживание для плавной картинки ----
-// Красота важнее точности: мелкая дрожь сигнала (±2–3 dB) не показывается,
-// большие изменения «перетекают» (T.steady). Палка шлёт уже спокойные значения,
-// здесь — второй слой, чтобы движение между пакетами было мягким.
+// ---- latest stick data + smoothing for a calm picture ----
+// Looks over precision: small signal jitter (+-2-3 dB) is hidden, big changes flow (T.steady).
+// The stick already sends calm values; this is a second layer so motion between packets is soft.
 const S = T.S = {
   st: null, ble: null, bleT: 0, wifi: null, wifiT: 0, snd: null, sndT: 0, sub: null, subT: 0, pc: null, pcT: 0, sky: null,
-  bleHist: [],                                         // число устройств, точка в секунду
-  dev: new Map(),                                      // id -> устройство (rs — что рисовать)
-  aps: new Map(),                                      // bssid -> сеть (rs — что рисовать)
+  bleHist: [],                                         // device count, one point per second
+  dev: new Map(),                                      // id -> device (rs = value to draw)
+  aps: new Map(),                                      // bssid -> network (rs = value to draw)
   bands: new Float32Array(32), caps: new Float32Array(32), level: -90, peak: -90, hz: 0, energy: 0,
   wave: new Float32Array(64), lvHist: [], target: new Float32Array(32),
-  subWf: [], subHist: [],                              // водопад Sub-GHz (строки спектра), до 400 строк
-  pcHist: [], cores: [],                               // CPU по секундам; ядра (сглаженные)
-  events: [],                                          // лента событий: {t, tag, text, alert}
+  subWf: [], subHist: [],                              // Sub-GHz waterfall (spectrum rows), up to 400 rows
+  pcHist: [], cores: [],                               // CPU per second; cores (smoothed)
+  events: [],                                          // event feed: {t, tag, text, alert}
 };
-// ---- тревоги штаба: настройки живут на палке (Settings › Alerts, /api/settings), здесь — копия ----
-// Значения по умолчанию — те же, что в прошивке (на старой прошивке без этой страницы работают они).
+// ---- HQ alerts: settings live on the stick (Settings > Alerts, /api/settings); this is a copy ----
+// Defaults match the firmware (older firmware without that page uses them).
 S.CFG_DEF = { al_near: -65, al_new: 1, al_trk: 1, al_newfor: 30, al_warm: 20, al_sens: 5, al_warn: 60, al_alarm: 80,
   al_cble: 1, al_crf: 1, al_csnd: 1, al_cprb: 1, al_blink: 1, al_plate: 1 };
 S.cfg = Object.assign({}, S.CFG_DEF);
-S.cfgItems = null;                                     // пункты страницы Alerts как их отдала палка (для панели в штабе)
-S.cfgFromItem = it => {                                 // пункт из /api/settings → число в S.cfg
+S.cfgItems = null;                                     // Alerts page items as the stick sent them (for the HQ panel)
+S.cfgFromItem = it => {                                 // item from /api/settings -> number in S.cfg
   if (!it || !(it.k in S.CFG_DEF)) return;
   let v = it.v;
   if (it.type === 'enum') { const i = (it.opts || []).findIndex(o => String(o).toLowerCase() === String(v).toLowerCase()); v = i >= 0 ? i : typeof v === 'number' ? v : S.CFG_DEF[it.k]; }
@@ -40,7 +39,7 @@ T.loadCfg = () => {
   return fetch(T.apiBase() + '/api/settings', { cache: 'no-store' }).then(r => r.json()).then(S.cfgFromSettings).catch(() => {});
 };
 setTimeout(T.loadCfg, 1500); setInterval(T.loadCfg, 15000);
-// «новое» и «трекер» по настройкам: штаб и лента событий судят одинаково
+// "new" and "tracker" by settings: HQ and the event feed judge alike
 S.isNew = (e, now) => {
   const c = S.cfg; if (e.first || !c.al_new) return false;
   if (now - e.born > c.al_newfor * 1000) return false;
@@ -50,10 +49,10 @@ S.isTrk = e => {
   const c = S.cfg; if (e.type !== 'tracker' || !c.al_trk) return false;
   return c.al_trk === 2 || (e.rs != null ? e.rs : e.r) > c.al_near;
 };
-// активность эфира — прозрачно, по источникам (каждый 0..1), только включённые в настройках:
-//   BLE — новые устройства за минуту (5/мин = максимум), 433 — посылки за минуту (20/мин),
-//   звук — громкость −60…−20 dB, IR/NFC — нажатия и карты за минуту (3/мин).
-//   Итог = среднее включённых × чувствительность/5.
+// Air activity per source (each 0..1), only those enabled in settings:
+//   BLE: new devices per minute (5/min = max), 433: packets per minute (20/min),
+//   sound: level -60...-20 dB, IR/NFC: presses and cards per minute (3/min).
+//   Result = mean of enabled sources x sensitivity/5.
 S.act = { ble: [], rf: [], prb: [] };
 const actPush = (k, now, n = 1) => { const a = S.act[k]; for (let i = 0; i < Math.min(n, 30); i++) a.push(now); while (a.length && now - a[0] > 60000) a.shift(); };
 S.activity = () => {
@@ -66,23 +65,22 @@ S.activity = () => {
   let sum = 0, n = 0; for (const k in parts) if (en[k]) { sum += parts[k]; n++; }
   return { v: n ? T.clamp(sum / n * c.al_sens / 5) : 0, parts, en };
 };
-// подпись уровня по порогам из настроек
+// level label by the thresholds from settings
 S.actState = v => {
   const c = S.cfg, warn = c.al_warn / 100, alarm = c.al_alarm / 100;
-  return v >= alarm ? 3 : v >= warn ? 2 : v >= warn / 2 ? 1 : 0;   // 0 тихо · 1 активно · 2 внимание · 3 тревога
+  return v >= alarm ? 3 : v >= warn ? 2 : v >= warn / 2 ? 1 : 0;   // 0 quiet, 1 active, 2 warning, 3 alarm
 };
 S.event = (tag, text, alert) => { S.events.unshift({ t: Date.now(), tag, text, alert: !!alert }); if (S.events.length > 40) S.events.pop(); };
 
-// подписи устройств («мои AirPods»): палка хранит их и шлёт 8-м полем; планшет держит свою копию,
-// чтобы новое имя было видно сразу, ещё до ответа палки
+// device labels ("my AirPods"): the stick stores them and sends them as field 8; the tablet keeps its own copy so a new name shows before the stick answers
 S.labels = new Map();                                  // id -> {n, t}
 S.setLabel = (id, n) => { S.labels.set(id, { n, t: performance.now() }); const e = S.dev.get(id); if (e) e.label = n; };
 const pickLabel = (id, fromStick) => {
   const loc = S.labels.get(id);
-  if (loc && (fromStick === undefined || performance.now() - loc.t < 6000)) return loc.n;   // своё свежее — главнее
+  if (loc && (fromStick === undefined || performance.now() - loc.t < 6000)) return loc.n;   // our fresh one wins
   return fromStick || '';
 };
-S.ever = new Map();                                  // id -> когда видели впервые (за сеанс)
+S.ever = new Map();                                  // id -> first seen (this session)
 S.onBle = d => {
   S.ble = d; S.bleT = performance.now();
   S.bleHist.push(d.n); if (S.bleHist.length > 180) S.bleHist.shift();
@@ -92,9 +90,8 @@ S.onBle = d => {
     const label = pickLabel(id, a.length > 7 ? a[7] : undefined);
     let e = S.dev.get(id);
     if (!e) {
-      // «новое» — только то, чего за сеанс ещё не было. Устройство, которое пропало из списка и вернулось
-      // (палка шлёт не всех сразу, телефоны то слышны, то нет), новым не считается. Первые 20 с после
-      // подключения — разогрев: список палки заполняется, все считаются «уже были».
+      // "new" = not seen earlier this session. A device that dropped out and came back (the stick does not send everyone at once,
+      // phones come and go) is not new. The first 20 s after connecting are warm-up: everything counts as already seen.
       const seenBefore = S.ever.has(id); S.ever.set(id, now);
       if (!S.warmT) S.warmT = now + S.cfg.al_warm * 1000 + 1;
       const fresh = !seenBefore && now > S.warmT;
@@ -106,7 +103,7 @@ S.onBle = d => {
     Object.assign(e, { r, type, vend, name, label, age, macs, alive: true, seen: now });
     e.hist.push(r); if (e.hist.length > 120) e.hist.shift();
   }
-  for (const [id, e] of S.dev) if (!seen.has(id) && e.alive) e.alive = false;      // «пропал» не пишем в ленту: слишком часто мигает
+  for (const [id, e] of S.dev) if (!seen.has(id) && e.alive) e.alive = false;      // no "lost" in the feed: it flickers too often
   S.devInit = true;
   if (S.ever.size > 5000) S.ever.clear();
 };
@@ -144,10 +141,10 @@ S.onPc = d => {
   S.pc = d; S.pcT = performance.now();
   if (d.live && d.cpu != null) { S.pcHist.push(d.cpu); if (S.pcHist.length > 120) S.pcHist.shift(); }
   if (d.c) d.c.forEach((v, i) => { if (!S.cores[i]) S.cores[i] = T.steady(3, 0.5); S.cores[i].set(v); });
-  if (was !== undefined && !!was !== !!d.live) S.event('PC', d.live ? 'laptop online' : 'laptop stopped', !d.live);
+  if (was !== undefined && !!was !== !!d.live) S.event('PC', d.live ? 'PC online' : 'PC offline', !d.live);
 };
 S.onSat = d => { S.sky = d; };
-// ИК-пульты (событие ir — на каждое нажатие): последнее + история; удержание кнопки (rep) не плодит строк
+// IR remotes (event ir, per press): last + history; a held button (rep) adds no rows
 S.ir = { last: null, t: 0, hist: [], n: 0 };
 S.onIr = d => {
   const I = S.ir, now = performance.now(), prev = I.hist[0];
@@ -159,7 +156,7 @@ S.onIr = d => {
   }
   I.last = d; I.t = now;
 };
-// NFC (событие nfc — на каждое касание): карта, история; err — нет считывателя
+// NFC (event nfc, per tap): card, history; err = no reader
 S.nfc = { last: null, t: 0, hist: [], err: '' };
 S.onNfc = d => {
   const N = S.nfc, now = performance.now();
@@ -171,7 +168,7 @@ S.onNfc = d => {
     S.event('NFC', d.fam || 'card'); actPush('prb', now);
   } else prev.at = now;
 };
-// датчики 433 (событие sens): таблица и последняя посылка; новая посылка = pk вырос
+// 433 sensors (event sens): table and last packet; new packet = pk grew
 S.sens = null; S.sensPkT = 0;
 S.onSens = d => {
   const prev = S.sens; S.sens = d; S.sensT = performance.now();
@@ -182,17 +179,17 @@ S.onSens = d => {
     for (const x of d.sensors || []) if (!known.has(x.id)) S.event('433', x.kind === 'remote' ? 'remote / bell #' + String(x.id).split('-').pop() : x.p + ' ch' + x.ch + (x.t != null ? '  ' + x.t + '°' : ''));
   }
 };
-// радиопогода (событие wx, раз в секунду): rx — что пришло, wxs — плавные значения для сцены
+// radio weather (event wx, once a second): rx = received, wxs = smoothed values for the scene
 S.wxs = { clouds: 0, wind: 0, rain: 0, storm: 0, trend: 0 }; S.wxBolt = 0;
 S.onWx = d => {
   const prev = S.wx; S.wx = d; S.wxT = performance.now();
-  if (d.thunder && !(prev && prev.thunder)) S.wxBolt++;          // новый раскат — сцена рисует молнию
+  if (d.thunder && !(prev && prev.thunder)) S.wxBolt++;          // new thunder: the scene draws lightning
 };
 S.onSt = d => {
   const prev = S.st; S.st = d;
   if (prev && prev.bat >= 0 && d.bat >= 0 && prev.bat > 15 && d.bat <= 15) S.event('PWR', 'battery ' + d.bat + '%', true);
 };
-// каждый кадр: всё, что приходит рывками, перетекает плавно
+// every frame: anything that arrives in jumps eases smoothly
 S.tick = dt => {
   if (S.wx) { const k = T.ease(dt, 1.4); for (const key in S.wxs) { const v = +S.wx[key] || 0; S.wxs[key] += (v - S.wxs[key]) * k; } }
   const k = 1 - Math.pow(0.001, dt);

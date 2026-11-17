@@ -1,13 +1,13 @@
 // ============================================================
-//  pc_city.cpp — раздел PC › City: город процессов ноутбука.
-//  Каждая программа (все её процессы вместе) — башня:
-//    высота — сколько процессора ест,  ширина — сколько памяти,
-//    белая крыша — программа активного окна, оранжевая — ест > 50% CPU.
-//  Места на площади закрепляются за программой, пока она в списке;
-//  новые «вырастают», ушедшие опускаются. Камера сама облетает город,
-//  нажатие колеса — прожектор на следующую башню.
+//  pc_city.cpp — PC › City section: the laptop's process city.
+//  Each program (all its processes together) is a tower:
+//    height = CPU use, width = memory,
+//    white roof = active-window program, orange = over 50% CPU.
+//  A program keeps its plot while it is listed; new ones "grow", gone ones sink.
+//  The camera orbits on its own; a wheel click moves the spotlight to the next tower.
 // ============================================================
 #include <algorithm>
+#include "core/lang.h"
 #include "pc/pc.h"
 #include "core/display.h"
 #include "core/theme.h"
@@ -16,20 +16,20 @@
 #include "core/jsonutil.h"
 
 #define CITY_MAX 24
-#define CITY_GRID 6                          // площадь 6x6 мест
+#define CITY_GRID 6                          // 6x6 plots
 struct Tower {
   char  name[20] = "";
-  float cpu = 0, ram = 0;                    // что прислал ноутбук: %, МБ
-  float h = 0, w = 0;                        // анимированные высота и ширина
+  float cpu = 0, ram = 0;                    // sent by the laptop: %, MB
+  float h = 0, w = 0;                        // animated height and width
   bool  fg = false, alive = false;
   int   slot = -1;
 };
 static Tower s_tw[CITY_MAX];
 static uint32_t s_cityT = 0;
-static int s_sel = -1;                       // прожектор (индекс в s_tw)
+static int s_sel = -1;                       // spotlight (index in s_tw)
 
 bool pcCityLive(uint32_t now) { return s_cityT && msSince(now, s_cityT) < 6000; }
-void pcCityNext() {                          // нажатие: следующая башня (по убыванию CPU)
+void pcCityNext() {                          // click: next tower (by descending CPU)
   int order[CITY_MAX], n = 0;
   for (int i = 0; i < CITY_MAX; i++) if (s_tw[i].alive) order[n++] = i;
   if (!n) { s_sel = -1; return; }
@@ -39,7 +39,7 @@ void pcCityNext() {                          // нажатие: следующа
   s_sel = order[k % n];
 }
 
-// «PP\tимя,cpu*10,МБ,активна\t...»
+// "PP\tname,cpu*10,MB,active\t..."
 void pcCityLine(char* s) {
   for (auto& t : s_tw) t.alive = false;
   char* save = nullptr;
@@ -53,7 +53,7 @@ void pcCityLine(char* s) {
       if (s_tw[k].name[0] && !strcmp(s_tw[k].name, tok)) i = k;
       if (free < 0 && !s_tw[k].name[0]) free = k;
     }
-    if (i < 0) {                             // новая программа — свободное место ближе к центру
+    if (i < 0) {                             // new program: free plot nearest the center
       if (free < 0) continue;
       i = free;
       Tower& t = s_tw[i];
@@ -73,7 +73,7 @@ void pcCityLine(char* s) {
   s_cityT = millis();
 }
 
-// для планшета: [[имя,cpu,МБ,активна,место],...]
+// for the tablet: [[name,cpu,MB,active,slot],...]
 void pcCityJson(String& o) {
   o += '[';
   bool first = true;
@@ -102,14 +102,14 @@ void drawPcCity(uint32_t now) {
     float vy = y * cp + zr * sp, vz = -y * sp + zr * cp;
     d = dist + vz; sx = cx + xr * F / d; syy = cyS - vy * F / d;
   };
-  // площадь и сетка улиц
+  // plaza and street grid
   const float half = 1.0f, step = 2 * half / CITY_GRID;
   for (int k = 0; k <= CITY_GRID; k++) {
     float a = -half + k * step, x0, y0, x1, y1, d;
     proj(a, 0, -half, x0, y0, d); proj(a, 0, half, x1, y1, d); spr.drawLine(x0, y0, x1, y1, UI_LINE());
     proj(-half, 0, a, x0, y0, d); proj(half, 0, a, x1, y1, d); spr.drawLine(x0, y0, x1, y1, UI_LINE());
   }
-  // анимация и порядок рисования (дальние раньше)
+  // animation and draw order (far ones first)
   struct D { int i; float depth; };
   D order[CITY_MAX]; int n = 0;
   float maxRam = 1;
@@ -143,18 +143,18 @@ void drawPcCity(uint32_t now) {
       spr.fillTriangle(bx[a], by[a], bx[b], by[b], tx[b], ty[b], fc);
       spr.fillTriangle(bx[a], by[a], tx[b], ty[b], tx[a], ty[a], fc);
     }
-    uint16_t roof = t.fg ? C_HOT() : col;                       // активное окно — белая крыша
+    uint16_t roof = t.fg ? C_HOT() : col;                       // active window: white roof
     spr.fillTriangle(tx[0], ty[0], tx[1], ty[1], tx[2], ty[2], roof);
     spr.fillTriangle(tx[0], ty[0], tx[2], ty[2], tx[3], ty[3], roof);
     for (int q = 0; q < 4; q++) spr.drawLine(tx[q], ty[q], tx[(q + 1) % 4], ty[(q + 1) % 4], sel ? C_HOT() : scale565(C_HOT(), 60));
-    if (sel) {                                                  // прожектор: луч сверху
+    if (sel) {                                                  // spotlight: beam from above
       float px, py, pd; proj(gx, t.h + 0.35f, gz, px, py, pd);
       float rx, ry, rd; proj(gx, t.h, gz, rx, ry, rd);
       spr.drawLine(px, py, rx, ry, C_HOT());
       spr.fillCircle(px, py, 2, C_HOT());
     }
   }
-  // подписи трёх самых занятых
+  // labels for the three busiest
   int top[3] = { -1, -1, -1 };
   for (int i = 0; i < CITY_MAX; i++) {
     if (!s_tw[i].alive) continue;
@@ -173,34 +173,34 @@ void drawPcCity(uint32_t now) {
     spr.setTextColor(t.cpu > 50 ? C_ALERT() : C_HOT());
     txt(t.name, (int)sx, y, 1);
   }
-  // справа: прожектор или итоги
+  // right side: spotlight or totals
   const int px = W - 104;
   char buf[32];
   spr.setTextDatum(TL_DATUM);
   int alive = 0; for (auto& t : s_tw) if (t.alive) alive++;
   if (s_sel >= 0 && s_tw[s_sel].alive) {
     Tower& t = s_tw[s_sel];
-    spr.setTextColor(UI_LABEL()); txt("SPOTLIGHT", px, UI_TOP + 4, 1);
+    spr.setTextColor(UI_LABEL()); txt(L("SPOTLIGHT", "В ФОКУСЕ"), px, UI_TOP + 4, 1);
     spr.setTextColor(C_HOT()); char nm[20]; fitText(t.name, nm, sizeof(nm), 100, 2); txt(nm, px, UI_TOP + 16, 2);
     snprintf(buf, sizeof(buf), "%.1f%%", t.cpu);
     spr.setTextColor(t.cpu > 50 ? C_ALERT() : C_ACC()); txt(buf, px, UI_TOP + 38, 4);
     spr.setTextColor(UI_LABEL()); txt("CPU", px, UI_TOP + 64, 1);
-    if (t.ram >= 1024) snprintf(buf, sizeof(buf), "%.1f GB RAM", t.ram / 1024); else snprintf(buf, sizeof(buf), "%d MB RAM", (int)t.ram);
+    if (t.ram >= 1024) snprintf(buf, sizeof(buf), L("%.1f GB RAM", "%.1f ГБ ОЗУ"), t.ram / 1024); else snprintf(buf, sizeof(buf), L("%d MB RAM", "%d МБ ОЗУ"), (int)t.ram);
     spr.setTextColor(C_HOT()); txt(buf, px, UI_TOP + 78, 1);
-    if (t.fg) { spr.setTextColor(C_ACC()); txt("ACTIVE WINDOW", px, UI_TOP + 92, 1); }
+    if (t.fg) { spr.setTextColor(C_ACC()); txt(L("ACTIVE WINDOW", "АКТИВНОЕ ОКНО"), px, UI_TOP + 92, 1); }
   } else {
-    spr.setTextColor(UI_LABEL()); txt("PROGRAMS", px, UI_TOP + 4, 1);
+    spr.setTextColor(UI_LABEL()); txt(L("PROGRAMS", "ПРОГРАММЫ"), px, UI_TOP + 4, 1);
     snprintf(buf, sizeof(buf), "%d", alive);
     spr.setTextColor(C_HOT()); txt(buf, px, UI_TOP + 16, 4);
     spr.setTextColor(UI_DIM());
-    txt("HEIGHT  CPU", px, UI_TOP + 50, 1);
-    txt("WIDTH   RAM", px, UI_TOP + 62, 1);
-    txt("WHITE   ACTIVE", px, UI_TOP + 74, 1);
-    spr.setTextColor(C_ALERT()); txt("ORANGE  >50% CPU", px, UI_TOP + 86, 1);
+    txt(L("HEIGHT  CPU", "ВЫСОТА  ЦП"), px, UI_TOP + 50, 1);
+    txt(L("WIDTH   RAM", "ШИРИНА  ОЗУ"), px, UI_TOP + 62, 1);
+    txt(L("WHITE   ACTIVE", "БЕЛЫЙ   АКТИВНО"), px, UI_TOP + 74, 1);
+    spr.setTextColor(C_ALERT()); txt(L("ORANGE  >50% CPU", "ЦВЕТ    >50% ЦП"), px, UI_TOP + 86, 1);
   }
-  if (!pcCityLive(now)) { spr.setTextColor(UI_DIM()); txt("WAITING FOR DATA", px, UI_TOP + 110, 1); }
-  snprintf(buf, sizeof(buf), "%d%% total", (int)lroundf(g_pc.cpu));
-  uiHeader("Process city", buf, g_pc.cpu >= 90);
-  uiFooter("wheel: screens  click: spotlight", "side: back");
+  if (!pcCityLive(now)) { spr.setTextColor(UI_DIM()); txt(L("WAITING FOR DATA", "ЖДУ ДАННЫЕ"), px, UI_TOP + 110, 1); }
+  snprintf(buf, sizeof(buf), L("%d%% total", "всего %d%%"), (int)lroundf(g_pc.cpu));
+  uiHeader(L("Process city", "Город процессов"), buf, g_pc.cpu >= 90);
+  uiFooter(L("wheel: screens  ·  click: spotlight", "колесо: экраны · нажать: фокус"), L("side: back", "кнопка: назад"));
   present();
 }

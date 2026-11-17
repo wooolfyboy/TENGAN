@@ -1,17 +1,17 @@
 // ============================================================
-//  sensors.h — чтение показаний BLE-термометров из их рекламы
+//  sensors.h — reading BLE thermometer values from their advertisements
 //
-//  Многие датчики сами рассылают температуру/влажность всем вокруг
-//  (без шифрования). Здесь только разбор этих пакетов.
+//  Many sensors broadcast temperature/humidity unencrypted to everyone
+//  around. This file only parses those packets.
 //
-//  Поддержка:
-//   - Xiaomi LYWSD03MMC и др. с прошивкой PVVX / ATC1441 (UUID 0x181A)
-//   - BTHome v2 (UUID 0xFCD2) — Shelly, PVVX в режиме BTHome и др.
-//   - Xiaomi MiBeacon без шифрования (UUID 0xFE95) — старые модели
+//  Supported:
+//   - Xiaomi LYWSD03MMC etc. with PVVX / ATC1441 firmware (UUID 0x181A)
+//   - BTHome v2 (UUID 0xFCD2): Shelly, PVVX in BTHome mode, etc.
+//   - Xiaomi MiBeacon, unencrypted (UUID 0xFE95): older models
 //   - Qingping / ClearGrass (UUID 0xFDCD)
 //   - SwitchBot Meter (UUID 0xFD3D)
-//   - Govee H5072/H5075/H5101/... (производитель 0xEC88)
-//   - RuuviTag, формат 5 (производитель 0x0499)
+//   - Govee H5072/H5075/H5101/... (manufacturer 0xEC88)
+//   - RuuviTag, format 5 (manufacturer 0x0499)
 // ============================================================
 #pragma once
 #include <Arduino.h>
@@ -22,7 +22,7 @@ struct SensorReading {
   float temp = 0;      // °C
   float hum  = 0;      // %
   int   batt = 0;      // %
-  float press = 0;     // гПа
+  float press = 0;     // hPa
   int   co2 = 0;       // ppm
   const char* model = "";
   bool any() const { return hasT || hasH || hasP || hasCO2; }
@@ -33,7 +33,7 @@ static inline uint16_t u16le(const uint8_t* p) { return (uint16_t)(p[0] | (p[1] 
 static inline int16_t s16be(const uint8_t* p) { return (int16_t)((p[0] << 8) | p[1]); }
 static inline uint16_t u16be(const uint8_t* p) { return (uint16_t)((p[0] << 8) | p[1]); }
 
-// --- 0x181A: PVVX (15 байт) или ATC1441 (13 байт) ---
+// --- 0x181A: PVVX (15 bytes) or ATC1441 (13 bytes) ---
 static inline bool parse181A(const uint8_t* d, uint8_t n, SensorReading& r) {
   if (n >= 15) {                     // PVVX: MAC(6,LE) t(s16,0.01) h(u16,0.01) mV(u16) %(u8) cnt flg
     r.temp = s16le(d + 6) / 100.0f; r.hasT = true;
@@ -53,9 +53,9 @@ static inline bool parse181A(const uint8_t* d, uint8_t n, SensorReading& r) {
 }
 
 // --- 0xFCD2: BTHome v2 ---
-// длина данных для каждого ID объекта (0 = неизвестно -> дальше не разбираем)
+// data length per object ID (0 = unknown -> stop parsing)
 static inline uint8_t bthomeLen(uint8_t id) {
-  if (id >= 0x15 && id <= 0x2F) return 1;              // бинарные сенсоры, влажн./влага uint8
+  if (id >= 0x15 && id <= 0x2F) return 1;              // binary sensors, humidity/moisture uint8
   switch (id) {
     case 0x00: case 0x01: case 0x09: case 0x0F: case 0x10: case 0x11:
     case 0x3A: case 0x46: return 1;
@@ -73,8 +73,8 @@ static inline uint8_t bthomeLen(uint8_t id) {
 static inline bool parseBTHome(const uint8_t* d, uint8_t n, SensorReading& r) {
   if (n < 1) return false;
   uint8_t info = d[0];
-  if (info & 0x01) return false;               // зашифровано — не читаем
-  if (((info >> 5) & 0x07) != 2) return false; // только v2
+  if (info & 0x01) return false;               // encrypted: skip
+  if (((info >> 5) & 0x07) != 2) return false; // v2 only
   uint8_t i = 1;
   while (i < n) {
     uint8_t id = d[i++];
@@ -96,15 +96,15 @@ static inline bool parseBTHome(const uint8_t* d, uint8_t n, SensorReading& r) {
   return r.any();
 }
 
-// --- 0xFE95: Xiaomi MiBeacon (только незашифрованные) ---
+// --- 0xFE95: Xiaomi MiBeacon (unencrypted only) ---
 static inline bool parseMiBeacon(const uint8_t* d, uint8_t n, SensorReading& r) {
   if (n < 5) return false;
   uint16_t fc = u16le(d);
-  if (fc & 0x0008) return false;               // зашифровано
-  if (!(fc & 0x0040)) return false;            // нет объекта с данными
-  uint8_t i = 5;                               // fc(2) + product id(2) + счётчик(1)
+  if (fc & 0x0008) return false;               // encrypted
+  if (!(fc & 0x0040)) return false;            // no data object
+  uint8_t i = 5;                               // fc(2) + product id(2) + counter(1)
   if (fc & 0x0010) i += 6;                     // MAC
-  if (fc & 0x0020) {                           // capability (+1 байт, если есть IO)
+  if (fc & 0x0020) {                           // capability (+1 byte if IO present)
     if (i >= n) return false;
     uint8_t cap = d[i++];
     if (cap & 0x20) i += 1;
@@ -129,7 +129,7 @@ static inline bool parseMiBeacon(const uint8_t* d, uint8_t n, SensorReading& r) 
 // --- 0xFDCD: Qingping ---
 static inline bool parseQingping(const uint8_t* d, uint8_t n, SensorReading& r) {
   if (n < 8) return false;
-  uint8_t i = 8;                               // флаги(1) + тип(1) + MAC(6)
+  uint8_t i = 8;                               // flags(1) + type(1) + MAC(6)
   while (i + 2 <= n) {
     uint8_t id = d[i], L = d[i + 1]; i += 2;
     if (i + L > n) break;
@@ -160,9 +160,9 @@ static inline bool parseSwitchBot(const uint8_t* d, uint8_t n, SensorReading& r)
   return true;
 }
 
-// --- производитель 0xEC88: Govee ---
+// --- manufacturer 0xEC88: Govee ---
 static inline bool parseGovee(const uint8_t* m, uint8_t n, SensorReading& r) {
-  if (n < 5) return false;                     // m = данные ПОСЛЕ company id
+  if (n < 5) return false;                     // m = data AFTER the company id
   uint32_t raw = ((uint32_t)m[1] << 16) | ((uint32_t)m[2] << 8) | m[3];
   bool neg = raw & 0x800000;
   raw &= 0x7FFFFF;
@@ -174,7 +174,7 @@ static inline bool parseGovee(const uint8_t* m, uint8_t n, SensorReading& r) {
   return r.temp > -40 && r.temp < 80;
 }
 
-// --- производитель 0x0499: RuuviTag формат 5 ---
+// --- manufacturer 0x0499: RuuviTag format 5 ---
 static inline bool parseRuuvi(const uint8_t* m, uint8_t n, SensorReading& r) {
   if (n < 15 || m[0] != 0x05) return false;
   int16_t t = s16be(m + 1);
@@ -187,7 +187,7 @@ static inline bool parseRuuvi(const uint8_t* m, uint8_t n, SensorReading& r) {
   return r.any();
 }
 
-// Главная функция: пробует все форматы на сыром пакете [len][type][data]...
+// Entry point: tries all formats on a raw [len][type][data]... packet
 static inline bool parseSensor(const uint8_t* p, size_t n, SensorReading& r) {
   size_t i = 0;
   bool ok = false;
@@ -197,7 +197,7 @@ static inline bool parseSensor(const uint8_t* p, size_t n, SensorReading& r) {
     uint8_t t = p[i + 1];
     const uint8_t* d = p + i + 2;
     uint8_t dl = L - 1;
-    if (t == 0x16 && dl >= 2) {                // service data: UUID(2) + данные
+    if (t == 0x16 && dl >= 2) {                // service data: UUID(2) + data
       uint16_t u = u16le(d);
       const uint8_t* v = d + 2; uint8_t vl = dl - 2;
       switch (u) {
@@ -207,7 +207,7 @@ static inline bool parseSensor(const uint8_t* p, size_t n, SensorReading& r) {
         case 0xFDCD: ok |= parseQingping(v, vl, r); break;
         case 0xFD3D: ok |= parseSwitchBot(v, vl, r); break;
       }
-    } else if (t == 0xFF && dl >= 2) {         // manufacturer data: CID(2) + данные
+    } else if (t == 0xFF && dl >= 2) {         // manufacturer data: CID(2) + data
       uint16_t cid = u16le(d);
       if (cid == 0xEC88) ok |= parseGovee(d + 2, dl - 2, r);
       else if (cid == 0x0499) ok |= parseRuuvi(d + 2, dl - 2, r);

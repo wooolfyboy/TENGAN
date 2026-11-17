@@ -1,12 +1,10 @@
 // ============================================================
-//  battery.cpp — заряд батареи
-//
-//  Только чтение регистров, ничего не настраиваем:
-//   - BQ27220 (0x55) — «счётчик топлива»: %, напряжение, ток, время;
-//   - BQ25896 (0x6B) — зарядка: есть ли USB, идёт ли заряд.
-//  Шина I2C: SDA 8, SCL 18 (по utilities.h из репозитория LilyGO).
+//  battery.cpp — battery state, read-only (no configuration):
+//   BQ27220 (0x55) fuel gauge: %, voltage, current, time; BQ25896 (0x6B) charger: USB present, charging.
+//  I2C: SDA 8, SCL 18 (LilyGO utilities.h).
 // ============================================================
 #include <Wire.h>
+#include "core/lang.h"
 #include "core/timeutil.h"
 #include "core/battery.h"
 #include "core/display.h"
@@ -48,7 +46,7 @@ static void batRead() {
     if (bq16(0x12, v)) g_bat.full = v;
   }
   uint8_t st;
-  g_bat.chgOk = i2cRead(BQ25896_ADDR, 0x0B, &st, 1);       // REG0B: статус
+  g_bat.chgOk = i2cRead(BQ25896_ADDR, 0x0B, &st, 1);       // REG0B: status
   if (g_bat.chgOk) {
     g_bat.bus = (st >> 5) & 0x07;
     g_bat.chg = (st >> 3) & 0x03;
@@ -79,17 +77,17 @@ uint16_t batColor() {
 }
 
 
-// одна строка о питании (для настроек)
+// one-line power summary (Settings)
 void batSummary(char* out, size_t n) {
-  if (!g_bat.ok) { snprintf(out, n, "battery gauge not found"); return; }
+  if (!g_bat.ok) { snprintf(out, n, L("battery gauge not found", "датчик батареи не найден")); return; }
   if (batCharging()) {
-    if (g_bat.ttf > 0) snprintf(out, n, "charging %d mA, full in ~%dh %02dm", g_bat.ma, g_bat.ttf / 60, g_bat.ttf % 60);
-    else               snprintf(out, n, "charging %d mA", g_bat.ma);
+    if (g_bat.ttf > 0) snprintf(out, n, L("charging %d mA, full in ~%dh %02dm", "зарядка %d мА, полностью через ~%d ч %02d мин"), g_bat.ma, g_bat.ttf / 60, g_bat.ttf % 60);
+    else               snprintf(out, n, L("charging %d mA", "зарядка %d мА"), g_bat.ma);
   } else if (batUsb()) {
-    snprintf(out, n, g_bat.chg == 3 ? "USB power, fully charged" : "USB power");
+    snprintf(out, n, "%s", g_bat.chg == 3 ? L("USB power, fully charged", "питание USB, заряжено") : L("USB power", "питание USB"));
   } else if (g_bat.tte > 0) {
-    snprintf(out, n, "on battery %d mA, ~%dh %02dm left", g_bat.ma, g_bat.tte / 60, g_bat.tte % 60);
+    snprintf(out, n, L("on battery %d mA, ~%dh %02dm left", "от батареи %d мА, осталось ~%d ч %02d мин"), g_bat.ma, g_bat.tte / 60, g_bat.tte % 60);
   } else {
-    snprintf(out, n, "on battery %d mA", g_bat.ma);
+    snprintf(out, n, L("on battery %d mA", "от батареи %d мА"), g_bat.ma);
   }
 }

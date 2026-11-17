@@ -1,9 +1,9 @@
-// ---- SUB-GHZ (CC1101, только приём): 3D-водопад и монитор всплесков ----
-// Spectrum: время уходит вглубь рельефом, спереди — светящаяся линия спектра.
-// Monitor: уровень на частоте полосы, всплески и их список.
-// ---- WebGL: сетка-рельеф под ту же камеру T.orbit, что и HUD (подписи совпадают с вершинами) ----
-// T.glOrbit.grid(name, C, R) -> { set(heights), draw(P, cam, vp, geo, extra) }; heights[r*C+c], r=0 — ближний ряд.
-// Вершинный шейдер повторяет T.orbit.p(): поворот yaw/pitch, перспектива F/(D+z) — HUD и меш не расходятся.
+// ---- SUB-GHZ (CC1101, receive only): 3D waterfall and burst monitor ----
+// Spectrum: time goes into depth as terrain, glowing spectrum line in front.
+// Monitor: level at the band frequency, bursts and their list.
+// ---- WebGL: terrain mesh for the same T.orbit camera as the HUD (labels match vertices) ----
+// T.glOrbit.grid(name, C, R) -> { set(heights), draw(P, cam, vp, geo, extra) }; heights[r*C+c], r=0 - nearest row.
+// Vertex shader repeats T.orbit.p(): yaw/pitch rotation, perspective F/(D+z) - HUD and mesh do not diverge.
 if (T.GL && T.GL.ok && !T.glOrbit) (() => {
   const gl = T.GL.gl, deriv = !!gl.getExtension('OES_standard_derivatives');
   const VS = `precision highp float;
@@ -12,7 +12,7 @@ uniform vec4 cam; uniform vec4 prj; uniform vec2 vp; uniform vec4 geo; uniform f
 varying vec3 wp; varying float vd; varying float vh; varying vec2 vg;
 void main(){
   float z=geo.z+(gr.y+zoff)*geo.w, y=hh*hs;
-  float x=(geo.x+gr.x*geo.y)*(fitw>0.?fitw*max(.2,prj.x+z*cam.z):1.+spread*abs(gr.y+zoff));   // fitw: каждый ряд во всю ширину кадра
+  float x=(geo.x+gr.x*geo.y)*(fitw>0.?fitw*max(.2,prj.x+z*cam.z):1.+spread*abs(gr.y+zoff));   // fitw: each row spans the full frame width
   float x1=x*cam.x-z*cam.y, z1=x*cam.y+z*cam.x;
   float y2=y*cam.z+z1*cam.w, z2=-y*cam.w+z1*cam.z, d=max(.05,prj.x+z2);
   vec2 s=vec2(prj.z+x1*prj.y/d, prj.w-y2*prj.y/d);
@@ -35,7 +35,7 @@ void main(){
       G = {
         C, R, n: idx.length,
         set(h) { gl.bindBuffer(gl.ARRAY_BUFFER, bh); gl.bufferSubData(gl.ARRAY_BUFFER, 0, h); },
-        // cam: T.orbit (после frame); vp: [w,h] CSS; geo: [x0, dx, z0, dz]; extra: прочие uniform
+        // cam: T.orbit (after frame); vp: [w,h] CSS; geo: [x0, dx, z0, dz]; extra: other uniforms
         draw(P, cam, vp, geo, extra = {}) {
           if (!P) return;
           gl.useProgram(P.p);
@@ -57,7 +57,7 @@ void main(){
 
 (() => {
 const BANDS = ['315', '433.92', '868', '915'];
-const lvl = v => T.clamp((v + 120 - 10) / 70);          // как wfColor на палке
+const lvl = v => T.clamp((v + 120 - 10) / 70);          // like wfColor on the stick
 const ROWS = 36, BINS = 96;
 
 T.views.push({
@@ -83,7 +83,7 @@ T.views.push({
     this.band = i; try { localStorage.setItem('sub_band', i); } catch (e) {}
     this.reset(); T.app.rewant();
   },
-  chips(g, w, u, m, y) {                                   // выбор полосы — справа под шапкой
+  chips(g, w, u, m, y) {                                   // band selection - right under the header
     const cw = u * 5.2, chh = u * 1.9, gap = u * 0.4;
     let x = w - m - BANDS.length * cw - (BANDS.length - 1) * gap;
     T.txt(g, 'BAND MHZ', x - u * 0.8, y + chh * 0.66, u * 0.7, T.C.dim, 'm', 'right');
@@ -122,7 +122,7 @@ T.views.push({
     T.finish(g, w, h);
   },
 
-  // WebGL-водопад: меш до ROWS_GL строк, цвет по высоте, светящиеся строки и пики, туман вглубь
+  // WebGL waterfall: mesh of up to ROWS_GL rows, color by height, glowing rows and peaks, fog into depth
   spectrumGL(g, w, h, cam, n, X, Z, HY) {
     const RG = 48, O = T.glOrbit;
     if (!this.glP) {
@@ -170,20 +170,20 @@ void main(){
     T.GL.draw(g, 0, 0, w, h);
   },
 
-  // ---------- SPECTRUM: 3D-водопад ----------
+  // ---------- SPECTRUM: 3D waterfall ----------
   spectrum(g, w, h, u, m, y0, dt, d, title) {
     const cam = this.cam, portrait = h > w * 1.05, cur = d.cur || [], n = cur.length || BINS;
     this.drag.tick(dt);
     cam.yaw = T.clamp(cam.yaw, -0.8, 0.8);
     cam.frame(w / 2, portrait ? h * 0.42 : h * 0.5, portrait ? w * 1.05 : Math.min(w * 0.7, h * 1.2));
     const X = i => (i / (n - 1) - 0.5) * 3.0, Z = r => -1.0 + r * (2.4 / ROWS), HY = 0.75;
-    // пиковое удержание (медленно опускается)
+    // peak hold (falls slowly)
     let mi = 0;
     for (let i = 0; i < n; i++) { this.peak[i] = Math.max(cur[i] ?? -120, this.peak[i] - dt * 6); if (cur[i] > cur[mi]) mi = i; }
     const pk = cur[mi] ?? -120, burst = pk > -70;
     this.flash = Math.max(burst ? 1 : 0, this.flash - dt * 1.5);
-    // «фейк»: рельеф меняется только с новой строкой данных (~7 раз в с) или при повороте камеры —
-    // рисуем его в отдельный слой и в остальные кадры просто кладём готовую картинку
+    // 'fake': terrain changes only with a new data row (~7 times/s) or camera rotation -
+    // draw it into a separate layer and in other frames just paste the ready picture
     if (T.glOrbit && T.GL.ok) this.spectrumGL(g, w, h, cam, n, X, Z, HY);
     else {
     const rows = S.subWf, R = Math.min(ROWS, rows.length), cv = this.cv.cv;
@@ -204,7 +204,7 @@ void main(){
       g.beginPath(); g.moveTo(b0[0], b0[1]); for (const p of pts) g.lineTo(p[0], p[1]); g.lineTo(b1[0], b1[1]); g.closePath();
       g.fillStyle = 'rgba(5,9,14,.9)'; g.fill();
       let stroke;
-      if (r < 8) {                                         // ближние строки — цвет по высоте, дальние — одним цветом (дешевле)
+      if (r < 8) {                                         // near rows - color by height, far ones - one color (cheaper)
         stroke = g.createLinearGradient(0, b0[1], 0, top[1]);
         stroke.addColorStop(0, T.heat(0.12, 0.5 * fog)); stroke.addColorStop(0.3, T.heat(0.45, 0.85 * fog)); stroke.addColorStop(0.65, T.heat(0.8, fog)); stroke.addColorStop(1, T.heat(1, fog));
       } else stroke = T.heat(0.3 + 0.45 * fog, 0.35 + 0.6 * fog);
@@ -215,7 +215,7 @@ void main(){
     }
     g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(this.layer, 0, 0); g.restore();
     }
-    // передняя линия + пики
+    // front line + peaks
     if (cur.length) {
       const z = Z(0) - 0.02;
       g.beginPath();
@@ -224,7 +224,7 @@ void main(){
       g.fillStyle = `rgba(${T.RGB.hot},.75)`;
       for (let i = 0; i < n; i += 2) { const p = cam.p(X(i), HY * Math.pow(lvl(this.peak[i]), 1.2), z); g.fillRect(p[0] - 1, p[1] - 1, 2, 2); }
     }
-    // ось частот
+    // frequency axis
     const zF = Z(0) - 0.15;
     for (let k = 0; k <= 8; k++) {
       const i = k / 8 * (n - 1), p = cam.p(X(i), 0, zF), f = d.lo + (d.hi - d.lo) * k / 8;
@@ -232,7 +232,7 @@ void main(){
       if (k % 2 === 0) T.txt(g, f.toFixed(2), p[0], p[1] + u * 1.2, u * (k % 4 ? 0.65 : 0.8), k % 4 ? T.C.label : T.C.hot, 'm', 'center');
     }
     T.bloom(this.cv, 0.8 + 0.5 * this.flash);
-    // выноска пиковой частоты
+    // peak frequency callout
     const fpk = d.lo + (d.hi - d.lo) * mi / (n - 1);
     if (cur.length) {
       const p = cam.p(X(mi), HY * Math.pow(lvl(pk), 1.2), Z(0));
@@ -245,14 +245,14 @@ void main(){
     }
     T.header(g, m, y0, w - 2 * m, u, title, `peak ${fpk.toFixed(2)} MHz  ${pk} dBm`, burst);
     this.chips(g, w, u, m, y0 + u * 3);
-    // шкала цвета
+    // color scale
     const sx = m, sy = y0 + u * 3.3, sw = u * 9;
     for (let i = 0; i < 40; i++) { g.fillStyle = T.heat(i / 39); g.fillRect(sx + i * sw / 40, sy, sw / 40 + 0.5, u * 0.45); }
     T.txt(g, '-110', sx, sy + u * 1.4, u * 0.62, T.C.dim); T.txt(g, '-40 DBM', sx + sw, sy + u * 1.4, u * 0.62, T.C.dim, 'm', 'right');
     T.footer(g, m, h - u * 2.2, w - 2 * m, u, 'drag: orbit  ·  time flows into depth', `${Math.min(T.glOrbit && T.GL.ok ? 48 : ROWS, S.subWf.length)} rows · receive only`);
   },
 
-  // ---------- MONITOR: уровень и всплески ----------
+  // ---------- MONITOR: level and bursts ----------
   monitor(g, w, h, u, m, y0, dt, d, title) {
     const portrait = h > w * 1.05, burst = !!d.burst, rssi = d.rssi || [];
     this.flash = Math.max(burst ? 1 : 0, this.flash - dt * 1.2);
@@ -260,19 +260,19 @@ void main(){
     this.chips(g, w, u, m, y0 + u * 3);
     const top = y0 + u * 6, bot = h - u * 3;
     const cx = m, cw = portrait ? w - 2 * m : (w - 2 * m) * 0.66, ch = portrait ? (bot - top) * 0.6 : bot - top;
-    // график
+    // graph
     T.panel(g, cx, top, cw, ch, u);
     const L = cx + u * 3.4, Rr = cx + cw - u * 1.2, Tp = top + u * 4.2, B = top + ch - u * 1.6;
     const Y = v => B - T.clamp((v + 110) / 80) * (B - Tp);
     g.lineWidth = 1;
     for (let v = -110; v <= -30; v += 10) { g.strokeStyle = v % 20 ? `rgba(${T.RGB.line},.5)` : T.C.line; g.beginPath(); g.moveTo(L, Y(v)); g.lineTo(Rr, Y(v)); g.stroke(); if (v % 20 === 0) T.txt(g, v, L - u * 0.5, Y(v) + u * 0.3, u * 0.65, T.C.dim, 'm', 'right'); }
-    // порог (пол + запас) пунктиром
+    // threshold (floor + margin) dashed
     if (d.floor != null) {
       g.setLineDash([u * 0.5, u * 0.4]); g.strokeStyle = `rgba(${T.RGB.label},.6)`;
       g.beginPath(); g.moveTo(L, Y(d.floor)); g.lineTo(Rr, Y(d.floor)); g.stroke(); g.setLineDash([]);
       T.txt(g, 'FLOOR', Rr, Y(d.floor) - u * 0.35, u * 0.6, T.C.label, 'm', 'right');
     }
-    // сглаживание линии между пакетами
+    // line smoothing between packets
     if (!this.chart || this.chart.length !== rssi.length) this.chart = Float32Array.from(rssi);
     for (let i = 0; i < rssi.length; i++) this.chart[i] = T.lerp(this.chart[i], rssi[i], T.ease(dt, 0.15));
     if (this.chart.length > 1) {
@@ -286,7 +286,7 @@ void main(){
       T.diamond(g, Rr, Y(last), u * 0.45, burst ? T.C.alert : T.C.hot, true);
     }
     T.bloom(this.cv, 0.55 + 0.6 * this.flash);
-    // крупное значение и баннер
+    // big value and banner
     const last = rssi.length ? rssi[rssi.length - 1] : -120;
     T.txt(g, '// LEVEL', cx + u, top + u * 1.6, u * 1.0, T.C.acc, 't');
     T.bigNum(g, last, cx + u * 6.5, top + u * 3.3, u * 2.8, burst ? T.C.alert : T.heat(0.3 + 0.7 * lvl(last)), 'DBM');
@@ -297,7 +297,7 @@ void main(){
       g.strokeStyle = burst ? T.C.alert : T.C.line; g.lineWidth = 1.2; g.stroke();
       T.txt(g, burst ? '// BURST' : '// LISTENING', bx + bw / 2, by + bh * 0.68, u * 1.15, burst ? T.C.alert : T.C.label, 't', 'center');
     }
-    // список событий
+    // event list
     const ex = portrait ? m : cx + cw + u, ey = portrait ? top + ch + u : top, ew = portrait ? w - 2 * m : w - m - ex, eh = portrait ? bot - ey : ch;
     T.panel(g, ex, ey, ew, eh, u);
     T.txt(g, '// EVENTS', ex + u, ey + u * 1.6, u * 1.0, T.C.acc, 't');
@@ -317,7 +317,7 @@ void main(){
     }
     T.footer(g, m, h - u * 2.2, w - 2 * m, u, 'level at band frequency · tap band to switch', 'receive only');
   },
-  // ---------- SENSORS: датчики 433 (термометры, звонки, пульты) + анализатор посылки ----------
+  // ---------- SENSORS: 433 sensors (thermometers, doorbells, remotes) + packet analyzer ----------
   sensors(g, w, h, u, m, y0, dt) {
     const d = S.sens, now = performance.now(), portrait = h > w * 1.05;
     if (!d) {
@@ -331,10 +331,10 @@ void main(){
     T.header(g, m, y0, w - 2 * m, u, 'Sensors 433.92', `${d.pk || 0} packets · noise ${d.noise || 0}`, false);
     const top = y0 + u * 3.6, bot = h - u * 3;
     const list = d.sensors || [];
-    // таблица
+    // table
     const tw = w - 2 * m, rowH = u * 3.1, th = portrait ? Math.min((bot - top) * 0.55, u * 4 + rowH * Math.max(3, list.length)) : Math.min((bot - top) * 0.52, u * 4 + rowH * Math.max(3, list.length));
     T.panel(g, m, top, tw, th, u);
-    const cols = [0.02, 0.32, 0.5, 0.63, 0.73, 0.9];                 // имя, темп, влажн, батарея, сигнал, когда
+    const cols = [0.02, 0.32, 0.5, 0.63, 0.73, 0.9];                 // name, temp, humidity, battery, signal, when
     const X = k => m + tw * cols[k];
     T.txt(g, '// SENSORS', X(0), top + u * 1.8, u * 1.0, T.C.acc, 't');
     ['TEMP', 'HUM', 'BAT', 'SIGNAL', 'SEEN'].forEach((s, i) => T.txt(g, s, X(i + 1), top + u * 1.8, u * 0.75, T.C.dim));
@@ -362,7 +362,7 @@ void main(){
       g.fillStyle = T.C.line; g.fillRect(m + u, y + rowH - u * 0.2, tw - 2 * u, 1);
       y += rowH;
     }
-    // анализатор последней посылки
+    // analyzer of the last packet
     const ay = top + th + u, ah = bot - ay, L = d.last;
     T.panel(g, m, ay, tw, ah, u);
     if (fresh > 0) { T.cutPath(g, m, ay, tw, ah, u * 0.8); g.strokeStyle = `rgba(${T.RGB.acc},${0.6 * fresh})`; g.lineWidth = 2; g.stroke(); }
@@ -387,7 +387,7 @@ void main(){
     T.bloom(this.cv, 0.5 + 0.5 * fresh);
     T.footer(g, m, h - u * 2.2, w - 2 * m, u, 'outdoor sensors feed radio weather · remotes show only a fingerprint', 'receive only');
   },
-  // посылка: [импульс, пауза, ...] мкс — меандр с подписью ширин
+  // packet: [pulse, space, ...] us - square wave with width labels
   pulses(g, pt, x, y, w, h, u, rev, sensor) {
     g.fillStyle = `rgba(${T.RGB.bg2},.5)`; g.fillRect(x, y, w, h);
     g.strokeStyle = T.C.line; g.lineWidth = 1;

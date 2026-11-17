@@ -1,19 +1,12 @@
 // ============================================================
-//  wifi.cpp — раздел Wi-Fi
-//
-//  Только приём: пассивный скан (слушаем маячки точек доступа, сами
-//  ничего не отправляем) и подсчёт пакетов в эфире. Содержимое пакетов
-//  не читается — только заголовки (кто кому шлёт), и только для счёта.
-//  ESP32-S3 работает только в диапазоне 2.4 ГГц — сети 5 ГГц не видны.
-//
-//  Экраны:
-//    NETWORKS  — список сетей + подробности
-//    CHANNELS  — загрузка каналов («холмики») и совет по каналу
-//    ACTIVITY  — пакеты в секунду и шум по каналам
-//    CLIENTS   — сколько устройств работает в каждой сети, сколько ищут Wi-Fi
-//    FIND      — «горячо-холодно» по выбранной сети (быстрый скан одного канала)
+//  wifi.cpp — Wi-Fi section. Receive-only: passive scan (we only listen to beacons, never transmit)
+//  and packet counting. Payloads are not read, only headers (who talks to whom), for counting.
+//  ESP32-S3 is 2.4 GHz only, so 5 GHz networks are invisible.
+//  Screens: NETWORKS (+details), CHANNELS (load + advice), ACTIVITY (pps + noise),
+//  CLIENTS (devices per network), FIND (hot/cold on one network, fast single-channel scan).
 // ============================================================
 #include <WiFi.h>
+#include "core/lang.h"
 #include <esp_wifi.h>
 #include <map>
 #include <vector>
@@ -36,21 +29,21 @@ static const int WIFI_STEADY_DB = 3;
 bool g_wOn = false;
 inline bool wNeedsProm(int m) { return m == W_ACTIVITY || m == W_CLIENTS; }
 
-// ---------- точки доступа ----------
+// ---------- access points ----------
 static const uint32_t AP_REMEMBER_MS = 60000;
 
 uint32_t g_scanRetryMs = 0;
-int      g_scanCh = 0;           // 0 — все каналы, иначе один (режим FIND)
+int      g_scanCh = 0;           // 0 = all channels, else one (FIND mode)
 
-// список
+// list
 int      g_wMove = 0;
 uint32_t g_wTouch = 0;
 uint64_t g_wSparkFor = 0;
 // FIND
 uint64_t g_fFor = 0;
 
-// ---------- приём пакетов (promiscuous) ----------
-// счётчики пишет обработчик пакетов (другая задача), читает основной цикл
+// ---------- packet capture (promiscuous) ----------
+// Counters are written by the packet handler (another task) and read by the main loop.
 std::atomic<uint32_t> g_pMgmt{0}, g_pData{0};
 std::atomic<int32_t>  g_nfSum{0};
 std::atomic<uint32_t> g_nfCnt{0};
@@ -58,19 +51,19 @@ uint32_t g_hopMs = 0, g_lastMgmt = 0, g_lastData = 0;
 uint32_t g_actHistMs = 0;
 static const uint32_t HOP_MS = 200;
 
-// события из обработчика пакетов -> основной цикл (кольцевой буфер)
-struct PEv { uint8_t kind; uint8_t a[6]; uint8_t b[6]; };   // 1: data (a=устройство, b=сеть), 2: probe (a=источник)
+// handler -> main loop events (ring buffer)
+struct PEv { uint8_t kind; uint8_t a[6]; uint8_t b[6]; };   // 1: data (a=device, b=network), 2: probe (a=source)
 #define PEV_N 128
 PEv g_pev[PEV_N];
 volatile uint16_t g_pevHead = 0, g_pevTail = 0;
 
-// устройства в сетях и «ищущие Wi-Fi» (только в памяти, только для счёта)
+// devices in networks and "looking for Wi-Fi" (RAM only, count only)
 static const uint32_t STA_REMEMBER_MS = 120000;
 static const size_t   STA_MAX = 500;
 
 static inline void IRAM_ATTR pushEv(uint8_t kind, const uint8_t* a, const uint8_t* b) {
   uint16_t h = g_pevHead, n = (h + 1) % PEV_N;
-  if (n == g_pevTail) return;                    // буфер полон — пропускаем
+  if (n == g_pevTail) return;                    // buffer full: drop
   PEv& e = g_pev[h];
   e.kind = kind;
   for (int i = 0; i < 6; i++) { e.a[i] = a[i]; e.b[i] = b ? b[i] : 0; }
@@ -90,18 +83,18 @@ static void IRAM_ATTR promCb(void* buf, wifi_promiscuous_pkt_type_t type) {
     g_pData++;
     if (len >= 24) {
       uint8_t ds = f[1] & 0x03;                                            // ToDS / FromDS
-      if (ds == 1)      pushEv(1, f + 10, f + 4);   // устройство -> сеть
-      else if (ds == 2) pushEv(1, f + 4,  f + 10);  // сеть -> устройство
+      if (ds == 1)      pushEv(1, f + 10, f + 4);   // device -> network
+      else if (ds == 2) pushEv(1, f + 4,  f + 10);  // network -> device
     }
   }
 }
 
 
 
-// раздача с телефона? (по имени сети и производителю)
+// phone hotspot? (by SSID and vendor)
 static bool looksLikeHotspot(const char* ssid, const char* vendor) {
   char low[33]; size_t i = 0;
-  for (; ssid[i] && i < 32; i++) low[i] = (char)tolower((unsigned char)ssid[i]);
+  for (; i < 32 && ssid[i]; i++) low[i] = (char)tolower((unsigned char)ssid[i]);
   low[i] = 0;
   static const char* const kw[] = { "iphone", "ipad", "androidap", "android", "galaxy", "redmi",
     "poco", "honor", "realme", "oneplus", "pixel", "hotspot", "huawei p", "huawei mate",
@@ -113,7 +106,7 @@ static bool looksLikeHotspot(const char* ssid, const char* vendor) {
   return false;
 }
 
-// ---------- управление радио ----------
+// ---------- radio control ----------
 static void promOn() {
   if (g_prom || !g_wOn) return;
   esp_wifi_scan_stop();
@@ -154,12 +147,12 @@ static void wifiStop() {
   g_scanning = false;
 }
 static void wifiEnter() {
-  bleRadioOff();        // одна антенна на двоих
-  wifiStart();          // в подменю только сканируем; приём пакетов — когда откроют экран
+  bleRadioOff();        // one antenna shared by both
+  wifiStart();          // submenu only scans; packet capture starts when a screen opens
 }
 static void wifiLeave() {
   promOff();
-  wifiRadioOff();       // вышли — Wi-Fi выключен
+  wifiRadioOff();       // left: Wi-Fi off
   ledsOff();
 }
 void wifiRadioOff() { wifiStop(); }
@@ -169,7 +162,7 @@ static void wifiSetMode(int m) {
   g_wMode = (m + W_NUM) % W_NUM;
   g_wDetail = false;
   if (wNeedsProm(g_wMode)) promOn(); else promOff();
-  // скан «всех каналов» и «одного канала» несовместимы — перезапускаем
+  // all-channel and single-channel scans are incompatible: restart
   if ((prev == W_FIND) != (g_wMode == W_FIND) && g_scanning) {
     esp_wifi_scan_stop(); WiFi.scanDelete(); g_scanning = false;
   }
@@ -177,7 +170,7 @@ static void wifiSetMode(int m) {
 }
 
 
-// ---------- скан: забираем результаты и запускаем следующий ----------
+// ---------- scan: collect results, start the next one ----------
 static void wifiOrderUpdate(bool force);
 
 static void wifiScanTick(uint32_t now) {
@@ -190,7 +183,7 @@ static void wifiScanTick(uint32_t now) {
       uint64_t t = findTarget();
       if (t) { g_scanCh = g_aps[t].ch; perCh = 110; }
     }
-    // async, show_hidden, passive (ничего не отправляем), время на канал, канал (0 = все)
+    // async, show_hidden, passive (nothing is sent), ms per channel, channel (0 = all)
     if (WiFi.scanNetworks(true, true, true, perCh, g_scanCh) == WIFI_SCAN_FAILED) {
       g_scanRetryMs = now + 1000; return;
     }
@@ -221,7 +214,7 @@ static void wifiScanTick(uint32_t now) {
     a.gen = r->phy_11ax ? 6 : r->phy_11n ? 4 : r->phy_11g ? 3 : 1;
     a.hotspot = looksLikeHotspot(a.ssid, a.vendor);
     a.rssiS = (int8_t)((a.rssiS + r->rssi) / 2);
-    // на экран — «спокойное» значение: дрожь ±2 dB не показываем (красота важнее точности)
+    // display a steadied value: hide +-2 dB jitter
     if (abs(a.rssiS - a.rssi) >= WIFI_STEADY_DB) a.rssi = a.rssiS;
     if (r->rssi < a.rmin) a.rmin = r->rssi;
     if (r->rssi > a.rmax) a.rmax = r->rssi;
@@ -229,11 +222,11 @@ static void wifiScanTick(uint32_t now) {
   }
   WiFi.scanDelete();
 
-  if (g_scanCh == 0) {                       // полный проход
+  if (g_scanCh == 0) {                       // full pass
     g_wEverScanned = true;
     for (auto it = g_aps.begin(); it != g_aps.end(); )
       if (msSince(now, it->second.t) > AP_REMEMBER_MS) it = g_aps.erase(it); else ++it;
-    if (g_wDetail && g_wSel) {               // история для подробностей
+    if (g_wDetail && g_wSel) {               // history for the detail view
       if (g_wSparkFor != g_wSel) { g_wSparkFor = g_wSel; g_wSparkN = 0; }
       auto it = g_aps.find(g_wSel);
       int8_t v = (it != g_aps.end() && it->second.t == now) ? it->second.rssi : (int8_t)-127;
@@ -241,7 +234,7 @@ static void wifiScanTick(uint32_t now) {
       else { memmove(g_wSpark, g_wSpark + 1, W_SPARK_N - 1); g_wSpark[W_SPARK_N - 1] = v; }
     }
     wifiOrderUpdate(false);
-  } else {                                    // FIND: быстрый проход одного канала
+  } else {                                    // FIND: fast single-channel pass
     uint64_t t = g_wSel;
     if (g_fFor != t) { g_fFor = t; g_fSparkN = 0; }
     auto it = g_aps.find(t);
@@ -253,14 +246,14 @@ static void wifiScanTick(uint32_t now) {
   }
 }
 
-// ---------- приём: прыгаем по каналам, считаем пакеты, шум и устройства ----------
+// ---------- capture: hop channels, count packets, noise and devices ----------
 static void wifiHopTick(uint32_t now) {
   if (!g_prom) return;
-  // разбираем события от обработчика пакетов
+  // drain handler events
   while (g_pevTail != g_pevHead) {
     PEv e = g_pev[g_pevTail];
     g_pevTail = (g_pevTail + 1) % PEV_N;
-    if (e.a[0] & 0x01) continue;                       // групповые адреса — не устройства
+    if (e.a[0] & 0x01) continue;                       // group addresses are not devices
     uint64_t a = macKey(e.a);
     if (e.kind == 1) {
       uint64_t b = macKey(e.b);
@@ -306,12 +299,12 @@ static void wifiHopTick(uint32_t now) {
 }
 
 
-// ---------- список сетей: «липкий» порядок, как у Bluetooth ----------
+// ---------- network list: "sticky" order, like Bluetooth ----------
 static void wifiOrderUpdate(bool force) {
   bool frozen = g_wDetail || (millis() - g_wTouch < 4000);
   if (frozen && !force && !g_wOrder.empty()) return;
   std::vector<uint64_t> o;
-  int minDbm = RANGES[g_wRange].dbm;               // настройка Wi-Fi > Range
+  int minDbm = RANGES[g_wRange].dbm;               // Wi-Fi > Range setting
   auto ok = [&](uint64_t k) { auto it = g_aps.find(k); return it != g_aps.end() && (it->second.rssiS >= minDbm || k == g_wSel); };
   for (uint64_t k : g_wOrder) if (ok(k)) o.push_back(k);
   auto rs = [&](uint64_t k) { return (int)g_aps[k].rssiS; };
@@ -345,27 +338,27 @@ static void wifiApplyMove() {
   if (g_wTop < 0) g_wTop = 0;
 }
 
-// колесо и нажатие в разделе Wi-Fi
+// wheel and click in the Wi-Fi section
 static void wifiRotate(int dir) {
   static uint32_t last = 0;
   if (g_wMode == W_NETS) { g_wMove += dir; g_wTouch = millis(); return; }
-  if (millis() - last < 120) return;          // экраны не проскакивают при быстром вращении
+  if (millis() - last < 120) return;          // do not skip screens on fast spin
   last = millis();
   wifiSetMode(g_wMode + dir);
 }
 static void wifiClick() {
   if (g_wMode == W_NETS && !g_wOrder.empty()) { g_wDetail = !g_wDetail; g_wTouch = millis(); return; }
-  if (g_wMode == W_FIND && !g_wOrder.empty()) {        // следующая сеть-цель
+  if (g_wMode == W_FIND && !g_wOrder.empty()) {        // next target network
     int idx = -1;
     for (size_t i = 0; i < g_wOrder.size(); i++) if (g_wOrder[i] == g_wSel) idx = (int)i;
     g_wSel = g_wOrder[(idx + 1) % g_wOrder.size()];
     if (g_scanning) { esp_wifi_scan_stop(); WiFi.scanDelete(); g_scanning = false; }
     return;
   }
-  // на остальных экранах у нажатия нет действия (назад — боковая кнопка)
+  // other screens: click does nothing (back = side button)
 }
 
-// ---------- подменю ----------
+// ---------- submenu ----------
 static void wifiOpenScreen(int m) { wifiSetMode(m); }
 static void wifiCloseScreen() {
   g_wDetail = false;
@@ -382,15 +375,15 @@ static bool wifiCloseDetail() {
 
 
 static void wifiScreenInfo(int i, SubItem& it) {
-  static const char* const names[W_NUM] = { "Networks", "Channels", "Activity", "Clients", "Find" };
-  static const char* const descs[W_NUM] = { "list + details", "who uses which ch", "packets & noise",
-    "devices in networks", "best signal spot" };
+  const char* const names[W_NUM] = { L("Networks", "Сети"), L("Channels", "Каналы"), L("Activity", "Активность"), L("Clients", "Клиенты"), L("Finder", "Поиск") };
+  const char* const descs[W_NUM] = { L("list + details", "список и подробности"), L("who uses which channel", "кто на каком канале"), L("packets & noise", "пакеты и шум"),
+    L("devices in networks", "устройства в сетях"), L("best signal spot", "где сигнал лучше") };
   it.name = names[i]; it.desc = descs[i]; strcpy(it.value, "-");
   switch (i) {
     case W_NETS:
       if (g_wEverScanned) sprintf(it.value, "%d", (int)g_aps.size()); else strcpy(it.value, "...");
       break;
-    case W_CHANNELS: { int bc = bestChannel(); if (bc) sprintf(it.value, "best %d", bc); break; }
+    case W_CHANNELS: { int bc = bestChannel(); if (bc) sprintf(it.value, L("best %d", "лучший %d"), bc); break; }
     case W_ACTIVITY: {
       float tot = 0;
       for (int c = 1; c <= CH_MAX; c++) tot += g_ppsMgmt[c] + g_ppsData[c];
@@ -407,10 +400,10 @@ static void wifiScreenInfo(int i, SubItem& it) {
   }
 }
 
-// каждый проход loop(), пока открыт раздел
+// every loop() pass while the section is open
 static void wifiTick(uint32_t now) {
   if (navInSub()) {
-    // в подменю — обычный скан всех каналов, чтобы цифры были живыми (FIND тут не нужен)
+    // submenu: plain all-channel scan keeps the numbers live (no FIND here)
     int saved = g_wMode;
     if (g_wMode == W_FIND) g_wMode = W_NETS;
     wifiScanTick(now);
@@ -434,8 +427,8 @@ static void wifiDraw(uint32_t now) {
 }
 
 static void wifiSubtitle(char* out, size_t n) {
-  if (g_wEverScanned) snprintf(out, n, "%d nets", (int)g_aps.size());
-  else                snprintf(out, n, "tap to scan");
+  if (g_wEverScanned) snprintf(out, n, "%d %s", (int)g_aps.size(), PL((int)g_aps.size(), "network", "networks", "сеть", "сети", "сетей"));
+  else                snprintf(out, n, "%s", L("open to scan", "откройте для поиска"));
 }
 
 const Section wifiSection = {

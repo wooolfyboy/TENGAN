@@ -1,5 +1,5 @@
 // ============================================================
-//  sat.cpp — разбор TLE и упрощённый расчёт орбиты (Кеплер + J2)
+//  sat.cpp — TLE parsing and simplified orbit propagation (Kepler + J2)
 // ============================================================
 #include "gallery/sat.h"
 #include "core/jsonutil.h"
@@ -9,11 +9,11 @@
 Sat g_sats[SAT_MAX];
 int g_nSats = 0;
 
-static const double MU = 398600.4418;          // км³/с²
+static const double MU = 398600.4418;          // km³/s²
 static const double RE = 6378.137, J2 = 1.08262668e-3;
 static const double TWO_PI_ = 2 * PI, D2R = PI / 180.0;
 
-static double fld(const char* s, int from, int len) {      // число из колонок TLE (с 1)
+static double fld(const char* s, int from, int len) {      // number from TLE columns (1-based)
   char b[24]; int n = min(len, 23);
   memcpy(b, s + from - 1, n); b[n] = 0;
   return atof(b);
@@ -23,11 +23,11 @@ static bool parseTle(const char* name, const char* l1, const char* l2, Sat& s) {
   int yy = (int)fld(l1, 19, 2);
   double doy = fld(l1, 21, 12);
   int year = yy < 57 ? 2000 + yy : 1900 + yy;
-  // юникс-время начала года
+  // Unix time of the start of the year
   long days = 0;
   for (int y = 1970; y < year; y++) days += (y % 4 == 0 && (y % 100 != 0 || y % 400 == 0)) ? 366 : 365;
   s.epochUnix = (days + doy - 1) * 86400.0;
-  double ndot2 = fld(l1, 34, 10);                          // (dn/dt)/2, об/сут²
+  double ndot2 = fld(l1, 34, 10);                          // (dn/dt)/2, rev/day²
   s.inc   = fld(l2, 9, 8) * D2R;
   s.raan0 = fld(l2, 18, 8) * D2R;
   char e[10] = "0."; memcpy(e + 2, l2 + 26, 7); e[9] = 0;
@@ -35,7 +35,7 @@ static bool parseTle(const char* name, const char* l1, const char* l2, Sat& s) {
   s.argp0 = fld(l2, 35, 8) * D2R;
   s.m0    = fld(l2, 44, 8) * D2R;
   double revDay = fld(l2, 53, 11);
-  s.n0    = revDay * TWO_PI_ / 1440.0;                     // рад/мин
+  s.n0    = revDay * TWO_PI_ / 1440.0;                     // rad/min
   s.ndot2 = ndot2 * TWO_PI_ / (1440.0 * 1440.0);
   double nSec = s.n0 / 60.0;
   s.a = pow(MU / (nSec * nSec), 1.0 / 3.0);
@@ -44,7 +44,7 @@ static bool parseTle(const char* name, const char* l1, const char* l2, Sat& s) {
   return s.ok;
 }
 
-// ---------- хранение ----------
+// ---------- storage ----------
 static void satSave(int i, const char* name, const char* l1, const char* l2) {
   Preferences p; p.begin("sats", false);
   char k[8];
@@ -66,7 +66,7 @@ void satBegin() {
   p.end();
 }
 
-// «TLE\t<имя>\t<строка1>\t<строка2>»
+// "TLE\t<name>\t<line1>\t<line2>"
 void satFromLine(char* line) {
   char* save = nullptr;
   char* f0 = strtok_r(line, "\t", &save);
@@ -81,15 +81,15 @@ void satFromLine(char* line) {
   if (slot < 0) { if (g_nSats >= SAT_MAX) return; slot = g_nSats++; }
   bool changed = fabs(g_sats[slot].epochUnix - s.epochUnix) > 1;
   g_sats[slot] = s;
-  if (changed) satSave(slot, name, l1, l2);                  // в память — только новые элементы
+  if (changed) satSave(slot, name, l1, l2);                  // save only new elements
 }
 
 float satAgeDays(const Sat& s, double t) { return (float)((t - s.epochUnix) / 86400.0); }
 
-// ---------- положение ----------
+// ---------- position ----------
 bool satPos(const Sat& s, double t, SatPos& out) {
   if (!s.ok) return false;
-  double tm = (t - s.epochUnix) / 60.0;                      // минуты от эпохи
+  double tm = (t - s.epochUnix) / 60.0;                      // minutes since epoch
   double cosi = cos(s.inc), sini = sin(s.inc);
   double p = s.a * (1 - s.ecc * s.ecc);
   double k = 1.5 * J2 * (RE / p) * (RE / p) * s.n0;
@@ -101,12 +101,12 @@ bool satPos(const Sat& s, double t, SatPos& out) {
   double nu = 2 * atan2(sqrt(1 + s.ecc) * sin(E / 2), sqrt(1 - s.ecc) * cos(E / 2));
   double r = s.a * (1 - s.ecc * cos(E));
   double u = argp + nu;
-  // инерциальная система (ECI)
+  // inertial frame (ECI)
   double cu = cos(u), su = sin(u), cO = cos(raan), sO = sin(raan);
   double x = r * (cO * cu - sO * su * cosi);
   double y = r * (sO * cu + cO * su * cosi);
   double z = r * (su * sini);
-  // поворот Земли: ECI -> ECEF
+  // Earth rotation: ECI -> ECEF
   double g = gmstDeg(julianDate(t)) * D2R;
   double xe = x * cos(g) + y * sin(g), ye = -x * sin(g) + y * cos(g);
   out.x = xe; out.y = ye; out.z = z;
@@ -122,7 +122,7 @@ void satLook(const SatPos& p, float lat, float lon, float& el, float& az) {
   double la = lat * D2R, lo = lon * D2R;
   double ox = RE * cos(la) * cos(lo), oy = RE * cos(la) * sin(lo), oz = RE * sin(la);
   double rx = p.x - ox, ry = p.y - oy, rz = p.z - oz;
-  // топоцентрические оси: восток, север, вверх
+  // topocentric axes: east, north, up
   double e = -sin(lo) * rx + cos(lo) * ry;
   double n = -sin(la) * cos(lo) * rx - sin(la) * sin(lo) * ry + cos(la) * rz;
   double u = cos(la) * cos(lo) * rx + cos(la) * sin(lo) * ry + sin(la) * rz;
@@ -140,7 +140,7 @@ Pass satNextPass(const Sat& s, double from, float lat, float lon, float minEl, f
     if (!satPos(s, t, p)) return ps;
     satLook(p, lat, lon, el, az);
     if (el >= minEl) {
-      if (!up) {                                           // уточнить момент восхода шагом 2 с
+      if (!up) {                                           // refine the rise time in 2 s steps
         double tr = t;
         for (double q = t - 30; q <= t; q += 2) { satPos(s, q, p); float e2, a2; satLook(p, lat, lon, e2, a2); if (e2 >= minEl) { tr = q; ps.azRise = a2; break; } }
         if (t == from) { ps.azRise = az; tr = from; }
@@ -153,8 +153,8 @@ Pass satNextPass(const Sat& s, double from, float lat, float lon, float minEl, f
   return ps;
 }
 
-// для планшета: элементы орбит, дальше считает браузер (тот же Кеплер + J2)
-// [[имя,эпоха_unix,n0,ndot2,inc,raan0,ecc,argp0,m0,a],...]
+// for the tablet: orbit elements; the browser does the rest (same Kepler + J2)
+// [[name,epoch_unix,n0,ndot2,inc,raan0,ecc,argp0,m0,a],...]
 void satJson(String& o) {
   o += '[';
   for (int i = 0; i < g_nSats; i++) {

@@ -3,7 +3,7 @@ chcp 65001 >nul
 cd /d "%~dp0"
 title TENGAN - PC monitor
 
-rem ---- 1. ищем Python ----
+rem ---- 1. find Python ----
 set "PY="
 py -3 -c "print(1)" >nul 2>nul && set "PY=py -3"
 if not defined PY (
@@ -19,7 +19,7 @@ if not defined PY (
   exit /b 1
 )
 
-rem ---- 2. первый запуск: ставим две библиотеки ----
+rem ---- 2. first run: install two libraries ----
 %PY% -c "import psutil, serial" >nul 2>nul
 if errorlevel 1 (
   echo Первый запуск: ставлю библиотеки psutil и pyserial. Это один раз, около минуты...
@@ -35,28 +35,28 @@ if errorlevel 1 (
   echo Готово!
 )
 
-rem ---- 2б. по желанию: pycaw — чтобы палка видела громкость в процентах ----
+rem ---- 2b. optional: pycaw, so the stick sees volume in percent ----
 %PY% -c "import pycaw" >nul 2>nul
 if errorlevel 1 (
-  echo Ставлю библиотеку pycaw ^(громкость в процентах на палке^)...
+  echo Ставлю библиотеку pycaw ^(громкость в процентах на TENGAN^)...
   %PY% -m pip install --user --disable-pip-version-check pycaw >nul 2>nul
 )
 
-rem ---- 2в. по желанию: winrt — чтобы палка видела, что сейчас играет ----
+rem ---- 2c. optional: winrt, so the stick sees what is playing ----
 %PY% -c "import winrt.windows.media.control" >nul 2>nul
 if errorlevel 1 (
-  echo Ставлю библиотеки winrt ^(название трека на палке^)...
+  echo Ставлю библиотеки winrt ^(название трека на TENGAN^)...
   %PY% -m pip install --user --disable-pip-version-check winrt-runtime winrt-Windows.Media.Control winrt-Windows.Foundation winrt-Windows.Foundation.Collections >nul 2>nul
 )
 
-rem ---- 2г. по желанию: numpy + PyAudioWPatch — звук ноутбука на палке (раздел Sound) ----
+rem ---- 2d. optional: numpy + PyAudioWPatch, laptop sound on the stick (Sound section) ----
 %PY% -c "import numpy, pyaudiowpatch" >nul 2>nul
 if errorlevel 1 (
-  echo Ставлю библиотеки для звука ноутбука ^(numpy, PyAudioWPatch^), около минуты...
+  echo Ставлю библиотеки для звука компьютера ^(numpy, PyAudioWPatch^), около минуты...
   %PY% -m pip install --user --disable-pip-version-check numpy PyAudioWPatch >nul 2>nul
 )
 
-rem ---- 3. запускаем ----
+rem ---- 3. run ----
 %PY% pc_monitor.py
 echo.
 pause

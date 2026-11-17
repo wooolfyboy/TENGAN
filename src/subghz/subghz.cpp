@@ -1,17 +1,18 @@
 // ============================================================
-//  subghz.cpp — раздел Sub-GHz на CC1101
+//  subghz.cpp — Sub-GHz section on the CC1101
 //
-//  ТОЛЬКО ПРИЁМ: модуль никогда не переводится в передачу (STX не
-//  используется). Мерим силу сигнала (RSSI) на частотах 315 / 433 / 868 / 915 МГц.
+//  RECEIVE ONLY: the module is never put into transmit (STX is not used).
+//  We measure signal strength (RSSI) at 315 / 433 / 868 / 915 MHz.
 //
-//  Экраны:
-//    SPECTRUM — развёртка по полосе ±2 МГц + «водопад»
-//    MONITOR  — слушаем одну частоту и ловим всплески (брелоки, звонки, датчики)
-//    SENSORS  — то же + разбор посылок: уличные термометры, звонки (sensors.h)
-//  В MONITOR и SENSORS CC1101 отдаёт демодулированный OOK на GDO0 — датчики
-//  разбираются в обоих (Радиопогода берёт отсюда температуру за окном).
+//  Screens:
+//    SPECTRUM — sweep over a ±2 MHz band + waterfall
+//    MONITOR  — listen on one frequency and catch bursts (key fobs, bells, sensors)
+//    SENSORS  — same + packet parsing: outdoor thermometers, bells (sensors.h)
+//  In MONITOR and SENSORS the CC1101 outputs demodulated OOK on GDO0, so sensors
+//  are parsed in both (Radio Weather takes the outdoor temperature from here).
 // ============================================================
 #include "core/settings.h"
+#include "core/lang.h"
 #include "subghz/subghz.h"
 #include "subghz/cc1101.h"
 #include "subghz/subghz_model.h"
@@ -47,7 +48,7 @@ static void spReset() {
 }
 
 static void spTick() {
-  for (int k = 0; k < 12; k++) {               // ~12 точек за проход цикла (~15 мс)
+  for (int k = 0; k < 12; k++) {               // ~12 points per loop pass (~15 ms)
     int r = ccMeasure(spFreq(g_spIdx));
     r = constrain(r, -120, -10);
     g_spRow[g_spIdx] = r;
@@ -55,9 +56,9 @@ static void spTick() {
     if (r > g_spPeak[g_spIdx]) g_spPeak[g_spIdx] = r;
     if (++g_spIdx >= SP_N) {
       g_spIdx = 0;
-      for (int i = 0; i < SP_N && g_wf; i++) {   // строка водопада
+      for (int i = 0; i < SP_N && g_wf; i++) {   // waterfall row
         g_wf[g_wfHead][i] = (uint8_t)constrain(g_spRow[i] + 120, 0, 110);
-        if (g_spPeak[i] > -110) g_spPeak[i]--; // пики медленно оседают
+        if (g_spPeak[i] > -110) g_spPeak[i]--; // peaks decay slowly
       }
       g_wfHead = (g_wfHead + 1) % WF_ROWS;
       if (g_wfCount < WF_ROWS) g_wfCount++;
@@ -71,7 +72,7 @@ static void spTick() {
 // ---------- MONITOR ----------
 int8_t   g_mon[MON_N];
 int      g_monN = 0;
-float    g_floor = -100;          // уровень шума (медленное среднее)
+float    g_floor = -100;          // noise level (slow average)
 bool     g_burst = false;
 uint32_t g_burstStart = 0, g_burstLastHi = 0;
 int      g_burstPeak = -120;
@@ -81,7 +82,7 @@ int      g_evN = 0;
 
 static void monStart() {
   ccStrobe(0x36);
-  ccSetBw(0x65);                               // пошире (~270 кГц) — брелоки и датчики «гуляют» по частоте
+  ccSetBw(0x65);                               // wider (~270 kHz): key fobs and sensors drift in frequency
   ccSetFreq(BANDS[g_band].mon);
   ccStrobe(0x34);                              // SRX
   g_monN = 0; g_burst = false;
@@ -89,7 +90,7 @@ static void monStart() {
 
 static void monTick(uint32_t now) {
   int mx = -127;
-  for (int k = 0; k < 8; k++) {                // несколько замеров подряд, берём максимум
+  for (int k = 0; k < 8; k++) {                // several readings in a row, take the max
     int r = ccRssi();
     if (r > mx) mx = r;
     delayMicroseconds(300);
@@ -98,16 +99,16 @@ static void monTick(uint32_t now) {
   else { memmove(g_mon, g_mon + 1, MON_N - 1); g_mon[MON_N - 1] = mx; }
 
   if (!g_burst) {
-    g_floor = g_floor * 0.98f + mx * 0.02f;    // шум считаем только вне всплесков
+    g_floor = g_floor * 0.98f + mx * 0.02f;    // noise is averaged outside bursts only
     if (mx > g_floor + BURST_ON_DB) {
       g_burst = true; g_burstStart = now; g_burstLastHi = now; g_burstPeak = mx;
-      strip.clear();                            // вспышка ленты
+      strip.clear();                            // LED strip flash
       for (int i = 0; i < WS2812_N; i++) strip.setPixelColor(i, strip.Color(40, 30, 0));
       strip.show();
     }
   } else {
     if (mx > g_floor + BURST_OFF_DB) { g_burstLastHi = now; if (mx > g_burstPeak) g_burstPeak = mx; }
-    if (now - g_burstLastHi > 150) {           // тишина 150 мс — всплеск закончился
+    if (now - g_burstLastHi > 150) {           // 150 ms of silence: the burst is over
       g_burst = false;
       g_events++;
       Burst b = { g_burstStart, (uint16_t)min<uint32_t>(g_burstLastHi - g_burstStart, 65000), (int8_t)g_burstPeak };
@@ -119,7 +120,7 @@ static void monTick(uint32_t now) {
 }
 
 
-// ---------- раздел целиком ----------
+// ---------- whole section ----------
 static void subEnter() {
   if (!g_ccTried) { g_ccTried = true; g_ccOk = ccInit(); spReset(); }
   if (!g_ccOk) return;
@@ -129,7 +130,7 @@ static void subEnter() {
 }
 static void subLeave() { if (g_ccOk) { sensRxStop(); ccSleep(); } g_ccOn = false; ledsOff(); }
 
-// пик уровня за последние ~10 замеров монитора — «сила» только что закончившейся посылки
+// peak level over the last ~10 monitor readings: "strength" of the packet that just ended
 static int monRecentPeak() {
   int mx = -120;
   for (int i = max(0, g_monN - 10); i < g_monN; i++) if (g_mon[i] > mx) mx = g_mon[i];
@@ -148,14 +149,14 @@ static void subCloseScreen() { if (g_ccOk) { sensRxStop(); ccStrobe(0x36); } str
 static int  subScreenNow() { return g_gMode; }
 static void subRotate(int dir) {
   static uint32_t last = 0;
-  if (millis() - last < 120) return;          // экраны не проскакивают при быстром вращении
+  if (millis() - last < 120) return;          // don't skip screens on fast wheel turns
   last = millis();
   g_gMode = (g_gMode + dir + G_NUM) % G_NUM;
   subStartMode();
 }
 static void subClick() { g_band = (g_band + 1) % N_BANDS; settingsTouch(); subStartMode(); }
 
-// вызывается на каждом проходе loop(), пока открыт экран раздела
+// called on every loop() pass while the section screen is open
 static void subTick(uint32_t now) {
   if (!g_ccOk || !g_ccOn) return;
   if (g_gMode == G_SPECTRUM) spTick();
@@ -171,10 +172,10 @@ static void subFrame(uint32_t now) {
 }
 
 static void subScreenInfo(int i, SubItem& it) {
-  static const char* const names[G_NUM] = { "Spectrum", "Monitor", "Sensors" };
-  static const char* const descs[G_NUM] = { "band + waterfall", "catch remotes", "thermometers, bells" };
+  const char* const names[G_NUM] = { L("Spectrum", "Спектр"), L("Monitor", "Монитор"), L("Sensors", "Датчики") };
+  const char* const descs[G_NUM] = { L("band + waterfall", "диапазон и водопад"), L("catch remotes", "ловить пульты"), L("thermometers, bells", "термометры, звонки") };
   it.name = names[i]; it.desc = descs[i];
-  if (!g_ccOk && g_ccTried) { strcpy(it.value, "no chip"); return; }
+  if (!g_ccOk && g_ccTried) { strcpy(it.value, L("no chip", "нет чипа")); return; }
   if (i == G_SPECTRUM) strcpy(it.value, BANDS[g_band].name);
   else if (i == G_SENSORS) { if (g_sensN) sprintf(it.value, "%d", g_sensN); else strcpy(it.value, "-"); }
   else if (g_events)   sprintf(it.value, "%lu", (unsigned long)g_events);
@@ -182,7 +183,7 @@ static void subScreenInfo(int i, SubItem& it) {
 }
 
 static void subSubtitle(char* out, size_t n) {
-  snprintf(out, n, "%s", (g_ccTried && !g_ccOk) ? "no chip" : BANDS[g_band].name);
+  snprintf(out, n, "%s", (g_ccTried && !g_ccOk) ? L("no chip", "нет чипа") : BANDS[g_band].name);
 }
 
 static void subTickFn(uint32_t now) { if (!navInSub()) subTick(now); }
@@ -196,8 +197,8 @@ const Section subghzSection = {
 };
 
 // ============================================================
-//  для веб-страницы: палка включает CC1101, пока вкладка Sub-GHz
-//  на телефоне спрашивает данные (web.cpp выключит её через пару секунд тишины)
+//  for the web page: the stick enables the CC1101 while the Sub-GHz tab
+//  on the phone requests data (web.cpp turns it off after a couple of seconds of silence)
 // ============================================================
 bool subWebUse(int mode, int band) {
   if (!g_ccTried) { g_ccTried = true; g_ccOk = ccInit(); spReset(); }

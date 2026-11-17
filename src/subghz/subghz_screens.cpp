@@ -1,15 +1,16 @@
 // ============================================================
-//  subghz_screens.cpp — экраны раздела Sub-GHz: SPECTRUM · MONITOR · SENSORS
-//  Все экраны собраны из компонентов core/ui.h по общей сетке.
+//  subghz_screens.cpp — Sub-GHz screens: SPECTRUM · MONITOR · SENSORS
+//  All screens are built from core/ui.h components on a common grid.
 // ============================================================
 #include "subghz/subghz_model.h"
+#include "core/lang.h"
 #include "subghz/sensors.h"
 #include "core/timeutil.h"
 #include "core/display.h"
 #include "core/theme.h"
 #include "core/ui.h"
 
-// «водопад»: v = dBm + 120; -110 почти чёрный … -40 белый
+// waterfall: v = dBm + 120; -110 almost black … -40 white
 static uint16_t wfColor(int v) {
   float x = constrain((v - 10) / 70.0f, 0.0f, 1.0f);
   if (x < 0.08f) return C_BG();
@@ -17,7 +18,7 @@ static uint16_t wfColor(int v) {
 }
 
 // ============================================================
-//  SPECTRUM — развёртка ±2 МГц и «водопад»
+//  SPECTRUM — ±2 MHz sweep and waterfall
 // ============================================================
 void drawSpectrum() {
   int W = spr.width();
@@ -25,8 +26,8 @@ void drawSpectrum() {
   spr.fillSprite(C_BG());
   int mi = 0;
   for (int i = 1; i < SP_N; i++) if (g_spCur[i] > g_spCur[mi]) mi = i;
-  snprintf(buf, sizeof(buf), "peak %.2f  %d dBm", spFreq(mi), g_spCur[mi]);
-  char title[24]; snprintf(title, sizeof(title), "Spectrum %s", BANDS[g_band].name);
+  snprintf(buf, sizeof(buf), L("peak %.2f  ·  %d dBm", "пик %.2f  ·  %d дБм"), spFreq(mi), g_spCur[mi]);
+  char title[48]; snprintf(title, sizeof(title), L("Spectrum %s", "Спектр %s"), BANDS[g_band].name);
   uiHeader(title, buf, g_spCur[mi] > -60);
 
   int pl = UI_M + 4, pr = W - UI_M - 4, pt = UI_TOP, pb = UI_TOP + 54;
@@ -35,7 +36,7 @@ void drawSpectrum() {
   uiFrame(pl, pt, pr - pl + 1, pb - pt + 1, UI_LINE());
   for (int db = -100; db <= -50; db += 10)
     for (int x = pl + 4; x < pr - 3; x += 4) spr.drawPixel(x, py(db), UI_LINE());
-  // пики — тускло, текущий уровень — ярко и «раскаляется» по силе
+  // peaks dim, current level bright and "heats up" with strength
   for (int i = 1; i < SP_N; i++) spr.drawLine(px(i - 1), py(g_spPeak[i - 1]), px(i), py(g_spPeak[i]), UI_DIM());
   for (int i = 0; i < SP_N; i++) {
     int x = px(i), y = py(g_spCur[i]);
@@ -43,12 +44,12 @@ void drawSpectrum() {
   }
   for (int i = 1; i < SP_N; i++)
     spr.drawLine(px(i - 1), py(g_spCur[i - 1]), px(i), py(g_spCur[i]), heat(max(g_spCur[i - 1], g_spCur[i]) + 10));
-  // маркер максимума
+  // max marker
   int mx = px(mi), my = py(g_spCur[mi]);
   for (int y = pt + 2; y < pb; y += 3) spr.drawPixel(mx, y, C_ACC());
   spr.fillTriangle(mx, my - 3, mx - 4, my - 9, mx + 4, my - 9, C_ACC());
 
-  // «водопад»: новые строки сверху
+  // waterfall: new rows on top
   int wt = pb + 4, wh = UI_BOTTOM - wt - 8;
   for (int r = 0; r < g_wfCount && r < wh; r++) {
     int row = (g_wfHead - 1 - r + WF_ROWS) % WF_ROWS;
@@ -57,31 +58,31 @@ void drawSpectrum() {
       if (g_wf) spr.drawFastHLine(x0, wt + r, x1 - x0, wfColor(g_wf[row][i]));
     }
   }
-  // ось частот
+  // frequency axis
   spr.setTextColor(UI_DIM());
   snprintf(buf, sizeof(buf), "%.2f", BANDS[g_band].lo);
   spr.setTextDatum(TL_DATUM); txt(buf, pl, UI_BOTTOM - 6, 1);
-  snprintf(buf, sizeof(buf), "%.2f MHZ", (BANDS[g_band].lo + BANDS[g_band].hi) / 2);
+  snprintf(buf, sizeof(buf), L("%.2f MHZ", "%.2f МГЦ"), (BANDS[g_band].lo + BANDS[g_band].hi) / 2);
   spr.setTextDatum(TC_DATUM); txt(buf, W / 2, UI_BOTTOM - 6, 1);
   snprintf(buf, sizeof(buf), "%.2f", BANDS[g_band].hi);
   spr.setTextDatum(TR_DATUM); txt(buf, pr, UI_BOTTOM - 6, 1);
-  uiFooter("wheel: screens  click: band", "side: back");
+  uiFooter(L("wheel: screens  ·  click: band", "колесо: экраны · нажать: полоса"), L("side: back", "кнопка: назад"));
   present();
 }
 
 // ============================================================
-//  MONITOR — одна частота, ловим всплески
+//  MONITOR — one frequency, catching bursts
 // ============================================================
 void drawMonitor(uint32_t now) {
   int W = spr.width();
   char buf[48];
   spr.fillSprite(C_BG());
   int cur = g_monN ? g_mon[g_monN - 1] : -120;
-  snprintf(buf, sizeof(buf), "%d dBm  %s", cur, g_burst ? "signal!" : "quiet");
-  char title[24]; snprintf(title, sizeof(title), "Monitor %.2f", BANDS[g_band].mon);
+  snprintf(buf, sizeof(buf), L("%d dBm  ·  %s", "%d дБм  ·  %s"), cur, g_burst ? L("signal!", "сигнал!") : L("quiet", "тихо"));
+  char title[48]; snprintf(title, sizeof(title), L("Monitor %.2f", "Монитор %.2f"), BANDS[g_band].mon);
   uiHeader(title, buf, g_burst);
 
-  // лента сигнала (~6 с), линия шума и порог срабатывания
+  // signal strip (~6 s), noise line and trigger threshold
   int gx = UI_M + 4, gy = UI_TOP, gw = W - 2 * UI_M - 8, gh = 62;
   uiFrame(gx, gy, gw, gh, UI_LINE());
   auto yy = [&](int db) { int c = constrain(db, -115, -35); return gy + gh - 3 - (c + 115) * (gh - 6) / 80; };
@@ -92,41 +93,41 @@ void drawMonitor(uint32_t now) {
     bool hi = g_mon[i] > g_floor + BURST_ON_DB;
     spr.drawFastVLine(x, y, gy + gh - 3 - y, hi ? heat(g_mon[i] + 10) : UI_LINE());
   }
-  snprintf(buf, sizeof(buf), "NOISE %d DBM   - - TRIGGER", (int)g_floor);
+  snprintf(buf, sizeof(buf), L("NOISE %d DBM   - - TRIGGER", "ШУМ %d ДБМ   - - ПОРОГ"), (int)g_floor);
   spr.setTextDatum(TL_DATUM);
   spr.setTextColor(UI_DIM());
   txt(buf, gx + 5, gy + 3, 1);
 
-  // журнал всплесков
+  // burst log
   int ly = gy + gh + 6;
   snprintf(buf, sizeof(buf), "%lu", (unsigned long)g_events);
   spr.setTextDatum(TL_DATUM);
   spr.setTextColor(C_HOT());
   txt(buf, UI_M + 8, ly, 6);
   spr.setTextColor(UI_DIM());
-  txt("BURSTS", UI_M + 8, ly + 46, 1);
+  txt(L("BURSTS", "ВСПЛЕСКИ"), UI_M + 8, ly + 46, 1);
   int tx = 96;
   spr.setTextColor(UI_DIM());
-  txt("WHEN", tx, ly, 1); txt("LENGTH", tx + 70, ly, 1); txt("PEAK", tx + 130, ly, 1);
+  txt(L("WHEN", "КОГДА"), tx, ly, 1); txt(L("LENGTH", "ДЛИНА"), tx + 70, ly, 1); txt(L("PEAK", "ПИК"), tx + 130, ly, 1);
   for (int i = 0; i < g_evN && i < 4; i++) {
     const Burst& b = g_ev[g_evN - 1 - i];
     uint32_t ago = (now - b.t) / 1000;
-    if (ago < 60)        snprintf(buf, sizeof(buf), "%lus ago", (unsigned long)ago);
-    else if (ago < 3600) snprintf(buf, sizeof(buf), "%lum ago", (unsigned long)(ago / 60));
-    else                 snprintf(buf, sizeof(buf), "%luh ago", (unsigned long)(ago / 3600));
+    if (ago < 60)        snprintf(buf, sizeof(buf), L("%lus ago", "%lu с наз."), (unsigned long)ago);
+    else if (ago < 3600) snprintf(buf, sizeof(buf), L("%lum ago", "%lu мин наз."), (unsigned long)(ago / 60));
+    else                 snprintf(buf, sizeof(buf), L("%luh ago", "%lu ч наз."), (unsigned long)(ago / 3600));
     int y = ly + 11 + i * 12;
     spr.setTextColor(i == 0 ? C_HOT() : UI_LABEL());
     txt(buf, tx, y, 1);
-    snprintf(buf, sizeof(buf), "%.1f s", b.durMs / 1000.0f); txt(buf, tx + 70, y, 1);
+    snprintf(buf, sizeof(buf), L("%.1f s", "%.1f с"), b.durMs / 1000.0f); txt(buf, tx + 70, y, 1);
     snprintf(buf, sizeof(buf), "%d", b.peak); txt(buf, tx + 130, y, 1);
     int len = constrain((b.peak + 110) * 1, 2, 60);
     spr.fillRect(W - UI_M - 8 - len, y + 1, len, 5, heat(b.peak + 10));
   }
   if (g_evN == 0) {
     spr.setTextColor(UI_DIM());
-    txt("PRESS A CAR KEY OR GATE REMOTE NEARBY", tx, ly + 14, 1);
+    txt(L("PRESS A CAR KEY OR GATE REMOTE NEARBY", "НАЖМИТЕ РЯДОМ БРЕЛОК ИЛИ ПУЛЬТ ВОРОТ"), tx, ly + 14, 1);
   }
-  uiFooter("wheel: screens  click: band", "side: back");
+  uiFooter(L("wheel: screens  ·  click: band", "колесо: экраны · нажать: полоса"), L("side: back", "кнопка: назад"));
   present();
 }
 
@@ -134,34 +135,34 @@ void drawMonitor(uint32_t now) {
 void drawCcMissing() {
   char buf[40];
   spr.fillSprite(C_BG());
-  uiHeader("Sub-GHz", "radio not found", true);
-  snprintf(buf, sizeof(buf), "chip answered 0x%02X", g_ccVersion);
-  uiEmpty("CC1101 not found", buf);
-  uiFooter("wheel: screens", "side: back");
+  uiHeader("Sub-GHz", L("radio not found", "радио не найдено"), true);
+  snprintf(buf, sizeof(buf), L("chip answered 0x%02X", "ответ чипа 0x%02X"), g_ccVersion);
+  uiEmpty(L("CC1101 not found", "CC1101 не найден"), buf);
+  uiFooter(L("wheel: screens", "колесо: экраны"), L("side: back", "кнопка: назад"));
   present();
 }
 
 // ============================================================
-//  SENSORS — кто передаёт на частоте: уличные термометры, звонки, пульты
-//  сверху таблица, снизу — форма последней посылки (анализатор)
+//  SENSORS — who transmits on the frequency: outdoor thermometers, bells, remotes
+//  table on top, shape of the last packet (analyzer) below
 // ============================================================
 static void agoStr(char* b, size_t n, uint32_t ms) {
   uint32_t s = ms / 1000;
-  if (s < 60) snprintf(b, n, "%lus", (unsigned long)s);
-  else if (s < 3600) snprintf(b, n, "%lum", (unsigned long)(s / 60));
-  else snprintf(b, n, "%luh", (unsigned long)(s / 3600));
+  if (s < 60) snprintf(b, n, L("%lus", "%luс"), (unsigned long)s);
+  else if (s < 3600) snprintf(b, n, L("%lum", "%luм"), (unsigned long)(s / 60));
+  else snprintf(b, n, L("%luh", "%luч"), (unsigned long)(s / 3600));
 }
 
-// короткое имя протокола для таблицы
+// short protocol name for the table
 static void shortName(const SensRec& r, char* b, size_t n) {
   const char* p = r.proto;
   if (!strncmp(p, "LaCrosse-", 9)) p = "LaCrosse";
   else if (!strncmp(p, "FineOffset-", 11)) p = "FineOffset";
   else if (!strncmp(p, "Acurite-", 8)) p = "Acurite";
-  if (r.kind == OOK_REMOTE) snprintf(b, n, "%s %04lX", strcmp(r.proto, "Rolling") ? "BELL/REMOTE" : "ROLLING", (unsigned long)(r.id & 0xFFFF));
-  else if (r.ch) snprintf(b, n, "%s CH%d", p, r.ch);
+  if (r.kind == OOK_REMOTE) snprintf(b, n, "%s %04lX", strcmp(r.proto, "Rolling") ? L("BELL/REMOTE", "ЗВОНОК/ПУЛЬТ") : L("ROLLING", "ПЛАВАЮЩИЙ"), (unsigned long)(r.id & 0xFFFF));
+  else if (r.ch) snprintf(b, n, L("%s CH%d", "%s К%d"), p, r.ch);
   else snprintf(b, n, "%s %02lX", p, (unsigned long)(r.id & 0xFF));
-  for (char* c = b; *c; c++) *c = toupper((unsigned char)*c);
+  utf8UpperInPlace(b);
 }
 
 static void degree(int x, int y, uint16_t col) { spr.drawCircle(x, y, 2, col); }
@@ -173,24 +174,24 @@ static void drawPulseTrain(int x0, int y0, int w, int h) {
   spr.setTextDatum(TL_DATUM);
   if (!L.valid) {
     spr.setTextColor(UI_DIM());
-    txt("NO SIGNAL YET", x0 + 6, y0 + 4, 1);
+    txt(L("NO SIGNAL YET", "СИГНАЛОВ ПОКА НЕТ"), x0 + 6, y0 + 4, 1);
     for (int x = x0 + 6; x < x0 + w - 6; x += 3) spr.drawPixel(x, y0 + h - 8, UI_LINE());
     return;
   }
   const OokInfo& I = L.info;
   bool sensor = strcmp(I.cls, "sensor") == 0;
-  // подпись: модуляция, биты, длительности; у датчика — протокол, у пульта — только отпечаток
+  // caption: modulation, bits, durations; sensor: protocol, remote: fingerprint only
   if (sensor) snprintf(buf, sizeof buf, "%s %db  P%u/%u G%u/%u", I.mod, I.bits, I.shortW, I.longW, I.shortG, I.longG ? I.longG : I.syncG);
   else snprintf(buf, sizeof buf, "%s %db  P%u/%u  #%04X", I.mod, I.bits, I.shortW, I.longW, I.hash);
   spr.setTextColor(UI_LABEL());
   txt(buf, x0 + 6, y0 + 4, 1);
   char cls[24];
   snprintf(cls, sizeof cls, "%s", sensor ? I.proto : I.cls);
-  for (char* c = cls; *c; c++) *c = toupper((unsigned char)*c);
+  utf8UpperInPlace(cls);
   spr.setTextDatum(TR_DATUM);
   spr.setTextColor(sensor ? C_ACC() : C_HOT());
   txt(cls, x0 + w - 6, y0 + 4, 1);
-  // сама посылка: «меандр» — вверху несущая, внизу тишина
+  // the packet itself: square wave, carrier on top, silence at the bottom
   uint32_t tot = 0;
   for (int i = 0; i < L.ptN * 2; i++) tot += L.pt[i];
   if (!tot) return;
@@ -207,7 +208,7 @@ static void drawPulseTrain(int x0, int y0, int w, int h) {
     if (!(i & 1)) for (int yy = hiY + 2; yy < loY; yy += 2) spr.drawFastHLine(prevX, yy, max(1, x - prevX), scale565(col, 18));
     prevX = x; prevY = y;
   }
-  if (!sensor) {                                 // дальше не рисуем: по рисунку пульт не повторить
+  if (!sensor) {                                 // no more drawing: a remote can't be replayed from the picture
     spr.setTextColor(UI_DIM()); spr.setTextDatum(TL_DATUM);
     txt("...", px0 + pw + 3, loY - 7, 1);
   }
@@ -217,10 +218,10 @@ void drawSensors(uint32_t now) {
   int W = spr.width();
   char buf[48];
   spr.fillSprite(C_BG());
-  char title[24]; snprintf(title, sizeof(title), "Sensors %.2f", BANDS[g_band].mon);
+  char title[48]; snprintf(title, sizeof(title), L("Sensors %.2f", "Датчики %.2f"), BANDS[g_band].mon);
   bool fresh = g_sensLast.valid && msSince(now, g_sensLast.ms) < 1500;
-  if (g_sensN) snprintf(buf, sizeof buf, "%d heard%s", g_sensN, fresh ? "  rx!" : "");
-  else snprintf(buf, sizeof buf, "%s", fresh ? "rx!" : "listening");
+  if (g_sensN) snprintf(buf, sizeof buf, L("%d heard%s", "услышано %d%s"), g_sensN, fresh ? L("  · rx", "  · приём") : "");
+  else snprintf(buf, sizeof buf, "%s", fresh ? L("rx", "приём") : L("listening", "слушаю"));
   uiHeader(title, buf, fresh);
 
   uint8_t idx[SENS_MAX];
@@ -229,13 +230,13 @@ void drawSensors(uint32_t now) {
   if (!n) {
     spr.setTextDatum(MC_DATUM);
     spr.setTextColor(UI_LABEL());
-    txt("LISTENING...", W / 2, top + 26, 4);
+    txt(L("LISTENING...", "СЛУШАЮ..."), W / 2, top + 26, 4);
     spr.setTextColor(UI_DIM());
-    txt("OUTDOOR THERMOMETERS, DOORBELLS, REMOTES", W / 2, top + 52, 1);
-    snprintf(buf, sizeof buf, "%lu PACKETS  %lu NOISE", (unsigned long)g_sensPackets, (unsigned long)g_sensNoise);
+    txt(L("OUTDOOR THERMOMETERS, DOORBELLS, REMOTES", "УЛИЧНЫЕ ТЕРМОМЕТРЫ, ЗВОНКИ, ПУЛЬТЫ"), W / 2, top + 52, 1);
+    snprintf(buf, sizeof buf, L("%lu PACKETS  ·  %lu NOISE", "%lu ПОСЫЛОК  ·  %lu ШУМ"), (unsigned long)g_sensPackets, (unsigned long)g_sensNoise);
     txt(buf, W / 2, top + 66, 1);
   }
-  int shown = n > rows ? rows - 1 : n;             // не влезли — последняя строка «+N»
+  int shown = n > rows ? rows - 1 : n;             // didn't fit: the last row is "+N"
   for (int k = 0; k < shown; k++) {
     const SensRec& r = g_sens[idx[k]];
     int y = top + k * rowH;
@@ -246,11 +247,11 @@ void drawSensors(uint32_t now) {
     shortName(r, buf, sizeof buf);
     spr.setTextColor(old ? UI_DIM() : UI_LABEL());
     txt(buf, UI_M + 4, y + 4, 1);
-    // температура / кнопка
+    // temperature / button
     spr.setTextDatum(TR_DATUM);
     if (r.kind == OOK_REMOTE) {
       spr.setTextColor(old ? UI_DIM() : C_HOT());
-      if (r.btn) snprintf(buf, sizeof buf, "BTN %d", r.btn); else strcpy(buf, "PRESS");
+      if (r.btn) snprintf(buf, sizeof buf, L("BTN %d", "КН %d"), r.btn); else strcpy(buf, L("PRESS", "НАЖАТИЕ"));
       txt(buf, 172, y + 4, 1);
     } else {
       snprintf(buf, sizeof buf, "%.1f", r.t);
@@ -261,14 +262,14 @@ void drawSensors(uint32_t now) {
       spr.setTextDatum(TL_DATUM); txt("C", 168, y + 4, 1);
       if (r.h >= 0) { snprintf(buf, sizeof buf, "%d%%", r.h); spr.setTextDatum(TR_DATUM); spr.setTextColor(old ? UI_DIM() : C_ACC()); txt(buf, 212, y, 2); }
     }
-    // батарейка: контур, внутри заливка (разряжена — тревожный цвет)
+    // battery: outline, fill inside (low = alert color)
     if (r.bat >= 0) {
       int bx = 220, by = y + 4;
       uint16_t bc = r.bat ? UI_DIM() : C_ALERT();
       spr.drawRect(bx, by, 11, 7, bc); spr.drawFastVLine(bx + 11, by + 2, 3, bc);
       spr.fillRect(bx + 2, by + 2, r.bat ? 7 : 2, 3, bc);
     }
-    // сила сигнала — полоска
+    // signal strength bar
     int len = constrain((r.rssi + 110) * 30 / 70, 1, 30);
     spr.fillRect(238, y + 5, 30, 5, UI_LINE());
     spr.fillRect(238, y + 5, len, 5, old ? UI_DIM() : heat(r.rssi + 10));
@@ -277,11 +278,11 @@ void drawSensors(uint32_t now) {
     txt(buf, W - UI_M - 2, y + 4, 1);
   }
   if (n > rows) {
-    snprintf(buf, sizeof buf, "+%d MORE ON TABLET", n - shown);
+    snprintf(buf, sizeof buf, L("+%d MORE IN THE APP", "+%d ЕЩЁ В ПРИЛОЖЕНИИ"), n - shown);
     spr.setTextDatum(TL_DATUM); spr.setTextColor(UI_DIM());
     txt(buf, UI_M + 4, top + shown * rowH + 4, 1);
   }
   drawPulseTrain(UI_M, 108, W - 2 * UI_M, UI_BOTTOM - 108);
-  uiFooter("wheel: screens  click: band", "side: back");
+  uiFooter(L("wheel: screens  ·  click: band", "колесо: экраны · нажать: полоса"), L("side: back", "кнопка: назад"));
   present();
 }

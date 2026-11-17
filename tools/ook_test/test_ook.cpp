@@ -1,4 +1,4 @@
-// Тест декодеров на компьютере: читает импульсы (demod.py) и печатает найденное.
+// Desktop test of the decoders: reads pulses (demod.py) and prints what it finds.
 //   g++ -O1 -std=gnu++17 -I../../src test_ook.cpp ../../src/subghz/ook.cpp -o test_ook
 //   ./test_ook file.pulses
 #include <cstdio>

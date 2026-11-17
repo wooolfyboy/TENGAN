@@ -1,11 +1,11 @@
 // ============================================================
-//  vendors.h — производители Bluetooth-устройств
+//  vendors.h — Bluetooth device vendors
 // ============================================================
 #pragma once
 #include <Arduino.h>
 #include "ble/devtypes.h"
 
-// Крупные бренды: имя на экране, цвет, ключ (первое слово имени в базе Bluetooth)
+// Major brands: on-screen name, colour, key (first word of the name in the Bluetooth DB)
 struct Brand { const char* label; const char* key; uint8_t r, g, b; };
 static const Brand BRANDS[] = {
   { "private",   "",          120, 120, 130 },   // 0  V_PRIV
@@ -39,6 +39,6 @@ static const int N_BRANDS = sizeof(BRANDS) / sizeof(BRANDS[0]);
 
 struct Vend { uint8_t cat, kind, score; uint16_t code; };
 
-Vend        resolveVendor(const AdvInfo& ai);   // лучший кандидат из Company ID и UUID сервисов
+Vend        resolveVendor(const AdvInfo& ai);   // best candidate from Company ID and service UUIDs
 const char* vendorLabel(uint8_t cat, uint8_t kind, uint16_t code);
-const char* btUuidOwner(uint16_t uuid);         // чей «фирменный» UUID (или nullptr)
+const char* btUuidOwner(uint16_t uuid);         // whose "signature" UUID it is (or nullptr)

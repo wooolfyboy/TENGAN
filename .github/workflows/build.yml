@@ -1,14 +1,28 @@
-# Сборка прошивки на каждый пуш. На тег вида v1.0 — ещё и GitHub Release
-# с двумя файлами: общий (шить по USB на 0x0) и firmware.bin (по Wi-Fi, вкладка Update).
-# Релиз можно сделать и без тега: Actions → build → Run workflow → release_tag = v1.1
-# (тег создастся сам на собранном коммите).
+# Builds the firmware on every push. A tag like v1.0 also makes a GitHub Release: full USB image (0x0),
+# OTA firmware and the web installer page. One firmware for both languages (chosen on the device).
+# A release can also be made without a tag: Actions → build → Run workflow → release_tag = v1.1
+# (the tag is created on the built commit).
 name: build
 
+# Text/image-only changes (README, docs/, licenses) skip the build to save Actions minutes.
+# Tag v* always builds (path filters don't apply to tags).
 on:
   push:
     branches: ['**']
     tags: ['v*']
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
+      - 'fonts/*.txt'
+      - '.gitignore'
   pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
+      - 'fonts/*.txt'
+      - '.gitignore'
   workflow_dispatch:
     inputs:
       release_tag:
@@ -23,9 +37,9 @@ jobs:
   firmware:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
@@ -45,7 +59,7 @@ jobs:
       - name: Build
         run: pio run
 
-      - name: Make merged image
+      - name: Make image and installer
         run: |
           B=.pio/build/t-embed-cc1101
           APP0=$(find ~/.platformio/packages -name boot_app0.bin | head -1)
@@ -53,12 +67,21 @@ jobs:
           esptool.py --chip esp32s3 merge_bin -o dist/tengan_full_0x0.bin \
             0x0 $B/bootloader.bin 0x8000 $B/partitions.bin 0xe000 "$APP0" 0x10000 $B/firmware.bin
           cp $B/firmware.bin dist/tengan_firmware_ota.bin
-          (cd tools && zip -r ../dist/pc_monitor_windows.zip pc_monitor -x "*/__pycache__/*")
-          # прошивальщик в одном файле: открыть в Chrome → «Прошить палку»
+          # single-file installer (English and Russian on one page): open in Chrome/Edge → "Install"
           python tools/flasher/make_flasher.py dist/tengan_full_0x0.bin dist/flash_tengan.html "${{ inputs.release_tag || github.ref_name }}"
           ls -la dist
 
-      - uses: actions/upload-artifact@v4
+      - name: Size budgets (fail if something grew unexpectedly; raise the limit on purpose if it should)
+        run: |
+          fail=0
+          check() { s=$(stat -c %s "$1"); echo "$1: $s / $2 bytes"; [ "$s" -le "$2" ] || { echo "::error::$1 is over budget ($s > $2)"; fail=1; }; }
+          check dist/tengan_firmware_ota.bin 2830000    # OTA firmware: 2.69 MB on v2.0-test5
+          check dist/flash_tengan.html      4150000    # installer: 3.94 MB
+          gz=$(python3 -c "import re;t=open('src/web/tablet_page.h').read();print(len(re.findall(r'0x[0-9a-fA-F]{2}',t)))")
+          echo "tablet page (gzip): $gz / 231000 bytes"; [ "$gz" -le 231000 ] || { echo "::error::tablet page is over budget ($gz > 231000)"; fail=1; }
+          exit $fail
+
+      - uses: actions/upload-artifact@v5
         with:
           name: firmware-${{ github.sha }}
           path: dist/*
@@ -72,35 +95,87 @@ jobs:
           name: TENGAN ${{ inputs.release_tag || github.ref_name }}
           files: |
             dist/*.bin
-            dist/*.zip
             dist/*.html
           generate_release_notes: true
           body: |
-            **flash_tengan.html** — easiest: open in Chrome/Edge, press the button, pick the device. No addresses, settings are kept.
-            **tengan_full_0x0.bin** — flash over USB at offset 0x0 (esptool-js / esptool), then power-cycle.
-            **tengan_firmware_ota.bin** — upload over Wi-Fi: Web section → page → Update tab.
-            **pc_monitor_windows.zip** — laptop monitor for the PC section: unzip, double-click start_pc_monitor.bat.
-            **tengan_tablet.apk** — Android app for the tablet (same page as /full plus GPS): copy to the tablet, open, allow install.
-            **tengan_desktop.exe** — Windows app: the same HQ page in a window + the PC monitor, over the USB cable or the stick's Wi-Fi. Open Web on the stick, run the exe, pick USB.
+            ## Install
+
+            One firmware for both languages: choose **English** or **Русский** on the device at first start (later: Settings › Language). Your settings are kept when you update.
+
+            | File | What it is |
+            |---|---|
+            | **flash_tengan.html** | The easiest way to install. Open it in Chrome or Edge, press *Install firmware* and choose the device. |
+            | **tengan_full_0x0.bin** | Full image for USB flashing at address 0x0 (esptool or esptool-js). |
+            | **tengan_firmware_ota.bin** | Wireless update: Web section on the device → open the page → Update. |
+            | **tengan_tablet.apk** | TENGAN Tablet for Android. Copy it to the tablet, open it and allow installation. |
+            | **tengan_desktop.exe** | TENGAN Desktop for Windows: the dashboard and PC monitor, over USB or Wi-Fi. |
+            | **TENGAN-tech-doc-en.pdf**, **TENGAN-tech-doc-ru.pdf** | Technical documentation: architecture, protocols, algorithms, build. |
+
+            ## Установка
+
+            Одна прошивка на оба языка: **English** или **Русский** выбирается на устройстве при первом включении (потом — Настройки › Язык). Настройки при обновлении сохраняются.
+
+            | Файл | Назначение |
+            |---|---|
+            | **flash_tengan.html** | Самый простой способ. Откройте файл в Chrome или Edge, нажмите «Установить прошивку» и выберите устройство. |
+            | **tengan_full_0x0.bin** | Полный образ для прошивки по USB с адреса 0x0 (esptool или esptool-js). |
+            | **tengan_firmware_ota.bin** | Обновление по Wi-Fi: раздел «Веб» на устройстве → открыть страницу → «Обновление». |
+            | **tengan_tablet.apk** | TENGAN Tablet для Android. Скопируйте на планшет, откройте и разрешите установку. |
+            | **tengan_desktop.exe** | TENGAN Desktop для Windows: панель управления и монитор ПК, по USB или Wi-Fi. |
+            | **TENGAN-tech-doc-en.pdf**, **TENGAN-tech-doc-ru.pdf** | Техническая документация: архитектура, протоколы, алгоритмы, сборка. |
 
 
-  # Приложение для планшета (Android, app/): та же страница, что /full на палке, плюс GPS.
-  # APK подписан постоянным ключом из репозитория — обновление ставится поверх старой версии.
+  # Technical documentation PDFs (docs/tech/en, docs/tech/ru): pandoc -> HTML -> headless Chrome.
+  # Built on every run (catches broken Markdown); attached to the release when there is one.
+  techdoc:
+    runs-on: ubuntu-latest
+    needs: firmware            # the release is created by the firmware job; this only adds the PDFs
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install pandoc and fonts
+        run: sudo apt-get update && sudo apt-get install -y pandoc fonts-dejavu-core fonts-liberation
+
+      - name: Build PDFs
+        run: |
+          mkdir -p dist
+          python tools/make_techdoc.py en dist/TENGAN-tech-doc-en.pdf
+          python tools/make_techdoc.py ru dist/TENGAN-tech-doc-ru.pdf
+          ls -la dist
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: techdoc-${{ github.sha }}
+          path: dist/*.pdf
+
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.release_tag || github.ref_name }}
+          files: dist/*.pdf
+
+  # Android tablet app (app/): same page as /full on the device, plus GPS.
+  # APK is signed with the TENGAN key from repo secrets, so updates install over the old version.
   android:
     runs-on: ubuntu-latest
     needs: firmware
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '22'
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '21'
@@ -111,17 +186,33 @@ jobs:
           npm ci --no-audit --no-fund
           npm run sync
 
+      - name: Signing key (repository secrets)
+        env:
+          KS_B64: ${{ secrets.TENGAN_KEYSTORE_B64 }}
+          RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != '' }}
+        run: |
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/tengan.p12"
+            echo "TENGAN_KEYSTORE=$RUNNER_TEMP/tengan.p12" >> "$GITHUB_ENV"
+            echo "release key: OK"
+          elif [ "$RELEASE" = "true" ]; then
+            echo "::error::no TENGAN_KEYSTORE_B64 secret — a release APK must be signed with the TENGAN key"; exit 1
+          else
+            echo "::warning::no TENGAN_KEYSTORE_B64 secret — APK signed with a throwaway debug key (won't update over the official one)"
+          fi
+
       - name: Build APK
         working-directory: app/android
         env:
           APP_VERSION_CODE: ${{ github.run_number }}
+          TENGAN_KEYSTORE_PASSWORD: ${{ secrets.TENGAN_KEYSTORE_PASSWORD }}
         run: |
           chmod +x gradlew
           ./gradlew --no-daemon assembleRelease
           mkdir -p ../../dist
           cp app/build/outputs/apk/release/app-release.apk ../../dist/tengan_tablet.apk
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: tablet-apk-${{ github.sha }}
           path: dist/tengan_tablet.apk
@@ -133,15 +224,14 @@ jobs:
           tag_name: ${{ inputs.release_tag || github.ref_name }}
           files: dist/tengan_tablet.apk
 
-  # Приложение для компьютера (Windows, tools/desktop): та же страница FULL + монитор ПК,
-  # связь по USB-кабелю или по Wi-Fi палки. Один файл tengan_desktop.exe.
+  # Windows desktop app (tools/desktop): FULL page + PC monitor, over USB cable or device Wi-Fi.
   desktop:
     runs-on: windows-latest
-    needs: firmware                  # релиз создаёт firmware — сюда только докладываем exe
+    needs: firmware                  # firmware creates the release; this only adds the exe
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
@@ -156,7 +246,7 @@ jobs:
       - name: Build exe
         run: python tools/desktop/build_exe.py
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: desktop-exe-${{ github.sha }}
           path: dist/tengan_desktop.exe

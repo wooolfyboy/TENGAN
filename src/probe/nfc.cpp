@@ -1,26 +1,27 @@
 // ============================================================
-//  nfc.cpp — PN532 по I2C (минимальный драйвер), раздел NFC, JSON.
+//  nfc.cpp — PN532 over I2C (minimal driver), NFC section, JSON.
 //
-//  Опрос без ожидания: шлём «кто тут?» (InListPassiveTarget) и
-//  возвращаемся в loop(); ответ забираем, когда PN532 готов.
-//  Карта нашлась — одним коротким заходом (~0.1 с) узнаём остальное:
-//  платёжная ли (только SELECT PPSE, ответ сразу затираем), NDEF метки.
+//  Non-blocking poll: send "who's there?" (InListPassiveTarget), return to loop(),
+//  and collect the answer when the PN532 is ready.
+//  When a card is found, one short pass (~0.1 s) learns the rest: whether it's
+//  a payment card (SELECT PPSE only, reply discarded at once), NDEF tags.
 // ============================================================
 #include <Wire.h>
+#include "core/lang.h"
 #include "probe/nfc.h"
 #include "core/jsonutil.h"
 #include "core/crumb.h"
 #include "core/timeutil.h"
 
 #define PN_ADDR  0x24
-#define PN_RST   45                   // BOARD_PN532_RF_REST: LOW — PN532 спит
+#define PN_RST   45                   // BOARD_PN532_RF_REST: LOW = PN532 asleep
 #define PN_BUF   64
 
 static uint8_t  s_rx[PN_BUF + 1];
-static bool     s_trunc = false;      // ответ длиннее буфера (хвост не читали)
-static int      s_poll = 0;           // 0 — ждём паузу, 1 — ждём ответ на опрос
+static bool     s_trunc = false;      // reply longer than the buffer (tail not read)
+static int      s_poll = 0;           // 0 = wait for a pause, 1 = wait for the poll reply
 static uint32_t s_pollMs = 0;
-static int      s_cycle = 0;          // каждый 3-й опрос — FeliCa
+static int      s_cycle = 0;          // every 3rd poll is FeliCa
 static int      s_fails = 0;
 
 static bool pnWrite(const uint8_t* cmd, int len) {
@@ -55,19 +56,19 @@ static bool pnAck(uint32_t tmo) {
   return (b[0] & 1) && !memcmp(b + 1, ACK, 6);
 }
 
-// забрать ответ (PN532 уже готов): данные после D5 <cmd+1>; -1 — ошибка
+// fetch the reply (PN532 is ready): data after D5 <cmd+1>; -1 = error
 static int pnRead(uint8_t cmd, const uint8_t*& data) {
   int got = Wire.requestFrom((uint8_t)PN_ADDR, (uint8_t)(PN_BUF + 1));
   if (got < 9) return -1;
   for (int i = 0; i < got; i++) s_rx[i] = Wire.read();
   if (!(s_rx[0] & 1)) return -1;
   int i = 1;
-  while (i < 4 && s_rx[i] == 0x00 && s_rx[i + 1] == 0x00) i++;          // преамбула
+  while (i < 4 && s_rx[i] == 0x00 && s_rx[i + 1] == 0x00) i++;          // preamble
   if (s_rx[i] != 0x00 || s_rx[i + 1] != 0xFF) return -1;
   uint8_t L = s_rx[i + 2];
   if ((uint8_t)(L + s_rx[i + 3]) != 0 || L < 2) return -1;
   if (s_rx[i + 4] != 0xD5 || s_rx[i + 5] != (uint8_t)(cmd + 1)) return -1;
-  int len = L - 2, avail = got - (i + 6) - 2;                          // минус DCS и постамбула
+  int len = L - 2, avail = got - (i + 6) - 2;                          // minus DCS and postamble
   s_trunc = len > avail;
   if (s_trunc) len = max(0, got - (i + 6));
   data = s_rx + i + 6;
@@ -80,7 +81,7 @@ static int pnCmd(const uint8_t* cmd, int len, const uint8_t*& data, uint32_t tmo
   return pnRead(cmd[0], data);
 }
 
-// ---------- включение ----------
+// ---------- power on ----------
 bool nfcStart() {
   NfcModel& m = g_nfc;
   if (m.state != NFC_OFF) return m.state == NFC_SCAN;
@@ -90,16 +91,16 @@ bool nfcStart() {
   digitalWrite(PN_RST, HIGH); delay(40);
   const uint8_t* d; int n = -1;
   static const uint8_t FW[] = { 0x02 };
-  for (int k = 0; k < 3 && n < 4; k++) { n = pnCmd(FW, 1, d, 100); if (n < 4) delay(15); }   // первая посылка будит PN532
+  for (int k = 0; k < 3 && n < 4; k++) { n = pnCmd(FW, 1, d, 100); if (n < 4) delay(15); }   // the first frame wakes the PN532
   if (n < 4) {
     m.state = NFC_NOREADER; m.gen++;
     digitalWrite(PN_RST, LOW);
     return false;
   }
   m.fw = (uint32_t)d[0] << 16 | d[1] << 8 | d[2];
-  static const uint8_t SAM[] = { 0x14, 0x01, 0x14, 0x00 };             // обычный режим
+  static const uint8_t SAM[] = { 0x14, 0x01, 0x14, 0x00 };             // normal mode
   pnCmd(SAM, sizeof(SAM), d);
-  static const uint8_t RETRY[] = { 0x32, 0x05, 0xFF, 0x01, 0x02 };     // искать карту коротко (2 попытки) — не висеть
+  static const uint8_t RETRY[] = { 0x32, 0x05, 0xFF, 0x01, 0x02 };     // short card search (2 tries) so we don't hang
   pnCmd(RETRY, sizeof(RETRY), d);
   m.state = NFC_SCAN; m.present = false;
   s_poll = 0; s_pollMs = 0; s_fails = 0;
@@ -115,14 +116,14 @@ void nfcStop() {
     static const uint8_t RF_OFF[] = { 0x32, 0x01, 0x00 };
     pnCmd(RF_OFF, sizeof(RF_OFF), d);
   }
-  digitalWrite(PN_RST, LOW);                                             // спать (почти не ест батарею)
+  digitalWrite(PN_RST, LOW);                                             // sleep (barely uses battery)
   m.state = NFC_OFF; m.present = false;
 }
 
-// ---------- карта нашлась: дочитать то, что она открыто рассказывает ----------
+// ---------- card found: read what it openly tells ----------
 static void inspectA(NfcCard& c) {
   const uint8_t* d; int n;
-  if (c.sak & 0x20) {                                                    // ISO-DEP: платёжная? (только «да/нет»)
+  if (c.sak & 0x20) {                                                    // ISO-DEP: payment card? (yes/no only)
     static const uint8_t PPSE[] = { 0x40, 0x01, 0x00, 0xA4, 0x04, 0x00, 0x0E,
       '2', 'P', 'A', 'Y', '.', 'S', 'Y', 'S', '.', 'D', 'D', 'F', '0', '1', 0x00 };
     n = pnCmd(PPSE, sizeof(PPSE), d, 200);
@@ -130,14 +131,14 @@ static void inspectA(NfcCard& c) {
       bool ok = d[1] == 0x6F || (!s_trunc && d[n - 2] == 0x90 && d[n - 1] == 0x00);
       c.bank = ok;
     }
-    memset(s_rx, 0, sizeof(s_rx));                                       // ответ карты не храним
+    memset(s_rx, 0, sizeof(s_rx));                                       // card's reply is not stored
   }
-  if (c.sak == 0x00 && (c.atqa & 0xFF) == 0x44) {                        // Ultralight / NTAG: открытая память
+  if (c.sak == 0x00 && (c.atqa & 0xFF) == 0x44) {                        // Ultralight / NTAG: open memory
     static uint8_t mem[160];
     int got = 0;
     uint8_t rd[4] = { 0x40, 0x01, 0x30, 3 };
     n = pnCmd(rd, 4, d);
-    if (n >= 17 && d[0] == 0x00 && d[1] == 0xE1) {                       // CC: метка размечена под NDEF
+    if (n >= 17 && d[0] == 0x00 && d[1] == 0xE1) {                       // CC: tag is formatted for NDEF
       for (int pg = 4; got + 16 <= (int)sizeof(mem); pg += 4) {
         rd[3] = pg;
         n = pnCmd(rd, 4, d);
@@ -175,7 +176,7 @@ static void gotTarget(const uint8_t* d, int n, bool felica, uint32_t now) {
     memcpy(c.uid, d + 6, c.uidLen);
     c.isoDep = c.sak & 0x20;
   }
-  if (m.present && m.have && sameUid(c, m.last)) { m.lastSeen = now; return; }   // та же карта всё ещё лежит
+  if (m.present && m.have && sameUid(c, m.last)) { m.lastSeen = now; return; }   // the same card is still there
   crumb("nfc card");
   if (felica) nfcClassify(c, -1); else inspectA(c);
   nfcCommit(c, millis());
@@ -194,16 +195,16 @@ void nfcTick(uint32_t now) {
     bool ok = fe ? pnWrite(PF, sizeof(PF)) : pnWrite(PA, sizeof(PA));
     if (!ok || !pnAck(30)) {
       s_pollMs = now;
-      if (++s_fails > 8) { m.state = NFC_NOREADER; m.gen++; digitalWrite(PN_RST, LOW); }   // пропал с шины
+      if (++s_fails > 8) { m.state = NFC_NOREADER; m.gen++; digitalWrite(PN_RST, LOW); }   // gone from the bus
       return;
     }
     s_fails = 0;
     s_poll = fe ? 2 : 1; s_pollMs = now;
     return;
   }
-  // ждём ответ, не блокируя loop()
+  // wait for the reply without blocking loop()
   if (!pnReady()) {
-    if (msSince(now, s_pollMs) > 400) {                                  // молчит — отменить и начать заново
+    if (msSince(now, s_pollMs) > 400) {                                  // silent: cancel and start over
       static const uint8_t ACK[6] = { 0, 0, 0xFF, 0, 0xFF, 0 };
       Wire.beginTransmission(PN_ADDR); Wire.write(ACK, 6); Wire.endTransmission();
       s_poll = 0; s_pollMs = now;
@@ -218,7 +219,7 @@ void nfcTick(uint32_t now) {
 }
 
 // {"fam":"MIFARE Classic 1K","hint":"..","uid":"04A2••","atqa":"0044","sak":"08","ndef":[".."],"t":123456}
-// без считывателя: {"err":"no reader","t":..}
+// no reader: {"err":"no reader","t":..}
 void nfcJson(String& o) {
   const NfcModel& m = g_nfc;
   o.reserve(320);
@@ -238,15 +239,15 @@ void nfcJson(String& o) {
   o += ",\"t\":"; o += c.t; o += '}';
 }
 
-// ---------- раздел ----------
+// ---------- section ----------
 static void nfcSubtitle(char* out, size_t n) {
-  if (g_nfc.state == NFC_NOREADER) snprintf(out, n, "no chip");
-  else if (g_nfc.taps) snprintf(out, n, "%lu cards", (unsigned long)g_nfc.taps);
+  if (g_nfc.state == NFC_NOREADER) snprintf(out, n, "%s", L("no chip", "нет чипа"));
+  else if (g_nfc.taps) snprintf(out, n, "%lu %s", (unsigned long)g_nfc.taps, PL((int)g_nfc.taps, "card", "cards", "карта", "карты", "карт"));
   else snprintf(out, n, "13.56 MHz");
 }
 static void nfcEnter() { nfcStart(); }
 static void nfcLeave() { nfcStop(); }
-static void nfcClick() {                                                 // нет считывателя — попробовать снова
+static void nfcClick() {                                                 // no reader: try again
   if (g_nfc.state == NFC_NOREADER) { g_nfc.state = NFC_OFF; nfcStart(); }
 }
 

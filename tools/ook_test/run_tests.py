@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
-"""Прогон декодеров по записям эфира из набора rtl_433_tests
-(https://github.com/merbanan/rtl_433_tests — .cu8 и ожидаемый .json рядом).
+"""Runs the decoders on captures from the rtl_433_tests set
+(https://github.com/merbanan/rtl_433_tests — .cu8 with the expected .json next to it).
 
-    python3 run_tests.py <путь к rtl_433_tests/tests> [папка ...]
+    python3 run_tests.py <path to rtl_433_tests/tests> [dir ...]
 
-Для каждой записи: demod.py -> test_ook -> сравнить модель/id/канал/температуру/влажность
-с тем, что выдал rtl_433. Без аргументов-папок берёт набор по умолчанию.
+For each capture: demod.py -> test_ook -> compare model/id/channel/temperature/humidity
+with rtl_433's output. With no dir arguments, uses the default set.
 """
 import sys, os, glob, json, subprocess
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, "..", "..")
 BIN = os.path.join(HERE, ".test_ook")
 
-MODELS = {   # модель rtl_433 -> наш протокол
+MODELS = {   # rtl_433 model -> our protocol
     "Nexus-TH": "Nexus", "Nexus-T": "Nexus", "Rubicson-Temperature": "Rubicson", "Prologue-TH": "Prologue",
     "LaCrosse-TX141THBv2": "LaCrosse-TX141TH", "LaCrosse-TX141Bv2": "LaCrosse-TX141", "LaCrosse-TX141Bv3": "LaCrosse-TX141",
     "LaCrosse-TX141B": "LaCrosse-TX141",

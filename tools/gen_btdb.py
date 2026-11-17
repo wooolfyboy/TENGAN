@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Генерирует src/ble/btdb.h — таблицы производителей Bluetooth.
+"""Generates src/ble/btdb.h — Bluetooth vendor tables.
 
-Источники (скачать заранее):
+Sources (download first):
   company_ids.json  — https://raw.githubusercontent.com/NordicSemiconductor/bluetooth-numbers-database/master/v1/company_ids.json
   member_uuids.yaml — https://bitbucket.org/bluetooth-SIG/public/raw/main/assigned_numbers/uuids/member_uuids.yaml
 
-Запуск:  python3 tools/gen_btdb.py company_ids.json member_uuids.yaml > src/ble/btdb.h
+Usage:  python3 tools/gen_btdb.py company_ids.json member_uuids.yaml > src/ble/btdb.h
 """
 import json, re, sys
 

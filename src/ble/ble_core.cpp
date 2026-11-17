@@ -1,11 +1,10 @@
 // ============================================================
-//  ble_core.cpp — раздел Bluetooth: сканирование, склейка адресов,
-//  сведение в «физические» устройства, история, список, навигация.
-//
-//  Только приём: палка слушает рекламу (широковещательные пакеты),
-//  ни к чему не подключается.
+//  ble_core.cpp — Bluetooth section: scanning, address merging, grouping into
+//  "physical" devices, history, list, navigation. Receive only: listens to
+//  advertisements, never connects.
 // ============================================================
 #include <NimBLEDevice.h>
+#include "core/lang.h"
 #include <algorithm>
 #include "core/jsonutil.h"
 #include "core/timeutil.h"
@@ -19,13 +18,13 @@
 #include "wifi/wifi.h"
 #include <Preferences.h>
 
-// ---------- сырые данные (пишет колбэк сканера, под мьютексом) ----------
-static std::map<uint64_t, Dev>    g_seen;     // по MAC-адресам
-static std::map<uint64_t, Sensor> g_sens;     // датчики погоды
+// ---------- raw data (written by the scanner callback, under mutex) ----------
+static std::map<uint64_t, Dev>    g_seen;     // by MAC address
+static std::map<uint64_t, Sensor> g_sens;     // weather sensors
 static uint32_t g_nextEnt = 0;
 static SemaphoreHandle_t g_lock;
 
-// ---------- состояние раздела ----------
+// ---------- section state ----------
 volatile int g_mode = 0;
 bool  g_bleActive = true;
 int   g_lastCount = 0;
@@ -49,21 +48,21 @@ int8_t   g_spark[SPARK_N];
 int      g_sparkN = 0;
 static uint32_t g_sparkEnt = 0, g_sparkMs = 0;
 
-// ---------- снимок на текущий кадр (bleUpdate) ----------
-static std::map<uint32_t, Ent> g_ents;        // физические устройства
+// ---------- snapshot for the current frame (bleUpdate) ----------
+static std::map<uint32_t, Ent> g_ents;        // physical devices
 static std::vector<Sensor> g_sensSnap;
 static std::vector<Blip>   g_snap;
 static int   g_typeCnt[T_NUM];
 static Ent   g_bestEnt;
 static int   g_bestRssi = -127;
 static bool  g_have = false;
-static Dev   g_detDev;                        // последние известные подробности выбранного
+static Dev   g_detDev;                        // last known details of the selected one
 static bool  g_detValid = false;
 static uint32_t g_detFor = 0;
 
 static bool bleIs(int m) { return navActive(&bleSection) && g_mode == m; }
 
-// переносим разобранные поля рекламы в запись об адресе
+// copy parsed advertisement fields into the address record
 static void fillAdv(Dev& v, const AdvInfo& ai) {
   if (ai.nameLen && !v.name[0]) {
     strncpy(v.name, ai.name, sizeof(v.name) - 1); v.name[sizeof(v.name) - 1] = 0;
@@ -80,7 +79,7 @@ static void fillAdv(Dev& v, const AdvInfo& ai) {
   }
 }
 
-// ---------- колбэк сканера (NimBLE 2.x) ----------
+// ---------- scanner callback (NimBLE 2.x) ----------
 class ScanCB : public NimBLEScanCallbacks {
   void onResult(const NimBLEAdvertisedDevice* d) override {
     const NimBLEAddress& addr = d->getAddress();
@@ -99,7 +98,7 @@ class ScanCB : public NimBLEScanCallbacks {
     uint32_t sig  = advSignature(ai);
     uint8_t akind = A_PUBLIC;
     if (addr.getType() == BLE_ADDR_RANDOM) {
-      switch (mac[5] >> 6) {          // два старших бита адреса
+      switch (mac[5] >> 6) {          // top two address bits
         case 3:  akind = A_STATIC;   break;
         case 1:  akind = A_ROTATING; break;
         default: akind = A_NONRES;   break;
@@ -128,7 +127,7 @@ class ScanCB : public NimBLEScanCallbacks {
       nd.type = type; nd.akind = akind; nd.rnd = rnd;
       memcpy(nd.mac, mac, 6);
       fillAdv(nd, ai);
-      // ищем «предшественника»: адрес с тем же отпечатком, который недавно замолчал
+      // look for a "predecessor": same fingerprint, recently went silent
       if (rnd && sig) {
         Dev* best = nullptr; int bestDiff = MERGE_DB + 1;
         for (auto& kv : g_seen) {
@@ -157,7 +156,7 @@ class ScanCB : public NimBLEScanCallbacks {
       g_seen[key] = nd;
     }
 
-    // показания датчика погоды
+    // weather sensor reading
     if (isSensor) {
       auto st = g_sens.find(key);
       if (st == g_sens.end() && g_sens.size() < MAX_SENSORS) {
@@ -183,22 +182,22 @@ class ScanCB : public NimBLEScanCallbacks {
   }
 };
 
-// ---------- сэмплер истории (раз в секунду) + детектор событий ±7 ----------
+// ---------- history sampler (once a second) + +-7 event detector ----------
 void bleSample(uint32_t now) {
-  if (!g_bleActive) return;                       // Bluetooth на паузе — историю не пишем
+  if (!g_bleActive) return;                       // Bluetooth paused: no history
   if (now - g_lastSampleMs < 1000) return;
   g_lastSampleMs = now;
   int c = g_lastCount;
 
-  if (g_base < 0) g_base = c;                     // инициализация
+  if (g_base < 0) g_base = c;                     // init
   int8_t ev = 0;
   float delta = c - g_base;
   if (g_thresh > 0 && now >= g_cooldownMs) {
     if (delta >= g_thresh)       { ev = +1; g_base = c; g_cooldownMs = now + 3000; }
     else if (delta <= -g_thresh) { ev = -1; g_base = c; g_cooldownMs = now + 3000; }
   }
-  if (ev != 0 && navActive(&bleSection)) ledsEvent(ev);   // лента — только в самом разделе Bluetooth
-  g_base += 0.15f * (c - g_base);                 // дрейф базовой линии (EMA)
+  if (ev != 0 && navActive(&bleSection)) ledsEvent(ev);   // LED feed only inside the Bluetooth section
+  g_base += 0.15f * (c - g_base);                 // baseline drift (EMA)
 
   Sample s = { c, g_base, ev };
   if (g_histLen < HIST_N) g_hist[g_histLen++] = s;
@@ -209,25 +208,25 @@ void bleBegin() {
   g_lock = xSemaphoreCreateMutex();
   NimBLEDevice::init("");
   NimBLEScan* s = NimBLEDevice::getScan();
-  s->setScanCallbacks(new ScanCB(), true);   // true — получать каждый пакет, а не только первый
+  s->setScanCallbacks(new ScanCB(), true);   // true = every packet, not just the first
   s->setActiveScan(true);
   s->setInterval(100);
   s->setWindow(99);
-  s->setMaxResults(0);                        // не копить результаты — всё в колбэке
-  g_bleActive = false;                        // сканирование включается только при входе в раздел
+  s->setMaxResults(0);                        // do not accumulate results: all handled in the callback
+  g_bleActive = false;                        // scanning starts only on entering the section
 }
 
 void bleRadioOn() {
   if (g_bleActive) return;
   NimBLEDevice::getScan()->start(0, false);
   g_bleActive = true;
-  g_base = -1;                              // заново набрать базовую линию событий
-  g_cooldownMs = millis() + 10000;          // и не мигать, пока список наполняется
+  g_base = -1;                              // re-learn the event baseline
+  g_cooldownMs = millis() + 10000;          // and stay quiet while the list fills
 }
 
 bool bleRadioActive() { return g_bleActive; }
 
-// id физических устройств в эфире сейчас (для «радиопогоды»: кто пришёл, кто ушёл)
+// ids of devices on air now (for "radio weather": who came, who left)
 int bleEntityIds(uint32_t* out, int max) {
   int n = 0;
   for (auto& kv : g_ents) { if (n >= max) break; out[n++] = kv.first; }
@@ -240,16 +239,16 @@ void bleRadioOff() {
   g_bleActive = false;
 }
 
-// ---------- «спокойный» сигнал для экранов ----------
-// Сигнал одного и того же устройства всё время дрожит на ±2–3 dB — пользы в
-// этом нет, а цели на Scope и башни City от этого дёргаются. Поэтому:
-//  - цель сдвигается, только если сглаженный сигнал ушёл от неё на STEADY_DB;
-//  - показанное значение плавно «перетекает» к цели (~0.7 с), без скачков.
-// Красота важнее точности: сортировка и фильтры по-прежнему по rssiS.
+// ---------- "calm" signal for screens ----------
+// One device's signal always jitters by +-2-3 dB; that is useless and makes
+// Scope targets and City towers twitch. So:
+//  - the target moves only when the smoothed signal is STEADY_DB away from it;
+//  - the shown value eases to the target (~0.7 s), no jumps.
+// Looks matter more than accuracy: sorting and filters still use rssiS.
 struct Steady { float shown; int8_t target; uint32_t t; };
 static std::map<uint32_t, Steady> g_steady;
 static const int STEADY_DB = 4;
-static const int BEST_HYST_DB = 3;            // «ближайший» меняется, только если другой сильнее на 3 dB
+static const int BEST_HYST_DB = 3;            // "nearest" changes only if another is stronger by 3 dB
 static uint32_t g_steadyMs = 0, g_bestId = 0;
 
 static int steadyRssi(uint32_t id, int rs, uint32_t now, float k) {
@@ -262,13 +261,13 @@ static int steadyRssi(uint32_t id, int rs, uint32_t now, float k) {
   return (int)lroundf(s.shown);
 }
 
-// ---------- подписи устройств (дал пользователь с планшета) ----------
-// Хранятся по MAC-адресу в памяти настроек: до LABEL_MAX штук. У телефонов адрес «гуляет»
-// (rotating): подпись держится, пока устройство не сменит адрес, — честно сообщаем это (stable=false).
+// ---------- device labels (set by the user on the tablet) ----------
+// Stored per MAC in settings memory, up to LABEL_MAX. Phones rotate their address:
+// a label lasts until the address changes; we report that honestly (stable=false).
 #define LABEL_MAX 32
 struct Label { uint8_t mac[6]; char name[21]; };
 static Label g_labels[LABEL_MAX];
-static int   g_nLabels = -1;                              // -1 — ещё не загружены
+static int   g_nLabels = -1;                              // -1 = not loaded yet
 
 static void labelsLoad() {
   if (g_nLabels >= 0) return;
@@ -287,7 +286,7 @@ static const char* labelFor(const uint8_t* mac) {
   return nullptr;
 }
 
-// /api/label: подписать устройство (id из потока) или убрать подпись (пустое имя)
+// /api/label: label a device (id from the stream) or clear it (empty name)
 bool bleLabelSet(uint32_t id, const char* name, bool& stable) {
   labelsLoad();
   auto it = g_ents.find(id);
@@ -302,16 +301,16 @@ bool bleLabelSet(uint32_t id, const char* name, bool& stable) {
   stable = akind == A_PUBLIC || akind == A_STATIC;
   int k = 0;
   while (k < g_nLabels && memcmp(g_labels[k].mac, mac, 6)) k++;
-  if (!name || !name[0]) {                                  // убрать
+  if (!name || !name[0]) {                                  // clear
     if (k < g_nLabels) { g_labels[k] = g_labels[g_nLabels - 1]; g_nLabels--; }
   } else {
     if (k == g_nLabels) {
-      if (g_nLabels >= LABEL_MAX) { memmove(g_labels, g_labels + 1, sizeof(Label) * (LABEL_MAX - 1)); k = LABEL_MAX - 1; }   // места нет — вытесняем самую старую
+      if (g_nLabels >= LABEL_MAX) { memmove(g_labels, g_labels + 1, sizeof(Label) * (LABEL_MAX - 1)); k = LABEL_MAX - 1; }   // full: evict the oldest
       else g_nLabels++;
       memcpy(g_labels[k].mac, mac, 6);
     }
     size_t n = strlen(name);
-    if (n > 20) {                                           // не резать посреди буквы UTF-8
+    if (n > 20) {                                           // do not cut in the middle of a UTF-8 character
       n = 20;
       while (n > 0 && (name[n] & 0xC0) == 0x80) n--;
     }
@@ -321,10 +320,10 @@ bool bleLabelSet(uint32_t id, const char* name, bool& stable) {
   return true;
 }
 
-// ---------- каждый кадр: адреса -> физические устройства ----------
+// ---------- every frame: addresses -> physical devices ----------
 void bleUpdate(uint32_t now) {
   labelsLoad();
-  // узлы карты не пересоздаём каждый кадр (меньше работы куче): обнуляем, а кого не нашли — убираем ниже
+  // do not recreate map nodes every frame (less heap churn): zero them, drop the missing ones below
   for (auto& kv : g_ents) memset(&kv.second, 0, sizeof(Ent));
   g_sensSnap.clear();
   g_snap.clear();
@@ -337,15 +336,15 @@ void bleUpdate(uint32_t now) {
     for (auto it = g_seen.begin(); it != g_seen.end(); ) {
       if (msSince(now, it->second.t) > REMEMBER_MS) { it = g_seen.erase(it); continue; }
       Dev& d = it->second;
-      // фильтр дальности с гистерезисом + отсев одиночных пакетов
+      // range filter with hysteresis + drop single-packet devices
       if (!d.inRange && d.rssiS >= thr) d.inRange = true;
       else if (d.inRange && d.rssiS < thr - RANGE_HYST_DB) d.inRange = false;
       if (!d.inRange || d.pkts < MIN_PKTS) { ++it; continue; }
-      Ent& e = g_ents[d.ent];           // новый Ent создаётся обнулённым
+      Ent& e = g_ents[d.ent];           // a new Ent is created zeroed
       if (d.t >= e.t) { e.t = d.t; e.rssi = d.rssi; e.rssiS = d.rssiS; e.key = it->first; }
       if (!e.first || d.first < e.first) e.first = d.first;
       if (d.pkts > e.pkts) e.pkts = d.pkts;
-      if (e.nMacs < 255) e.nMacs++;                // uint8_t: не перекручиваться в 0
+      if (e.nMacs < 255) e.nMacs++;                // uint8_t: do not wrap to 0
       if (d.type != T_UNKNOWN) e.type = d.type;
       if (d.vscore > e.vscore) { e.cat = d.cat; e.vkind = d.vkind; e.vcode = d.vcode; e.vscore = d.vscore; }
       if (d.name[0] && !e.name[0]) memcpy(e.name, d.name, sizeof(e.name));
@@ -363,10 +362,10 @@ void bleUpdate(uint32_t now) {
     }
     xSemaphoreGive(g_lock);
   }
-  for (auto it = g_ents.begin(); it != g_ents.end(); )   // в этом кадре не встретились — ушли
+  for (auto it = g_ents.begin(); it != g_ents.end(); )   // not seen this frame: gone
     if (it->second.t == 0) it = g_ents.erase(it); else ++it;
 
-  // спокойные значения для всех экранов
+  // calm values for all screens
   float dt = g_steadyMs ? msSince(now, g_steadyMs) / 1000.0f : 0.0f;
   g_steadyMs = now;
   float k = 1.0f - expf(-dt / 0.7f);
@@ -384,20 +383,20 @@ void bleUpdate(uint32_t now) {
     const Ent& e = kv.second;
     if (e.rssi > g_bestRssi) { g_bestRssi = e.rssi; g_bestEnt = e; g_bestId = kv.first; g_have = true; }
     g_typeCnt[e.type < T_NUM ? (int)e.type : (int)T_UNKNOWN]++;
-    // угол блипа — от id физического устройства: не прыгает при смене MAC
+    // blip angle comes from the physical device id: stable across MAC changes
     if (wantScope) { Blip b = { e.rssi, kv.first * 2654435761u, e.cat, e.type, {0} }; strlcpy(b.label, e.label, sizeof(b.label)); g_snap.push_back(b); }
   }
-  if (g_have) g_bestRssi = g_bestEnt.rssi;            // убрать фору гистерезиса
+  if (g_have) g_bestRssi = g_bestEnt.rssi;            // drop the hysteresis head start
   g_lastCount = (int)g_ents.size();
   g_lastRaw = raw;
 }
 
-// ---------- список: «липкий» порядок и выбор строки ----------
+// ---------- list: "sticky" order and row selection ----------
 static void listUpdate(uint32_t now) {
-  // ближние сверху, но строки не прыгают:
-  //  - пока крутишь колесо или открыты подробности — порядок заморожен;
-  //  - соседи меняются местами, только если разница сигнала > ORDER_HYST_DB;
-  //  - новые устройства вставляются на своё место, ушедшие убираются.
+  // nearest on top, but rows do not jump:
+  //  - while the wheel turns or details are open, the order is frozen;
+  //  - neighbours swap only if the signal differs by > ORDER_HYST_DB;
+  //  - new devices go to their place, departed ones are removed.
   bool frozen = g_detail || (msSince(now, g_lastTouch) < ORDER_FREEZE);
   if (g_order.empty() || (!frozen && msSince(now, g_orderMs) >= ORDER_EVERY)) {
     auto rs = [&](uint32_t id) { return g_ents[id].rssiS; };
@@ -425,7 +424,7 @@ static void listUpdate(uint32_t now) {
   int idx = -1;
   for (int i = 0; i < n; i++) if (g_order[i] == g_sel) { idx = i; break; }
   int mv = g_listMove; g_listMove = 0;
-  bool keep = (idx < 0 && g_detail && mv == 0);   // выбранное пропало — держим его подробности
+  bool keep = (idx < 0 && g_detail && mv == 0);   // selected one vanished: keep its details
   if (!keep && n > 0) {
     if (idx < 0) idx = 0;
     idx = constrain(idx + mv, 0, n - 1);
@@ -442,7 +441,7 @@ static void drawListOrDetail(uint32_t now) {
   if (!(g_detail && g_sel)) { drawList(g_ents); return; }
   auto it = g_ents.find(g_sel);
   bool inMap = it != g_ents.end();
-  // история сигнала выбранного: точка раз в 0.5 с
+  // signal history of the selected one: a point every 0.5 s
   if (g_sparkEnt != g_sel) { g_sparkEnt = g_sel; g_sparkN = 0; g_sparkMs = 0; }
   if (msSince(now, g_sparkMs) >= 500) {
     g_sparkMs = now;
@@ -456,18 +455,18 @@ static void drawListOrDetail(uint32_t now) {
   else            drawList(g_ents);
 }
 
-// ---------- раздел для меню ----------
+// ---------- section for the menu ----------
 static void bleSubtitle(char* out, size_t n) {
-  if (g_bleActive) snprintf(out, n, "%d devices", g_lastCount);
-  else             snprintf(out, n, "off");
+  if (g_bleActive) snprintf(out, n, L("%d devices", "%d в эфире"), g_lastCount);
+  else             snprintf(out, n, "%s", L("off", "выкл"));
 }
 static void bleEnter() { wifiRadioOff(); bleRadioOn(); }
-static void bleLeave() { bleRadioOff(); ledsOff(); }   // вышли — радио и лента выключены
+static void bleLeave() { bleRadioOff(); ledsOff(); }   // left: radio and feed off
 
 static void bleScreenInfo(int i, SubItem& it) {
-  static const char* const names[NUM_MODES] = { "Overview", "Scope", "City", "Nearest", "Devices", "Weather" };
-  static const char* const descs[NUM_MODES] = { "count, trend, types", "radar picture", "3D: devices as towers", "closest device",
-    "list + details", "BLE thermometers" };
+  const char* const names[NUM_MODES] = { L("Overview", "Обзор"), L("Scope", "Радар"), L("City", "Город"), L("Nearest", "Ближайшее"), L("Devices", "Устройства"), L("Weather", "Погода") };
+  const char* const descs[NUM_MODES] = { L("count, trend, types", "число, тренд, типы"), L("radar picture", "картина вокруг"), L("3D: devices as towers", "3D: башни-устройства"), L("closest device", "самое близкое"),
+    L("list + details", "список и подробности"), L("BLE thermometers", "BLE-термометры") };
   it.name = names[i]; it.desc = descs[i]; it.value[0] = 0;
   switch (i) {
     case M_OVERVIEW: case M_LIST: case M_CITY: sprintf(it.value, "%d", g_lastCount); break;
@@ -478,7 +477,7 @@ static void bleScreenInfo(int i, SubItem& it) {
       break;
     }
     case M_NEAREST:
-      if (g_have) sprintf(it.value, "%d dBm", g_bestRssi); else strcpy(it.value, "-");
+      if (g_have) sprintf(it.value, L("%d dBm", "%d дБм"), g_bestRssi); else strcpy(it.value, "-");
       break;
     case M_WEATHER:
       if (g_sensCount) sprintf(it.value, "%d", g_sensCount); else strcpy(it.value, "-");
@@ -491,13 +490,13 @@ static void bleClose() { g_detail = false; }
 
 static void bleClick() {
   if (g_mode == M_LIST) { g_detail = !g_detail; g_lastTouch = millis(); }
-  // на остальных экранах у нажатия нет действия (назад — боковая кнопка)
+  // other screens have no press action (back = side button)
 }
 static void bleRotate(int dir) {
   static uint32_t last = 0;
   if (g_mode == M_LIST) { g_listMove += dir; g_lastTouch = millis(); return; }
-  if (g_mode == M_CITY) { cityTurn(dir); return; }   // в городе колесо крутит камеру
-  if (millis() - last < 120) return;               // экраны не проскакивают при быстром вращении
+  if (g_mode == M_CITY) { cityTurn(dir); return; }   // in City the wheel turns the camera
+  if (millis() - last < 120) return;               // so screens do not flip by on fast spinning
   last = millis();
   g_mode = (g_mode + dir + NUM_MODES) % NUM_MODES;
   g_detail = false;
@@ -524,7 +523,7 @@ const Section bleSection = {
   bleClick, bleRotate, bleBack, nullptr, bleDraw,
 };
 
-// ---------- для веб-страницы: устройства в JSON ----------
+// ---------- for the web page: devices as JSON ----------
 
 void bleJson(String& o) {
   uint32_t now = millis();
@@ -576,7 +575,7 @@ void bleJson(String& o) {
   o += "]}";
 }
 
-// подробности одного устройства: все его адреса (MAC меняются), сервисы, данные производителя
+// details of one device: all its addresses (MACs rotate), services, manufacturer data
 void bleDevJson(uint32_t id, String& o) {
   static const char* const AK[] = { "public", "static random", "rotating (private)", "non-resolvable" };
   uint32_t now = millis();
@@ -624,7 +623,7 @@ void bleDevJson(uint32_t id, String& o) {
   o += '}';
 }
 
-// для веб-режима: Bluetooth слушает реже, чтобы Wi-Fi точке хватало эфира
+// web mode: Bluetooth scans less often so Wi-Fi gets enough air
 void bleLowDuty(bool low) {
   NimBLEScan* s = NimBLEDevice::getScan();
   bool was = g_bleActive;
@@ -633,8 +632,8 @@ void bleLowDuty(bool low) {
   if (was) s->start(0, false);
 }
 
-// для планшета (поток SSE): компактно — массивы вместо объектов, до 80 устройств
-// {"n":число,"m":адресов,"d":[[id,rssi,"тип","производитель","имя",возраст_с,адресов,"подпись"],...]}
+// for the tablet (SSE stream): compact, arrays instead of objects, up to 80 devices
+// {"n":count,"m":addresses,"d":[[id,rssi,"type","vendor","name",age_s,addresses,"label"],...]}
 void bleStreamJson(String& o) {
   uint32_t now = millis();
   std::vector<std::pair<uint32_t, const Ent*>> v;
@@ -648,7 +647,7 @@ void bleStreamJson(String& o) {
   for (size_t i = 0; i < v.size(); i++) {
     const Ent* e = v[i].second;
     if (i) o += ',';
-    o += '['; o += v[i].first; o += ','; o += e->rssi; o += ',';   // «спокойное» значение
+    o += '['; o += v[i].first; o += ','; o += e->rssi; o += ',';   // "calm" value
     jsonStr(o, typeName(e->type)); o += ','; jsonStr(o, vendorLabel(e->cat, e->vkind, e->vcode)); o += ',';
     jsonStr(o, e->name); o += ','; o += msSince(now, e->first) / 1000; o += ','; o += e->nMacs; o += ','; jsonStr(o, e->label); o += ']';
   }

@@ -1,18 +1,17 @@
 // ============================================================
-//  serout.cpp — очередь записи в USB (см. serout.h)
-//  Кольцевой буфер 64 КБ во внешней памяти (PSRAM): строки ложатся целиком,
-//  в порт уходят кусками по мере места в его буфере — без ожидания.
+//  serout.cpp — USB write queue (see serout.h).
+//  64 KB ring buffer in PSRAM: lines are stored whole, sent in chunks as the port has room.
 // ============================================================
 #include <Arduino.h>
 #include <string.h>
 #include "core/psram.h"
 #include "link/serout.h"
 
-static const size_t CAP = 64 * 1024;      // всё, что может ждать отправки
-static const size_t DROP_AT = 12 * 1024;  // «можно выкинуть» — уже при такой очереди
+static const size_t CAP = 64 * 1024;      // max pending bytes
+static const size_t DROP_AT = 12 * 1024;  // droppable lines are refused above this queue size
 static char*  s_buf = nullptr;
-static size_t s_head = 0, s_len = 0;      // начало и длина данных в кольце
-static bool   s_open = false;             // строка собирается (begin…end)
+static size_t s_head = 0, s_len = 0;      // ring start and data length
+static bool   s_open = false;             // a line is being built (begin..end)
 
 static bool ensure() { if (!s_buf) s_buf = psAlloc<char>(CAP); return s_buf != nullptr; }
 static void put(const char* s, size_t n) {
@@ -43,9 +42,9 @@ void serOutPump() {
   if (!s_len || s_open) return;
   for (int guard = 0; guard < 8 && s_len; guard++) {
     int room = Serial.availableForWrite();
-    if (room <= 0) return;                 // компьютер не успевает — позже
+    if (room <= 0) return;                 // PC is not keeping up, retry later
     size_t n = s_len < (size_t)room ? s_len : (size_t)room;
-    if (n > CAP - s_head) n = CAP - s_head;     // до конца кольца, остальное — следующим куском
+    if (n > CAP - s_head) n = CAP - s_head;     // up to ring end; the rest goes next time
     size_t w = Serial.write((const uint8_t*)(s_buf + s_head), n);
     if (!w) return;
     s_head = (s_head + w) % CAP; s_len -= w;

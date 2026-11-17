@@ -1,0 +1,120 @@
+# TENGAN Desktop for macOS and Linux (the Windows build is in build.yml → tengan_desktop.exe).
+# Manual run: Actions → desktop-xplat → Run workflow (with release_tag to attach to a release).
+# With release_tag (e.g. v2.0) the files are added to that release.
+name: desktop-xplat
+
+# Manual/release only: a macOS build counts as 10 minutes of Actions limit, so it doesn't run on every push.
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Attach the builds to this release tag (e.g. v2.0); leave empty to just build'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  mac:
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install
+        run: pip install -r tools/desktop/requirements-mac.txt pyinstaller
+      - name: Logic tests
+        run: |
+          python -m py_compile tools/desktop/*.py tools/pc_monitor/pc_monitor.py
+          python tools/desktop/test_events.py
+      - name: Build .app
+        run: python tools/desktop/build_xplat.py mac
+      - name: Smoke run (start the app for 25 s, check the log)
+        run: TENGAN_NO_TRAY=1 python tools/desktop/smoke_run.py "dist/TENGAN Desktop.app/Contents/MacOS/TENGAN Desktop" 25
+      - uses: actions/upload-artifact@v5
+        with:
+          name: desktop-mac-${{ github.sha }}
+          path: dist/TENGAN-Desktop-mac.zip
+      - name: Release
+        if: inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.release_tag }}
+          files: dist/TENGAN-Desktop-mac.zip
+
+  linux:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: System libraries (Qt WebEngine, audio, AppImage)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1 libegl1 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 \
+            libxcb-shape0 libxcb-xinerama0 libxcb-randr0 libxcb-render-util0 libxcb-image0 libnss3 libxcomposite1 \
+            libxdamage1 libxrandr2 libxtst6 libasound2 libportaudio2 libfuse2 xvfb file
+      - name: Install
+        run: pip install -r tools/desktop/requirements-linux.txt pyinstaller
+      - name: Logic tests
+        run: |
+          python -m py_compile tools/desktop/*.py tools/pc_monitor/pc_monitor.py
+          python tools/desktop/test_events.py
+      - name: Build binary
+        run: python tools/desktop/build_xplat.py linux
+      - name: Self-test (packaged binary imports window engine and all modules)
+        env:
+          TENGAN_SELFTEST: "1"
+          TENGAN_NO_TRAY: "1"
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          LOG=~/.config/TENGAN/desktop.log
+          rm -f "$LOG"
+          rc=0; timeout 60 dist/tengan_desktop/tengan_desktop || rc=$?
+          echo "exit code: $rc"; echo "--- desktop.log ---"; cat "$LOG" || true
+          test "$rc" = 0 && grep -q "selftest OK" "$LOG"
+      - name: Smoke run (start the app with its windows for 25 s under a virtual display)
+        env:
+          TENGAN_NO_TRAY: "1"
+          QTWEBENGINE_DISABLE_SANDBOX: "1"
+        run: xvfb-run -a -s "-screen 0 1280x800x24" python tools/desktop/smoke_run.py dist/tengan_desktop/tengan_desktop 25
+      - name: AppImage
+        run: |
+          set -e
+          A=build/AppDir
+          rm -rf $A && mkdir -p $A/usr/bin
+          cp -r dist/tengan_desktop $A/usr/bin/tengan_desktop
+          cp dist/tengan.png $A/tengan.png
+          cat > $A/tengan-desktop.desktop <<'EOF'
+          [Desktop Entry]
+          Type=Application
+          Name=TENGAN Desktop
+          Comment=TENGAN HQ and PC monitor
+          Exec=tengan_desktop
+          Icon=tengan
+          Categories=Utility;
+          Terminal=false
+          EOF
+          sed -i 's/^          //' $A/tengan-desktop.desktop
+          printf '#!/bin/sh\nexec "$(dirname "$(readlink -f "$0")")/usr/bin/tengan_desktop/tengan_desktop" "$@"\n' > $A/AppRun
+          chmod +x $A/AppRun
+          chmod -R a+rX $A   # PySide6 ships some dirs as 0700; others would get "Permission denied"
+          curl -fsSL -o appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool
+          ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 ./appimagetool $A dist/TENGAN-Desktop-linux-x86_64.AppImage
+          ls -la dist
+      - uses: actions/upload-artifact@v5
+        with:
+          name: desktop-linux-${{ github.sha }}
+          path: dist/TENGAN-Desktop-linux-x86_64.AppImage
+      - name: Release
+        if: inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.release_tag }}
+          files: dist/TENGAN-Desktop-linux-x86_64.AppImage

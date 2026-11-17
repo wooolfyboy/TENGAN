@@ -1,6 +1,6 @@
-// ---- IR · NFC: «чей пульт?» и «что за карта?» (палка только слушает и читает) ----
-// IR: событие ir на каждое нажатие — протокол, марка (догадка), код, форма импульсов.
-// NFC: событие nfc на каждое касание — тип карты по ATQA/SAK, часть UID, записи NDEF.
+// ---- IR / NFC: 'whose remote?' and 'what card?' (the stick only listens and reads) ----
+// IR: an ir event per press - protocol, brand (a guess), code, pulse shape.
+// NFC: an nfc event per touch - card type by ATQA/SAK, part of UID, NDEF records.
 (() => {
 const AGO = ms => T.ago(ms / 1000);
 
@@ -32,13 +32,13 @@ T.views.push({
     const hold = d && d.rep && now - I.t < 1200, fresh = d ? T.clamp(1 - (now - I.t) / 900) : 0;
     T.header(g, m, y0, w - 2 * m, u, 'IR · whose remote?', d ? `${I.n} presses · last ${AGO(now - I.t)} ago` : 'listening · 38 kHz', false);
     const top = y0 + u * 3.6, bot = h - u * 3;
-    if (!d) { this.irIdle(g, w, h, u, top, bot); T.bloom(this.cv, 0.7); T.footer(g, m, h - u * 2.2, w - 2 * m, u, 'point any remote at the stick and press a button', 'receive only · nothing is sent'); return; }
+    if (!d) { this.irIdle(g, w, h, u, top, bot); T.bloom(this.cv, 0.7); T.footer(g, m, h - u * 2.2, w - 2 * m, u, 'point any remote at TENGAN and press a button', 'receive only · nothing is sent'); return; }
     const lw = portrait ? w - 2 * m : (w - 2 * m) * 0.64, lh = portrait ? (bot - top) * 0.62 : bot - top;
     T.panel(g, m, top, lw, lh, u);
     if (fresh > 0) { T.cutPath(g, m, top, lw, lh, u * 0.8); g.strokeStyle = `rgba(${T.RGB.acc},${0.7 * fresh})`; g.lineWidth = 2; g.stroke(); }
     const x0 = m + u * 1.4;
     T.txt(g, '// LAST CODE', x0, top + u * 1.8, u * 1.0, T.C.acc, 't');
-    // протокол крупно + HOLD
+    // protocol large + HOLD
     const px = Math.min(u * 5.4, lw * 0.11);
     T.txt(g, d.p, x0, top + u * 2.4 + px, px, T.C.hot, 't');
     if (hold) {
@@ -51,7 +51,7 @@ T.views.push({
     T.txt(g, T.fit(g, d.brand || 'unknown brand', lw - u * 3), x0, y + u * 0.6, u * 1.7, d.brand ? T.C.hot : T.C.label, 'c');
     T.txt(g, d.brand ? 'LIKELY · GUESS BY ADDRESS' : 'NO MATCH IN THE BRAND TABLE', x0, y + u * 2, u * 0.75, T.C.dim);
     y += u * 3.6;
-    // поля
+    // fields
     const fields = [['ADDR', T.hexs(d.addr, 2)], ['CMD', T.hexs(d.cmd, 2)], ['BITS', String(d.bits)]];
     const fw = (lw - u * 2.8) / 3;
     fields.forEach(([k, v], i) => {
@@ -60,11 +60,11 @@ T.views.push({
       g.font = `600 ${u * 2.3}px ${T.FT}`; T.txt(g, T.fit(g, v, fw - u), fx, y + u * 2.4, u * 2.3, T.C.hot, 't');
     });
     y += u * 4.6;
-    // форма импульсов (метка — вверх, пауза — вниз), «прорисовка» слева направо
+    // pulse shape (mark up, space down), drawn left to right
     const wx = x0, ww = lw - u * 2.8, wy = y + u * 0.6, wh = Math.max(u * 3, top + lh - wy - u * 2.6);
     T.txt(g, '// PULSES · ' + (d.raw ? d.raw.length : 0) + ' EDGES', wx, y, u * 0.8, T.C.acc);
     this.wave(g, d.raw || [], wx, wy, ww, wh, u, this.irRev, T.C.acc);
-    // история
+    // history
     const hx = portrait ? m : m + lw + u, hy = portrait ? top + lh + u : top, hw = portrait ? w - 2 * m : w - m - hx, hh = portrait ? bot - hy : lh;
     T.panel(g, hx, hy, hw, hh, u);
     T.txt(g, '// HISTORY', hx + u, hy + u * 1.8, u * 1.0, T.C.acc, 't');
@@ -86,7 +86,7 @@ T.views.push({
   },
   irIdle(g, w, h, u, top, bot) {
     const cx = w / 2, cy = top + (bot - top) * 0.45, t = this.t;
-    // пульт слева, приёмник справа, между ними бегут дуги
+    // remote on the left, receiver on the right, arcs run between them
     const rx = cx - u * 12, ry = cy;
     g.strokeStyle = T.C.label; g.lineWidth = 1.5;
     T.cutPath(g, rx - u * 1.6, ry - u * 3.4, u * 3.2, u * 6.8, u * 0.7); g.stroke();
@@ -99,10 +99,10 @@ T.views.push({
     const sx = cx + u * 12;
     for (let k = 0; k < 3; k++) { const p = (t * 0.5 + k / 3) % 1; g.strokeStyle = `rgba(${T.RGB.acc},${0.5 * (1 - p)})`; g.lineWidth = 1.2; g.beginPath(); g.arc(sx, ry, u * (1.2 + p * 3), 0, T.TAU); g.stroke(); }
     g.fillStyle = T.C.hot; g.beginPath(); g.arc(sx, ry, u * 0.9, 0, T.TAU); g.fill();
-    T.txt(g, 'POINT ANY REMOTE AT THE STICK', cx, cy + u * 6.5, u * 1.6, T.C.hot, 't', 'center');
+    T.txt(g, 'POINT ANY REMOTE AT TENGAN', cx, cy + u * 6.5, u * 1.6, T.C.hot, 't', 'center');
     T.txt(g, 'PRESS A BUTTON — WE GUESS WHOSE REMOTE IT IS', cx, cy + u * 8.2, u * 0.85, T.C.label, 'm', 'center');
   },
-  // меандр из длительностей [метка, пауза, ...] (мкс)
+  // square wave from durations [mark, space, ...] (us)
   wave(g, raw, x, y, w, h, u, rev, col) {
     g.fillStyle = `rgba(${T.RGB.bg2},.5)`; g.fillRect(x, y, w, h);
     g.strokeStyle = T.C.line; g.lineWidth = 1;
@@ -127,7 +127,7 @@ T.views.push({
     const N = S.nfc, d = N.last, now = performance.now(), portrait = h > w * 1.05;
     if (N.err) {
       T.header(g, m, y0, w - 2 * m, u, 'NFC · what card?', 'no reader', true);
-      T.emptyState(g, w, h, u, 'NFC CHIP NOT FOUND', 'this stick may have no PN532 reader', true);
+      T.emptyState(g, w, h, u, 'NFC CHIP NOT FOUND', 'this device may have no NFC reader (PN532)', true);
       T.footer(g, m, h - u * 2.2, w - 2 * m, u, 'read only', ''); return;
     }
     if (N.t !== this.nfcSeen) { this.nfcSeen = N.t; this.tap = 0; }
@@ -136,25 +136,26 @@ T.views.push({
     T.header(g, m, y0, w - 2 * m, u, 'NFC · what card?', d ? `${N.hist.length} cards · last ${AGO(now - N.t)} ago` : 'scanning · 13.56 MHz');
     const top = y0 + u * 3.6, bot = h - u * 3;
     const lw = portrait ? w - 2 * m : (w - 2 * m) * 0.44, lh = portrait ? (bot - top) * 0.42 : bot - top;
-    // сцена: считыватель (палка) и карта
+    // scene: reader (stick) and card
     const cx = m + lw / 2, cy = top + lh * 0.55, t = this.t;
     const cw = Math.min(lw * 0.62, lh * 0.75), ch = cw * 0.63;
+    if (!(cw > 4)) return;                               // window not laid out yet (rotation/resize)
     const rx = cx, ry = cy + ch * 0.55;
-    // кольца поля от считывателя
+    // field rings from the reader
     for (let k = 0; k < 4; k++) {
       const p = (t * 0.45 + k / 4) % 1, r = cw * (0.3 + p * 0.7);
       g.strokeStyle = `rgba(${T.RGB.acc},${(on ? 0.35 : 0.18) * (1 - p)})`; g.lineWidth = 1.2;
-      g.beginPath(); g.ellipse(rx, ry, r, r * 0.32, 0, 0, T.TAU); g.stroke();
+      g.beginPath(); g.ellipse(rx, ry, Math.max(0, r), Math.max(0, r * 0.32), 0, 0, T.TAU); g.stroke();
     }
-    // вспышка касания
+    // touch flash
     if (this.tap < 1) {
       const p = this.tap, r = cw * (0.2 + p * 1.1);
       g.strokeStyle = `rgba(${T.RGB.hot},${0.9 * (1 - p)})`; g.lineWidth = 3 * (1 - p) + 1;
-      g.beginPath(); g.ellipse(rx, ry, r, r * 0.32, 0, 0, T.TAU); g.stroke();
+      g.beginPath(); g.ellipse(rx, ry, Math.max(0, r), Math.max(0, r * 0.32), 0, 0, T.TAU); g.stroke();
     }
-    g.fillStyle = T.C.line; g.beginPath(); g.ellipse(rx, ry, cw * 0.28, cw * 0.09, 0, 0, T.TAU); g.fill();
+    g.fillStyle = T.C.line; g.beginPath(); g.ellipse(rx, ry, Math.max(0, cw * 0.28), Math.max(0, cw * 0.09), 0, 0, T.TAU); g.fill();
     T.txt(g, 'TENGAN', rx, ry + cw * 0.2, u * 0.75, T.C.dim, 'm', 'center');
-    // карта: без карты парит выше пунктиром; при касании опускается
+    // card: without a card it hovers higher, dashed; on touch it lowers
     const lift = on ? (1 - T.clamp(this.tap * 2.5)) * ch * 0.6 : ch * 0.55 + Math.sin(t * 1.6) * u * 0.6;
     const kx = cx - cw / 2, ky = cy - ch / 2 - lift;
     T.cutPath(g, kx, ky, cw, ch, u * 0.9);
@@ -165,8 +166,8 @@ T.views.push({
     g.strokeStyle = on ? T.C.hot : T.C.dim; g.lineWidth = 1.2;
     for (let k = 0; k < 3; k++) { g.beginPath(); g.arc(kx + cw * 0.84, ky + ch * 0.2, u * (0.5 + k * 0.45), -0.8, 0.8); g.stroke(); }
     if (d && on && /bank|emv/i.test(d.fam)) T.txt(g, '•••• •••• •••• ••••', kx + cw * 0.09, ky + ch * 0.8, u * 0.9, T.C.label);
-    T.txt(g, on ? 'ON THE STICK' : d ? 'LAST CARD ' + AGO(now - N.t) + ' AGO' : 'TOUCH A CARD TO THE STICK', cx, Math.min(top + lh - u, ry + cw * 0.36), u * 0.95, on ? T.C.hot : T.C.label, 't', 'center');
-    // карточка данных
+    T.txt(g, on ? 'ON THE READER' : d ? 'LAST CARD ' + AGO(now - N.t) + ' AGO' : 'TOUCH A CARD TO TENGAN', cx, Math.min(top + lh - u, ry + cw * 0.36), u * 0.95, on ? T.C.hot : T.C.label, 't', 'center');
+    // data card
     const ix = portrait ? m : m + lw + u, iy = portrait ? top + lh + u : top, iw = portrait ? w - 2 * m : w - m - ix, ih = portrait ? bot - iy : lh;
     T.panel(g, ix, iy, iw, ih, u);
     if (!d) {
@@ -194,7 +195,7 @@ T.views.push({
         T.txt(g, '// TAG SAYS', x0, y, u * 0.9, T.C.acc, 't'); y += u * 1.8;
         for (const r of nd) { if (y > iy + ih - u * 6) break; g.font = `500 ${u * 1.3}px ${T.FC}`; T.txt(g, T.fit(g, r, mw), x0, y, u * 1.3, T.C.hot, 'c'); y += u * 1.9; }
       }
-      // последние карты
+      // recent cards
       const hy = iy + ih - u * 1.2 - Math.min(3, N.hist.length - 1) * u * 1.4;
       if (N.hist.length > 1) {
         g.fillStyle = T.C.line; g.fillRect(x0, hy - u * 1.6, mw, 1);

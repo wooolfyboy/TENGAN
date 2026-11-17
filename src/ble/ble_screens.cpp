@@ -1,10 +1,11 @@
 // ============================================================
-//  ble_screens.cpp — экраны раздела Bluetooth
+//  ble_screens.cpp — Bluetooth section screens
 //
-//  OVERVIEW · SCOPE · NEAREST · DEVICES (+подробности) · WEATHER
-//  Все экраны собраны из компонентов core/ui.h по общей сетке.
+//  OVERVIEW · SCOPE · NEAREST · DEVICES (+details) · WEATHER
+//  All built from core/ui.h components on a common grid.
 // ============================================================
 #include <algorithm>
+#include "core/lang.h"
 #include "core/timeutil.h"
 #include "ble/ble_model.h"
 #include "ble/vendors.h"
@@ -14,15 +15,15 @@
 #include "core/settings.h"
 #include "audio/audio.h"
 
-static int g_sweep = 0;                  // угол луча на SCOPE
+static int g_sweep = 0;                  // beam angle on SCOPE
 
-// подпись пользователя важнее имени из эфира; кириллица — шрифтом с русскими буквами
+// user label beats the over-the-air name; Cyrillic uses the font with Russian letters
 static bool isUtf8(const char* s) { for (; *s; s++) if ((uint8_t)*s >= 0x80) return true; return false; }
 static int  fontFor(const char* s, int latin) { return isUtf8(s) ? (latin >= 4 ? 5 : 3) : latin; }
 
 float estDistance(int rssi) {
-  const float MEASURED = -59.0f;         // ожидаемый RSSI на 1 м
-  const float N = 2.5f;                  // показатель затухания (помещение)
+  const float MEASURED = -59.0f;         // expected RSSI at 1 m
+  const float N = 2.5f;                  // path-loss exponent (indoors)
   float d = powf(10.0f, (MEASURED - (float)rssi) / (10.0f * N));
   return constrain(d, 0.1f, 99.0f);
 }
@@ -55,13 +56,9 @@ static const char* uuidName(uint16_t u) {
   }
 }
 
-static void upperCopy(const char* s, char* out, size_t n) {
-  size_t i = 0;
-  for (; s[i] && i < n - 1; i++) out[i] = (char)toupper((unsigned char)s[i]);
-  out[i] = 0;
-}
+static void upperCopy(const char* s, char* out, size_t n) { utf8Upper(s, out, n); }
 
-// типы по убыванию количества
+// types by descending count
 static int sortedTypes(const int* cnt, int* order) {
   int n = 0;
   for (int t = 0; t < T_NUM; t++) if (cnt[t] > 0) order[n++] = t;
@@ -70,27 +67,27 @@ static int sortedTypes(const int* cnt, int* order) {
 }
 
 // ============================================================
-//  OVERVIEW — сколько вокруг, как менялось, кто это
+//  OVERVIEW — how many around, how it changed, who they are
 // ============================================================
 void drawOverview(int count, int raw, const int* typeCnt) {
   int W = spr.width();
   char buf[48];
   spr.fillSprite(C_BG());
-  snprintf(buf, sizeof(buf), "%d mac  range %s", raw, RANGES[g_range].name);
-  uiHeader("BLE overview", buf);
+  snprintf(buf, sizeof(buf), L("%d MAC  ·  range %s", "%d MAC  ·  дальность %s"), raw, RANGES[g_range].name);
+  uiHeader(L("Overview", "Обзор"), buf);
 
-  // слева: главное число и тренд
+  // left: main number and trend
   spr.setTextDatum(TL_DATUM);
   spr.setTextColor(C_HOT());
   txtNum(count, UI_M + 8, UI_TOP + 2, 6);
   spr.setTextColor(UI_DIM());
-  txt("CONTACTS", UI_M + 8, UI_TOP + 50, 1);
-  int delta = 0;                                   // изменение за ~2 минуты
+  txt(PL(count, "DEVICE", "DEVICES", "УСТРОЙСТВО", "УСТРОЙСТВА", "УСТРОЙСТВ"), UI_M + 8, UI_TOP + 50, 1);
+  int delta = 0;                                   // change over ~2 minutes
   if (g_histLen > 120) delta = g_hist[g_histLen - 1].count - g_hist[g_histLen - 121].count;
   snprintf(buf, sizeof(buf), "%+d", delta);
-  uiReadout(UI_M + 8, UI_TOP + 64, "2 min", buf, delta > 0 ? C_ACC() : UI_LABEL(), 2);
+  uiReadout(UI_M + 8, UI_TOP + 64, L("2 min", "2 мин"), buf, delta > 0 ? C_ACC() : UI_LABEL(), 2);
 
-  // справа: график числа устройств
+  // right: device count chart
   int gx = 112, gy = UI_TOP + 2, gw = W - UI_M - 4 - gx, gh = 82;
   uiFrame(gx, gy, gw, gh, UI_LINE());
   int peak = 1;
@@ -103,17 +100,17 @@ void drawOverview(int count, int raw, const int* typeCnt) {
     int y = gy + gh - 3 - (int)((long)g_hist[i].count * (gh - 8) / ymax);
     spr.drawFastVLine(x, y, gy + gh - 3 - y, UI_PANEL());
     if (px >= 0) spr.drawLine(px, py, x, y, C_ACC());
-    if (g_hist[i].ev > 0) spr.fillTriangle(x, gy + 18, x - 3, gy + 13, x + 3, gy + 13, C_HOT());   // «пришла группа»
+    if (g_hist[i].ev > 0) spr.fillTriangle(x, gy + 18, x - 3, gy + 13, x + 3, gy + 13, C_HOT());   // "a group arrived"
     px = x; py = y;
   }
   spr.setTextDatum(TL_DATUM);
   spr.setTextColor(UI_DIM());
-  txt("COUNT  2.5 MIN", gx + 6, gy + 4, 1);
-  snprintf(buf, sizeof(buf), "PEAK %d", peak);
+  txt(L("COUNT · 2.5 MIN", "ЧИСЛО · 2.5 МИН"), gx + 6, gy + 4, 1);
+  snprintf(buf, sizeof(buf), L("PEAK %d", "МАКС %d"), peak);
   spr.setTextDatum(TR_DATUM);
   txt(buf, gx + gw - 6, gy + 4, 1);
 
-  // внизу: из чего состоит толпа — полоса долей и значки с числами
+  // bottom: what the crowd is made of: share bar and icons with counts
   int order[T_NUM];
   int n = sortedTypes(typeCnt, order), total = 0;
   for (int i = 0; i < n; i++) total += typeCnt[order[i]];
@@ -139,28 +136,28 @@ void drawOverview(int count, int raw, const int* typeCnt) {
   } else {
     spr.setTextDatum(TL_DATUM);
     spr.setTextColor(UI_DIM());
-    txt("NO DEVICES IN RANGE", bx, by + 14, 1);
+    txt(L("NO DEVICES IN RANGE", "НЕТ УСТРОЙСТВ В ЗОНЕ"), bx, by + 14, 1);
   }
-  uiFooter("wheel: screens", "side: back");
+  uiFooter(L("wheel: screens", "колесо: экраны"), L("side: back", "кнопка: назад"));
   present();
 }
 
 // ============================================================
-//  SCOPE — радар: расстояние по силе сигнала, угол условный
+//  SCOPE — radar: distance from signal strength, angle is arbitrary
 // ============================================================
 void drawScope(const std::vector<Blip>& bl) {
   int W = spr.width();
   char buf[24];
   spr.fillSprite(C_BG());
-  snprintf(buf, sizeof(buf), "%d contacts", (int)bl.size());
-  uiHeader("Scope", buf);
+  snprintf(buf, sizeof(buf), "%d %s", (int)bl.size(), PL((int)bl.size(), "device", "devices", "устройство", "устройства", "устройств"));
+  uiHeader(L("Scope", "Радар"), buf);
 
   int maxR = 62, cx = W - UI_M - 6 - maxR, cy = UI_TOP + 2 + maxR;
   uint16_t ring = UI_LINE();
   for (int k = 1; k <= 3; k++) spr.drawCircle(cx, cy, maxR * k / 3, ring);
   spr.drawFastHLine(cx - maxR, cy, 2 * maxR, ring);
   spr.drawFastVLine(cx, cy - maxR, 2 * maxR, ring);
-  // след луча: линии всё тусклее
+  // beam trail: lines fade
   for (int t = 0; t < 36; t++) {
     float a = (g_sweep - t) * PI / 180.0f;
     float k = 1.0f - t / 36.0f;
@@ -171,8 +168,8 @@ void drawScope(const std::vector<Blip>& bl) {
   txt("1M", cx + 3, cy - maxR / 3 + 2, 1);
   txt("5M", cx + 3, cy - 2 * maxR / 3 + 2, 1);
 
-  // цели: слабые снизу, сильные поверх; метки — тревога
-  static std::vector<int> idx;                         // static: без выделения памяти каждый кадр
+  // targets: weak below, strong on top; tags = alert
+  static std::vector<int> idx;                         // static: no allocation every frame
   idx.resize(bl.size());
   for (size_t i = 0; i < bl.size(); i++) idx[i] = (int)i;
   std::sort(idx.begin(), idx.end(), [&](int a, int b) { return bl[a].rssi < bl[b].rssi; });
@@ -183,7 +180,7 @@ void drawScope(const std::vector<Blip>& bl) {
     drawMarker(cx + (int)(cosf(ang) * r), cy + (int)(sinf(ang) * r), heat(bl[i].rssi), bl[i].type == T_TRACKER);
   }
 
-  // легенда: сколько каких типов
+  // legend: how many of each type
   int cnt[T_NUM] = {0};
   for (size_t i = 0; i < bl.size(); i++) cnt[bl[i].type < T_NUM ? (int)bl[i].type : 0]++;
   int order[T_NUM];
@@ -200,24 +197,24 @@ void drawScope(const std::vector<Blip>& bl) {
     spr.setTextColor(alert ? C_ALERT() : C_HOT());
     txtNum(cnt[t], UI_M + 100, y, 2);
   }
-  uiFooter("wheel: screens", "side: back");
+  uiFooter(L("wheel: screens", "колесо: экраны"), L("side: back", "кнопка: назад"));
   present();
   g_sweep = (g_sweep + 6) % 360;
 }
 
 // ============================================================
-//  NEAREST — ближайшее устройство на дуге-шкале
+//  NEAREST — closest device on an arc scale
 // ============================================================
 void drawNearest(bool have, int rssi, const Ent& best, int count) {
   int W = spr.width();
   char buf[48];
   spr.fillSprite(C_BG());
-  snprintf(buf, sizeof(buf), "%d in range", count);
-  uiHeader("Nearest", buf);
-  if (!have) { uiEmpty("no devices", "nothing heard in range"); present(); return; }
+  snprintf(buf, sizeof(buf), L("%d in range", "%d в зоне"), count);
+  uiHeader(L("Nearest", "Ближайшее"), buf);
+  if (!have) { uiEmpty(L("no devices", "нет устройств"), L("nothing heard in range", "в зоне ничего не слышно")); present(); return; }
 
   int pct = constrain((rssi + 95) * 100 / 50, 0, 100);
-  const char* word = pct > 66 ? "CLOSE" : pct > 33 ? "NEAR" : "FAR";
+  const char* word = pct > 66 ? L("CLOSE", "ВПЛОТНУЮ") : pct > 33 ? L("NEAR", "РЯДОМ") : L("FAR", "ДАЛЕКО");
   bool tracker = (best.type == T_TRACKER);
   uint16_t col = tracker ? C_ALERT() : heat(rssi);
   int cx = W / 2, cy = 120;
@@ -227,12 +224,12 @@ void drawNearest(bool have, int rssi, const Ent& best, int count) {
   spr.setTextColor(C_HOT());
   txtNum(rssi, cx, cy - 22, 6);
   float d = estDistance(rssi);
-  if (d < 10.0f) snprintf(buf, sizeof(buf), "DBM  %s  ~%.1f M", word, d);
-  else           snprintf(buf, sizeof(buf), "DBM  %s  ~%.0f M", word, d);
+  if (d < 10.0f) snprintf(buf, sizeof(buf), L("DBM  %s  ~%.1f M", "ДБМ  %s  ~%.1f М"), word, d);
+  else           snprintf(buf, sizeof(buf), L("DBM  %s  ~%.0f M", "ДБМ  %s  ~%.0f М"), word, d);
   spr.setTextColor(UI_LABEL());
   txt(buf, cx, cy + 4, 1);
 
-  // кто это
+  // who is it
   char tn[16]; upperCopy(typeName(best.type), tn, sizeof(tn));
   char who[40]; snprintf(who, sizeof(who), "%s  %s", tn, vendorLabel(best.cat, best.vkind, best.vcode));
   const char* nm = best.label[0] ? best.label : best.name[0] ? best.name : who;
@@ -248,22 +245,22 @@ void drawNearest(bool have, int rssi, const Ent& best, int count) {
   if (tracker) {
     spr.setTextDatum(TL_DATUM);
     spr.setTextColor(C_ALERT());
-    txt("! TRACKER", UI_M + 8, UI_TOP + 4, 2);
+    txt(L("! TRACKER", "! ТРЕКЕР"), UI_M + 8, UI_TOP + 4, 2);
   }
   present();
-  if (g_bleTicks) audioGeiger(pct);                // щелчки чаще — ближе
+  if (g_bleTicks) audioGeiger(pct);                // clicks faster = closer
 }
 
 // ============================================================
-//  DEVICES — список (ближние сверху) и подробности
+//  DEVICES — list (nearest first) and details
 // ============================================================
 void drawList(const std::map<uint32_t, Ent>& ents) {
   int W = spr.width();
   char buf[48];
   spr.fillSprite(C_BG());
-  snprintf(buf, sizeof(buf), "%d  nearest first", (int)g_order.size());
-  uiHeader("Devices", buf);
-  if (g_order.empty()) { uiEmpty("no devices", "nothing heard in range"); uiFooter("", "side: back"); present(); return; }
+  snprintf(buf, sizeof(buf), L("%d  ·  nearest first", "%d  ·  ближние сверху"), (int)g_order.size());
+  uiHeader(L("Devices", "Устройства"), buf);
+  if (g_order.empty()) { uiEmpty(L("no devices", "нет устройств"), L("nothing heard in range", "в зоне ничего не слышно")); uiFooter("", L("side: back", "кнопка: назад")); present(); return; }
 
   for (int i = 0; i < LIST_ROWS; i++) {
     int idx = g_top + i;
@@ -276,7 +273,7 @@ void drawList(const std::map<uint32_t, Ent>& ents) {
     if (it == ents.end()) {
       spr.setTextDatum(ML_DATUM);
       spr.setTextColor(UI_DIM());
-      txt("(gone)", UI_M + 18, cy, 2);
+      txt(L("(gone)", "(пропало)"), UI_M + 18, cy, 2);
       continue;
     }
     const Ent& e = it->second;
@@ -297,7 +294,7 @@ void drawList(const std::map<uint32_t, Ent>& ents) {
     txtNum(e.rssi, 266, cy, 2);
     drawBars(274, cy - 7, e.rssi, heat(e.rssi));
   }
-  int n = (int)g_order.size();                     // полоса прокрутки
+  int n = (int)g_order.size();                     // scrollbar
   if (n > LIST_ROWS) {
     int trackH = LIST_ROWS * LIST_ROWH;
     int barH = max(8, trackH * LIST_ROWS / n);
@@ -305,7 +302,7 @@ void drawList(const std::map<uint32_t, Ent>& ents) {
     spr.fillRect(W - UI_M + 2, LIST_Y0, 2, trackH, UI_LINE());
     spr.fillRect(W - UI_M + 2, barY, 2, barH, C_ACC());
   }
-  uiFooter("wheel: pick  click: details", "side: back");
+  uiFooter(L("wheel: pick  ·  click: details", "колесо: выбор · нажать: подробно"), L("side: back", "кнопка: назад"));
   present();
 }
 
@@ -315,11 +312,11 @@ void drawDetail(const Dev& d, const Ent& e, bool inMap, uint32_t now) {
   spr.fillSprite(C_BG());
   int pos = -1;
   for (size_t i = 0; i < g_order.size(); i++) if (g_order[i] == g_sel) pos = (int)i;
-  if (pos >= 0) snprintf(buf, sizeof(buf), "%d / %d  click: list", pos + 1, (int)g_order.size());
-  else          snprintf(buf, sizeof(buf), "click: list");
-  uiHeader("Device", buf);
+  if (pos >= 0) snprintf(buf, sizeof(buf), L("%d / %d  ·  click: list", "%d / %d · нажать: список"), pos + 1, (int)g_order.size());
+  else          snprintf(buf, sizeof(buf), "%s", L("click: list", "нажать: список"));
+  uiHeader(L("Device", "Устройство"), buf);
 
-  // имя и «кто это»
+  // name and "who is it"
   bool alert = (e.type == T_TRACKER);
   const char* nm = e.label[0] ? e.label : d.name[0] ? d.name : typeName(e.type);
   int nf = fontFor(nm, 4);
@@ -330,38 +327,38 @@ void drawDetail(const Dev& d, const Ent& e, bool inMap, uint32_t now) {
   txt(tmp, UI_M + 20, UI_TOP, nf);
   char tn[16]; upperCopy(typeName(e.type), tn, sizeof(tn));
   if (e.vkind) snprintf(buf, sizeof(buf), "%s  %s  %s%04X", tn, vendorLabel(e.cat, e.vkind, e.vcode), e.vkind == 1 ? "0x" : "svc ", e.vcode);
-  else         snprintf(buf, sizeof(buf), "%s  maker unknown", tn);
+  else         snprintf(buf, sizeof(buf), L("%s  ·  maker unknown", "%s  ·  производитель неизвестен"), tn);
   char bu[96]; upperCopy(buf, bu, sizeof(bu));
   spr.setTextColor(UI_LABEL());
   txt(bu, UI_M + 20, UI_TOP + 26, 1);
 
-  // показатели: 3 колонки × 2 ряда
+  // readouts: 3 columns x 2 rows
   uint32_t ago = msSince(now, e.t) / 1000;
   int x0 = UI_M + 8, y0 = UI_TOP + 40, cw = 64;
-  if (!inMap) { uiReadout(x0, y0, "signal", "lost", C_ALERT()); }
-  else { snprintf(tmp, sizeof(tmp), "%d", e.rssi); uiReadout(x0, y0, ago >= 3 ? "signal (old)" : "signal", tmp, heat(e.rssi)); }
+  if (!inMap) { uiReadout(x0, y0, L("signal", "сигнал"), L("lost", "потерян"), C_ALERT()); }
+  else { snprintf(tmp, sizeof(tmp), "%d", e.rssi); uiReadout(x0, y0, ago >= 3 ? L("signal (old)", "сигнал (давно)") : L("signal", "сигнал"), tmp, heat(e.rssi)); }
   float dist = estDistance(e.rssi);
-  if (dist < 10) snprintf(tmp, sizeof(tmp), "~%.1fm", dist); else snprintf(tmp, sizeof(tmp), "~%.0fm", dist);
-  uiReadout(x0 + cw, y0, "distance", tmp, C_HOT());
+  if (dist < 10) snprintf(tmp, sizeof(tmp), L("~%.1fm", "~%.1fм"), dist); else snprintf(tmp, sizeof(tmp), L("~%.0fm", "~%.0fм"), dist);
+  uiReadout(x0 + cw, y0, L("distance", "до него"), tmp, C_HOT());
   uint32_t secs = (now - (e.first ? e.first : now)) / 1000;
   snprintf(tmp, sizeof(tmp), "%lu:%02lu", (unsigned long)(secs / 60), (unsigned long)(secs % 60));
-  uiReadout(x0 + 2 * cw, y0, "seen", tmp, C_HOT());
+  uiReadout(x0 + 2 * cw, y0, L("seen", "виден"), tmp, C_HOT());
   snprintf(tmp, sizeof(tmp), "%d/%d", d.rmin, d.rmax);
-  uiReadout(x0, y0 + 28, "range", tmp, C_HOT());
+  uiReadout(x0, y0 + 28, L("range", "разброс"), tmp, C_HOT());
   snprintf(tmp, sizeof(tmp), "%lu", (unsigned long)e.pkts);
-  uiReadout(x0 + cw, y0 + 28, "packets", tmp, C_HOT());
+  uiReadout(x0 + cw, y0 + 28, L("packets", "пакеты"), tmp, C_HOT());
   snprintf(tmp, sizeof(tmp), "%d", e.nMacs);
-  uiReadout(x0 + 2 * cw, y0 + 28, "macs", tmp, C_HOT());
+  uiReadout(x0 + 2 * cw, y0 + 28, L("addresses", "адреса"), tmp, C_HOT());
 
-  // график сигнала
+  // signal chart
   int gx = 206, gy = y0, gw = W - UI_M - 4 - gx, gh = 52;
   uiFrame(gx, gy, gw, gh, UI_LINE());
   spr.setTextDatum(TL_DATUM);
   spr.setTextColor(UI_DIM());
-  txt("SIGNAL 30S", gx + 5, gy + 3, 1);
+  txt(L("SIGNAL · 30 S", "СИГНАЛ · 30 С"), gx + 5, gy + 3, 1);
   drawSpark(gx, gy, gw, gh, g_spark, g_sparkN, SPARK_N, heat(e.rssi));
 
-  // технические подробности
+  // technical details
   int y = UI_TOP + 98;
   macStr(d.mac, tmp);
   snprintf(buf, sizeof(buf), "MAC %s  %s", tmp, akindName(d.akind));
@@ -389,17 +386,17 @@ void drawDetail(const Dev& d, const Ent& e, bool inMap, uint32_t now) {
 }
 
 // ============================================================
-//  WEATHER — BLE-термометры вокруг
+//  WEATHER — BLE thermometers around
 // ============================================================
 void drawWeather(const std::vector<Sensor>& ss, uint32_t now) {
   int W = spr.width();
   char buf[48];
   spr.fillSprite(C_BG());
-  snprintf(buf, sizeof(buf), "%d sensor%s", (int)ss.size(), ss.size() == 1 ? "" : "s");
-  uiHeader("Weather", ss.empty() ? "" : buf);
+  snprintf(buf, sizeof(buf), "%d %s", (int)ss.size(), PL((int)ss.size(), "sensor", "sensors", "датчик", "датчика", "датчиков"));
+  uiHeader(L("Weather", "Погода"), ss.empty() ? "" : buf);
   if (ss.empty()) {
-    uiEmpty("no sensors yet", "xiaomi pvvx/atc, bthome, govee, qingping, switchbot, ruuvi");
-    uiFooter("wheel: screens", "side: back");
+    uiEmpty(L("no sensors yet", "датчиков пока нет"), "Xiaomi pvvx/atc, BTHome, Govee, Qingping, SwitchBot, Ruuvi");
+    uiFooter(L("wheel: screens", "колесо: экраны"), L("side: back", "кнопка: назад"));
     present();
     return;
   }
@@ -412,7 +409,7 @@ void drawWeather(const std::vector<Sensor>& ss, uint32_t now) {
     const Sensor& S = ss[k];
     int y = UI_TOP + 2 + i * RH;
     if (i > 0) spr.drawFastHLine(UI_M + 8, y - 3, W - 2 * UI_M - 16, UI_LINE());
-    // подпись: имя или модель + хвост MAC; справа батарея и «когда»
+    // label: name or model + MAC tail; right: battery and "when"
     if (S.name[0]) fitText(S.name, buf, sizeof(buf), 160, 1);
     else snprintf(buf, sizeof(buf), "%s %02X%02X", S.r.model, S.mac[1], S.mac[0]);
     char bu[48]; upperCopy(buf, bu, sizeof(bu));
@@ -421,9 +418,9 @@ void drawWeather(const std::vector<Sensor>& ss, uint32_t now) {
     txt(bu, UI_M + 8, y, 1);
     uint32_t ago = msSince(now, S.t) / 1000;
     int n = 0;
-    if (S.r.hasB) n += snprintf(buf + n, sizeof(buf) - n, "BAT %d%%  ", S.r.batt);
-    if (ago < 60) snprintf(buf + n, sizeof(buf) - n, "%luS AGO", (unsigned long)ago);
-    else          snprintf(buf + n, sizeof(buf) - n, "%luM AGO", (unsigned long)(ago / 60));
+    if (S.r.hasB) n += snprintf(buf + n, sizeof(buf) - n, L("BAT %d%%  ", "БАТ %d%%  "), S.r.batt);
+    if (ago < 60) snprintf(buf + n, sizeof(buf) - n, L("%luS AGO", "%lu С НАЗАД"), (unsigned long)ago);
+    else          snprintf(buf + n, sizeof(buf) - n, L("%luM AGO", "%lu МИН НАЗАД"), (unsigned long)(ago / 60));
     spr.setTextDatum(TR_DATUM);
     spr.setTextColor((S.r.hasB && S.r.batt <= 15) ? C_ALERT() : UI_DIM());
     txt(buf, W - UI_M - 8, y, 1);
@@ -446,13 +443,13 @@ void drawWeather(const std::vector<Sensor>& ss, uint32_t now) {
     int ex = 200;
     spr.setTextDatum(TL_DATUM);
     spr.setTextColor(UI_LABEL());
-    if (S.r.hasP)   { snprintf(buf, sizeof(buf), "%.0f hPa", S.r.press); txt(buf, ex, vy + 5, 2); }
+    if (S.r.hasP)   { snprintf(buf, sizeof(buf), L("%.0f hPa", "%.0f гПа"), S.r.press); txt(buf, ex, vy + 5, 2); }
     else if (S.r.hasCO2) { snprintf(buf, sizeof(buf), "%d ppm", S.r.co2); txt(buf, ex, vy + 5, 2); }
   }
-  if (pages > 1) {                                   // листы датчиков — номером в шапке
-    snprintf(buf, sizeof(buf), "%d sensors  %d/%d", (int)ss.size(), page + 1, pages);
-    uiHeader("Weather", buf);
+  if (pages > 1) {                                   // sensor pages: number in the header
+    snprintf(buf, sizeof(buf), L("%d sensors  ·  %d/%d", "%d датч.  ·  %d/%d"), (int)ss.size(), page + 1, pages);
+    uiHeader(L("Weather", "Погода"), buf);
   }
-  uiFooter("wheel: screens", "side: back");
+  uiFooter(L("wheel: screens", "колесо: экраны"), L("side: back", "кнопка: назад"));
   present();
 }

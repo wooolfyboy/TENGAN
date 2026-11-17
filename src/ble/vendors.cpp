@@ -1,15 +1,15 @@
 // ============================================================
-//  vendors.cpp — производители Bluetooth-устройств
+//  vendors.cpp — Bluetooth device vendors
 // ============================================================
 #include "ble/vendors.h"
 #include "ble/ble_model.h"
-#include "ble/btdb.h"            // база Bluetooth — подключается только здесь
+#include "ble/btdb.h"            // Bluetooth DB, included only here
 #include "core/display.h"
 #include "core/theme.h"
 
 const char* btUuidOwner(uint16_t uuid) { return uuidOwner(uuid); }
 
-// производители Bluetooth-чипов: их код говорит о «начинке», а не о бренде устройства
+// Bluetooth chip makers: the code names the silicon, not the device brand
 static bool isChipMaker(uint16_t cid) {
   switch (cid) {
     case 0x0002: case 0x0009: case 0x000A: case 0x000D: case 0x000F: case 0x001D:
@@ -21,10 +21,10 @@ static bool isChipMaker(uint16_t cid) {
   return false;
 }
 
-// UUID, которыми пользуются устройства любых брендов (о производителе ничего не говорят)
+// UUIDs used by devices of any brand (say nothing about the vendor)
 static bool isSharedUuid(uint16_t u) {
-  return u == 0xFD6F /* уведомления о контактах */ || u == 0xFEAA /* Eddystone */ ||
-         u == 0xFE2C /* Fast Pair в чужих наушниках */;
+  return u == 0xFD6F /* contact tracing */ || u == 0xFEAA /* Eddystone */ ||
+         u == 0xFE2C /* Fast Pair in third-party earbuds */;
 }
 
 static uint8_t brandFromName(const char* name) {
@@ -36,7 +36,7 @@ static uint8_t brandFromName(const char* name) {
   return V_OTHER;
 }
 
-// Выбираем лучшего «кандидата в производители» из Company ID и UUID сервисов
+// pick the best vendor candidate from Company ID and service UUIDs
 Vend resolveVendor(const AdvInfo& ai) {
   Vend best = { V_PRIV, 0, 0, 0 };
   auto consider = [&](uint8_t kind, uint16_t code, const char* name, bool chip) {
@@ -54,7 +54,7 @@ Vend resolveVendor(const AdvInfo& ai) {
   return best;
 }
 
-// имя производителя для экрана
+// vendor name for the screen
 const char* vendorLabel(uint8_t cat, uint8_t kind, uint16_t code) {
   if (cat >= 2 && cat < N_BRANDS) return BRANDS[cat].label;
   if (kind == 1) { const char* n = companyName(code); if (n) return n; }
