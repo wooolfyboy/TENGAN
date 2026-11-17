@@ -240,10 +240,18 @@ class Widget:
         W, H = screen_size()
         x = r[0] if r[0] is not None else W - 340
         y = r[1] if r[1] is not None else 80
+        if not (-100 <= x <= W - 120 and -20 <= y <= H - 80):       # место за пределами экрана (сменился монитор) — в угол
+            x, y = W - 340, 80
         self.ready = False
         self.shown = bool(p.get("widget"))
-        self.win = webview.create_window("TENGAN widget", html=WIDGET_HTML, width=int(r[2]), height=int(r[3]), x=int(x), y=int(y),
-                                         frameless=True, easy_drag=IS_MAC, on_top=True, resizable=True, hidden=not self.shown,
+        # Windows: не прячем окно, а уводим за край экрана (PARK) — у окна, созданного скрытым, WebView2 не рисует,
+        # и включённый потом виджет не появлялся. Показать = вернуть на место.
+        if IS_WIN:
+            kw = dict(x=int(x) if self.shown else PARK, y=int(y) if self.shown else PARK, hidden=False)
+        else:
+            kw = dict(x=int(x), y=int(y), hidden=not self.shown)
+        self.win = webview.create_window("TENGAN widget", html=WIDGET_HTML, width=int(r[2]), height=int(r[3]), **kw,
+                                         frameless=True, easy_drag=IS_MAC, on_top=True, resizable=True,
                                          focus=False, min_size=(240, 150), background_color="#050302", js_api=_WidgetApi(self))
         self.win.events.loaded += self._loaded
         try:
@@ -301,6 +309,8 @@ class Widget:
                 pass
 
     def _moved(self, x, y):
+        if not self.shown or x <= PARK // 2:           # уехал «на стоянку» — это не новое место виджета
+            return
         self._rect[0], self._rect[1] = x, y
         self._save_later()
 
@@ -321,7 +331,11 @@ class Widget:
     def set_shown(self, on):
         self.shown = on
         try:
-            if on:
+            if IS_WIN:
+                self.win.move(*(self._rect[:2] if on else (PARK, PARK)))
+                if on:
+                    self.apply_style()
+            elif on:
                 self.win.show()
                 self.apply_style()
             else:
