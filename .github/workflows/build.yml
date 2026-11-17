@@ -109,6 +109,7 @@ jobs:
             | **tengan_firmware_ota.bin** | Wireless update: Web section on the device → open the page → Update. |
             | **tengan_tablet.apk** | TENGAN Tablet for Android. Copy it to the tablet, open it and allow installation. |
             | **tengan_desktop.exe** | TENGAN Desktop for Windows: the dashboard and PC monitor, over USB or Wi-Fi. |
+            | **TENGAN-tech-doc-en.pdf**, **TENGAN-tech-doc-ru.pdf** | Technical documentation: architecture, protocols, algorithms, build. |
 
             ## Установка
 
@@ -121,7 +122,42 @@ jobs:
             | **tengan_firmware_ota.bin** | Обновление по Wi-Fi: раздел «Веб» на устройстве → открыть страницу → «Обновление». |
             | **tengan_tablet.apk** | TENGAN Tablet для Android. Скопируйте на планшет, откройте и разрешите установку. |
             | **tengan_desktop.exe** | TENGAN Desktop для Windows: панель управления и монитор ПК, по USB или Wi-Fi. |
+            | **TENGAN-tech-doc-en.pdf**, **TENGAN-tech-doc-ru.pdf** | Техническая документация: архитектура, протоколы, алгоритмы, сборка. |
 
+
+  # Technical documentation PDFs (docs/tech/en, docs/tech/ru): pandoc -> HTML -> headless Chrome.
+  # Built on every run (catches broken Markdown); attached to the release when there is one.
+  techdoc:
+    runs-on: ubuntu-latest
+    needs: firmware            # the release is created by the firmware job; this only adds the PDFs
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install pandoc and fonts
+        run: sudo apt-get update && sudo apt-get install -y pandoc fonts-dejavu-core fonts-liberation
+
+      - name: Build PDFs
+        run: |
+          mkdir -p dist
+          python tools/make_techdoc.py en dist/TENGAN-tech-doc-en.pdf
+          python tools/make_techdoc.py ru dist/TENGAN-tech-doc-ru.pdf
+          ls -la dist
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: techdoc-${{ github.sha }}
+          path: dist/*.pdf
+
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.release_tag || github.ref_name }}
+          files: dist/*.pdf
 
   # Android tablet app (app/): same page as /full on the device, plus GPS.
   # APK is signed with the TENGAN key from repo secrets, so updates install over the old version.

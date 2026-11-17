@@ -333,6 +333,8 @@ Bluetooth · Wi-Fi · Sub-GHz · ИК · NFC · звук · монитор ПК 
 
 **Версия** — одна на всё, в файле `VERSION`. Релиз: Actions → build → Run workflow, `release_tag = vX.Y`.
 
+**Техническая документация** — архитектура, протоколы, алгоритмы, сборка: [`docs/tech/ru/`](docs/tech/ru/) (PDF — в каждом релизе; английская: [`docs/tech/en/`](docs/tech/en/)).
+
 <details>
 <summary><b>Прошивка</b></summary>
 

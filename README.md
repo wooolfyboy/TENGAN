@@ -333,6 +333,8 @@ On the device: **Settings › Language** (English / Русский). It switches
 
 **Version** — one for everything, in `VERSION`. Release: Actions → build → Run workflow, `release_tag = vX.Y`.
 
+**Technical documentation** — architecture, protocols, algorithms, build: [`docs/tech/en/`](docs/tech/en/) (also as PDF in every release; Russian: [`docs/tech/ru/`](docs/tech/ru/)).
+
 <details>
 <summary><b>Firmware</b></summary>
 
