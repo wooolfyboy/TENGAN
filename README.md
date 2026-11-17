@@ -4,10 +4,10 @@
 
 # TENGAN 天眼
 
-**A pocket radio-environment analyzer for the LilyGO T-Embed CC1101 Plus**
+**See the invisible radio world around you — beautifully.**
 
-Bluetooth · Wi-Fi · Sub-GHz · IR · NFC · sound · PC monitor — one tactical interface<br>
-on the device, on a tablet (TENGAN Tablet) and on a computer (TENGAN Desktop).<br>
+Bluetooth · Wi-Fi · Sub-GHz · IR · NFC · sound · PC monitor turned into a living tactical HUD<br>
+on the LilyGO T-Embed CC1101 Plus, on a tablet (TENGAN Tablet) and on a computer (TENGAN Desktop).<br>
 **Receive only.** TENGAN never transmits on the air and never writes to cards.
 
 [![release](https://img.shields.io/github/v/release/wolfyboy1488/lilygostuff?include_prereleases&style=flat-square&color=3fd9ff&label=release)](https://github.com/wolfyboy1488/lilygostuff/releases/latest)
@@ -282,7 +282,7 @@ Until a screen knows the device's theme, startup is plain black and white.
 - It shows only what devices already broadcast to everyone around. Wi-Fi packet contents are never read,
   remote codes are not stored, bank card numbers and names are not read.
 - Everything works **offline**, with no cloud: data never leaves the device and your tablet/computer.
-- TENGAN is a tool for learning how the radio world around you works. Laws on radio reception and privacy differ
+- TENGAN is for looking at the radio world around you, not for interfering with it. Laws on radio reception and privacy differ
   between countries — use it where and how it is legal, and respect other people's privacy.
 
 ## ❓ FAQ
