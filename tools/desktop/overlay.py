@@ -270,16 +270,26 @@ class Widget:
         self.apply_style()
 
     def native_drag(self):
+        """Системное перетаскивание (как за заголовок окна). Захват мыши держит WebView2 в потоке окна —
+        отпустить его можно только оттуда, поэтому оба вызова уходят в поток формы (BeginInvoke)."""
         h = hwnd_of(self.win)
         if not (IS_WIN and h):
             return
-        try:
-            import ctypes
-            u = ctypes.windll.user32
+        import ctypes
+        u = ctypes.windll.user32
+
+        def go():
             u.ReleaseCapture()
-            u.SendMessageW(h, 0x00A1, 2, 0)            # WM_NCLBUTTONDOWN, HTCAPTION — системное перетаскивание
+            u.SendMessageW(h, 0x00A1, 2, 0)            # WM_NCLBUTTONDOWN, HTCAPTION
+        try:
+            from System import Action                  # pythonnet — на нём работает окно pywebview на Windows
+            self.win.native.BeginInvoke(Action(go))
         except Exception as e:
             log("widget drag:", e)
+            try:
+                go()
+            except Exception:
+                pass
 
     def apply_style(self):
         p = self.app.engine.prefs
