@@ -22,6 +22,7 @@ TENGAN — приложение для компьютера (Windows).
 """
 import base64
 import gzip
+import zlib
 import hashlib
 import http.server
 import json
@@ -425,7 +426,22 @@ class Link:
             pg["chunks"][int(parts[1])] = base64.b64decode(parts[2])
             pg["got"] = sum(len(c) for c in pg["chunks"].values())
 
-    def get_page(self, timeout=60, progress=None):
+    def get_page(self, timeout=60, progress=None, tries=3):
+        """Страница с палки; если по дороге потерялся кусок (по USB-CDC изредка пропадает пакет в 64 байта —
+        «страница пришла не целиком» или битый gzip), молча просим ещё раз."""
+        for n in range(1, tries + 1):
+            try:
+                return self._get_page_once(timeout, progress)
+            except Msg as e:
+                if e.key != "partial" or n == tries:
+                    raise
+                log("страница: пришла не целиком (%s из %s) — прошу ещё раз (%d)" % (e.kw.get("a"), e.kw.get("b"), n + 1))
+            except (OSError, EOFError, zlib.error) as e:      # битый gzip (BadGzipFile — это OSError)
+                if n == tries:
+                    raise Msg("partial", a="?", b="?")
+                log("страница: не распаковалась (%s) — прошу ещё раз (%d)" % (e, n + 1))
+
+    def _get_page_once(self, timeout, progress):
         with self.lock:
             self.req_id += 1
             pid = str(self.req_id)
