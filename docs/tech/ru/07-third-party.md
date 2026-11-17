@@ -24,10 +24,9 @@
 |---|---|---|---|
 | Exo 2 (SemiBold, Bold) | `Exo2-*.ttf`, `OFL-Exo2.txt` | SIL OFL 1.1, (c) 2013 The Exo 2 Project Authors | Заголовки и крупные цифры (тема DENKO) |
 | Oswald (SemiBold) | `Oswald-SemiBold.ttf`, `OFL-Oswald.txt` | SIL OFL 1.1, (c) 2016 The Oswald Project Authors | Узкие заголовки и цифры (тема KURENAI) |
-| JetBrains Mono (Medium, SemiBold) | `JetBrainsMono-*.ttf`, `LICENSE-JetBrainsMono.txt` | Apache 2.0, (c) 2020 JetBrains s.r.o. (файл лицензии в формате Debian copyright, указано Apache-2) | Весь остальной текст |
+| JetBrains Mono (Medium, SemiBold) | `JetBrainsMono-*.ttf`, `OFL-JetBrainsMono.txt` | SIL OFL 1.1, (c) 2020 The JetBrains Mono Project Authors (font version 2.304) | Весь остальной текст |
 | IPAGothic | в репозитории нет; `LICENSE-IPAFont.txt` | IPA Font License v1.0, (c) 2007-2011 Information-technology Promotion Agency, Japan | Только два иероглифа печати 天眼 |
 
-Замечание: в первых строках сгенерированных заголовков `src/core/fonts/JBM*.h` написано «SIL Open Font License 1.1», а `fonts/LICENSE-JetBrainsMono.txt` и README указывают Apache 2.0. Комментарий в выводе генератора стоит привести в соответствие с файлом лицензии.
 
 Как шрифты попадают в продукт:
 
@@ -68,7 +67,7 @@
 | Pillow | `tools/gen_*.py`, `tools/sim`, `tools/make_docs.py` | Растеризация картинок и шрифтов | см. проект |
 | fonttools, brotli | `tools/webapp/make_fonts.py` | Подрезка шрифтов для страницы | см. проект |
 
-В README перечислены только лицензии, указанные в файлах репозитория (MIT для проекта, OFL для Exo 2 и Oswald, Apache 2.0 для JetBrains Mono и esptool-js, IPA Font License, BSD-3, ISC). Для остальных пакетов действует лицензия, опубликованная соответствующим проектом; проверьте её перед распространением сборки.
+В README перечислены только лицензии, указанные в файлах репозитория (MIT для проекта, OFL для Exo 2, Oswald и JetBrains Mono, Apache 2.0 для esptool-js, IPA Font License, BSD-3, ISC). Для остальных пакетов действует лицензия, опубликованная соответствующим проектом; проверьте её перед распространением сборки.
 
 ## Принцип «только приём» и ответственное использование
 

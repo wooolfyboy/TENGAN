@@ -24,10 +24,9 @@ Fonts are in `fonts/` with their license files. Both Latin and Cyrillic are draw
 |---|---|---|---|
 | Exo 2 (SemiBold, Bold) | `Exo2-*.ttf`, `OFL-Exo2.txt` | SIL OFL 1.1, (c) 2013 The Exo 2 Project Authors | Headings and big numbers (DENKO theme) |
 | Oswald (SemiBold) | `Oswald-SemiBold.ttf`, `OFL-Oswald.txt` | SIL OFL 1.1, (c) 2016 The Oswald Project Authors | Condensed headings and numbers (KURENAI theme) |
-| JetBrains Mono (Medium, SemiBold) | `JetBrainsMono-*.ttf`, `LICENSE-JetBrainsMono.txt` | Apache 2.0, (c) 2020 JetBrains s.r.o. (the license file is in Debian copyright format and says Apache-2) | All other text |
+| JetBrains Mono (Medium, SemiBold) | `JetBrainsMono-*.ttf`, `OFL-JetBrainsMono.txt` | SIL OFL 1.1, (c) 2020 The JetBrains Mono Project Authors (font version 2.304) | All other text |
 | IPAGothic | not in the repository; `LICENSE-IPAFont.txt` | IPA Font License v1.0 (c) 2007-2011 Information-technology Promotion Agency, Japan | Only the two glyphs of the 天眼 seal |
 
-Note: the generated headers `src/core/fonts/JBM*.h` say "SIL Open Font License 1.1" in their first lines, while `fonts/LICENSE-JetBrainsMono.txt` and the README say Apache 2.0. The comment in the generator output should be aligned with the license file.
 
 How fonts reach the product:
 
@@ -68,7 +67,7 @@ Details:
 | Pillow | `tools/gen_*.py`, `tools/sim`, `tools/make_docs.py` | Image and font rasterization | see the project |
 | fonttools, brotli | `tools/webapp/make_fonts.py` | Font subsetting for the page | see the project |
 
-The README lists only licenses that are stated in the repository files (MIT for the project, OFL for Exo 2 and Oswald, Apache 2.0 for JetBrains Mono and esptool-js, IPA Font License, BSD-3, ISC). For other packages the license is the one published by the corresponding project; check it before redistributing a bundle.
+The README lists only licenses that are stated in the repository files (MIT for the project, OFL for Exo 2, Oswald and JetBrains Mono, Apache 2.0 for esptool-js, IPA Font License, BSD-3, ISC). For other packages the license is the one published by the corresponding project; check it before redistributing a bundle.
 
 ## Receive-only principle and responsible use
 

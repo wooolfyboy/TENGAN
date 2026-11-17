@@ -406,8 +406,8 @@ tools/sim/                симулятор экрана
 
 Код проекта — **MIT** (`LICENSE`).
 
-- Шрифты (одна семья рисует и латиницу, и кириллицу — при смене языка раскладка не прыгает): **Exo 2**, **Oswald** — SIL OFL 1.1;
-  **JetBrains Mono** — Apache 2.0; печать 天眼 — **IPAGothic** (IPA Font License).
+- Шрифты (одна семья рисует и латиницу, и кириллицу — при смене языка раскладка не прыгает): **Exo 2**, **Oswald**,
+  **JetBrains Mono** — SIL OFL 1.1; печать 天眼 — **IPAGothic** (IPA Font License).
 - Прошивальщик: [**esptool-js**](https://github.com/espressif/esptool-js) © Espressif — Apache 2.0.
 - Библиотеки: TFT_eSPI, NimBLE-Arduino, Adafruit NeoPixel, ESP-IDF / Arduino-ESP32.
 - Данные: Bluetooth SIG (Company ID, member UUID), IEEE OUI; [d3-celestial](https://github.com/ofrohn/d3-celestial) — BSD-3;

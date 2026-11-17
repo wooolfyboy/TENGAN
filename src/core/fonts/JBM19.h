@@ -1,5 +1,5 @@
 // АВТОМАТИЧЕСКИ СГЕНЕРИРОВАНО tools/gen_gfxfont.py из JetBrainsMono-SemiBold.ttf, 19 px.
-// Шрифт: JetBrainsMono-SemiBold.ttf (JetBrains s.r.o.) — Apache License 2.0 (см. fonts/LICENSE-JetBrainsMono.txt).
+// Шрифт: JetBrainsMono-SemiBold.ttf — SIL Open Font License 1.1 (см. fonts/OFL-JetBrainsMono.txt).
 #pragma once
 #include <TFT_eSPI.h>
 
